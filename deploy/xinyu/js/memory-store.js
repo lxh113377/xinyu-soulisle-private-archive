@@ -12,8 +12,19 @@ window.MemoryStore = (function () {
   function cfg() {
     try { return JSON.parse(localStorage.getItem(CFG_KEY) || "{}"); } catch { return {}; }
   }
-  /** 远端记忆开关：默认关闭（现有回归全部依赖本地存储，不能被动改变行为） */
-  function isRemote() { return cfg().remote === true; }
+  let remoteDown = false; // 熔断：一旦确认服务端没有 /api/memory（404）或不可达，本会话不再尝试
+  /**
+   * 远端记忆开关。
+   *
+   * 为什么**不做全局默认开启**（2026-09-22 实测结论）：公网版（Cloudflare Pages / CloudBase）
+   * 只实现了 `/api/chat`，没有 `/api/memory/**` —— 默认开启会给评委看到 404 控制台报错，
+   * 并打破 `_test/public_check.py` 的 `CONSOLE_ERRORS: 0` 断言。
+   * 因此开关放在**能用的环境**这一侧：`src/js/demo-config.js`（本地 / fat jar 演示，Java 同时托管前端与 API）置 `remote: true`。
+   */
+  function isRemote() { return cfg().remote === true && !remoteDown; }
+  function markDown() { remoteDown = true; }
+  /** 404 = 服务端没有该接口；网络失败 = 服务端不在 → 两种情况都熔断，避免持续噪音 */
+  function guard(resp) { if (resp.status === 404) markDown(); return resp; }
   function sessionId() {
     try {
       let s = localStorage.getItem(SID_KEY);
@@ -48,7 +59,7 @@ window.MemoryStore = (function () {
             sessionId: sessionId(), emotion: entry.emotion, intensity: entry.intensity || 0.5,
             secondary: entry.secondary || null, text: entry.text || ""
           })
-        }).catch(() => { /* 推送失败不影响本地 */ });
+        }).then(guard).catch(markDown);
       } catch { /* 忽略 */ }
     }
   }
@@ -59,7 +70,7 @@ window.MemoryStore = (function () {
       api("/message", {
         method: "POST", headers: JSON_HEADERS,
         body: JSON.stringify({ sessionId: sessionId(), role, content })
-      }).catch(() => {});
+      }).then(guard).catch(markDown);
     } catch { /* 忽略 */ }
   }
   function all() { return load().slice(); }
@@ -67,16 +78,19 @@ window.MemoryStore = (function () {
     mem = [];
     try { localStorage.removeItem(KEY); } catch { /* 忽略 */ }
     if (isRemote()) {
-      try { api("/" + encodeURIComponent(sessionId()), { method: "DELETE" }).catch(() => {}); } catch { /* 忽略 */ }
+      try { api("/" + encodeURIComponent(sessionId()), { method: "DELETE" }).then(guard).catch(markDown); } catch { /* 忽略 */ }
     }
   }
   /** 用服务端权威副本覆盖本地；返回 true 表示确实取到了数据（供调用方决定是否重绘星图） */
   function hydrate() {
     if (!isRemote()) return Promise.resolve(false);
     return api("/emotions?limit=500&sessionId=" + encodeURIComponent(sessionId()))
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
+      .then(r => {
+        if (r.status === 404) { markDown(); return null; }   // 服务端没有 /api/memory → 熔断
+        return r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status));
+      })
       .then(list => {
-        if (!Array.isArray(list) || !list.length) return false;
+        if (!Array.isArray(list) || !list.length) return false;   // 服务端在线但本会话无记录
         mem = list.map(x => ({
           ts: Date.parse(x.createdAt) || Date.now(),
           emotion: x.emotion,

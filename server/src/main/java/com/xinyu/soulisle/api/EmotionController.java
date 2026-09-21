@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
@@ -71,9 +72,39 @@ public class EmotionController {
         return json(200, write(body));
     }
 
-    /** 复跑评测集：词典层准确率 + 危机召回（通过线 94.4% / 3-3） */
+    /**
+     * 导出 Java 侧词表（供与 JS 侧做**一致性守卫**）。
+     *
+     * <p>为什么需要它：情绪引擎在 JS / Java 各有一份实现（离线降级需要本地那份），
+     * 只比对「评测汇总指标」可能因巧合相同而漏掉个别条目分叉 ——
+     * 直接比对**词表结构本身**才能抓到「改一边忘一边」。
+     */
+    @GetMapping("/api/emotion/lexicon")
+    public ResponseEntity<byte[]> lexicon() {
+        Map<String, Object> lex = new LinkedHashMap<>();
+        for (Map.Entry<String, EmotionLexicon.Cfg> e : EmotionLexicon.LEX.entrySet()) {
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("weight", e.getValue().weight());
+            c.put("color", e.getValue().color());
+            c.put("words", e.getValue().words());
+            lex.put(e.getKey(), c);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("lex", lex);
+        body.put("neg", EmotionLexicon.NEG);
+        body.put("deg", EmotionLexicon.DEG);
+        body.put("crisis", EmotionLexicon.CRISIS);
+        return json(200, write(body));
+    }
+
+    /**
+     * 复跑评测集：词典层准确率 + 危机召回（通过线 94.4% / 3-3）。
+     *
+     * @param detail 1 = 额外返回逐条 {@code {text,expect,pred}}（供一致性守卫**逐条**比对，
+     *               避免只看汇总指标漏掉个别分叉）
+     */
     @GetMapping("/api/emotion/eval")
-    public ResponseEntity<byte[]> eval() {
+    public ResponseEntity<byte[]> eval(@RequestParam(defaultValue = "0") int detail) {
         Path ds = Path.of(datasetPath).toAbsolutePath().normalize();
         if (!Files.isRegularFile(ds)) {
             return json(404, "{\"error\":\"dataset-not-found\",\"path\":\"" + escape(ds.toString()) + "\"}");
@@ -92,6 +123,7 @@ public class EmotionController {
         int correct = 0;
         Map<String, int[]> perClass = new LinkedHashMap<>();
         List<Map<String, Object>> misses = new ArrayList<>();
+        List<Map<String, Object>> results = new ArrayList<>();
         List<JsonNode> crisisItems = new ArrayList<>();
         int crisisHit = 0;
 
@@ -99,6 +131,14 @@ public class EmotionController {
             String text = it.path("text").asText();
             String expect = it.path("expect").asText();
             EmotionEngine.ScanResult r = EmotionEngine.scan(text);
+
+            if (detail == 1) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("text", text);
+                row.put("expect", expect);
+                row.put("pred", r.emotion());
+                results.add(row);
+            }
 
             int[] slot = perClass.computeIfAbsent(expect, k -> new int[2]);
             slot[1]++;
@@ -130,6 +170,9 @@ public class EmotionController {
         body.put("crisis_recall", crisisHit + "/" + crisisItems.size());
         body.put("per_class", perClassOut);
         body.put("misses", misses);
+        if (detail == 1) {
+            body.put("results", results);
+        }
         return json(200, write(body));
     }
 

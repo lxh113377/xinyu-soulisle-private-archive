@@ -126,7 +126,8 @@
 - `交付物/` — iCAN 评审文档与截图（`iCAN评审/`）、提交包大纲（`提交包/`）
 
 ### 验证与记忆
-- `_test/` — 常驻回归脚本：`browser_check.py`（离线降级链路 + 回滚可见性 + 双色 + 滚动淡入淡出）、`pixel_dual_check.py`（双色像素级三用例）、`lightshow_check.py`、`online_check.py`、`public_check.py`、`emotion_eval.js` + `emotion-eval-dataset.json`（36 条评测集）；`_shots/`（脚本生成的截图，已 ignore）
+- `_test/` — 常驻回归脚本：`browser_check.py`（离线降级链路 + 回滚可见性 + 双色 + 滚动淡入淡出）、`pixel_dual_check.py`（双色像素级三用例）、`lightshow_check.py`、`online_check.py`、`public_check.py`、`emotion_eval.js` + `emotion-eval-dataset.json`（36 条评测集）
+  - v2 新增：`j2_chat_contract.py`（`/api/chat` 契约对照）、`j4_memory_check.py`（持久化 + 清本地仍点亮）、`j4_remote_down_check.py`（**熔断对照组**：无 `/api/memory` 时请求数上界 = 页面加载数）、`engine_consistency_check.py` + `engine_lexicon_dump.js`（**J3 两端词表一致性守卫**）；`_shots/`（脚本生成的截图，已 ignore）
 - `memory/` — 本项目交接记忆（01–08 + `AGENTS.md` 绑定表 + 阶段基线文件）
 - `archive/` — 阶段归档（`A-project-handoff archive` 产出）
 - `.codebuddy/` — 工作记忆与会话数据（已 ignore，勿删）

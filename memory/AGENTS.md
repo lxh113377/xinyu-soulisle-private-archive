@@ -23,7 +23,8 @@
 - Java 任务（v2 起）：源码一律 UTF-8，编译必须 `javac -encoding UTF-8`；JDK 版本切换后必须重验编码
 - **Java 构建环境（2026-09-21 实测，禁凭记忆猜路径）**：JDK 17 = `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot`；Maven = `%USERPROFILE%\.local\maven\apache-maven-3.9.9\bin\mvn`（不在 PATH）。⚠️ **默认 `JAVA_HOME` 是 JDK 8，每次构建/启动前必须显式切换**，否则 Spring Boot 3 编译失败
 - **静态页托管红线**：服务端直读 `src/`（`static-locations=file:${XINYU_WEB_ROOT:./src/}`），**禁止**把前端复制进 `src/main/resources/static/`（会造出第三处副本同步点）
-- **评测集红线（J3）**：`GET /api/emotion/eval` 从 `_test/emotion-eval-dataset.json` **直读权威源**（`XINYU_EVAL_DATASET` 可覆盖），**禁止**把评测集复制进 jar/资源目录；改词表必须同时改 `src/js/emotion-engine.js` 并重跑 `node _test/emotion_eval.js` 对账
+- **评测集红线（J3）**：`GET /api/emotion/eval` 从 `_test/emotion-eval-dataset.json` **直读权威源**（`XINYU_EVAL_DATASET` 可覆盖），**禁止**把评测集复制进 jar/资源目录
+- **🔴 词表一致性红线（J3，2026-09-22 立）**：情绪引擎在 JS / Java **各有一份**（本地那份是**离线降级**用的，不可删）。**改任一端的词表，必须两端同步改，并跑 `python _test/engine_consistency_check.py`**（三层判据：词表结构含重复项与顺序 / 逐条预测 36 条 / 汇总指标）—— **不一致即失败**，禁止只看 `emotion_eval.js` 单侧通过就提交
 - **J4 开关**：前端远端记忆默认**关闭**，靠 `cfg.remote === true` 启用（`memory-store.js`）；改动该默认值会波及全部浏览器回归，须先跑 `_test/j4_memory_check.py` + `browser_check.py`
 - **密钥红线（J5）**：`DEEPSEEK_KEY` 只从环境变量读；`XINYU_API_TOKEN` 留空=不鉴权（演示默认），私有部署时置非空
 

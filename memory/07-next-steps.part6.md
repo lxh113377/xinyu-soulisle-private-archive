@@ -3,16 +3,11 @@
 <!-- 本卷为 07-next-steps.md 的延续 -->
 
 - [ ] **J3/J4 变现（优先级高于继续加功能，2026-09-22 校准后确立）**：⚠️ **「变现」= 让已建成但未启用的能力真正接进产品跑起来（非商业变现）**；更准确的说法是「接入 / 启用」。现状实测 —— 前端 **0 处**调用 `/api/emotion`（仍用本地 `src/js/emotion-engine.js`）、**0 处** `remote:true`（J4 默认关闭）⇒ **J3/J4 目前对演示零可见影响，是"能力就位、生产未启用"**。三件：
-  1. ⚠️ **更正（2026-09-22 老大追问「接上什么」后重审）**：原写「前端切到 `/api/emotion` —— 消除『情绪引擎两份真相』隐患」，**此方案有缺陷**：前端**不再自带词表**会导致**服务端不可达时情绪识别能力归零**（现离线仍可用本地词典，且 `browser_check` 专测该降级链路）；而为保离线保留本地词典则**两份真相并未消除**，只是多了一条网络路径。
-     **改正后的做法 = 把「静默重复」变成「受监控重复」**：① 保留本地词典作离线降级；② 建**两端一致性常驻守卫** —— `_test/emotion_eval.js`（JS 侧）与 `GET /api/emotion/eval`（Java 侧）跑**同一份 36 条评测集逐项对账**（基础设施 J3 已具备：实测 94.4% / 危机 3-3 / per_class 七类 / misses 两条逐字相同），只需**改成常驻断言**（一条命令跑两端，不一致即失败）。目标 = 改词表忘同步时**立刻报警**而非静默分叉。
-  2. 默认开 `cfg.remote` —— 让"跨设备记住你"成立（演示才能讲）；须先跑 `_test/j4_memory_check.py` + `browser_check.py`
-  3. fat jar 部署到国内可达机器 —— 摆脱 CloudBase 首访中间页；Dockerfile 已交付但**本机无 Docker，镜像未实测**
-- [ ] 🔴 **iCAN 提交硬截止 2026-09-30**（今天 09-22，剩 8 天；截止即锁团队信息）：官网报名 + 提交。缺件风险：官方要《应用方案》PDF（≤20 页），而该项此前按老大 09-19「视频/PPT/PDF 不管」指令被冻结 —— 需一句话解冻即开做
-- [x] ~~CloudBase 国内线决策~~ ✅ 2026-09-22 老大定：**接受中间页，仅作备用**（零成本，保持现状）。注意：CloudBase 云函数的 Key 仍是旧值（CLI 无 `fn env push`，只能控制台改）；若旧 Key 被平台作废，国内备用线会失效，需在控制台同步新 Key
-- [x] ~~云端密钥轮换~~ ✅ 2026-09-22：新 Key 实测 `200 OK` → `wrangler pages secret put DEEPSEEK_KEY`（**wrangler@3 报错，@4 成功**）+ `pages deploy` 重部署使其生效（secret 需新部署才绑定）→ 生产 `PUBLIC-ONLINE-ALL-PASS`（在线 AI 1206ms、`KEY_LEAK: False`）
-- [x] ~~部署在线演示~~ ✅ 2026-09-19 Cloudflare：**https://xinyu-soulisle.pages.dev** （Pages + Function 代理 /api/chat，密钥在 env，前端零密钥）；✅ 2026-09-20 加国内线：**https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com**（CloudBase 静态托管 + 云函数 chat，环境有效期至 2027-03-14）。两端均实测 PUBLIC-ONLINE-ALL-PASS；前端 demo-config 按域名自适应指向对应代理
-- [x] ~~**待老大决策**（CloudBase 中间页）~~ ✅ 2026-09-22 老大定：**选 ① 接受中间页，CloudBase 仅作备用**（零成本，保持现状）。背景：测试域名首访有「风险提醒」中间页（点一次放行；官方无免备案开关，需绑 ICP 备案自定义域名才能去掉，且默认域名有风控关停风险）。②办备案约 1–3 周（赶得上 10 月复赛但赶不上 09-30 提交）；③撤回国内线 —— 均未采用
-
-## 分卷目录
-- **卷1** `07-next-steps.part5.md` — 07-next-steps 分卷（R199 自动拆卷）
-
+  1. ✅ **已做（2026-09-22）**：**两端一致性常驻守卫** —— 新增 `_test/engine_consistency_check.py` + `_test/engine_lexicon_dump.js`，Java 侧加 `GET /api/emotion/lexicon` 与 `eval?detail=1`，JS 侧 `emotion-engine.js` 导出 `NEG/DEG/CRISIS`。
+     判据三层：**A 词表结构**（含**重复项与顺序** —— 重复词会被重复计分，"顺手去重"会改分数）/ **B 逐条预测 36 条**（只比汇总会漏"两条错误互相抵消"）/ **C 汇总指标**。
+     **验证含对照**：`ENGINE-CONSISTENCY-PASS`（两端词表+逐条+汇总全等）+ `--selftest` 注入分叉报出 2 问题 + **端到端对照**（真改 JS 词表 → FAIL 且精确指出 `仅JS=['考上了X'] 仅Java=['考上了']`；还原 → PASS 且文件 SHA 不变）。
+     原方案「前端切 `/api/emotion`」**已否决**：会让服务端不可达时情绪识别归零（离线降级是红线），保留本地词典又消不掉重复 —— 改为"把静默重复变成受监控重复"。
+  2. ✅ **已做（2026-09-22）**：`src/js/demo-config.js` 预置 `remote: true` → **本地 / fat jar 演示默认开启服务端持久化**（"跨设备、清缓存都不丢"成立）。
+     ⚠️ **未做全局默认开**，原因：公网版（Pages/CloudBase）只有 `/api/chat`、没有 `/api/memory`，默认开会给评委看到 404 并打破 `public_check` 的 `CONSOLE_ERRORS: 0`。
+     配套加**熔断**（`memory-store.js`）：探测遇 404 或网络失败即 `remoteDown`，本会话不再重试；实测 3 句对话只发 2 个请求（上界 = 页面加载次数）、本地存储照常写入、`is_remote` 熔断后为 False → 新常驻对照组 `_test/j4_remote_down_check.py` **J4-FUSE-PASS**。
+  3. ⏳ **仍待做**：fat jar 部署到国内可达机器 —— 摆脱 CloudBase 首访中间页；Dockerfile 已交付但**本机无 Docker，镜像未实测**

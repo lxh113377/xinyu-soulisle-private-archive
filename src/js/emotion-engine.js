@@ -71,5 +71,7 @@ window.EmotionEngine = (function () {
     return Object.keys(LEX).map(k => ({ emotion: k, label: labelOf(k), color: LEX[k].color.slice() }));
   }
 
-  return { scan, colorOf, labelOf, secondaryOf, palette, LEX };
+  // NEG / DEG / CRISIS 一并导出：供 `_test/engine_consistency_check.py` 与 Java 侧逐项对账
+  // （一致性守卫需要比对词表**结构本身**，只比预测汇总可能因巧合相同而漏掉分叉）
+  return { scan, colorOf, labelOf, secondaryOf, palette, LEX, NEG, DEG, CRISIS };
 })();

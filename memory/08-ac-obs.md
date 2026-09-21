@@ -30,6 +30,8 @@
 - [x] AC-OBS-10: 情绪记忆真落库（跨浏览器、跨重启不丢） → `j4_memory_check.py` **核心断言**：清空 `localStorage` 后刷新星图仍点亮；`GET /api/memory/stats` 计数正确；重启服务后计数不变 | 数据库查询 + 测试输出
 - [x] AC-OBS-11: 密钥零落前端、零入库 → `public_check.py` 报 `KEY_LEAK: False`；`git grep -E "sk-[A-Za-z0-9]{20,}" HEAD` 0 命中 | 测试输出
 - [x] AC-OBS-12: 可选鉴权可开可关且边界正确 → 无 token 时全放行 200；有 token 时 无头 401 / 错头 401 / 对头 200，且 `/api/health` 与静态页**始终放行** | API响应
+- [x] AC-OBS-13: 情绪引擎两端（JS/Java）**不静默分叉** → `engine_consistency_check.py` 三层判据全等（词表结构含重复项与顺序 / 逐条预测 / 汇总指标）；**判据非恒真已证**：`--selftest` 注入分叉报错 + 端到端改真词表 → FAIL 并精确指出差异 | 测试输出
+- [x] AC-OBS-14: 远端记忆不可用时**熔断且不制造噪音** → `j4_remote_down_check.py`：无 `/api/memory` 时请求数上界 = 页面加载次数（3 句对话仅 2 请求）、本地存储照常写入、`isRemote()` 熔断后为 False | 测试输出
 
 ## 已识别的判据误报（保留记录，不修改数据）
 
