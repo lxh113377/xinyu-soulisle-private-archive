@@ -2,7 +2,7 @@
 
 <!-- 本卷为 07-next-steps.md 的延续 -->
 
-- [ ] **J3/J4 变现（优先级高于继续加功能，2026-09-22 校准后确立）**：现状实测 —— 前端 **0 处**调用 `/api/emotion`（仍用本地 `src/js/emotion-engine.js`）、**0 处** `remote:true`（J4 默认关闭）⇒ **J3/J4 目前对演示零可见影响，是"能力就位、生产未启用"**。三件：
+- [ ] **J3/J4 变现（优先级高于继续加功能，2026-09-22 校准后确立）**：⚠️ **「变现」= 让已建成但未启用的能力真正接进产品跑起来（非商业变现）**；更准确的说法是「接入 / 启用」。现状实测 —— 前端 **0 处**调用 `/api/emotion`（仍用本地 `src/js/emotion-engine.js`）、**0 处** `remote:true`（J4 默认关闭）⇒ **J3/J4 目前对演示零可见影响，是"能力就位、生产未启用"**。三件：
   1. 前端切到 `/api/emotion` —— **消除"情绪引擎两份真相"隐患**（`emotion-engine.js` 与 `EmotionLexicon.java` 改一边忘一边就分叉）；必须先跑 `_test/emotion_eval.js` 双端对账 + `browser_check.py` + `pixel_dual_check.py`
   2. 默认开 `cfg.remote` —— 让"跨设备记住你"成立（演示才能讲）；须先跑 `_test/j4_memory_check.py` + `browser_check.py`
   3. fat jar 部署到国内可达机器 —— 摆脱 CloudBase 首访中间页；Dockerfile 已交付但**本机无 Docker，镜像未实测**
