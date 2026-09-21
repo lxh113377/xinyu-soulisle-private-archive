@@ -29,6 +29,10 @@
 - [x] ~~版本控制基线~~ ✅ 2026-09-21 r2（纪律 #20 四步全达标）：首提 `8c4f59d`（73 文件，`--file` 白名单禁 `add -A`）→ 私有远端 `https://github.com/lxh113377/xinyu-soulisle-private-archive` → push → `rev-parse HEAD` == `ls-remote origin main` == `8c4f59d76f3e6ce39b9f054a182cdd3bd8c9f30b`；密钥零入库（`git grep -E "sk-[A-Za-z0-9]{20,}" HEAD` = **0 命中**）。注意：`gh` 在 PowerShell 下因**无扩展名**被判为"文档"无法执行，**须经 Git Bash 调用**
 - [x] ~~J2 API 契约对齐~~ ✅ 2026-09-22（详见分阶段表）
 - [x] ~~J3 / J4 / J5~~ ✅ 2026-09-22 全部完成（详见分阶段表）→ **Java 全栈主线 J1–J5 已贯通**
+- [ ] **J3/J4 变现（优先级高于继续加功能，2026-09-22 校准后确立）**：现状实测 —— 前端 **0 处**调用 `/api/emotion`（仍用本地 `src/js/emotion-engine.js`）、**0 处** `remote:true`（J4 默认关闭）⇒ **J3/J4 目前对演示零可见影响，是"能力就位、生产未启用"**。三件：
+  1. 前端切到 `/api/emotion` —— **消除"情绪引擎两份真相"隐患**（`emotion-engine.js` 与 `EmotionLexicon.java` 改一边忘一边就分叉）；必须先跑 `_test/emotion_eval.js` 双端对账 + `browser_check.py` + `pixel_dual_check.py`
+  2. 默认开 `cfg.remote` —— 让"跨设备记住你"成立（演示才能讲）；须先跑 `_test/j4_memory_check.py` + `browser_check.py`
+  3. fat jar 部署到国内可达机器 —— 摆脱 CloudBase 首访中间页；Dockerfile 已交付但**本机无 Docker，镜像未实测**
 - [ ] 🔴 **iCAN 提交硬截止 2026-09-30**（今天 09-22，剩 8 天；截止即锁团队信息）：官网报名 + 提交。缺件风险：官方要《应用方案》PDF（≤20 页），而该项此前按老大 09-19「视频/PPT/PDF 不管」指令被冻结 —— 需一句话解冻即开做
 - [x] ~~CloudBase 国内线决策~~ ✅ 2026-09-22 老大定：**接受中间页，仅作备用**（零成本，保持现状）。注意：CloudBase 云函数的 Key 仍是旧值（CLI 无 `fn env push`，只能控制台改）；若旧 Key 被平台作废，国内备用线会失效，需在控制台同步新 Key
 - [x] ~~云端密钥轮换~~ ✅ 2026-09-22：新 Key 实测 `200 OK` → `wrangler pages secret put DEEPSEEK_KEY`（**wrangler@3 报错，@4 成功**）+ `pages deploy` 重部署使其生效（secret 需新部署才绑定）→ 生产 `PUBLIC-ONLINE-ALL-PASS`（在线 AI 1206ms、`KEY_LEAK: False`）
