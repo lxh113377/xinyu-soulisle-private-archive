@@ -11,6 +11,7 @@
 | 任务结束/复盘/经验沉淀 | A-get-memory |
 | 动手前需求澄清 | A-ask-questions |
 | **任何 Java 代码 / 编译运行 / JDK 环境相关** | **A-java-problem**（铁律 #45，禁绕过） |
+| **技术栈 / 架构选型决策（新增、变更、推翻）** | **A-project-handoff** —— 唯一落盘位置 `03-tech-stack.md` 的「📋 选型决策记录」节（2026-09-22 老大定：此类决定由该 skill 负责，禁止散落在对话或 `.codebuddy/` 记忆里） |
 | （按需追加：部署/审计/UI 等专用 skill） | 项目名-deploy 等 |
 
 ## 铁律
@@ -25,3 +26,13 @@
 - **评测集红线（J3）**：`GET /api/emotion/eval` 从 `_test/emotion-eval-dataset.json` **直读权威源**（`XINYU_EVAL_DATASET` 可覆盖），**禁止**把评测集复制进 jar/资源目录；改词表必须同时改 `src/js/emotion-engine.js` 并重跑 `node _test/emotion_eval.js` 对账
 - **J4 开关**：前端远端记忆默认**关闭**，靠 `cfg.remote === true` 启用（`memory-store.js`）；改动该默认值会波及全部浏览器回归，须先跑 `_test/j4_memory_check.py` + `browser_check.py`
 - **密钥红线（J5）**：`DEEPSEEK_KEY` 只从环境变量读；`XINYU_API_TOKEN` 留空=不鉴权（演示默认），私有部署时置非空
+
+## 架构决策（索引 —— 详表见 `03-tech-stack.md`「📋 选型决策记录」）
+
+> **约定（2026-09-22 老大立）**：技术栈/架构选型类决定由 **A-project-handoff** 负责，唯一落盘位置 = `03-tech-stack.md`「📋 选型决策记录」；每条须含五要素（背景 / 选项 / 结论 / 已知代价 / 重评触发条件），未落地项标「待落地验证」，被推翻的决策保留原条目 + 增更正注。
+
+- **后端语言 = Java(Spring Boot)** —— 已执行；但**复核结论：若重做本作品会选 Python**，不返工。重评触发条件 = 需要本地模型/Embedding/RAG/微调/AI 生态 → 届时起 **Python 侧服务由 Java HTTP 调用**，不用 Java 硬啃 AI 生态
+- **静态页直读 `src/`**（不复制进 `resources/static/`）—— 消灭第三处副本同步点；代价 = 启动工作目录必须是项目根
+- **J4 远端记忆默认关闭**（`cfg.remote`）—— 零回归风险；代价 = 不主动开启则"跨设备记住你"不成立
+- **鉴权用轻量 token 过滤器**（未引 Spring Security）—— 够用 + 依赖最小；代价 = 无多用户/角色/会话管理
+- **评测集不复制进 jar**（服务端直读 `_test/`）—— 保证 Java 侧与 JS 侧跑的是同一份数据
