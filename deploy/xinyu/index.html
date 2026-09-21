@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>心屿 · AI 情感陪伴 — 滚轮驱动的 3D 情绪叙事</title>
+<meta name="description" content="对话陪聊 + 情感陪伴：以 WebGL 3D 情绪星云承载 AI 共情对话，滚动即叙事。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%237c6cff'/><circle cx='12' cy='12' r='4' fill='%23b9aefe'/></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!-- WebGL 画布：固定全屏，滚动驱动镜头 -->
+<canvas id="gl" aria-hidden="true"></canvas>
+<div id="gl-fallback" hidden></div>
+
+<!-- 顶栏 -->
+<header id="topbar">
+  <div class="brand"><span class="brand-dot"></span>心屿<span class="brand-sub">SoulIsle</span></div>
+  <div class="top-right">
+    <span id="mode-badge" class="badge">● 在线 AI</span>
+    <button id="btn-settings" class="ghost-btn" aria-label="设置">⚙ 模型设置</button>
+  </div>
+</header>
+
+<!-- 滚动叙事容器：每个 section 为一幕 -->
+<main id="story">
+  <!-- 第一幕：相遇 -->
+  <section class="act" id="act1" data-act="1">
+    <div class="act-copy">
+      <p class="kicker">第一幕 · 相遇</p>
+      <h1>你心里的那座岛<br>今天是什么天气？</h1>
+      <p class="lead">心屿把每一次倾诉，渲染成一片会呼吸的星雾。<br>向下滚动，走进它。</p>
+      <div class="scroll-hint" aria-hidden="true">▼ 滚动</div>
+    </div>
+  </section>
+
+  <!-- 第二幕：情绪感知 -->
+  <section class="act" id="act2" data-act="2">
+    <div class="act-copy">
+      <p class="kicker">第二幕 · 感知</p>
+      <h2>你说的每句话，都会被记住</h2>
+      <p class="lead">在页面底部和心屿说话。它会读出话里的情绪底色，<br>并点亮星雾里的一小簇星 —— 星雾已点亮 <b id="lit-count">0</b> 颗，共记住 <b id="mem-count">0</b> 个瞬间。</p>
+      <div id="probe-result" class="probe-result" aria-live="polite">还没有对话记录 —— 在页面底部说第一句话试试。</div>
+    </div>
+  </section>
+
+  <!-- 第三幕：AI 对话陪伴 -->
+  <section class="act" id="act3" data-act="3">
+    <div class="act-copy wide">
+      <p class="kicker">第三幕 · 陪伴</p>
+      <h2>它先听懂你的情绪，再开口陪你</h2>
+      <p class="lead">共情链路：情绪识别 → 策略选择 → 大模型生成 → 点亮一颗星。<br>断网或无凭据时自动降级为离线共情模板，陪伴不打烊。</p>
+      <ul class="promise">
+        <li><b>记得你的情绪</b>：每一次对话的底色都会点亮星雾里的一小簇星，越聊越亮。</li>
+        <li><b>记得你的过往</b>：多轮上下文本机留存，刷新后回来还能接着聊。</li>
+        <li><b>记得你说的每件事</b>：情绪曲线与整张星图都留在这台设备上，随时可一键清空。</li>
+      </ul>
+      <p class="lead">↓ 对话就在<b>页面底部</b>，滚到哪一幕都能说。</p>
+    </div>
+  </section>
+
+  <!-- 第四幕：情绪记忆 -->
+  <section class="act" id="act4" data-act="4">
+    <div class="act-copy">
+      <p class="kicker">第四幕 · 记忆</p>
+      <h2>情绪会留下潮汐</h2>
+      <p class="lead">所有对话情绪在本机留存为情绪曲线（不上传、可一键清除），<br>它记得你来过的每一次天气。</p>
+      <canvas id="mood-chart" width="560" height="220" aria-label="情绪历史曲线"></canvas>
+      <div class="chart-actions">
+        <button id="btn-clear" class="ghost-btn danger">清除我的数据</button>
+        <span id="chart-count" class="muted"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 第五幕：安全与承诺 -->
+  <section class="act" id="act5" data-act="5">
+    <div class="act-copy">
+      <p class="kicker">第五幕 · 边界</p>
+      <h2>陪伴，不越界</h2>
+      <ul class="promise">
+        <li><b>隐私本地化</b>：情绪记忆仅存于你的浏览器，随时可清空。</li>
+        <li><b>危机转介</b>：识别到自伤/危机信号时，优先推送求助热线，不做诊断。</li>
+        <li><b>透明降级</b>：离线时明示"共情模板模式"，不假装是在线 AI。</li>
+      </ul>
+      <p class="lead">心屿 · 2026 iCAN 大学生创新创业大赛 AI 应用创新挑战赛参赛作品</p>
+    </div>
+  </section>
+</main>
+
+<!-- 底部常驻对话坞：滚到哪一幕都能说话（第二幕探针 + 第三幕聊天已融合于此） -->
+<aside id="chat-dock" class="open" aria-label="心屿对话">
+  <header id="dock-bar">
+    <div class="dock-title"><span class="brand-dot"></span>心屿 · 随时都在
+      <span class="muted">星雾已点亮 <b id="lit-count-dock">0</b> 颗 · 记住 <b id="mem-count-dock">0</b> 个瞬间</span>
+    </div>
+    <button id="btn-lightshow" class="ghost-btn tiny" type="button" title="六种情绪各点亮一簇（仅演示，不写入记忆）">✨ 一键点亮</button>
+    <button id="btn-dock" class="ghost-btn tiny" type="button" aria-expanded="true">收起 ▾</button>
+  </header>
+  <div id="chat-log" class="chat-log" role="log" aria-live="polite"></div>
+  <form id="chat-form" class="chat-form">
+    <input id="chat-input" type="text" maxlength="500" placeholder="和心屿说说今天…" autocomplete="off" aria-label="对话输入">
+    <button type="button" id="btn-voice" class="ghost-btn voice-btn" aria-label="语音输入" title="语音输入">🎤</button>
+    <button type="submit" class="primary-btn">发送</button>
+  </form>
+  <div class="chat-meta">
+    <span id="chat-engine">引擎：未初始化</span>
+    <span id="latency"></span>
+  </div>
+  <div class="demo-strip" id="demo-strip" hidden>
+    <span class="muted">🔒 评委体验模式 · 本机已预置在线模型，无需配置</span>
+    <button id="btn-demo-clear" class="ghost-btn tiny">清除本机配置</button>
+  </div>
+</aside>
+
+<!-- 演示态唯一的退出口：右下角，点了回页面但保留点亮的星雾 -->
+<button id="btn-exit-show" type="button">← 回到心屿（保留星雾）</button>
+
+<!-- 设置面板 -->
+<dialog id="dlg-settings">
+  <form method="dialog" class="settings-form">
+    <h3>模型设置（OpenAI 兼容接口）</h3>
+    <label>API Base URL<input id="set-base" type="url" placeholder="https://api.deepseek.com/v1"></label>
+    <label>API Key<input id="set-key" type="password" placeholder="sk-…（仅存本机）"></label>
+    <label>模型名<input id="set-model" type="text" placeholder="deepseek-chat"></label>
+    <p class="muted">留空则使用离线共情模板引擎。Key 仅保存在本机 localStorage，不上传。</p>
+    <div class="dlg-actions">
+      <button value="cancel" class="ghost-btn">取消</button>
+      <button value="save" id="btn-save-settings" class="primary-btn">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/ScrollTrigger.min.js"></script>
+<script src="js/emotion-engine.js"></script>
+<script src="js/memory-store.js"></script>
+<script src="js/demo-config.js"></script>
+<script src="js/chat-agent.js"></script>
+<script src="js/three-scene.js"></script>
+<script src="js/scroll-story.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

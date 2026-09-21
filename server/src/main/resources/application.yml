@@ -1,0 +1,22 @@
+server:
+  port: ${XINYU_PORT:8080}
+
+spring:
+  application:
+    name: xinyu-soulisle
+  web:
+    resources:
+      # 直读前端权威源，不做第二份副本 —— 避开「src → deploy/xinyu」之外的第三处同步点。
+      # 相对路径基于 JVM 工作目录：从项目根执行 java -jar server/target/soulisle-server.jar 即命中 src/。
+      static-locations: file:${XINYU_WEB_ROOT:./src/}
+      cache:
+        period: 0
+
+xinyu:
+  stage: J1
+  web-root: ${XINYU_WEB_ROOT:./src/}
+
+logging:
+  level:
+    root: INFO
+    com.xinyu.soulisle: INFO

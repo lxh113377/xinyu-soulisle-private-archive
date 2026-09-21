@@ -1,0 +1,11 @@
+{
+  "name": "xinyu-chat",
+  "version": "1.0.0",
+  "description": "心屿 · DeepSeek 服务端代理（密钥只在云端 env，前端零密钥）",
+  "main": "index.js",
+  "scripts": {},
+  "dependencies": {},
+  "engines": {
+    "node": ">=18"
+  }
+}

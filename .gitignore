@@ -1,0 +1,35 @@
+# 心屿 SoulIsle（陪聊）— .gitignore
+# 建立：2026-09-20（体积归因实测后补齐版本控制基线，纪律#20）
+# 原则：只排除「可重建生成物 / 环境元数据 / 密钥」；源码、交付物、memory 一律入库。
+# 实测基线：全项目 3.84 MB / 81 文件（无 .venv、无 node_modules，纯静态前端）。
+
+# ===== 1. 密钥：任何情况下不得入库 =====
+# src/js/demo-config.js 是本地演示版，硬编码 DeepSeek Key（实测 sk- 命中 1 处）
+# 公网版是 deploy/xinyu/js/demo-config.js（同源 /api/chat 代理，零密钥）→ 该文件正常入库
+src/js/demo-config.js
+# _test/cors_probe.py 为浏览器直连 CORS 探测脚本，含同一 Key（实测 sk- 命中 1 处）
+_test/cors_probe.py
+.env
+.env.*
+*.key
+
+# ===== 2. 可重建生成物 / 测试产物 =====
+__pycache__/
+*.pyc
+*.pyo
+# 浏览器回归截图（1.09 MB / 8 张），browser_check.py / lightshow_check.py 每次重跑即生成
+_test/_shots/
+# Java 服务端构建产物（mvn package 可重建；fat jar 约 20 MB，不得入库）
+server/target/
+
+# ===== 3. 环境与编辑器元数据 =====
+.codebuddy/
+.trae/
+.workbuddy/
+.vscode/
+.idea/
+
+# ===== 4. 系统杂物 =====
+.DS_Store
+Thumbs.db
+desktop.ini
