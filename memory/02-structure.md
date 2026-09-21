@@ -34,4 +34,5 @@
   - `src/main/resources/application.yml`（`server.port=${XINYU_PORT:8080}`；`static-locations=file:${XINYU_WEB_ROOT:./src/}`）
   - `server/target/` — 构建产物（fat jar ≈ 20 MB，**已 ignore**）
 - **静态页托管策略：直读 `src/` 权威源，不复制到 `src/main/resources/static/`** —— 避免第三处副本同步点（既有同步红线：`src/` → `deploy/xinyu/`）
-- 后续分层（J2–J5 待建）：`controller`（`/api/chat`）/ `service`（对话编排）/ `engine`（`EmotionEngine` 词典 + LLM 双路）/ `mapper`（MyBatis-Plus）/ `entity`
+- 已落地（J2）：`llm/LlmProxy.java`（JDK 内置 `HttpClient` 转发 OpenAI 兼容上游，零额外依赖）+ `api/ChatController.java`（`/api/chat`，契约 1:1 复刻 v1 Function）
+- 后续分层（J3–J5 待建）：`service`（对话编排）/ `engine`（`EmotionEngine` 词典 + LLM 双路）/ `mapper`（MyBatis-Plus）/ `entity`

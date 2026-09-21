@@ -13,8 +13,13 @@ spring:
         period: 0
 
 xinyu:
-  stage: J1
+  stage: J2
   web-root: ${XINYU_WEB_ROOT:./src/}
+  llm:
+    # 密钥只从环境变量来：零落盘、零入库。J5 会进一步做外置与最小权限。
+    base: ${DEEPSEEK_BASE:https://api.deepseek.com/v1}
+    model: ${DEEPSEEK_MODEL:deepseek-chat}
+    key: ${DEEPSEEK_KEY:}
 
 logging:
   level:

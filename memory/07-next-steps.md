@@ -14,7 +14,7 @@
 
 ### 分阶段（每阶段都要能跑、能回归，禁止一次性推倒重写）
 - [x] **J1 骨架** ✅ 2026-09-21：`server/`（Maven 3.9.9 + Spring Boot 3.2.5 + JDK 17）+ `/api/health` + 托管现有前端静态页（**直读 `src/` 权威源，零副本**）→ `java -jar server\target\soulisle-server.jar --server.port=8123` 实测 `status=UP` / `webRoot` 解析到项目 `src/` / `indexFound=true` / `vendorFound=true`，首页与 `js`、`css`、`vendor` 全 200；`_test/browser_check.py` **原样复用（同端口 8123）ALL-ASSERT-PASS**。对照组：换回旧 `python -m http.server` 同为 4 条 `ERR_CONNECTION_REFUSED` ⇒ 该错误出自脚本自注入的不可达端点 `127.0.0.1:18123`（离线降级用），与 Java 服务端无关
-- [ ] **J2 API 契约对齐**：`POST /api/chat` 与现 v1 契约 **1:1**（请求/响应字段不变）→ 前端只改 baseURL 即可切换，新旧两线可对比
+- [x] **J2 API 契约对齐** ✅ 2026-09-22：`POST /api/chat` 与 v1 **1:1**（契约实读自 `deploy/functions/api/chat.js` + `src/js/chat-agent.js:25-43`，非凭记忆）。请求认 `{messages,temperature,max_tokens}`；**上游响应逐字透传**（含 status）；错误体与 v1 完全一致（`no-key` 500 / `bad-json` 400 / `upstream-nonjson` / `upstream-error` 502），且**判定顺序一致**（先查 key 再解析 body）。验收：`_test/j2_chat_contract.py` **J2-CONTRACT-PASS**（A 组走 Java 965ms 在线 / B 组不可达端点 3ms 回落离线，单变量对照）+ curl 三例（no-key 500、bad-json 400、真实调用 200 中文无损）+ `browser_check.py` ALL-ASSERT-PASS
 - [ ] **J3 情绪引擎 Java 化**：词典快判（复用现词表 JSON）+ LLM 精判 + 分歧采信 LLM + 危机拦截；`_test/emotion-eval-dataset.json` 36 条在 Java 侧复跑，**词典层准确率 ≥94.4% / 危机召回 3/3** 为通过线
 - [ ] **J4 持久化**：`chat_message` / `emotion_record` 表（MyBatis-Plus + MySQL 8，演示可切 H2）替代 localStorage；前端保留本地降级
 - [ ] **J5 安全与部署**：密钥外置（环境变量，禁入库）、可选 Spring Security + JWT、`mvn package` → fat jar 部署（预留 Dockerfile）
@@ -26,7 +26,8 @@
 
 ## P0 — 必须做
 - [x] ~~版本控制基线~~ ✅ 2026-09-21 r2（纪律 #20 四步全达标）：首提 `8c4f59d`（73 文件，`--file` 白名单禁 `add -A`）→ 私有远端 `https://github.com/lxh113377/xinyu-soulisle-private-archive` → push → `rev-parse HEAD` == `ls-remote origin main` == `8c4f59d76f3e6ce39b9f054a182cdd3bd8c9f30b`；密钥零入库（`git grep -E "sk-[A-Za-z0-9]{20,}" HEAD` = **0 命中**）。注意：`gh` 在 PowerShell 下因**无扩展名**被判为"文档"无法执行，**须经 Git Bash 调用**
-- [ ] **J2 API 契约对齐**（J1 已就绪，下一步就是它）：`POST /api/chat` 与 v1 **1:1** 对齐（先取 `src/js/chat-agent.js` 与 `deploy/functions/api/chat.js` 实测请求/响应字段，禁止凭记忆写契约）→ 前端只改 baseURL 即可切换，新旧两线可对比
+- [x] ~~J2 API 契约对齐~~ ✅ 2026-09-22（详见分阶段表）
+- [ ] **J3 情绪引擎 Java 化**（下一阶段）：`engine` 包实现词典快判 + LLM 精判 + 分歧采信 LLM + 危机拦截；`_test/emotion-eval-dataset.json` 36 条在 Java 侧复跑，**词典层准确率 ≥94.4% / 危机召回 3/3** 为通过线。动手前先实读 `src/js/emotion-engine.js` 取词表与判定口径，禁止凭记忆重写
 - [x] ~~部署在线演示~~ ✅ 2026-09-19 Cloudflare：**https://xinyu-soulisle.pages.dev** （Pages + Function 代理 /api/chat，密钥在 env，前端零密钥）；✅ 2026-09-20 加国内线：**https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com**（CloudBase 静态托管 + 云函数 chat，环境有效期至 2027-03-14）。两端均实测 PUBLIC-ONLINE-ALL-PASS；前端 demo-config 按域名自适应指向对应代理
 - [ ] 🔴 **待老大决策**：CloudBase 测试域名首访有「风险提醒」中间页（点一次放行；官方无免备案开关，需绑 ICP 备案自定义域名才能去掉，且默认域名有风控关停风险）。选项：①接受中间页并把 CloudBase 仅作备用（零成本，当前状态）②办域名+ICP 备案后绑自定义域名（约 1–3 周，赶得上 10 月复赛）③撤回国内线，仅用 pages.dev
 - [ ] 起草《应用方案》PDF（大纲：交付物/提交包/应用方案大纲.md；AI核心作用章节可直接引用：双路情绪引擎实测分歧案例 + 词典层评测 94.4%/危机召回3/3 + **Serverless密钥隔离架构**，见 _test/emotion_eval.js / src/functions/api/chat.js）
