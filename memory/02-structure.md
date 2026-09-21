@@ -4,9 +4,114 @@
 > 归档类型：快照（整体复制到归档）
 
 <!-- SYNC_AUTO_GENERATED_START -->
-<!-- 以下内容由 sync 命令自动生成，手动修改会在下次 sync 时被覆盖 -->
-（运行 `handoff.py sync` 自动生成目录树）
+```
+├── .codebuddy/
+├── .wrangler/
+│   └── cache/
+│       └── wrangler-account.json
+├── _test/
+│   ├── _shots/
+│   │   ├── dual_mixed-contrast.png
+│   │   ├── dual_mixed-similar.png
+│   │   ├── dual_single.png
+│   │   ├── lightshow_after.png
+│   │   ├── lightshow_before.png
+│   │   ├── lightshow_blackout.png
+│   │   ├── lit_multi.png
+│   │   └── lit_single.png
+│   ├── browser_check.py
+│   ├── cors_probe.py
+│   ├── emotion-eval-dataset.json
+│   ├── emotion_eval.js
+│   ├── j2_chat_contract.py
+│   ├── j4_memory_check.py
+│   ├── lightshow_check.py
+│   ├── online_check.py
+│   ├── pixel_dual_check.py
+│   ├── public_check.py
+│   ├── screenshots.py
+│   └── screenshots_online.py
+├── deploy/
+│   ├── .wrangler/
+│   │   ├── cache/
+│   │   │   ├── pages.json
+│   │   │   └── wrangler-account.json
+│   │   └── tmp/
+│   ├── cloudbase/
+│   │   ├── functions/
+│   │   │   └── chat/
+│   │   └── cloudbaserc.json
+│   ├── functions/
+│   │   └── api/
+│   │       └── chat.js
+│   ├── xinyu/
+│   │   ├── assets/
+│   │   ├── css/
+│   │   │   └── style.css
+│   │   ├── js/
+│   │   │   ├── app.js
+│   │   │   ├── chat-agent.js
+│   │   │   ├── demo-config.js
+│   │   │   ├── emotion-engine.js
+│   │   │   ├── memory-store.js
+│   │   │   ├── scroll-story.js
+│   │   │   └── three-scene.js
+│   │   └── index.html
+│   └── wrangler.toml
+├── server/
+│   ├── data/
+│   │   └── xinyu.mv.db
+│   ├── src/
+│   │   └── main/
+│   │       ├── java/
+│   │       └── resources/
+│   ├── Dockerfile
+│   └── pom.xml
+├── src/
+│   ├── assets/
+│   ├── css/
+│   │   └── style.css
+│   ├── functions/
+│   │   └── api/
+│   │       └── chat.js
+│   ├── js/
+│   │   ├── app.js
+│   │   ├── chat-agent.js
+│   │   ├── demo-config.js
+│   │   ├── emotion-engine.js
+│   │   ├── memory-store.js
+│   │   ├── scroll-story.js
+│   │   └── three-scene.js
+│   └── index.html
+├── 交付物/
+│   ├── _参考资料-非提交/
+│   ├── iCAN评审/
+│   │   ├── 截图/
+│   │   │   ├── 01-第一幕-相遇.png
+│   │   │   ├── 02-第二幕-情绪探针.png
+│   │   │   ├── 02-第二幕-情绪读数.png
+│   │   │   ├── 03-第三幕-AI对话.png
+│   │   │   ├── 04-第四幕-情绪曲线.png
+│   │   │   ├── 05-在线模式-徽章与体验条.png
+│   │   │   ├── 06-双路情绪探针-词典与LLM分歧.png
+│   │   │   └── 07-在线对话-双路证据标签.png
+│   │   ├── 01-评分维度与权重-实证.md
+│   │   ├── 02-逐维度诊断报告.md
+│   │   ├── 03-优化优先级与实施路径.md
+│   │   ├── 04-答辩逻辑与仿真数据风险应对.md
+│   │   └── 05-获奖作品差距分析.md
+│   └── 提交包/
+│       ├── 应用方案大纲.md
+│       ├── 提交清单与验收状态.md
+│       └── 演示视频脚本.md
+├── .aiexclude
+├── AGENTS.md
+└── README.md
+```
 <!-- SYNC_AUTO_GENERATED_END -->
+
+> ⚠️ **sync 自动块参考用（2026-09-22 实测）**：生成的目录树包含 `.codebuddy/`、`.wrangler/`、`_test/_shots/` 等 **ignore 目录**（非项目内容，勿据此判断结构）。
+> **以「模块说明」节为准**（手工维护）。
 
 ## 模块说明
 

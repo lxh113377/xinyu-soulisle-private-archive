@@ -4,9 +4,13 @@
 > 归档类型：快照（整体复制到归档）
 
 <!-- SYNC_AUTO_GENERATED_START -->
-<!-- 以下内容由 sync 命令自动生成 -->
-（运行 `handoff.py sync` 自动识别入口/配置文件）
+### 入口文件:
+  - `deploy/cloudbase/functions/chat/index.js`
+### 文档: `README.md`
 <!-- SYNC_AUTO_GENERATED_END -->
+
+> ⚠️ **sync 自动块对本项目失效（2026-09-22 实测）**：它把 `deploy/cloudbase/functions/chat/index.js` 当成入口。
+> **真入口是 `src/index.html`（前端）与 `server/src/main/java/com/xinyu/soulisle/SoulIsleApplication.java`（后端）**。以下手工区为准。
 
 ## 核心逻辑文件
 <!-- 手动补充：核心业务逻辑文件说明 -->
