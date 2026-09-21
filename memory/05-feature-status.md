@@ -27,9 +27,9 @@
 ### Java 全栈改造（2026-09-20 老大定方向，分阶段见 07-next-steps.md）
 - [x] **J1** Spring Boot 骨架 + 静态页托管 ✅ 2026-09-21（`server/`，Maven 3.9.9 + Spring Boot 3.2.5 + JDK 17；`/api/health` 返 `status=UP` 且回传 `webRoot/indexFound/vendorFound` 可复核判据；静态页直读 `src/` 零副本；`browser_check.py` 原样 ALL-ASSERT-PASS）
 - [x] **J2** `/api/chat` 契约与 v1 对齐 ✅ 2026-09-22（前端零代码改动，只换 localStorage 的 proxy 指向；上游响应逐字透传；`_test/j2_chat_contract.py` J2-CONTRACT-PASS）
-- 📋 **J3** 情绪引擎 Java 化（词典 + LLM 双路、分歧采信、危机拦截；评测集 36 条 ≥94.4%）
-- 📋 **J4** 记忆持久化入库（`chat_message` / `emotion_record`，替代 localStorage，前端保留降级）
-- 📋 **J5** 密钥外置 + 可选 JWT + fat jar 部署
+- [x] **J3** 情绪引擎 Java 化 ✅ 2026-09-22（`engine/` 三件套 + `/api/emotion` + `/api/emotion/eval`；Java 侧与 JS 侧逐项对账完全一致 94.4% / 危机 3/3）
+- [x] **J4** 记忆持久化入库 ✅ 2026-09-22（`chat_message` / `emotion_record` + MyBatis-Plus + H2 file 默认 / MySQL 可切；前端 `cfg.remote` 可选接入默认关闭，本地 storage 保留为降级）
+- [x] **J5** 密钥外置 + 可选 token 鉴权 + fat jar + Dockerfile ✅ 2026-09-22（Docker 未装，镜像构建未实测）
 
 ### 前端
 - 📋 多情绪强度分层（当前只取 top-2）

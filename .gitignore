@@ -21,6 +21,10 @@ __pycache__/
 _test/_shots/
 # Java 服务端构建产物（mvn package 可重建；fat jar 约 20 MB，不得入库）
 server/target/
+# J4 运行时数据库文件（H2 file 模式，本地演示数据，可重建）
+server/data/
+# wrangler 本地缓存与状态（每次 deploy 自动重建）
+.wrangler/
 
 # ===== 3. 环境与编辑器元数据 =====
 .codebuddy/

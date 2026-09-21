@@ -11,15 +11,37 @@ spring:
       static-locations: file:${XINYU_WEB_ROOT:./src/}
       cache:
         period: 0
+  datasource:
+    # 默认 H2 文件库（演示即可持久，落 server/data/ 已 ignore）；生产切 MySQL：
+    #   XINYU_DB_URL=jdbc:mysql://host:3306/xinyu?serverTimezone=Asia/Shanghai
+    #   XINYU_DB_DRIVER=com.mysql.cj.jdbc.Driver  XINYU_DB_USER=...  XINYU_DB_PASSWORD=...
+    url: ${XINYU_DB_URL:jdbc:h2:file:./server/data/xinyu;MODE=MySQL;DB_CLOSE_DELAY=-1}
+    driver-class-name: ${XINYU_DB_DRIVER:org.h2.Driver}
+    username: ${XINYU_DB_USER:sa}
+    password: ${XINYU_DB_PASSWORD:}
+  sql:
+    init:
+      mode: always
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
 
 xinyu:
-  stage: J2
+  stage: J5
+  # 可选鉴权：留空 = 完全放行（演示默认）；非空则 /api/**（除 /api/health）需带 X-Xinyu-Token
+  api-token: ${XINYU_API_TOKEN:}
   web-root: ${XINYU_WEB_ROOT:./src/}
   llm:
     # 密钥只从环境变量来：零落盘、零入库。J5 会进一步做外置与最小权限。
     base: ${DEEPSEEK_BASE:https://api.deepseek.com/v1}
     model: ${DEEPSEEK_MODEL:deepseek-chat}
     key: ${DEEPSEEK_KEY:}
+  eval:
+    # 评测集权威源在项目 _test/ 下（不复制进 jar，避免造第二份副本）
+    dataset: ${XINYU_EVAL_DATASET:./_test/emotion-eval-dataset.json}
 
 logging:
   level:

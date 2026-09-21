@@ -34,6 +34,9 @@
   - `src/main/resources/application.yml`（`server.port=${XINYU_PORT:8080}`；`static-locations=file:${XINYU_WEB_ROOT:./src/}`）
   - `server/target/` — 构建产物（fat jar ≈ 20 MB，**已 ignore**）
 - **静态页托管策略：直读 `src/` 权威源，不复制到 `src/main/resources/static/`** —— 避免第三处副本同步点（既有同步红线：`src/` → `deploy/xinyu/`）
-- 已落地（J2）：`llm/LlmProxy.java`（JDK 内置 `HttpClient` 转发 OpenAI 兼容上游，零额外依赖）+ `api/ChatController.java`（`/api/chat`，契约 1:1 复刻 v1 Function）
-- 后续分层（J3–J5 待建）：`service`（对话编排）/ `engine`（`EmotionEngine` 词典 + LLM 双路）/ `mapper`（MyBatis-Plus）/ `entity`
-  - ⚠️ **待落地验证**：以上为规划，尚未落地，不得当作既成事实引用（J1 实证过一次：原写「前端置于 `src/main/resources/static/`」真动手才发现会造第三处副本同步点，已改为直读权威源）
+- `llm/LlmProxy.java`（J2，JDK 内置 `HttpClient` 转发 OpenAI 兼容上游，零额外依赖）+ `api/ChatController.java`（`/api/chat` 契约 1:1 复刻 v1 Function）
+- `engine/`（J3）：`EmotionLexicon`（词表/否定/程度/危机词，逐字对齐 `src/js/emotion-engine.js`）+ `EmotionEngine`（`scan`/`secondaryOf`）+ `EmotionClassifier`（双路 + 分歧采信 + 危机优先）
+- `api/EmotionController.java`（J3）：`POST /api/emotion`、`GET /api/emotion/eval`（复跑 `_test/emotion-eval-dataset.json`，输出与 `_test/emotion_eval.js` 同构）
+- `entity/` + `mapper/` + `service/MemoryService` + `api/MemoryController`（J4）：`chat_message` / `emotion_record` 两表，`/api/memory/**` CRUD + stats
+- `config/ApiTokenFilter.java`（J5）：可选鉴权（`xinyu.api-token` 留空=放行）
+- `server/src/main/resources/schema.sql`（J4 DDL，H2/MySQL 双兼容）、`server/Dockerfile`（J5，**未实测**：本机无 Docker）

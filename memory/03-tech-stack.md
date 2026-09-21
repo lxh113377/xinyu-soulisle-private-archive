@@ -26,8 +26,8 @@
 ## 🎯 目标技术栈（v2 — Java 全栈，2026-09-20 老大定方向 · 选型为假设值待确认）
 
 > ⚠️ **本表未落地项均为「待落地验证」的假设值**（A-project-handoff V3.41.4 立规）：落地阶段必须用**实测值**回填，禁止把计划当既成事实引用。
-> **已落地实测**（可作为事实引用）：JDK 17 / Maven 3.9.9 / Spring Boot 3.2.5 / 静态页 `static-locations` 直读 `src/` / `POST /api/chat` 契约 1:1（J1、J2）。
-> **未落地**（仍属假设）：MyBatis-Plus + MySQL 8、Spring Security + JWT、fat jar 部署、Dockerfile。
+> **已落地实测**（可作为事实引用，2026-09-22 J1–J5 全部跑通）：JDK 17 / Maven 3.9.9 / Spring Boot 3.2.5 / 静态页 `static-locations` 直读 `src/` / `POST /api/chat` 契约 1:1 / 情绪引擎 Java 化（与 JS 侧对账 94.4%、危机 3-3 一致）/ **MyBatis-Plus 3.5.7 + H2 file（默认）**、MySQL 8 驱动已引可切 / `/api/memory/**` 持久化（跨重启实测）/ fat jar `server/target/soulisle-server.jar` / 可选 `XINYU_API_TOKEN` 鉴权。
+> **未落地**（仍属假设）：**Spring Security + JWT 未引入**（J5 改用轻量 token 过滤器，默认关闭）；**Dockerfile 未实测**（本机无 Docker）；**MySQL 实际连接未实测**（仅 H2 跑通）。
 
 | 层 | 选型（待确认） | 备注 |
 |---|---|---|

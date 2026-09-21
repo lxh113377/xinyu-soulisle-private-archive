@@ -120,9 +120,7 @@ window.ChatAgent = (function () {
     // 次情绪一并入库：星图重放要能复现「主色 n 颗 + 次色 n/2 颗」的原始点亮形态
     const secondary = window.EmotionEngine.secondaryOf(lex.all, emo);
     if (emo === "crisis") {
-      history.push({ role: "user", content: text });
-      history.push({ role: "assistant", content: CRISIS_REPLY });
-      saveHistory();
+      remember(text, CRISIS_REPLY);
       window.MemoryStore.record({ emotion: "crisis", intensity: 1, text: text.slice(0, 60) });
       return { reply: CRISIS_REPLY, emotion: "crisis", mode: "guard", path, latency: 0 };
     }
@@ -135,11 +133,20 @@ window.ChatAgent = (function () {
       reply = await offlineReply(text, emo); mode = "offline";
     }
     const latency = Math.round(performance.now() - t0);
-    history.push({ role: "user", content: text });
-    history.push({ role: "assistant", content: reply });
-    saveHistory();
+    remember(text, reply);
     window.MemoryStore.record({ emotion: emo, intensity, secondary, text: text.slice(0, 60) });
     return { reply, emotion: emo, intensity, mode, path, latency, secondary };
+  }
+
+  /** 记住一轮问答：本地 history 为主，远端（J4，默认关闭）尽力而为 */
+  function remember(userText, aiText) {
+    history.push({ role: "user", content: userText });
+    history.push({ role: "assistant", content: aiText });
+    saveHistory();
+    if (window.MemoryStore && window.MemoryStore.pushMessage) {
+      window.MemoryStore.pushMessage("user", userText);
+      window.MemoryStore.pushMessage("assistant", aiText);
+    }
   }
 
   function setCfg(c) { saveCfg(c); history = []; saveHistory(); }

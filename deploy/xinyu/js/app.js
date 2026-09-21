@@ -266,6 +266,13 @@
     drawChart();
   });
 
+  // J4：远端记忆（默认关闭）。开启且服务端可达时，用数据库权威副本覆盖本地后重建星图；
+  // 未开启/不可达 → 走下面这行，行为与 v1 完全一致（确保既有回归不受影响）。
+  if (window.MemoryStore.isRemote()) {
+    window.MemoryStore.hydrate()
+      .then(ok => { if (ok) { replayStars(); drawChart(); } })
+      .catch(() => { /* 服务端不可达 → 保持本地记忆 */ });
+  }
   replayStars(); // 进页面先按本机记忆把星图重建出来
 
   // 7) 设置面板

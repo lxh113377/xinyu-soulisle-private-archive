@@ -15,9 +15,10 @@
 ### 分阶段（每阶段都要能跑、能回归，禁止一次性推倒重写）
 - [x] **J1 骨架** ✅ 2026-09-21：`server/`（Maven 3.9.9 + Spring Boot 3.2.5 + JDK 17）+ `/api/health` + 托管现有前端静态页（**直读 `src/` 权威源，零副本**）→ `java -jar server\target\soulisle-server.jar --server.port=8123` 实测 `status=UP` / `webRoot` 解析到项目 `src/` / `indexFound=true` / `vendorFound=true`，首页与 `js`、`css`、`vendor` 全 200；`_test/browser_check.py` **原样复用（同端口 8123）ALL-ASSERT-PASS**。对照组：换回旧 `python -m http.server` 同为 4 条 `ERR_CONNECTION_REFUSED` ⇒ 该错误出自脚本自注入的不可达端点 `127.0.0.1:18123`（离线降级用），与 Java 服务端无关
 - [x] **J2 API 契约对齐** ✅ 2026-09-22：`POST /api/chat` 与 v1 **1:1**（契约实读自 `deploy/functions/api/chat.js` + `src/js/chat-agent.js:25-43`，非凭记忆）。请求认 `{messages,temperature,max_tokens}`；**上游响应逐字透传**（含 status）；错误体与 v1 完全一致（`no-key` 500 / `bad-json` 400 / `upstream-nonjson` / `upstream-error` 502），且**判定顺序一致**（先查 key 再解析 body）。验收：`_test/j2_chat_contract.py` **J2-CONTRACT-PASS**（A 组走 Java 965ms 在线 / B 组不可达端点 3ms 回落离线，单变量对照）+ curl 三例（no-key 500、bad-json 400、真实调用 200 中文无损）+ `browser_check.py` ALL-ASSERT-PASS
-- [ ] **J3 情绪引擎 Java 化**：词典快判（复用现词表 JSON）+ LLM 精判 + 分歧采信 LLM + 危机拦截；`_test/emotion-eval-dataset.json` 36 条在 Java 侧复跑，**词典层准确率 ≥94.4% / 危机召回 3/3** 为通过线
-- [ ] **J4 持久化**：`chat_message` / `emotion_record` 表（MyBatis-Plus + MySQL 8，演示可切 H2）替代 localStorage；前端保留本地降级
-- [ ] **J5 安全与部署**：密钥外置（环境变量，禁入库）、可选 Spring Security + JWT、`mvn package` → fat jar 部署（预留 Dockerfile）
+- [x] **J3 情绪引擎 Java 化** ✅ 2026-09-22：`engine` 包（`EmotionLexicon` 词表逐字搬 / `EmotionEngine.scan` 同公式 / `EmotionClassifier` 双路）+ `POST /api/emotion` + `GET /api/emotion/eval`。**双端逐项对账完全一致**：Java 侧 `94.4%` / `crisis_recall 3/3` / `per_class` 七类全同 / `misses` 两条逐字相同（JS 侧 `node _test/emotion_eval.js` 为对照）。危机命中**不调 LLM**（实测 `llm=null`）；分歧案例 `lex anger 0.625 vs llm sadness 0.75 → 采信 LLM` 与前端路径一致
+- [x] **J4 持久化** ✅ 2026-09-22：`chat_message` / `emotion_record` 两表（MyBatis-Plus 3.5.7 + **H2 file 默认 / MySQL 8 可切**）+ `/api/memory/**` CRUD。实测**跨重启持久**（2 emotion / 2 message 重启后仍在）、`DELETE` 清除 `removed=4` 且会话隔离。前端接入为**可选项**（`cfg.remote===true`，默认关闭）：`_test/j4_memory_check.py` **J4-MEMORY-PASS** —— 核心断言「**清空 localStorage 后刷新星图仍点亮 6 颗**」证明数据真来自数据库；对照组默认关闭时服务端 0/0（判据非恒真）
+- [x] **J5 安全与部署** ✅ 2026-09-22：密钥全外置（`DEEPSEEK_KEY` 环境变量，零落盘零入库）；可选鉴权 `XINYU_API_TOKEN`（默认空=放行，非空则 `/api/**` 除 `/api/health` 需 `X-Xinyu-Token`，实测 无头401/错头401/对头200/health 与静态页放行）；`server/Dockerfile` 已交付。⚠️ **Docker 本机未安装 → 镜像构建未实测**（不谎称验证过）
+- 部署形态说明：J5 采用**轻量 token 过滤器**而非引入 Spring Security 全家桶（演示场景够用 + 依赖最小化 + 默认关闭零影响）。若后续需要多用户/角色，再评估升级
 
 ### 改造期间的不变量（违反 = 回滚）
 - 密钥零落前端、零入库（`src/js/demo-config.js` 已在 .gitignore 排除）
@@ -27,7 +28,10 @@
 ## P0 — 必须做
 - [x] ~~版本控制基线~~ ✅ 2026-09-21 r2（纪律 #20 四步全达标）：首提 `8c4f59d`（73 文件，`--file` 白名单禁 `add -A`）→ 私有远端 `https://github.com/lxh113377/xinyu-soulisle-private-archive` → push → `rev-parse HEAD` == `ls-remote origin main` == `8c4f59d76f3e6ce39b9f054a182cdd3bd8c9f30b`；密钥零入库（`git grep -E "sk-[A-Za-z0-9]{20,}" HEAD` = **0 命中**）。注意：`gh` 在 PowerShell 下因**无扩展名**被判为"文档"无法执行，**须经 Git Bash 调用**
 - [x] ~~J2 API 契约对齐~~ ✅ 2026-09-22（详见分阶段表）
-- [ ] **J3 情绪引擎 Java 化**（下一阶段）：`engine` 包实现词典快判 + LLM 精判 + 分歧采信 LLM + 危机拦截；`_test/emotion-eval-dataset.json` 36 条在 Java 侧复跑，**词典层准确率 ≥94.4% / 危机召回 3/3** 为通过线。动手前先实读 `src/js/emotion-engine.js` 取词表与判定口径，禁止凭记忆重写
+- [x] ~~J3 / J4 / J5~~ ✅ 2026-09-22 全部完成（详见分阶段表）→ **Java 全栈主线 J1–J5 已贯通**
+- [ ] 🔴 **iCAN 提交硬截止 2026-09-30**（今天 09-22，剩 8 天；截止即锁团队信息）：官网报名 + 提交。缺件风险：官方要《应用方案》PDF（≤20 页），而该项此前按老大 09-19「视频/PPT/PDF 不管」指令被冻结 —— 需一句话解冻即开做
+- [x] ~~CloudBase 国内线决策~~ ✅ 2026-09-22 老大定：**接受中间页，仅作备用**（零成本，保持现状）。注意：CloudBase 云函数的 Key 仍是旧值（CLI 无 `fn env push`，只能控制台改）；若旧 Key 被平台作废，国内备用线会失效，需在控制台同步新 Key
+- [x] ~~云端密钥轮换~~ ✅ 2026-09-22：新 Key 实测 `200 OK` → `wrangler pages secret put DEEPSEEK_KEY`（**wrangler@3 报错，@4 成功**）+ `pages deploy` 重部署使其生效（secret 需新部署才绑定）→ 生产 `PUBLIC-ONLINE-ALL-PASS`（在线 AI 1206ms、`KEY_LEAK: False`）
 - [x] ~~部署在线演示~~ ✅ 2026-09-19 Cloudflare：**https://xinyu-soulisle.pages.dev** （Pages + Function 代理 /api/chat，密钥在 env，前端零密钥）；✅ 2026-09-20 加国内线：**https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com**（CloudBase 静态托管 + 云函数 chat，环境有效期至 2027-03-14）。两端均实测 PUBLIC-ONLINE-ALL-PASS；前端 demo-config 按域名自适应指向对应代理
 - [ ] 🔴 **待老大决策**：CloudBase 测试域名首访有「风险提醒」中间页（点一次放行；官方无免备案开关，需绑 ICP 备案自定义域名才能去掉，且默认域名有风控关停风险）。选项：①接受中间页并把 CloudBase 仅作备用（零成本，当前状态）②办域名+ICP 备案后绑自定义域名（约 1–3 周，赶得上 10 月复赛）③撤回国内线，仅用 pages.dev
 - [ ] ⏸ **已冻结（范围冲突待老大一句话解冻）**：起草《应用方案》PDF（大纲：交付物/提交包/应用方案大纲.md；AI核心作用章节可直接引用：双路情绪引擎实测分歧案例 + 词典层评测 94.4%/危机召回3/3 + **Serverless密钥隔离架构**，见 _test/emotion_eval.js / src/functions/api/chat.js）
@@ -43,6 +47,7 @@
 - ~~角色形象（VRM 或 SVG 表情脸）~~ ❌ 老大 2026-09-19 指示：不做，已从待办移除
 
 ## 最近对话摘要
+- 2026-09-22 r2 — 老大「全部授权」+ 定 CloudBase 决策 + 给新 Key + 要求**完成 J3/J4/J5** → 主线 Java 全栈 J1–J5 **全部贯通**。要点：**J3** 词表逐字移植（注意 JS 里 `难受`/`不` 有重复项会被重复计分，必须原样保留否则对不上 94.4%），双端对账逐项一致；**J4** H2 file 默认/MySQL 可切，核心断言是「清空 localStorage 后刷新星图仍点亮」；**J5** 轻量 token 过滤器（不引 Spring Security）+ Dockerfile（Docker 未装未实测）。踩坑：① 我一度写出**重复的 `spring:` YAML 键**（SnakeYAML 会直接启动失败），读盘自查后合并 ② `wrangler@3` 报错、**`@4` 成功** ③ Pages **secret 需重新部署才生效** ④ 顺手修了 `src/js/demo-config.js` 缺 `!cur.proxy` 守卫的老坑（J2 踩到的就是它）。生产 `PUBLIC-ONLINE-ALL-PASS`。
 - 2026-09-22 r1 — 老大「全部授权，继续执行未完成的任务」→ 完成 **J2**：`POST /api/chat` 与 v1 契约 1:1（契约实读自 `deploy/functions/api/chat.js` + `src/js/chat-agent.js:25-43`）。新增 `llm/LlmProxy.java`（JDK 内置 HttpClient，上游响应**逐字透传**）+ `api/ChatController.java`（no-key 500 / bad-json 400，判定顺序与 v1 一致）；密钥只走 `DEEPSEEK_KEY` 环境变量。**踩坑（判据差点恒真）**：首版验收脚本 A/B 两组都"在线" —— 根因是 `demo-config.js` 只在 `cfg.base` 与 `cfg.key` 都为空时才预置 Key，只设 `{proxy}` 会在 reload 后被硬编码 Key 覆盖，两组都走浏览器直连。修法 = 单变量对照（base/key 设无效值，只让 proxy 不同）⇒ A 在线 965ms 只可能来自 Java / B 3ms 回落离线 ⇒ `j2_chat_contract.py` J2-CONTRACT-PASS + `browser_check` ALL-ASSERT-PASS。同轮老大立规：**非破坏性步骤自动执行不要多问**（授权/继续/升级建议三类）。提交 `fd6804e` 已 push。
 - 2026-09-21 r1 — 老大「继续执行未完成的任务」→ 接主线 **J1**，已完成（详见上方分阶段表）。动手前实测拦下三个阻塞：① Maven 未装（新装 3.9.9 到 `~/.local/maven`，配腾讯云镜像）② **默认 `JAVA_HOME` 是 JDK 8 而非 17**（构建必显式切换）③ **版本控制基线缺失**（0 commit + 无远端，纪律 #20 判 🔴）。设计取舍：静态页**不复制进 `src/main/resources/static/`**，改用 `spring.web.resources.static-locations=file:${XINYU_WEB_ROOT:./src/}` 直读权威源 —— 避免造出第三处副本同步点（已有 `src/` → `deploy/xinyu/` 一条同步红线）。验收：`/api/health` UP + 资源全 200 + `browser_check.py` 原样 ALL-ASSERT-PASS + python 服务对照组证明控制台错误与 Java 无关。`.gitignore` 增 `server/target/`。
 - 2026-09-20 r16 — **方向定调**：老大要求把陪聊后续计划改为「**Java 全栈**」目标，已落进本文件「主线目标」章节（J1–J5 分阶段 + 不变量）。同轮补齐项目**版本控制基线**（此前唯一无 `.git`/`.gitignore` 的项目）：`git init -b main` + 新建 `.gitignore`（密钥 `src/js/demo-config.js` / `_test/cors_probe.py` / `.env*`；生成物 `__pycache__`、`_test/_shots/`；元数据 `.codebuddy/` 等），**未 commit**。
@@ -54,6 +59,7 @@
 - 2026-09-19 — 从零建原型+评审5文档（详见交付物/iCAN评审/）
 
 ## 已完成
+- [x] **J3/J4/J5**（2026-09-22）：情绪引擎 Java 化（双端对账 94.4%/3-3 一致）、持久化（H2/MySQL 可切，跨重启实测）、安全与部署（密钥外置 + 可选 token + Dockerfile）→ **Java 全栈主线贯通**
 - [x] **J1 Java 骨架**（2026-09-21）：`server/` Spring Boot 3.2.5 + `/api/health` + 直读 `src/` 托管前端；`browser_check.py` 原样 ALL-ASSERT-PASS
 - [x] 原型可运行 + 评审文档落盘（2026-09-19）
 - [x] M1 LLM在线+双路+体验模式（2026-09-19，ONLINE-ALL-PASS）
