@@ -25,6 +25,10 @@
 
 ## 🎯 目标技术栈（v2 — Java 全栈，2026-09-20 老大定方向 · 选型为假设值待确认）
 
+> ⚠️ **本表未落地项均为「待落地验证」的假设值**（A-project-handoff V3.41.4 立规）：落地阶段必须用**实测值**回填，禁止把计划当既成事实引用。
+> **已落地实测**（可作为事实引用）：JDK 17 / Maven 3.9.9 / Spring Boot 3.2.5 / 静态页 `static-locations` 直读 `src/` / `POST /api/chat` 契约 1:1（J1、J2）。
+> **未落地**（仍属假设）：MyBatis-Plus + MySQL 8、Spring Security + JWT、fat jar 部署、Dockerfile。
+
 | 层 | 选型（待确认） | 备注 |
 |---|---|---|
 | 语言 / 运行时 | **JDK 17** | 本机实测 `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot`；JDK 8（`…jdk-8.0.504.1-hotspot`）是课程作业用，本项目勿混 |

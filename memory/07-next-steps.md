@@ -30,7 +30,7 @@
 - [ ] **J3 情绪引擎 Java 化**（下一阶段）：`engine` 包实现词典快判 + LLM 精判 + 分歧采信 LLM + 危机拦截；`_test/emotion-eval-dataset.json` 36 条在 Java 侧复跑，**词典层准确率 ≥94.4% / 危机召回 3/3** 为通过线。动手前先实读 `src/js/emotion-engine.js` 取词表与判定口径，禁止凭记忆重写
 - [x] ~~部署在线演示~~ ✅ 2026-09-19 Cloudflare：**https://xinyu-soulisle.pages.dev** （Pages + Function 代理 /api/chat，密钥在 env，前端零密钥）；✅ 2026-09-20 加国内线：**https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com**（CloudBase 静态托管 + 云函数 chat，环境有效期至 2027-03-14）。两端均实测 PUBLIC-ONLINE-ALL-PASS；前端 demo-config 按域名自适应指向对应代理
 - [ ] 🔴 **待老大决策**：CloudBase 测试域名首访有「风险提醒」中间页（点一次放行；官方无免备案开关，需绑 ICP 备案自定义域名才能去掉，且默认域名有风控关停风险）。选项：①接受中间页并把 CloudBase 仅作备用（零成本，当前状态）②办域名+ICP 备案后绑自定义域名（约 1–3 周，赶得上 10 月复赛）③撤回国内线，仅用 pages.dev
-- [ ] 起草《应用方案》PDF（大纲：交付物/提交包/应用方案大纲.md；AI核心作用章节可直接引用：双路情绪引擎实测分歧案例 + 词典层评测 94.4%/危机召回3/3 + **Serverless密钥隔离架构**，见 _test/emotion_eval.js / src/functions/api/chat.js）
+- [ ] ⏸ **已冻结（范围冲突待老大一句话解冻）**：起草《应用方案》PDF（大纲：交付物/提交包/应用方案大纲.md；AI核心作用章节可直接引用：双路情绪引擎实测分歧案例 + 词典层评测 94.4%/危机召回3/3 + **Serverless密钥隔离架构**，见 _test/emotion_eval.js / src/functions/api/chat.js）
 
 ## P1 — 应该做
 - [ ] 情绪引擎评测集扩到 ≥60 条（当前36条、94.4%；剩2误判=真歧义类，可标注为"混合情绪"改评分口径为top-k命中）
@@ -43,6 +43,7 @@
 - ~~角色形象（VRM 或 SVG 表情脸）~~ ❌ 老大 2026-09-19 指示：不做，已从待办移除
 
 ## 最近对话摘要
+- 2026-09-22 r1 — 老大「全部授权，继续执行未完成的任务」→ 完成 **J2**：`POST /api/chat` 与 v1 契约 1:1（契约实读自 `deploy/functions/api/chat.js` + `src/js/chat-agent.js:25-43`）。新增 `llm/LlmProxy.java`（JDK 内置 HttpClient，上游响应**逐字透传**）+ `api/ChatController.java`（no-key 500 / bad-json 400，判定顺序与 v1 一致）；密钥只走 `DEEPSEEK_KEY` 环境变量。**踩坑（判据差点恒真）**：首版验收脚本 A/B 两组都"在线" —— 根因是 `demo-config.js` 只在 `cfg.base` 与 `cfg.key` 都为空时才预置 Key，只设 `{proxy}` 会在 reload 后被硬编码 Key 覆盖，两组都走浏览器直连。修法 = 单变量对照（base/key 设无效值，只让 proxy 不同）⇒ A 在线 965ms 只可能来自 Java / B 3ms 回落离线 ⇒ `j2_chat_contract.py` J2-CONTRACT-PASS + `browser_check` ALL-ASSERT-PASS。同轮老大立规：**非破坏性步骤自动执行不要多问**（授权/继续/升级建议三类）。提交 `fd6804e` 已 push。
 - 2026-09-21 r1 — 老大「继续执行未完成的任务」→ 接主线 **J1**，已完成（详见上方分阶段表）。动手前实测拦下三个阻塞：① Maven 未装（新装 3.9.9 到 `~/.local/maven`，配腾讯云镜像）② **默认 `JAVA_HOME` 是 JDK 8 而非 17**（构建必显式切换）③ **版本控制基线缺失**（0 commit + 无远端，纪律 #20 判 🔴）。设计取舍：静态页**不复制进 `src/main/resources/static/`**，改用 `spring.web.resources.static-locations=file:${XINYU_WEB_ROOT:./src/}` 直读权威源 —— 避免造出第三处副本同步点（已有 `src/` → `deploy/xinyu/` 一条同步红线）。验收：`/api/health` UP + 资源全 200 + `browser_check.py` 原样 ALL-ASSERT-PASS + python 服务对照组证明控制台错误与 Java 无关。`.gitignore` 增 `server/target/`。
 - 2026-09-20 r16 — **方向定调**：老大要求把陪聊后续计划改为「**Java 全栈**」目标，已落进本文件「主线目标」章节（J1–J5 分阶段 + 不变量）。同轮补齐项目**版本控制基线**（此前唯一无 `.git`/`.gitignore` 的项目）：`git init -b main` + 新建 `.gitignore`（密钥 `src/js/demo-config.js` / `_test/cors_probe.py` / `.env*`；生成物 `__pycache__`、`_test/_shots/`；元数据 `.codebuddy/` 等），**未 commit**。
 - 2026-09-20 r6 — 「越聊越点亮」星雾 + 底部对话坞（老大点子）：初始星雾全暗（极暗灰白微光轮廓），每句对话按其情绪点亮 1–8 颗星并持久化重放，清除数据即熄灭；第二幕探针 + 第三幕聊天融合为**底部常驻对话坞**（`#chat-dock`，可折叠、点叙事区自动收起）。为让"被点亮的星"看得见，`PointsMaterial` 换成 `ShaderMaterial` 支持逐粒子尺寸（暗星 0.05 / 点亮 0.22，实测有效像素 29 → 323）。踩坑：① 悬浮坞遮住第四幕清除按钮（已 padding 预留 + 自动收起 + 测试断言坞可收起）② 像素判据单比色距会被 1 像素噪点骗过 → 改双条件（色距 >0.25 且少数簇占比 >0.10）③ 次情绪必须入库否则重放少点。回归：browser_check（lit 0→5→17→刷新 17→清除 0）+ pixel_dual_check（多色 0.488/33.4% vs 单色 0.197/0.2%）双绿，console 0；deploy/xinyu 哈希全一致。

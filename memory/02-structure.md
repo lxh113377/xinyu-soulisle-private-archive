@@ -36,3 +36,4 @@
 - **静态页托管策略：直读 `src/` 权威源，不复制到 `src/main/resources/static/`** —— 避免第三处副本同步点（既有同步红线：`src/` → `deploy/xinyu/`）
 - 已落地（J2）：`llm/LlmProxy.java`（JDK 内置 `HttpClient` 转发 OpenAI 兼容上游，零额外依赖）+ `api/ChatController.java`（`/api/chat`，契约 1:1 复刻 v1 Function）
 - 后续分层（J3–J5 待建）：`service`（对话编排）/ `engine`（`EmotionEngine` 词典 + LLM 双路）/ `mapper`（MyBatis-Plus）/ `entity`
+  - ⚠️ **待落地验证**：以上为规划，尚未落地，不得当作既成事实引用（J1 实证过一次：原写「前端置于 `src/main/resources/static/`」真动手才发现会造第三处副本同步点，已改为直读权威源）
