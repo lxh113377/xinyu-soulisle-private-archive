@@ -25,7 +25,7 @@
 - 每阶段收尾必须跑 `_test/browser_check.py` 确认前端未回归，并在 `05-feature-status.md` 标状态
 
 ## P0 — 必须做
-- [ ] 🔴 **版本控制基线缺失**（2026-09-21 实测：`git log` → `does not have any commits yet`、`git remote -v` → 空 ⇒ 纪律 #20 四步基线缺 3 步）。现状：已 `git init -b main` + `.gitignore`（本轮新增 `server/target/`），**0 commit、无远端**。待老大授权后才可执行：① 首个 commit（`--file` 白名单，禁 `add -A`，防席卷并发会话改动）② 建私有远端并推送 ③ 校验 `rev-parse HEAD` == `ls-remote origin main`
+- [x] ~~版本控制基线~~ ✅ 2026-09-21 r2（纪律 #20 四步全达标）：首提 `8c4f59d`（73 文件，`--file` 白名单禁 `add -A`）→ 私有远端 `https://github.com/lxh113377/xinyu-soulisle-private-archive` → push → `rev-parse HEAD` == `ls-remote origin main` == `8c4f59d76f3e6ce39b9f054a182cdd3bd8c9f30b`；密钥零入库（`git grep -E "sk-[A-Za-z0-9]{20,}" HEAD` = **0 命中**）。注意：`gh` 在 PowerShell 下因**无扩展名**被判为"文档"无法执行，**须经 Git Bash 调用**
 - [ ] **J2 API 契约对齐**（J1 已就绪，下一步就是它）：`POST /api/chat` 与 v1 **1:1** 对齐（先取 `src/js/chat-agent.js` 与 `deploy/functions/api/chat.js` 实测请求/响应字段，禁止凭记忆写契约）→ 前端只改 baseURL 即可切换，新旧两线可对比
 - [x] ~~部署在线演示~~ ✅ 2026-09-19 Cloudflare：**https://xinyu-soulisle.pages.dev** （Pages + Function 代理 /api/chat，密钥在 env，前端零密钥）；✅ 2026-09-20 加国内线：**https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com**（CloudBase 静态托管 + 云函数 chat，环境有效期至 2027-03-14）。两端均实测 PUBLIC-ONLINE-ALL-PASS；前端 demo-config 按域名自适应指向对应代理
 - [ ] 🔴 **待老大决策**：CloudBase 测试域名首访有「风险提醒」中间页（点一次放行；官方无免备案开关，需绑 ICP 备案自定义域名才能去掉，且默认域名有风控关停风险）。选项：①接受中间页并把 CloudBase 仅作备用（零成本，当前状态）②办域名+ICP 备案后绑自定义域名（约 1–3 周，赶得上 10 月复赛）③撤回国内线，仅用 pages.dev
