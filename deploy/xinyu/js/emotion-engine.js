@@ -15,6 +15,30 @@ window.EmotionEngine = (function () {
   const DEG = { "太":1.4,"好":1.3,"非常":1.5,"特别":1.4,"超":1.5,"真的":1.3,"巨":1.5,"有点":0.6,"有些":0.6,"稍微":0.5 };
   const CRISIS = ["自杀","不想活","活不下去","结束生命","割腕","轻生","一了百了","死了算了","去死","自我了断","结束一切","想结束"];
 
+  /**
+   * 否定判定（2026-09-23 修缺陷）：否定词的字符若**被程度副词覆盖**，则该否定词不生效。
+   * - 背景：NEG 含「别」，而取词窗口是「词前 3 字」⇒「心里【特别】难受」里「特别」的「别」
+   *   被当成否定词，sadness 乘 −0.7 反号后归零，最终误判成 anger（评委输入「我特别难受」必翻车）。
+   * - 修正后：「特别难受」→ 程度副词占位，否定不生效（正确）；
+   *           「别难过」  → 窗口内无程度副词，否定照常生效（正确，保留）。
+   */
+  function hasNegation(before) {
+    const degSpans = [];
+    for (const d of Object.keys(DEG)) {
+      let p = before.indexOf(d);
+      while (p !== -1) { degSpans.push([p, p + d.length]); p = before.indexOf(d, p + 1); }
+    }
+    return NEG.some(n => {
+      let q = before.indexOf(n);
+      while (q !== -1) {
+        const covered = degSpans.some(([a, b]) => q < b && q + n.length > a);
+        if (!covered) return true;
+        q = before.indexOf(n, q + 1);
+      }
+      return false;
+    });
+  }
+
   function scan(text) {
     const scores = {};
     for (const [emo, cfg] of Object.entries(LEX)) {
@@ -24,7 +48,7 @@ window.EmotionEngine = (function () {
         while (idx !== -1) {
           const before = text.slice(Math.max(0, idx - 3), idx);
           let mult = 1;
-          if (NEG.some(n => before.includes(n))) mult = -0.7;       // 否定反转
+          if (hasNegation(before)) mult = -0.7;                     // 否定反转
           for (const [d, m] of Object.entries(DEG)) if (before.includes(d)) mult *= m;
           s += cfg.w * mult;
           idx = text.indexOf(w, idx + w.length);

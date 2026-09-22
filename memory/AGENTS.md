@@ -19,7 +19,9 @@
 - `memory/07-next-steps.md` P0 永不为空；`savepoint` 后才能结束对话
 - **当前主线 = Java 全栈改造（2026-09-20 定）**：分阶段 J1–J5 落在 `07-next-steps.md`，每阶段必须能跑 + 过 `_test/browser_check.py`，禁止一次性推倒重写
 - **密钥红线**：密钥零落前端、零入库。`src/js/demo-config.js`（含 Key）已在 `.gitignore`；`deploy/xinyu/js/demo-config.js`（零密钥代理版）**禁止**被 src 版覆盖
-- **同步红线**：改 `src/` 必须同步 `deploy/xinyu/` 并做 SHA256 双向比对（MISSING / DIFF / EXTRA 三类全归零）
+- **同步红线**：改 `src/` 必须同步 `deploy/xinyu/` 并做 SHA256 双向比对（MISSING / DIFF / EXTRA 三类全归零）→ **已固化为 `python _test/deploy_sync_check.py`**（2026-09-23 立）。
+  ⚠️ 立规缘由：修完 `src/js/emotion-engine.js` 缺陷后公网副本**仍是旧引擎**，差点把带缺陷的版本部署上线；且首次手工比对被 PowerShell 别名 `h`(Get-History) 覆盖自定义函数 → 两端哈希都取不到 → `None==None` → **全报 SAME（假通过）**。故脚本强制哈希非空 + 输入非空断言，并自带对照组用法。
+  `js/demo-config.js` **不参与内容比对**（两端本就该不同：src 版含真实 Key，deploy 版是零密钥 stub），只做红线复核（零密钥 + 与 src 版不同）。
 - Java 任务（v2 起）：源码一律 UTF-8，编译必须 `javac -encoding UTF-8`；JDK 版本切换后必须重验编码
 - **Java 构建环境（2026-09-21 实测，禁凭记忆猜路径）**：JDK 17 = `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot`；Maven = `%USERPROFILE%\.local\maven\apache-maven-3.9.9\bin\mvn`（不在 PATH）。⚠️ **默认 `JAVA_HOME` 是 JDK 8，每次构建/启动前必须显式切换**，否则 Spring Boot 3 编译失败
 - **静态页托管红线**：服务端直读 `src/`（`static-locations=file:${XINYU_WEB_ROOT:./src/}`），**禁止**把前端复制进 `src/main/resources/static/`（会造出第三处副本同步点）
