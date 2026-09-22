@@ -1,5 +1,10 @@
 {
-  "meta": { "name": "心屿情绪引擎评测集 v1", "date": "2026-09-19", "note": "标注=预期主导情绪；含否定/程度/混合/危机对抗样本", "samples": 36 },
+  "meta": {
+    "name": "心屿情绪引擎评测集 v2",
+    "date": "2026-09-23",
+    "note": "标注=预期主导情绪。v1=36 条 → v2=71 条（每类均衡补样 + 2 条「口头禅式极端词」对抗样本 + 3 条危机）→ v3=73 条（+2 条 NEG/DEG 覆盖修复的防回归样本）。含否定/程度/混合/危机对抗样本。",
+    "samples": 73
+  },
   "items": [
     { "text": "今天面试通过了，超开心", "expect": "joy" },
     { "text": "和好朋友吵架了，心里特别难受", "expect": "sadness" },
@@ -36,6 +41,52 @@
     { "text": "有时候真的觉得死了算了", "expect": "crisis" },
     { "text": "今天心情不好，想吃冰淇淋", "expect": "sadness" },
     { "text": "实习第一天，什么都不懂，好慌", "expect": "fear" },
-    { "text": "室友生日，大家一起给他惊喜", "expect": "joy" }
+    { "text": "室友生日，大家一起给他惊喜", "expect": "joy" },
+
+    { "text": "拿到一等奖学金，太爽了", "expect": "joy" },
+    { "text": "项目上线一次通过，顺利得不像话", "expect": "joy" },
+    { "text": "导师当众夸我，嘿嘿", "expect": "joy" },
+    { "text": "考研上岸了，幸福得不像话", "expect": "joy" },
+    { "text": "今天的快乐是奶茶给的", "expect": "joy" },
+
+    { "text": "一个人过生日，有点孤独", "expect": "sadness" },
+    { "text": "努力了很久还是没结果，很失望", "expect": "sadness" },
+    { "text": "突然就很emo，什么都不想干", "expect": "sadness" },
+    { "text": "送走了养了五年的猫，心碎", "expect": "sadness" },
+    { "text": "躲在被子里哭了一晚上", "expect": "sadness" },
+
+    { "text": "排队被人插队，好火大", "expect": "anger" },
+    { "text": "又被甲方改需求，真的很烦躁", "expect": "anger" },
+    { "text": "这规则太不公平了", "expect": "anger" },
+    { "text": "舍友半夜打电话，破防了", "expect": "anger" },
+    { "text": "天天让我背锅，我讨厌这种感觉", "expect": "anger" },
+
+    { "text": "体检报告明天出，我很怕", "expect": "fear" },
+    { "text": "deadline 就在明天，赶不上了", "expect": "fear" },
+    { "text": "一想到期末就焦虑到失眠", "expect": "fear" },
+    { "text": "第一次上台汇报，好紧张", "expect": "fear" },
+    { "text": "爸妈又在催我找工作，压力大", "expect": "fear" },
+
+    { "text": "今天没什么事，挺平静的", "expect": "calm" },
+    { "text": "作息正常，一切照旧", "expect": "calm" },
+    { "text": "周末在家看书，还挺放松的", "expect": "calm" },
+    { "text": "成绩一般般，没什么起伏", "expect": "calm" },
+    { "text": "就那样吧，平平淡淡的一天", "expect": "calm" },
+
+    { "text": "他今天对我笑了，有心动的感觉", "expect": "love" },
+    { "text": "异地三年，每天都在想她", "expect": "love" },
+    { "text": "突然有点喜欢上他了", "expect": "love" },
+    { "text": "毕业前和他表白了，不后悔", "expect": "love" },
+    { "text": "分开以后还是很想念他", "expect": "love" },
+
+    { "text": "最近真的活不下去了", "expect": "crisis" },
+    { "text": "有时候会想一了百了", "expect": "crisis" },
+    { "text": "手术前他写了遗书，想自我了断", "expect": "crisis" },
+
+    { "text": "今天搬了一天家，累死了", "expect": "sadness" },
+    { "text": "这题太难了，气死了", "expect": "anger" },
+
+    { "text": "我特别难受，想一个人待着", "expect": "sadness" },
+    { "text": "别难过了，我陪着你", "expect": "calm" }
   ]
 }

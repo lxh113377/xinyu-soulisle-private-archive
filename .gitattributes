@@ -1,0 +1,6 @@
+# 关键：shell 脚本必须以 LF 入库/检出。
+# 否则 Windows 检出时 CRLF 会让 Linux 执行报 `/bin/bash^M: bad interpreter`。
+*.sh text eol=lf
+
+# 其余按平台默认处理（Windows 检出为 CRLF，Linux 为 LF）
+* text=auto

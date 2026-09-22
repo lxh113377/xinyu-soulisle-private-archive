@@ -24,8 +24,12 @@
 - **Java 构建环境（2026-09-21 实测，禁凭记忆猜路径）**：JDK 17 = `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot`；Maven = `%USERPROFILE%\.local\maven\apache-maven-3.9.9\bin\mvn`（不在 PATH）。⚠️ **默认 `JAVA_HOME` 是 JDK 8，每次构建/启动前必须显式切换**，否则 Spring Boot 3 编译失败
 - **静态页托管红线**：服务端直读 `src/`（`static-locations=file:${XINYU_WEB_ROOT:./src/}`），**禁止**把前端复制进 `src/main/resources/static/`（会造出第三处副本同步点）
 - **评测集红线（J3）**：`GET /api/emotion/eval` 从 `_test/emotion-eval-dataset.json` **直读权威源**（`XINYU_EVAL_DATASET` 可覆盖），**禁止**把评测集复制进 jar/资源目录
-- **🔴 词表一致性红线（J3，2026-09-22 立）**：情绪引擎在 JS / Java **各有一份**（本地那份是**离线降级**用的，不可删）。**改任一端的词表，必须两端同步改，并跑 `python _test/engine_consistency_check.py`**（三层判据：词表结构含重复项与顺序 / 逐条预测 36 条 / 汇总指标）—— **不一致即失败**，禁止只看 `emotion_eval.js` 单侧通过就提交
-- **J4 开关**：前端远端记忆默认**关闭**，靠 `cfg.remote === true` 启用（`memory-store.js`）；改动该默认值会波及全部浏览器回归，须先跑 `_test/j4_memory_check.py` + `browser_check.py`
+- **🔴 词表一致性红线（J3，2026-09-22 立）**：情绪引擎在 JS / Java **各有一份**（本地那份是**离线降级**用的，不可删）。**改任一端的词表，必须两端同步改，并跑 `python _test/engine_consistency_check.py`**（三层判据：词表结构含重复项与顺序 / **逐条预测 73 条**（2026-09-23 由 36 扩至 73）/ 汇总指标）—— **不一致即失败**，禁止只看 `emotion_eval.js` 单侧通过就提交
+- **J4 开关（2026-09-23 校正：此前只写「默认关闭」，与磁盘实况不符）**：分三层，**不得混为一谈**
+  1. **代码层**（`src/js/memory-store.js`）—— 判定仍是 `cfg.remote === true` 才发远端请求，**默认关闭**；服务端不可达即熔断（404/网络失败 → `remoteDown`，本会话不再重试），本地 `localStorage` 照常写入
+  2. **本地演示预置层**（`src/js/demo-config.js`）—— 已置 **`remote: true`** ⇒ **本地 / fat jar 演示默认开启**服务端持久化（"跨设备、清缓存都不丢"成立）
+  3. **公网部署层**（`deploy/xinyu/js/demo-config.js`）—— **刻意不含 `remote`** ⇒ Pages / CloudBase 上默认关闭（那里只有 `/api/chat`、没有 `/api/memory`，开了会给评委看到 404）
+  改动任一层都须先跑 `_test/j4_memory_check.py` + `_test/j4_remote_down_check.py` + `_test/browser_check.py`
 - **密钥红线（J5）**：`DEEPSEEK_KEY` 只从环境变量读；`XINYU_API_TOKEN` 留空=不鉴权（演示默认），私有部署时置非空
 
 ## 架构决策（索引 —— 详表见 `03-tech-stack.md`「📋 选型决策记录」）

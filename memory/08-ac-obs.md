@@ -26,12 +26,19 @@
 
 - [x] AC-OBS-07: 服务端托管前端静态页且能自证源命中 → `GET /api/health` 返回 `status=UP` + `webRoot` 绝对路径 + `indexFound=true` + `vendorFound=true`；首页与 `js/css/vendor` 均 200 | API响应
 - [x] AC-OBS-08: `POST /api/chat` 与 v1 契约 1:1（前端零代码改动即可切换） → `j2_chat_contract.py` **单变量对照**：A（proxy=Java）在线、B（不可达）回落离线；curl 补验 `no-key` 500 / `bad-json` 400 且**判定顺序与 v1 一致** | 测试输出 + API响应
+> **2026-09-23 校正注（两段变更，均当日实测）**：① 评测集 36 → **73 条**；② 修掉 NEG/DEG 覆盖缺陷（见决策 #6）后准确率再升。
+> 同一判据最新实测：`accuracy=98.6%` / `crisis_recall=6/6`，双端仍逐项相同。下面行内的 `94.4% / 3-3` 是 **2026-09-22 当日真值**（历史留痕不可改写），保留不动；**对外引用一律用新值 73 条 / 98.6% / 6-6**。
+
 - [x] AC-OBS-09: 情绪引擎评测可现场复跑且双端一致 → `GET /api/emotion/eval` 返回 `accuracy=94.4%` / `crisis_recall=3/3`，且 `per_class`、`misses` 与 `node _test/emotion_eval.js` **逐项相同** | API响应 + 测试输出
 - [x] AC-OBS-10: 情绪记忆真落库（跨浏览器、跨重启不丢） → `j4_memory_check.py` **核心断言**：清空 `localStorage` 后刷新星图仍点亮；`GET /api/memory/stats` 计数正确；重启服务后计数不变 | 数据库查询 + 测试输出
 - [x] AC-OBS-11: 密钥零落前端、零入库 → `public_check.py` 报 `KEY_LEAK: False`；`git grep -E "sk-[A-Za-z0-9]{20,}" HEAD` 0 命中 | 测试输出
 - [x] AC-OBS-12: 可选鉴权可开可关且边界正确 → 无 token 时全放行 200；有 token 时 无头 401 / 错头 401 / 对头 200，且 `/api/health` 与静态页**始终放行** | API响应
 - [x] AC-OBS-13: 情绪引擎两端（JS/Java）**不静默分叉** → `engine_consistency_check.py` 三层判据全等（词表结构含重复项与顺序 / 逐条预测 / 汇总指标）；**判据非恒真已证**：`--selftest` 注入分叉报错 + 端到端改真词表 → FAIL 并精确指出差异 | 测试输出
 - [x] AC-OBS-14: 远端记忆不可用时**熔断且不制造噪音** → `j4_remote_down_check.py`：无 `/api/memory` 时请求数上界 = 页面加载次数（3 句对话仅 2 请求）、本地存储照常写入、`isRemote()` 熔断后为 False | 测试输出
+- [x] **AC-OBS-15（2026-09-23）**：fat jar **可脱离项目根独立部署** → 从系统临时目录启动 `deploy/jar/start.ps1 -Port 8125 -WebRoot <仓库外静态副本>`，`/api/health` = `UP` + `indexFound/vendorFound=true`，`/`、`/js/*`、`/vendor/*`、`/css/*` 全 200，公网版 `js/demo-config.js` `KEY_LEAK=False` | 启动日志 + HTTP 实测
+- [x] **AC-OBS-16（2026-09-23）**：语音输入链路真机可跑 → `_test/voice_check.py` **VOICE-PASS**；事件序列 `start → audiostart → result:n=1 → end`（真出识别结果），监听态进入/恢复正常，console 0 错误 | 测试输出
+- [x] **AC-OBS-17（2026-09-23）**：国内备用线 AI 对话可用 → `POST https://qwer-d4gf2r76o8829463b.service.tcloudbase.com/api` = **200** + 真实 DeepSeek 回复 + `access-control-allow-origin: *` | curl 实测
+  ⚠️ 判据口径提醒：必须用 `service.tcloudbase.com`（云函数域），**不能用** `tcloudbaseapp.com/api/chat`（那里是 404，属静态托管域，测它会对国内线得出错误的"已死"结论）
 
 ## 已识别的判据误报（保留记录，不修改数据）
 
