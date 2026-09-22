@@ -13,4 +13,6 @@
   3. ⏳ **fat jar 部署到国内可达机器** —— 摆脱 CloudBase 首访中间页。**2026-09-23 进展：部署包已交付并可独立运行**（`deploy/jar/`：`start.ps1` / `start.sh` / `README-部署.md`）。
      实测（取证时刻 2026-09-23 00:30）：从**系统临时目录**启动（非项目根）+ `-WebRoot` 指向仓库外静态副本 `deploy/xinyu` → `Started SoulIsleApplication in 4.213s`；`/api/health` = `status=UP` / `webRoot` 解析正确 / `indexFound=true` / `vendorFound=true`；`/`、`/js/app.js`、`/js/three-scene.js`、`/vendor/three.min.js`、`/css/style.css` **全 200**；`js/demo-config.js` 610 B **`KEY_LEAK=False`**。
      **踩坑两条（已修进脚本）**：① 本机默认 `JAVA_HOME` = **JDK 8**，Spring Boot 3 起不来 → 脚本改为**探测版本**（要求 major ≥ 17）而不信任 `JAVA_HOME`；② 脚本顶部有 `$ErrorActionPreference='Stop'`，而 `java -version` **只写 stderr** → PowerShell 把原生 stderr 变成终止性 ErrorRecord，探测**恒 false** → 改走 `cmd /c` 合并流。
-     **剩余阻塞**：需老大提供目标机器（IP / 登录方式 / 安全组放行端口）。Dockerfile 已交付但**本机无 Docker，镜像未实测**；`start.sh` 仅静态检查未真机跑。
+     **剩余阻塞**：需老大提供目标机器（IP / 登录方式 / 安全组放行端口）。
+     **Dockerfile 2026-09-23 修了一条红线级问题**：原 `COPY src/ /app/web/` 会把含真实 Key 的 `src/js/demo-config.js` 打进镜像（与其自身注释矛盾）→ 改 `COPY deploy/xinyu/`（零密钥公网版）+ 根目录新增 `.dockerignore` 纵深防御。三层静态核验已过（gitignore 命中 / deploy-xinyu 0 命中 / jar 抽字节 0 命中）。
+     ⚠️ **但镜像构建与运行仍未实测** —— 本机**未安装 Docker**（两条安装路都要老大本人在场：Docker Desktop 需 UAC + 重启；WSL2 Ubuntu 需 sudo 密码且代理未镜像）。`start.sh` 仅静态检查未真机跑（已用 `.gitattributes` 保证 `*.sh` 行尾为 LF）。
