@@ -99,7 +99,24 @@ docker run -p 8080:8080 -e DEEPSEEK_KEY=sk-xxx -v xinyu-data:/app/data xinyu-sou
 
 已做的三层静态核验（无需 Docker 即可证）：① `git check-ignore` 命中 `.gitignore:9:src/js/demo-config.js`；② `deploy/xinyu/**`（12 文件）`sk-` 正则 **0 命中**；③ fat jar 抽字节后（29,415,359 B）`sk-` **0 命中**。
 
-## 八、已知未验项
+## 八、装 Docker（老大执行，2026-09-23 定：走 Docker Desktop）
+
+```powershell
+# 管理员权限的 PowerShell / 终端里执行（会弹 UAC，需本人点确认；装完需重启）
+winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements
+```
+
+装完重启后回来说一句「好了」，我接着执行（无需你再决策）：
+
+1. `docker version` 确认 daemon 起来了
+2. `python _test/deploy_sync_check.py` —— **构建前置闸门**：公网版前端必须与 `src/` 三类归零，否则会把过时/带缺陷的前端打进镜像
+3. `docker build -f server/Dockerfile -t xinyu-soulisle .`（context = 仓库根）
+4. `docker run -d -p 8080:8080 -v xinyu-data:/app/data xinyu-soulisle`
+5. 验收：`/api/health`（`UP` + `indexFound/vendorFound=true`）、`/`、`/js/app.js`、`/vendor/three.min.js`、`/api/emotion/eval`（73 条 / 98.6%）
+6. **镜像内密钥扫描**：`docker run --rm xinyu-soulisle sh -c "grep -rE 'sk-[A-Za-z0-9]{20,}' /app || echo CLEAN"` —— 必须 `CLEAN`
+7. 清理容器；把实测结果回填本文档与 `08-ac-obs.md`
+
+## 九、已知未验项
 
 - **Docker 镜像构建/运行未实测**：本机**未安装 Docker**（`docker` 不在 PATH，`C:\Program Files\Docker\Docker` 不存在）。上面的命令**一条都没跑过**，装好 Docker 后必须真跑一次再对外声称已验证。
 - **真实云服务器部署未做**：需要老大提供目标机器（IP / 登录方式 / 是否有公网与安全组放行端口）。
