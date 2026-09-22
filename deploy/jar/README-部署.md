@@ -99,7 +99,11 @@ docker run -p 8080:8080 -e DEEPSEEK_KEY=sk-xxx -v xinyu-data:/app/data xinyu-sou
 
 已做的三层静态核验（无需 Docker 即可证）：① `git check-ignore` 命中 `.gitignore:9:src/js/demo-config.js`；② `deploy/xinyu/**`（12 文件）`sk-` 正则 **0 命中**；③ fat jar 抽字节后（29,415,359 B）`sk-` **0 命中**。
 
-## 八、装 Docker（老大执行，2026-09-23 定：走 Docker Desktop）
+## 八、Docker 环境（2026-09-23 已装好并**全链路实测通过**）
+
+### 8.1 安装（已完成）
+
+Docker Desktop 4.91.0，daemon 实测 `Server 29.8.0 / linux / overlayfs`。
 
 ```powershell
 # 管理员权限的 PowerShell / 终端里执行（会弹 UAC，需本人点确认；装完需重启）
@@ -111,9 +115,40 @@ winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept
 > `sbx diagnose` 报 `Daemon — not reachable`；其余 9 项通过）。它**不是镜像构建器**，装它等于白装。
 > 包 ID 必须**精确**写 `Docker.DockerDesktop`（写错一个词就会装到另一个产品）。
 
-在等 Docker 期间，已用**磁盘级模拟**把 Dockerfile 的非 Docker 专属部分全部验过 —— 见下方「十、Dockerfile 模拟验收」。
+### 8.2 🔴 国内必读：Docker Hub 被墙，直接 `docker build` 必失败
 
-装完重启后回来说一句「好了」，我接着执行（无需你再决策）：
+实测（2026-09-23）：本机**根本无法访问 Docker Hub** ——
+`registry-1.docker.io` 返回 **000**（连接超时），构建报
+`failed to authorize: ... dial tcp 88.191.249.182:443: connectex: ...`
+
+加速源连通性实测（`/v2/` 探测）：
+
+| 源 | 结果 |
+|---|---|
+| `registry-1.docker.io` | **000（不通）** |
+| `mirror.ccs.tencentyun.com` | **000（仅腾讯 CVM 内网可用）** |
+| `docker.mirrors.ustc.edu.cn` | **000（已停止公共访问）** |
+| `docker.1ms.run` | **401（通）** ← 本次使用 |
+| `docker.m.daocloud.io` | 401（通） |
+| `docker.1panel.live` | 200（通） |
+| `hub.rat.dev` | 302（通） |
+
+**本次采用的解法（不改 daemon 配置、不重启 Docker Desktop）**：先从可用源拉基础镜像并本地打标，
+之后 build 就会用本地镜像，不再去 Docker Hub 取元数据。
+
+```bash
+docker pull docker.1ms.run/library/eclipse-temurin:17-jre
+docker tag  docker.1ms.run/library/eclipse-temurin:17-jre eclipse-temurin:17-jre
+docker build -f server/Dockerfile -t xinyu-soulisle .     # 此时才可成功
+```
+
+> 另一条路（更"正规"但要重启 Docker Desktop）：在 `~/.docker/daemon.json` 里加
+> `"registry-mirrors": ["https://docker.1ms.run","https://docker.m.daocloud.io"]`，然后重启。
+> 本次未走这条，因为前者已验证可行。
+
+### 8.3 已执行的完整清单
+
+下列步骤已于 2026-09-23 全部执行完毕（结果见「十」）：
 
 1. `docker version` 确认 daemon 起来了
 2. `python _test/deploy_sync_check.py` —— **构建前置闸门**：公网版前端必须与 `src/` 三类归零，否则会把过时/带缺陷的前端打进镜像
@@ -125,10 +160,10 @@ winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept
 
 ## 九、已知未验项
 
-- **Docker 镜像构建/运行未实测**：本机**未安装 Docker**（`docker` 不在 PATH，`C:\Program Files\Docker\Docker` 不存在）。上面的命令**一条都没跑过**，装好 Docker 后必须真跑一次再对外声称已验证。
+- ✅ ~~Docker 镜像构建/运行未实测~~ → **2026-09-23 已实测通过**（真 `docker build` + `docker run` + 镜像内密钥扫描 + 持久化重启验证），详见「十」。原先「命令一条都没跑过」的状态已解除。
 - **真实云服务器部署未做**：需要老大提供目标机器（IP / 登录方式 / 是否有公网与安全组放行端口）。
 - **`start.sh` 未实跑**：本机为 Windows，仅做了静态检查（语法 + JDK 探测逻辑与 ps1 同构），未真机验证。已用 `.gitattributes`（`*.sh text eol=lf`）保证行尾不被转成 CRLF。
-- **两条装 Docker 的路都卡在需要老大本人在场**：① Docker Desktop（`winget install -e --id Docker.DockerDesktop`）→ 需 **UAC 点确认 + 重启**；② WSL2 内 Ubuntu 26.04 装 `docker.io` → 需 **sudo 密码**，且 WSL 当前报「localhost 代理未镜像到 WSL」，apt 联网可能受阻。
+- ✅ ~~两条装 Docker 的路都卡在需要老大本人在场~~ → **已解决**：走 Docker Desktop 4.91.0（`winget install -e --id Docker.DockerDesktop`，需 UAC + 重启）后 daemon 就绪（`Server 29.8.0 / linux / overlayfs`）。WSL2 路线未采用。
 - **Docker Sandboxes 不可用**（2026-09-23 实测）：无 `docker` CLI、daemon 起不来，产品定位是 agent 隔离沙箱而非构建器。已在「八」节记录，避免重复踩。
 
 ## 十、Dockerfile 磁盘级模拟验收（2026-09-23，无 Docker 时的最强替代证据）
@@ -162,4 +197,25 @@ winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept
 
 **它证明了什么 / 没证明什么**：
 - ✅ 镜像内文件齐全、路径与 ENV 正确、静态页与 API 可用、**镜像内无密钥**
-- ❌ **不等于 `docker build` 已验证** —— 基础镜像 `eclipse-temurin:17-jre` 拉取、层缓存、`ENTRYPOINT` exec 形式、容器网络与端口映射，仍必须真 Docker 跑一遍
+- ❌ **不等于 `docker build` 已验证** —— 该模拟只是「装好 Docker 之前」的过渡证据，**现已由真 Docker 取代**（见「十一」）
+
+## 十一、真 Docker 实测结果（2026-09-23，已取代模拟）
+
+环境：Docker Desktop 4.91.0 → daemon `Server 29.8.0 / linux / overlayfs`。
+镜像：`xinyu-soulisle:latest`，**482 MB**（`FROM eclipse-temurin:17-jre`）。
+
+| # | 验收项 | 实测结果 |
+|---|---|---|
+| 1 | `docker build` | ✅ 成功（`COPY` 三条 layer 全绿，见「8.2」的 Hub 绕行） |
+| 2 | 容器状态 | ✅ `Up`，`0.0.0.0:8080->8080/tcp` |
+| 3 | `/api/health` | ✅ `UP` / `webRoot=/app/web` / `indexFound=true` / `vendorFound=true` |
+| 4 | 静态资源 | ✅ `/` 7437B、`/js/app.js` 14091B、`/vendor/three.min.js` 603445B、`/css/style.css` 9131B 全 200 |
+| 5 | `/api/emotion/eval` | ✅ **73 条 / 98.6% / 危机召回 6-6** |
+| 6 | **镜像内密钥扫描** | ✅ `IMAGE_KEY_SCAN=CLEAN` |
+| 7 | 扫描判据有效性对照 | ✅ 输入非空（`/app` 15 文件）；注入假密钥 → `GREP_EFFECTIVE`；干净文件 → `NO_FALSE_POSITIVE` |
+| 8 | **持久化（Docker 专属坑）** | ✅ 写 2 情绪 + 1 消息 → `docker restart` → **重启后仍为 2 / 1** ⇒ DB 确实落在挂载卷里 |
+| 9 | 清理 | ✅ 测试容器与探针卷已删，仅保留镜像 |
+
+> 第 8 项是 Docker 场景最容易踩的坑：容器内**相对路径**写的 DB 可能落在卷外，容器一删数据全丢。
+> `application.yml` 的默认 `jdbc:h2:file:./server/data/xinyu` 是**相对 cwd** 的，而 Dockerfile 用
+> `XINYU_DB_URL` 显式覆盖成 `/app/data/xinyu` 并把 `/app/data` 声明为 `VOLUME` —— 实测证明这条链路是通的。

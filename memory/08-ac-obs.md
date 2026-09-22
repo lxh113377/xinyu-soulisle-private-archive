@@ -42,6 +42,10 @@
 - [x] **AC-OBS-18（2026-09-23）**：Dockerfile 的**镜像内容物与运行参数**在无 Docker 时也可证 → `python _test/docker_image_sim_check.py` **DOCKER-SIM-PASS**：COPY×3/ENV×5/WORKDIR 从 `server/Dockerfile` **解析**（非手抄）后磁盘等价实现 → 写入 14 文件、评测集 73 条、**镜像内 `sk-` 0 命中**、`status=UP`/`indexFound`/`vendorFound` 全真、4 条静态资源 200、`/api/emotion/eval` = 73 条 / 98.6% / 危机 6-6。
   判据附带**隔离桩**（`--selftest`）：注入 1 处假密钥 → 恰好命中 1；移除 → 回到 0 ⇒ 「0 命中」类判据非恒真/恒假。
   ⚠️ **边界（不谎称已验）**：本项**不等于 `docker build` 通过** —— 基础镜像拉取、层缓存、ENTRYPOINT exec 形式、容器网络/端口映射仍未验；且本机 Docker 尚未可用（`Docker.sbx` 即 Docker Sandboxes 无 `docker` CLI、daemon 起不来，非构建器）。
+  ✅ **本项的边界已于同日闭合** —— 见 AC-OBS-19（真 Docker 已跑通，模拟降级为历史过渡证据）。
+- [x] **AC-OBS-19（2026-09-23）**：容器镜像**真构建真运行**通过 → Docker Desktop 4.91.0（daemon `Server 29.8.0 / linux / overlayfs`）→ `docker build` 成功，镜像 `xinyu-soulisle:latest` **482 MB**；`docker run -p 8080:8080 -v xinyu-data:/app/data` 后 `Up`；`/api/health` = `UP` + `webRoot=/app/web` + `indexFound/vendorFound=true`；4 条静态资源全 200；`/api/emotion/eval` = **73 / 98.6% / 危机 6-6**；**镜像内 `sk-` = CLEAN**（附对照：输入非空 15 文件 / 注入假密钥 `GREP_EFFECTIVE` / 干净文件 `NO_FALSE_POSITIVE`）。
+  **持久化（Docker 专属坑）**：写 2 情绪 + 1 消息 → `docker restart` → 重启后仍 2 / 1 ⇒ DB 确实落在挂载卷（Dockerfile 用 `XINYU_DB_URL` 显式覆盖相对路径 + 声明 `VOLUME /app/data` 是有效设计）。
+  ⚠️ **前置坑（不解决则永远 build 不了）**：本机**无法访问 Docker Hub**（`registry-1.docker.io` 探测 = **000**），`docker build` 报 `failed to authorize ... dial tcp 88.191.249.182:443`。解法 = 先从可用源拉基础镜像并本地打标（本次用 `docker.1ms.run`，实测 401=通），之后 build 走本地镜像。
 
 ## 已识别的判据误报（保留记录，不修改数据）
 

@@ -16,4 +16,6 @@
      **剩余阻塞**：需老大提供目标机器（IP / 登录方式 / 安全组放行端口）。
      **Dockerfile 2026-09-23 修了一条红线级问题**：原 `COPY src/ /app/web/` 会把含真实 Key 的 `src/js/demo-config.js` 打进镜像（与其自身注释矛盾）→ 改 `COPY deploy/xinyu/`（零密钥公网版）+ 根目录新增 `.dockerignore` 纵深防御。三层静态核验已过（gitignore 命中 / deploy-xinyu 0 命中 / jar 抽字节 0 命中）。
      **2026-09-23 无 Docker 时的替代证据已取得**：新增 `_test/docker_image_sim_check.py`（**DOCKER-SIM-PASS**）—— 把 Dockerfile 的 COPY/ENV/WORKDIR/ENTRYPOINT **从文件解析**后在磁盘等价实现：写入 14 文件、评测集 73 条、**镜像内密钥 0 命中**、`/api/health` UP、4 条静态资源 200、评测 73/98.6%/6-6；带 `--selftest` 隔离桩证明「0 命中」判据非恒真。
-     ⚠️ **但不等于 `docker build` 已验证**（基础镜像/层缓存/容器网络未验）。本机 Docker 仍不可用，且已实测**踩过一次装错包**：`winget install Docker.sbx` 装到的是 **Docker Sandboxes**（无 `docker` CLI、daemon 不可达、非构建器），正确包 ID 是 `Docker.DockerDesktop`（需 UAC + 重启）。`start.sh` 仅静态检查未真机跑（已用 `.gitattributes` 保证 `*.sh` 行尾为 LF）。
+     ✅ **同日已用真 Docker 收口**：Docker Desktop 4.91.0（daemon `Server 29.8.0 / linux / overlayfs`）→ `docker build` 成功（镜像 482 MB）、`docker run` 后 `/api/health` UP + 静态全 200 + 评测 73/98.6%/6-6 + **镜像内密钥 CLEAN**（附注入对照）；**持久化实测**：写 2 情绪+1 消息 → `docker restart` → 仍 2/1（DB 确实落在 `VOLUME /app/data`）。上述模拟脚本（`docker_image_sim_check.py`）降级为「Docker 就绪前的过渡证据」，不再是对外主证据。
+     ⚠️ **两个已实测的坑**：① `winget install Docker.sbx` 装到的是 **Docker Sandboxes**（无 `docker` CLI、daemon 不可达、非构建器）—— 正确包 ID 是 `Docker.DockerDesktop`；② 本机**访问不了 Docker Hub**（`registry-1.docker.io` = 000），必须先 `docker pull docker.1ms.run/library/eclipse-temurin:17-jre` 再 `docker tag` 成本地名，否则 build 必失败。
+     `start.sh` 仍仅静态检查未真机跑（已用 `.gitattributes` 保证 `*.sh` 行尾为 LF）。
