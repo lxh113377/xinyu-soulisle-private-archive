@@ -1,0 +1,14 @@
+# 纵深防御：即使有人把 Dockerfile 改回 `COPY src/`，含真实 Key 的文件也不会进 build context。
+# src/js/demo-config.js 是本地演示专用（含 DEEPSEEK 真实 Key，已在 .gitignore），
+# 公网/镜像一律用 deploy/xinyu/js/demo-config.js（proxy stub，零密钥）。
+src/js/demo-config.js
+
+# 减少 build context 体积（这些与运行镜像无关）
+.git
+.codebuddy
+memory
+交付物
+_test/_shots
+node_modules
+**/__pycache__
+**/*.pyc

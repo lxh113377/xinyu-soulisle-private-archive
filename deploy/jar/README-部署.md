@@ -82,8 +82,26 @@ Invoke-RestMethod http://<host>:8080/api/emotion/eval
 2. **探测函数不能用 `& $java -version 2>&1`** —— 本脚本顶部有 `$ErrorActionPreference = 'Stop'`，PowerShell 会把原生命令的 stderr 变成终止性 ErrorRecord，探测**恒为 false**。`java -version` 恰好只写 stderr，所以必须经 `cmd /c` 合并流再取文本。
 3. **H2 数据文件路径跟随工作目录** —— 启动日志为 `jdbc:h2:file:./server/data/xinyu`，是相对**进程工作目录**的。独立目录部署时务必先 `cd` 到部署目录再启动，否则数据库会建到别处（用 MySQL 可彻底避开，见 `application.yml`）。
 
-## 七、已知未验项
+## 七、容器化（Docker）
 
-- **Dockerfile 未实测**：本机无 Docker，镜像构建/运行未验证（不谎称已验）。
+```bash
+# 前置 1：先同步公网版前端并跑 SHA256 双向比对（同步红线）
+# 前置 2：mvn -f server/pom.xml package
+docker build -f server/Dockerfile -t xinyu-soulisle .   # build context 必须是仓库根
+docker run -p 8080:8080 -e DEEPSEEK_KEY=sk-xxx -v xinyu-data:/app/data xinyu-soulisle
+```
+
+> ⚠️ **2026-09-23 修了一条红线级问题**：原 Dockerfile 写 `COPY src/ /app/web/`，会把含**真实 API Key** 的
+> `src/js/demo-config.js` 打进镜像（与其自身注释「密钥绝不打进镜像」矛盾）。现改为 `COPY deploy/xinyu/`
+> （公网零密钥版），并新增根目录 `.dockerignore` 做纵深防御。
+> **代价**：镜像内前端走 proxy stub 且不含 `remote`（J4 公网默认关闭），与 Pages/CloudBase 形态一致 —— 这是我们要的形态。
+> **新约束**：构建前必须先同步 `deploy/xinyu/` 并跑 SHA256 双向比对，否则会把过时前端打进镜像。
+
+已做的三层静态核验（无需 Docker 即可证）：① `git check-ignore` 命中 `.gitignore:9:src/js/demo-config.js`；② `deploy/xinyu/**`（12 文件）`sk-` 正则 **0 命中**；③ fat jar 抽字节后（29,415,359 B）`sk-` **0 命中**。
+
+## 八、已知未验项
+
+- **Docker 镜像构建/运行未实测**：本机**未安装 Docker**（`docker` 不在 PATH，`C:\Program Files\Docker\Docker` 不存在）。上面的命令**一条都没跑过**，装好 Docker 后必须真跑一次再对外声称已验证。
 - **真实云服务器部署未做**：需要老大提供目标机器（IP / 登录方式 / 是否有公网与安全组放行端口）。
-- **`start.sh` 未实跑**：本机为 Windows，仅做了静态检查（语法 + JDK 探测逻辑与 ps1 同构），未真机验证。
+- **`start.sh` 未实跑**：本机为 Windows，仅做了静态检查（语法 + JDK 探测逻辑与 ps1 同构），未真机验证。已用 `.gitattributes`（`*.sh text eol=lf`）保证行尾不被转成 CRLF。
+- **两条装 Docker 的路都卡在需要老大本人在场**：① Docker Desktop（`winget install -e --id Docker.DockerDesktop`）→ 需 **UAC 点确认 + 重启**；② WSL2 内 Ubuntu 26.04 装 `docker.io` → 需 **sudo 密码**，且 WSL 当前报「localhost 代理未镜像到 WSL」，apt 联网可能受阻。
