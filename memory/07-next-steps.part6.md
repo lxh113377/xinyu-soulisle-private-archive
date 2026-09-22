@@ -15,4 +15,5 @@
      **踩坑两条（已修进脚本）**：① 本机默认 `JAVA_HOME` = **JDK 8**，Spring Boot 3 起不来 → 脚本改为**探测版本**（要求 major ≥ 17）而不信任 `JAVA_HOME`；② 脚本顶部有 `$ErrorActionPreference='Stop'`，而 `java -version` **只写 stderr** → PowerShell 把原生 stderr 变成终止性 ErrorRecord，探测**恒 false** → 改走 `cmd /c` 合并流。
      **剩余阻塞**：需老大提供目标机器（IP / 登录方式 / 安全组放行端口）。
      **Dockerfile 2026-09-23 修了一条红线级问题**：原 `COPY src/ /app/web/` 会把含真实 Key 的 `src/js/demo-config.js` 打进镜像（与其自身注释矛盾）→ 改 `COPY deploy/xinyu/`（零密钥公网版）+ 根目录新增 `.dockerignore` 纵深防御。三层静态核验已过（gitignore 命中 / deploy-xinyu 0 命中 / jar 抽字节 0 命中）。
-     ⚠️ **但镜像构建与运行仍未实测** —— 本机**未安装 Docker**（两条安装路都要老大本人在场：Docker Desktop 需 UAC + 重启；WSL2 Ubuntu 需 sudo 密码且代理未镜像）。`start.sh` 仅静态检查未真机跑（已用 `.gitattributes` 保证 `*.sh` 行尾为 LF）。
+     **2026-09-23 无 Docker 时的替代证据已取得**：新增 `_test/docker_image_sim_check.py`（**DOCKER-SIM-PASS**）—— 把 Dockerfile 的 COPY/ENV/WORKDIR/ENTRYPOINT **从文件解析**后在磁盘等价实现：写入 14 文件、评测集 73 条、**镜像内密钥 0 命中**、`/api/health` UP、4 条静态资源 200、评测 73/98.6%/6-6；带 `--selftest` 隔离桩证明「0 命中」判据非恒真。
+     ⚠️ **但不等于 `docker build` 已验证**（基础镜像/层缓存/容器网络未验）。本机 Docker 仍不可用，且已实测**踩过一次装错包**：`winget install Docker.sbx` 装到的是 **Docker Sandboxes**（无 `docker` CLI、daemon 不可达、非构建器），正确包 ID 是 `Docker.DockerDesktop`（需 UAC + 重启）。`start.sh` 仅静态检查未真机跑（已用 `.gitattributes` 保证 `*.sh` 行尾为 LF）。

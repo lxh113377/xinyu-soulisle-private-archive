@@ -106,6 +106,13 @@ docker run -p 8080:8080 -e DEEPSEEK_KEY=sk-xxx -v xinyu-data:/app/data xinyu-sou
 winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements
 ```
 
+> ⚠️ **2026-09-23 实测踩坑：`winget install Docker.sbx` 装错了**。Docker Sandboxes 是「给 AI agent 用的隔离沙箱」，
+> **不提供 `docker` CLI**，自带 daemon 也起不来（`sbx daemon start` 挂死无输出、进程表里没有 `sandboxd`、
+> `sbx diagnose` 报 `Daemon — not reachable`；其余 9 项通过）。它**不是镜像构建器**，装它等于白装。
+> 包 ID 必须**精确**写 `Docker.DockerDesktop`（写错一个词就会装到另一个产品）。
+
+在等 Docker 期间，已用**磁盘级模拟**把 Dockerfile 的非 Docker 专属部分全部验过 —— 见下方「十、Dockerfile 模拟验收」。
+
 装完重启后回来说一句「好了」，我接着执行（无需你再决策）：
 
 1. `docker version` 确认 daemon 起来了
@@ -122,3 +129,37 @@ winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept
 - **真实云服务器部署未做**：需要老大提供目标机器（IP / 登录方式 / 是否有公网与安全组放行端口）。
 - **`start.sh` 未实跑**：本机为 Windows，仅做了静态检查（语法 + JDK 探测逻辑与 ps1 同构），未真机验证。已用 `.gitattributes`（`*.sh text eol=lf`）保证行尾不被转成 CRLF。
 - **两条装 Docker 的路都卡在需要老大本人在场**：① Docker Desktop（`winget install -e --id Docker.DockerDesktop`）→ 需 **UAC 点确认 + 重启**；② WSL2 内 Ubuntu 26.04 装 `docker.io` → 需 **sudo 密码**，且 WSL 当前报「localhost 代理未镜像到 WSL」，apt 联网可能受阻。
+- **Docker Sandboxes 不可用**（2026-09-23 实测）：无 `docker` CLI、daemon 起不来，产品定位是 agent 隔离沙箱而非构建器。已在「八」节记录，避免重复踩。
+
+## 十、Dockerfile 磁盘级模拟验收（2026-09-23，无 Docker 时的最强替代证据）
+
+`python _test/docker_image_sim_check.py` —— 把 Dockerfile 在磁盘上逐行等价实现：
+
+| Dockerfile 指令 | 模拟做法 |
+|---|---|
+| `COPY` | 真实拷文件（并遵守 `.dockerignore` 排除语义） |
+| `ENV` | 真实注入子进程环境 |
+| `WORKDIR /app` | 真实作为 java 进程 cwd |
+| `ENTRYPOINT ["java","-jar","/app/app.jar"]` | 真实执行 |
+
+> **关键设计**：COPY / ENV / WORKDIR **直接从 `server/Dockerfile` 解析，禁止手抄** —— 否则 Dockerfile 一改，
+> 这份模拟就静默失效，变成「说明与实际脱钩」的假证据。
+
+实测结果（`DOCKER-SIM-PASS`）：
+
+```
+[解析] COPY×3 ENV×5 WORKDIR=/app
+[COPY] 共写入 14 个文件
+[内容] 评测集 73 条
+[红线] 镜像内 sk- 命中: 0
+[健康] status=UP  webRoot=<tmp>/web  indexFound=true  vendorFound=true
+[静态] 200 / (7437B)   200 /js/app.js   200 /vendor/three.min.js (603445B)   200 /css/style.css
+[评测] 73 条 / 98.6% / 危机 6/6
+```
+
+**判据含隔离桩**（`--selftest`）：注入 1 处假密钥 + 1 个干净文件 → 命中恰好 1 处；移除后回到 0
+⇒ 证明「0 命中」既不恒真也不恒假（当天已因 PowerShell 别名覆盖踩过一次假通过，故凡 0 命中类判据一律附桩）。
+
+**它证明了什么 / 没证明什么**：
+- ✅ 镜像内文件齐全、路径与 ENV 正确、静态页与 API 可用、**镜像内无密钥**
+- ❌ **不等于 `docker build` 已验证** —— 基础镜像 `eclipse-temurin:17-jre` 拉取、层缓存、`ENTRYPOINT` exec 形式、容器网络与端口映射，仍必须真 Docker 跑一遍

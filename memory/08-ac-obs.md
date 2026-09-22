@@ -39,6 +39,9 @@
 - [x] **AC-OBS-16（2026-09-23）**：语音输入链路真机可跑 → `_test/voice_check.py` **VOICE-PASS**；事件序列 `start → audiostart → result:n=1 → end`（真出识别结果），监听态进入/恢复正常，console 0 错误 | 测试输出
 - [x] **AC-OBS-17（2026-09-23）**：国内备用线 AI 对话可用 → `POST https://qwer-d4gf2r76o8829463b.service.tcloudbase.com/api` = **200** + 真实 DeepSeek 回复 + `access-control-allow-origin: *` | curl 实测
   ⚠️ 判据口径提醒：必须用 `service.tcloudbase.com`（云函数域），**不能用** `tcloudbaseapp.com/api/chat`（那里是 404，属静态托管域，测它会对国内线得出错误的"已死"结论）
+- [x] **AC-OBS-18（2026-09-23）**：Dockerfile 的**镜像内容物与运行参数**在无 Docker 时也可证 → `python _test/docker_image_sim_check.py` **DOCKER-SIM-PASS**：COPY×3/ENV×5/WORKDIR 从 `server/Dockerfile` **解析**（非手抄）后磁盘等价实现 → 写入 14 文件、评测集 73 条、**镜像内 `sk-` 0 命中**、`status=UP`/`indexFound`/`vendorFound` 全真、4 条静态资源 200、`/api/emotion/eval` = 73 条 / 98.6% / 危机 6-6。
+  判据附带**隔离桩**（`--selftest`）：注入 1 处假密钥 → 恰好命中 1；移除 → 回到 0 ⇒ 「0 命中」类判据非恒真/恒假。
+  ⚠️ **边界（不谎称已验）**：本项**不等于 `docker build` 通过** —— 基础镜像拉取、层缓存、ENTRYPOINT exec 形式、容器网络/端口映射仍未验；且本机 Docker 尚未可用（`Docker.sbx` 即 Docker Sandboxes 无 `docker` CLI、daemon 起不来，非构建器）。
 
 ## 已识别的判据误报（保留记录，不修改数据）
 
