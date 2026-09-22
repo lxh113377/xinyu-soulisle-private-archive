@@ -5,26 +5,16 @@
 
 <!-- SYNC_AUTO_GENERATED_START -->
 ```
-├── .codebuddy/
-├── .wrangler/
-│   └── cache/
-│       └── wrangler-account.json
 ├── _test/
-│   ├── _shots/
-│   │   ├── dual_mixed-contrast.png
-│   │   ├── dual_mixed-similar.png
-│   │   ├── dual_single.png
-│   │   ├── lightshow_after.png
-│   │   ├── lightshow_before.png
-│   │   ├── lightshow_blackout.png
-│   │   ├── lit_multi.png
-│   │   └── lit_single.png
 │   ├── browser_check.py
 │   ├── cors_probe.py
 │   ├── emotion-eval-dataset.json
 │   ├── emotion_eval.js
+│   ├── engine_consistency_check.py
+│   ├── engine_lexicon_dump.js
 │   ├── j2_chat_contract.py
 │   ├── j4_memory_check.py
+│   ├── j4_remote_down_check.py
 │   ├── lightshow_check.py
 │   ├── online_check.py
 │   ├── pixel_dual_check.py
@@ -32,11 +22,6 @@
 │   ├── screenshots.py
 │   └── screenshots_online.py
 ├── deploy/
-│   ├── .wrangler/
-│   │   ├── cache/
-│   │   │   ├── pages.json
-│   │   │   └── wrangler-account.json
-│   │   └── tmp/
 │   ├── cloudbase/
 │   │   ├── functions/
 │   │   │   └── chat/
@@ -59,8 +44,6 @@
 │   │   └── index.html
 │   └── wrangler.toml
 ├── server/
-│   ├── data/
-│   │   └── xinyu.mv.db
 │   ├── src/
 │   │   └── main/
 │   │       ├── java/
@@ -110,8 +93,8 @@
 ```
 <!-- SYNC_AUTO_GENERATED_END -->
 
-> ⚠️ **sync 自动块参考用（2026-09-22 实测）**：生成的目录树包含 `.codebuddy/`、`.wrangler/`、`_test/_shots/` 等 **ignore 目录**（非项目内容，勿据此判断结构）。
-> **以「模块说明」节为准**（手工维护）。
+> ✅ **sync 自动块已修复（2026-09-22，A-project-handoff V3.44.0）**：旧版树混入 `.codebuddy/`、`.wrangler/`、`_test/_shots/` 等 ignore 目录（`EXCLUDE_DIRS` 硬编码不读 `.gitignore`）；现 sync 时并入 `.gitignore` 目录条目，这些已从树中剔除。
+> 结构判读仍以「模块说明」节为主（手工维护，含各目录职责）。
 
 ## 模块说明
 
