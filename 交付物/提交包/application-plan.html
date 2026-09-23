@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>心屿 SoulIsle · 应用方案</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 16mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Microsoft YaHei", "SimHei", "DengXian", sans-serif;
+    font-size: 10.5pt; line-height: 1.72; color: #1b2430; margin: 0;
+  }
+  .cover { page-break-after: always; text-align: center; padding-top: 42mm; }
+  .cover h1 { font-size: 30pt; margin: 0 0 6mm; letter-spacing: 2px; }
+  .cover .sub { font-size: 14pt; color: #4a5b70; margin-bottom: 16mm; }
+  .cover .track { font-size: 11pt; color: #33475f; border: 1px solid #c8d4e2;
+    display: inline-block; padding: 4mm 8mm; border-radius: 3px; margin-bottom: 26mm; }
+  .cover table { margin: 0 auto; border: none; font-size: 10.5pt; }
+  .cover td { border: none; padding: 2mm 4mm; text-align: left; }
+  .cover td.k { color: #6b7c91; text-align: right; white-space: nowrap; }
+
+  h2.ch {
+    font-size: 15pt; margin: 0 0 5mm; padding: 2mm 0 2mm 4mm;
+    border-left: 4px solid #2f6fbf; background: #f2f6fb; page-break-before: always;
+  }
+  h2.ch:first-of-type { page-break-before: avoid; }
+  h3 { font-size: 12pt; margin: 6mm 0 3mm; color: #22456f; }
+  h4 { font-size: 10.8pt; margin: 4mm 0 2mm; color: #33475f; }
+  p { margin: 0 0 3mm; text-align: justify; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.5mm; }
+
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; font-size: 9.4pt; }
+  th, td { border: 1px solid #c3cfdd; padding: 2mm 2.5mm; text-align: left; vertical-align: top; }
+  th { background: #eef3f9; font-weight: 600; }
+  td.c, th.c { text-align: center; }
+  table.narrow { font-size: 9pt; }
+
+  figure { margin: 4mm 0; text-align: center; break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid #ccd7e3; border-radius: 2px; }
+  figure.two img { width: 48.5%; display: inline-block; margin: 0 0.5%; }
+  figcaption { font-size: 8.6pt; color: #6b7c91; margin-top: 1.5mm; }
+
+  .box { border: 1px solid #d6c9a8; background: #fdf9ef; padding: 3mm 4mm;
+         margin: 4mm 0; font-size: 9.6pt; border-radius: 2px; break-inside: avoid; }
+  .box .t { font-weight: 700; color: #8a6a1f; margin-bottom: 1.5mm; }
+  .kv { border-left: 3px solid #2f6fbf; background: #f6f9fc; padding: 2.5mm 4mm;
+        margin: 3mm 0; font-size: 9.6pt; break-inside: avoid; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: #6b7c91; }
+  .tag { display: inline-block; background: #e8f0f9; color: #2f6fbf;
+         border-radius: 2px; padding: 0 1.5mm; font-size: 8.6pt; margin-right: 1mm; }
+  .tag.warn { background: #fdeeee; color: #b23b3b; }
+  pre { background: #f5f7fa; border: 1px solid #dde5ee; padding: 3mm 4mm;
+        font-size: 8.4pt; line-height: 1.5; margin: 3mm 0; white-space: pre;
+        font-family: "Consolas", "SimSun", monospace; break-inside: avoid; }
+  .np { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<!-- ============ 封面 ============ -->
+<div class="cover">
+  <h1>心屿 SoulIsle</h1>
+  <div class="sub">对话陪聊 + 情感陪伴的 AI 网页应用<br>滚轮驱动的 3D 情绪叙事与情绪可视化闭环</div>
+  <div class="track">2026 年 iCAN 大学生创新创业大赛<br>AI 应用创新挑战赛 · 软件赛道 · 高校组</div>
+  <table>
+    <tr><td class="k">作品名称</td><td>心屿 SoulIsle</td></tr>
+    <tr><td class="k">作品形态</td><td>网页应用（Web 端，含 Java 服务端）</td></tr>
+    <tr><td class="k">在线演示</td><td>https://xinyu-soulisle.pages.dev</td></tr>
+    <tr><td class="k">团队成员</td><td>＿＿＿＿＿＿＿＿＿＿＿＿（按官网报名顺序填写）</td></tr>
+    <tr><td class="k">指导教师</td><td>＿＿＿＿＿＿＿＿＿＿＿＿（按官网报名顺序填写）</td></tr>
+    <tr><td class="k">提交日期</td><td>2026 年 9 月</td></tr>
+  </table>
+</div>
+
+<!-- ============ 1 项目背景 ============ -->
+<h2 class="ch">一、项目背景</h2>
+
+<h3>1.1 大学生情绪健康：一个被广泛记录却缺少日常出口的问题</h3>
+<p>中国科学院心理研究所发布的心理健康蓝皮书《中国国民心理健康发展报告（2021～2022）》显示，成年人群抑郁风险检出率为 <span class="num">10.6%</span>、焦虑风险检出率为 <span class="num">15.8%</span>；其中 <b>18～24 岁年龄组的抑郁风险检出率达到 24.1%</b>，显著高于其他年龄组。同一蓝皮书系列中的《2020 年大学生心理健康现状与需求》调查显示，大学生中 <span class="num">18.5%</span> 有抑郁倾向、<span class="num">4.2%</span> 处于抑郁高风险，<span class="num">8.4%</span> 有焦虑倾向，<span class="num">43.8%</span> 表示最近一周有若干天睡眠不足。2025 年发布的《心理健康蓝皮书：中国国民心理健康发展报告（2023—2024）》基于全国 79 家机构、逾 17 万份样本进一步确认了这一趋势。</p>
+<p>这些数字说明：情绪困扰在大学生群体中是<b>高频、常态、非病理性为主</b>的状态，大部分人需要的并不是临床干预，而是一个<b>随时可以说话、说出来有人接住</b>的日常出口。</p>
+
+<h3>1.2 现有供给的三个缺口</h3>
+<p>市面上与"陪伴"相关的产品并不少，但对照上述需求，普遍存在三个结构性缺口：</p>
+<table>
+  <tr><th style="width:16%">缺口</th><th style="width:42%">表现</th><th>后果</th></tr>
+  <tr><td><b>只聊天</b></td><td>通用聊天机器人对用户情绪不做识别，回复与情绪状态无关</td><td>用户说了"我很难过"，得到的仍是通用话术</td></tr>
+  <tr><td><b>不感知</b></td><td>情绪状态不被结构化地抽取，只存在于上下文里</td><td>系统无法基于情绪做策略选择，也就无法"对症"</td></tr>
+  <tr><td><b>看不见</b></td><td>对话结束即结束，情绪没有被记录、没有变化趋势</td><td>用户感受不到"被持续理解"，陪伴关系无法积累</td></tr>
+</table>
+
+<h3>1.3 我们的切入点</h3>
+<p>心屿不是又一个聊天框。它把<b>情绪</b>作为系统的一等公民：先识别情绪，再据此选择共情策略，然后把情绪<b>画出来</b>（3D 星雾随心情变色）、<b>记下来</b>（情绪曲线），并在识别到危机信号时<b>立刻转介</b>专业热线。情绪从"隐含在文字里"变成"系统里可计算、可呈现、可追溯的一条数据"。</p>
+
+<div class="box">
+  <div class="t">数据来源索引（本页）</div>
+  ① 中国科学院心理研究所《中国国民心理健康发展报告（2021～2022）》（2022 版蓝皮书，2023-02 发布），抑郁/焦虑风险检出率及 18～24 岁年龄组数据；
+  ② 《2020 年大学生心理健康现状与需求》（心理健康蓝皮书系列）；
+  ③ 《心理健康蓝皮书：中国国民心理健康发展报告（2023—2024）》（中国科学院心理研究所与社会科学文献出版社，2025-04 发布）。
+  上述均为公开出版物数据，本方案仅作引用，不代表本团队开展过同等规模的调研。
+</div>
+
+<!-- ============ 2 痛点 ============ -->
+<h2 class="ch">二、痛点问题</h2>
+
+<h3>2.1 痛点一：倾诉渠道稀缺且门槛高</h3>
+<p>高校心理咨询中心普遍存在预约排队、时间固定、名额有限的情况；更关键的是<b>病耻感</b>——大量学生并不认为自己"严重到需要去心理咨询"，于是在情绪最需要被接住的那几个小时里没有任何出口。</p>
+
+<h3>2.2 痛点二：现有陪伴类产品"不感知情绪"</h3>
+<p>大量产品把大模型直接接进一个聊天框，情绪完全依赖模型在上下文里隐式理解。这带来两个问题：一是<b>不可控</b>——模型是否识别到情绪、识别得对不对，产品侧无从知晓与干预；二是<b>不可复用</b>——情绪没有被结构化，就无法驱动渲染、无法统计趋势、无法触发安全策略。</p>
+
+<h3>2.3 痛点三：情绪没有反馈闭环，"说完就忘"</h3>
+<p>用户倾诉完，对话窗口一关，什么都没留下。既没有"我的情绪被看见"的即时反馈，也没有"这段时间我状态如何"的长期反馈。陪伴关系因此无法沉淀。</p>
+
+<h3>2.4 痛点四：危机信号缺少自动拦截</h3>
+<p>当用户输入涉及自伤、轻生等表达时，通用聊天产品通常没有专门的安全边界。这不是一个可以"交给模型自由发挥"的环节——它必须是<b>确定性的、优先于一切生成逻辑</b>的规则。</p>
+
+<div class="kv">
+<b>一句话概括我们要解决的：</b>把"情绪"从聊天文本里抽出来，让它<b>被识别、被呈现、被记住、被安全兜底</b>，从而让陪伴产品真正做到"懂你"，而不是"回你"。
+</div>
+
+<!-- ============ 3 需求分析 ============ -->
+<h2 class="ch">三、需求分析</h2>
+
+<h3>3.1 功能需求</h3>
+<table>
+  <tr><th style="width:18%">需求</th><th style="width:44%">说明</th><th>验收方式（可复核）</th></tr>
+  <tr><td>情绪识别</td><td>对用户输入的文本做情绪分类与强度估计，输出 6 类情绪之一及 0–1 强度</td><td>评测集复跑：73 条样本、准确率 98.6%</td></tr>
+  <tr><td>共情对话</td><td>依据识别到的情绪构造系统提示与上下文，调用大模型生成共情回复</td><td>在线模式徽章 + 延迟显示 + 逐条对话留痕</td></tr>
+  <tr><td>情绪可视化</td><td>把情绪映射为 3D 星雾的颜色与点亮数量，实时渲染</td><td>星雾配色读数（主色/辅色）与像素级双色校验</td></tr>
+  <tr><td>情绪记忆</td><td>记录每次情绪，绘制情绪变化曲线，支持本机留存与服务端留存</td><td>曲线条目计数；清除后可复现归零</td></tr>
+  <tr><td>危机转介</td><td>命中危机词时最高优先级拦截，返回求助热线，不调用大模型</td><td>危机召回 6/6</td></tr>
+  <tr><td>语音输入</td><td>支持中文语音输入（Web Speech API）</td><td>浏览器实测</td></tr>
+</table>
+
+<h3>3.2 非功能需求</h3>
+<table>
+  <tr><th style="width:20%">类别</th><th>要求</th><th>实现方式</th></tr>
+  <tr><td>隐私</td><td>对话与情绪记录默认留在本机，不上传</td><td>默认使用浏览器本地存储；服务端留存为可选项，仅在自托管环境开启</td></tr>
+  <tr><td>稳定</td><td>任一环节失效都必须可用，且<b>不能伪装</b></td><td>无 WebGL → CSS 渐变；大模型不可用 → 离线共情模板，界面明示"离线"</td></tr>
+  <tr><td>密钥安全</td><td>API 密钥零落前端、零入库</td><td>密钥只存于服务端环境变量 / 云端 secret，前端仅调用同源代理</td></tr>
+  <tr><td>可用性</td><td>评委免配置即可体验</td><td>免登录体验模式</td></tr>
+  <tr><td>兼容</td><td>无 WebGL、弱网、移动端可用</td><td>降级链路 + 响应式布局</td></tr>
+</table>
+
+<!-- ============ 4 目标用户与功能需求 ============ -->
+<h2 class="ch">四、目标用户群体及功能需求</h2>
+
+<h3>4.1 目标用户画像</h3>
+<p><b>核心用户：高校在校学生（18～24 岁）</b>。这一群体与第 1.1 节引用的数据高度重合，且具备三个共同特征：高频使用手机与网页、对"被理解"有强需求、对隐私（不想被同学/老师知道）极为敏感。</p>
+<table>
+  <tr><th style="width:22%">典型场景</th><th style="width:40%">用户可能说的话</th><th>系统应识别</th></tr>
+  <tr><td>学业压力</td><td>"论文被拒了三次，感觉努力全白费"</td><td>低落</td></tr>
+  <tr><td>考试焦虑</td><td>"明天答辩，我怕赶不上，压力好大"</td><td>焦虑</td></tr>
+  <tr><td>人际冲突</td><td>"凭什么每次都是我背锅，太气人了"</td><td>烦躁</td></tr>
+  <tr><td>情感困扰</td><td>"分手之后还是忍不住想他"</td><td>心动 / 低落</td></tr>
+  <tr><td>疲惫空洞</td><td>"好累，什么都没意思"</td><td>低落</td></tr>
+  <tr><td>危机信号</td><td>"不想活了"（示例表述）</td><td><b>危机信号 → 立即转介，不生成对话</b></td></tr>
+</table>
+
+<h3>4.2 功能矩阵</h3>
+<table class="narrow">
+  <tr><th style="width:20%">功能模块</th><th style="width:34%">实现位置</th><th>AI 角色</th><th class="c" style="width:12%">状态</th></tr>
+  <tr><td>滚动五幕叙事</td><td>scroll-story.js + index.html</td><td>—</td><td class="c">已实现</td></tr>
+  <tr><td>3D 情绪星雾</td><td>three-scene.js（Three.js）</td><td>渲染层：把情绪映射为视觉</td><td class="c">已实现</td></tr>
+  <tr><td>双路情绪识别</td><td>emotion-engine.js + 服务端引擎</td><td><b>感知层</b>：词典快判 + 大模型精判</td><td class="c">已实现</td></tr>
+  <tr><td>共情对话生成</td><td>chat-agent.js + /api/chat</td><td><b>生成层</b>：情绪注入系统提示</td><td class="c">已实现</td></tr>
+  <tr><td>危机拦截与转介</td><td>危机词表（最高优先级）</td><td><b>安全边界</b>：规则优先于生成</td><td class="c">已实现</td></tr>
+  <tr><td>情绪曲线</td><td>memory-store.js + Canvas</td><td>—</td><td class="c">已实现</td></tr>
+  <tr><td>语音输入</td><td>Web Speech API</td><td>输入层</td><td class="c">已实现</td></tr>
+  <tr><td>服务端持久化</td><td>Spring Boot + H2/MySQL</td><td>—</td><td class="c">已实现（可选开启）</td></tr>
+  <tr><td>离线降级</td><td>chat-agent.js 模板 + CSS 渐变</td><td>兜底策略</td><td class="c">已实现</td></tr>
+</table>
+
+<!-- ============ 5 开发工具 ============ -->
+<h2 class="ch">五、开发工具</h2>
+
+<table>
+  <tr><th style="width:16%">层次</th><th style="width:44%">选型</th><th>说明</th></tr>
+  <tr><td>三维渲染</td><td>Three.js r128（本地 vendor）</td><td>粒子星云与自定义着色器</td></tr>
+  <tr><td>滚动动效</td><td>GSAP 3.12 + ScrollTrigger（本地 vendor）</td><td>五幕叙事的滚动驱动</td></tr>
+  <tr><td>前端框架</td><td>原生 ES Module JavaScript，<b>无构建、无前端框架</b></td><td>零打包，依赖库已本地化，离线可跑</td></tr>
+  <tr><td>大模型服务</td><td><b>DeepSeek（OpenAI 兼容 API）</b></td><td><span class="tag warn">第三方服务</span>用于共情回复生成与情绪精判；调用经服务端代理，密钥不出服务端</td></tr>
+  <tr><td>服务端</td><td>JDK 17 / Spring Boot 3.2.5 / MyBatis-Plus 3.5.7</td><td>单体应用，提供 API 与静态页托管</td></tr>
+  <tr><td>数据存储</td><td>H2 文件库（默认），MySQL 8 驱动已引入可切换</td><td>对话消息与情绪记录两张表</td></tr>
+  <tr><td>本地情绪引擎</td><td><b>自研词典引擎</b></td><td>106 个情绪触发词、9 个否定词、10 个程度副词、12 个危机词</td></tr>
+  <tr><td>部署</td><td>Cloudflare Pages（主）/ 腾讯云 CloudBase（备）/ Docker</td><td>前端静态托管 + 服务端函数</td></tr>
+  <tr><td>版本与协作</td><td>Git</td><td>源码版本管理</td></tr>
+</table>
+
+<div class="box">
+  <div class="t">第三方服务如实声明</div>
+  本作品的<b>大模型能力来自第三方服务 DeepSeek（OpenAI 兼容接口）</b>，用于共情回复生成与情绪精判。除该服务外，情绪词典引擎、评分公式、可视化渲染、叙事交互、降级策略、危机拦截规则均为本团队自主设计与实现。前端除 Three.js、GSAP 两个开源渲染/动效库外未使用第三方商业组件。
+</div>
+
+<!-- ============ 6 技术方案 ============ -->
+<h2 class="ch">六、技术方案</h2>
+
+<h3>6.1 总体架构</h3>
+<pre>用户输入（文字 / 语音）
+      │
+      ▼
+ ┌──────────────────────────────────────────────┐
+ │ ① 感知层  双路情绪识别                        │
+ │    词典快判（本地，零延迟、可解释、离线可用）  │
+ │      ＋ 大模型精判（语义理解、处理反讽/隐晦）  │
+ │    仲裁：一致→采信大模型；分歧→采信大模型；    │
+ │          大模型失败→回落词典；                 │
+ │          命中危机词→最高优先级，不调用大模型   │
+ └──────────────────────────────────────────────┘
+      │  情绪标签 + 强度 + 次情绪
+      ▼
+ ┌──────────────────────────────────────────────┐
+ │ ② 决策/生成层  chat-agent                     │
+ │    按情绪构造系统提示 → 拼接近 10 轮上下文     │
+ │    → 调用大模型（同源 /api/chat 代理）         │
+ │    → 失败则回落离线共情模板（界面明示）        │
+ └──────────────────────────────────────────────┘
+      │  回复文本 + 模式标记 + 耗时
+      ▼
+ ┌──────────────────────────────────────────────┐
+ │ ③ 呈现层  three-scene（WebGL）                │
+ │    情绪 → 颜色 → 星雾粒子插值点亮             │
+ │    主色 n 颗 ＋ 次色 n/2 颗（双色星雾）        │
+ │    无 WebGL → 降级 CSS 渐变                   │
+ └──────────────────────────────────────────────┘
+      │
+      ▼
+ ┌──────────────────────────────────────────────┐
+ │ ④ 记忆层  memory-store                        │
+ │    本机 localStorage（默认，不上传）           │
+ │    服务端持久化（可选，自托管环境开启）         │
+ │    → 情绪曲线                                  │
+ └──────────────────────────────────────────────┘</pre>
+
+<h3>6.2 双路情绪识别：为什么不是"直接问大模型"</h3>
+<p>只用大模型做情绪分类，会带来三个无法接受的问题：<b>离线即失效</b>、<b>结果不可解释</b>、<b>危机场景受网络与延迟影响</b>。只用词典，则无法处理反讽、隐晦表达与复杂句。因此本作品采用<b>双路并行 + 显式仲裁</b>：</p>
+<table>
+  <tr><th style="width:22%">情形</th><th style="width:40%">仲裁结果</th><th>界面明示</th></tr>
+  <tr><td>词典命中危机词</td><td>直接判为危机信号，<b>不调用大模型</b></td><td>危机转介卡片 + 热线</td></tr>
+  <tr><td>两路结论一致</td><td>采信大模型（强度更细腻）</td><td>"词典+LLM 一致 → LLM"</td></tr>
+  <tr><td>两路结论分歧</td><td>采信大模型</td><td>"词典+LLM 分歧 → 采信 LLM"，并展示两路分值</td></tr>
+  <tr><td>大模型不可用</td><td>回落词典</td><td>"LLM 精判失败 → 词典兜底"</td></tr>
+  <tr><td>完全离线</td><td>仅词典</td><td>"仅词典（离线）"</td></tr>
+</table>
+<p class="muted">设计取舍说明：分歧时采信大模型，是因为语义理解能力更强；但<b>危机判定例外</b>——安全边界必须是确定性的规则，绝不接受模型的随机性，也绝不在该路径上等待网络。</p>
+
+<h3>6.3 评分公式（可解释性来源）</h3>
+<p>词典层对每类情绪累加 <span class="num">权重 × 修正系数</span>：取命中词前 3 字窗口，命中否定词则系数取 <span class="num">−0.7</span>（否定词若被程度副词覆盖则不生效），再对窗口内命中的程度副词逐个相乘（如"非常"×1.5、"有点"×0.6）。仅总分 &gt; 0 才计入候选，取最高分为主情绪；次情绪需达到主情绪分值的 <span class="num">40%</span> 才渲染第二种颜色，避免噪声词干扰画面。</p>
+
+<h3>6.4 词表单一真相源（工程一致性设计）</h3>
+<div class="kv">
+情绪词典同时被<b>浏览器端引擎</b>与<b>Java 服务端引擎</b>使用。为避免"两份实现各自维护、静默分叉"，词表被抽取为一个<b>独立文件作为唯一真相源</b>，两端启动时读取同一份数据；读取失败一律终止启动，绝不静默回退到旧词表。一致性由专门的守卫脚本逐项比对（词表结构、逐条预测、汇总指标三层）。<br>
+<span class="muted">效果：改词表只需改一个文件，两端行为必然同步。</span>
+</div>
+
+<h3>6.5 服务端接口</h3>
+<table class="narrow">
+  <tr><th style="width:26%">接口</th><th>用途</th></tr>
+  <tr><td>GET /api/health</td><td>健康检查，回传静态目录解析结果等可复核判据</td></tr>
+  <tr><td>POST /api/chat</td><td>大模型代理（密钥在服务端，前端零密钥）</td></tr>
+  <tr><td>POST /api/emotion</td><td>服务端情绪识别（与前端同算法）</td></tr>
+  <tr><td>GET /api/emotion/eval</td><td>复跑评测集，输出逐条结果与汇总指标</td></tr>
+  <tr><td>/api/memory/**</td><td>对话与情绪记录的留存与统计（可选开启）</td></tr>
+</table>
+
+<h3>6.6 实测数据</h3>
+<table>
+  <tr><th style="width:34%">指标</th><th style="width:24%">实测值</th><th>取证方式</th></tr>
+  <tr><td>情绪评测集规模</td><td class="num">73 条</td><td>评测集文件 + 复跑脚本</td></tr>
+  <tr><td>情绪识别准确率</td><td class="num">98.6%</td><td>前端引擎与服务端引擎分别复跑，结果全等</td></tr>
+  <tr><td>危机信号召回</td><td class="num">6 / 6</td><td>同上</td></tr>
+  <tr><td>在线对话端到端耗时</td><td class="num">约 965 ms</td><td>页面延迟显示（含情绪识别）</td></tr>
+  <tr><td>离线回落耗时</td><td class="num">约 3 ms</td><td>同上</td></tr>
+  <tr><td>容器镜像体积</td><td class="num">482 MB</td><td>Docker 构建产物</td></tr>
+  <tr><td>容器重启后数据留存</td><td>留存</td><td>重启后复查记录条数</td></tr>
+</table>
+<p class="muted">说明：上述为团队在自有评测集与自有环境下的实测结果，非第三方权威测评；评测集为团队构造，用于回归与两端一致性校验，不代表真实用户分布。</p>
+
+<!-- ============ 7 功能逐项说明 ============ -->
+<h2 class="ch">七、作品功能逐项说明（重点：AI 功能的核心作用）</h2>
+
+<h3>7.1 第一幕 · 相遇 —— 叙事载体</h3>
+<p>以滚轮驱动的 3D 星空引入，用户无需注册、无需配置即可进入。<b>AI 角色：</b>无（叙事与引导层）。</p>
+<figure><img src="img/s01.png"><figcaption>图 1 第一幕：星空叙事入口</figcaption></figure>
+
+<h3>7.2 第二幕 · 情绪探针 —— <span class="tag">AI 感知层</span></h3>
+<p>用户输入一段文字，系统同时进行词典快判与大模型精判，输出情绪类别、强度（0–1）与次情绪，并在界面上<b>明示判定路径</b>（一致 / 分歧 / 兜底）。这一幕是可验证的：不是"模型说它理解了"，而是把两路的分值都摆出来。</p>
+<figure><img src="img/s07.png"><figcaption>图 2 双路情绪探针（在线模式）：词典判「平静 25%」、大模型判「低落 85%」，出现分歧时采信大模型；界面同时展示两路分值与判定路径</figcaption></figure>
+<figure><img src="img/s03.png"><figcaption>图 3 情绪识别结果即时进入对话：在线 AI 徽章、端到端耗时与星雾配色读数</figcaption></figure>
+
+<h3>7.3 第三幕 · AI 对话 —— <span class="tag">AI 生成层</span></h3>
+<p>系统把识别到的情绪注入系统提示（例如"用户刚说的话被识别为主要情绪『低落』"），拼接近 10 轮上下文后调用大模型生成共情回复，限制字数与语气，并要求结尾抛出开放式问题以延续对话。回复下方<b>明示模式与耗时</b>：在线大模型生成 / 离线共情模板，绝不允许把模板伪装成在线 AI。</p>
+<figure class="two">
+  <img src="img/s04.png"><img src="img/s08.png">
+  <figcaption>图 4 在线对话：模式徽章、耗时与双路证据标签</figcaption>
+</figure>
+<figure><img src="img/s06.png"><figcaption>图 5 在线模式徽章与体验条</figcaption></figure>
+
+<h3>7.4 第四幕 · 情绪曲线 —— 记忆与反馈闭环</h3>
+<p>每次对话的情绪被记录（含次情绪，用于复现双色星雾形态），以 Canvas 绘制成情绪变化曲线，并支持清除。<b>这一幕解决"说完就忘"</b>：用户能看到自己一段时间内的情绪走势。<span class="tag warn">演示数据</span>曲线中的记录为示例数据，用户可自行产生真实记录。</p>
+<figure><img src="img/s05.png"><figcaption>图 6 第四幕：情绪曲线（示例中数据为演示样例）</figcaption></figure>
+
+<h3>7.5 第五幕 · 陪伴 —— 危机安全边界</h3>
+<p>当输入命中危机词表（如自伤、轻生类表述），系统<b>跳过全部生成逻辑</b>，直接返回求助热线与陪伴话术（全国心理援助热线 12356，24 小时；北京心理危机研究与干预中心 010-82951332；生命热线 400-161-9995）。这是优先级最高的规则分支，实测危机召回 6/6。</p>
+
+<h3>7.6 离线降级 —— 诚实标注模式</h3>
+<p>当大模型不可用时，系统不报错、不空白，而是切换到离线共情模板继续陪伴；同时界面<b>明示</b>当前为"离线共情模板"并显示真实耗时，<b>绝不允许把模板伪装成在线 AI</b>。情绪识别同步降级为纯词典路径，判定路径显示为"仅词典（离线）"。这一设计是有意为之：宁可让评委看到"此刻是离线"，也不制造"AI 一直在线"的假象。</p>
+<figure><img src="img/s02.png"><figcaption>图 7 离线降级模式示例：右上角徽章与回复标签均明示「离线共情模板」，绝不以模板冒充在线大模型</figcaption></figure>
+
+<h3>7.7 功能 × AI 角色对照</h3>
+<table class="narrow">
+  <tr><th style="width:24%">功能</th><th style="width:26%">AI 角色</th><th>具体作用</th></tr>
+  <tr><td>情绪探针</td><td>感知</td><td>词典规则 + 大模型语义精判，双路仲裁后输出结构化情绪</td></tr>
+  <tr><td>AI 对话</td><td>决策 + 生成</td><td>情绪条件化系统提示，控制语气、长度、共情结构与追问</td></tr>
+  <tr><td>情绪星雾</td><td>呈现</td><td>把情绪向量映射为颜色与粒子点亮数量，实现"情绪被看见"</td></tr>
+  <tr><td>情绪曲线</td><td>记忆</td><td>累积情绪记录，形成可回看的状态变化</td></tr>
+  <tr><td>危机转介</td><td>安全边界</td><td>规则优先于生成，命中即拦截并给出专业求助渠道</td></tr>
+  <tr><td>离线降级</td><td>兜底</td><td>大模型不可用时切换模板，并诚实标注模式</td></tr>
+</table>
+
+<!-- ============ 8 使用说明 ============ -->
+<h2 class="ch">八、完整使用说明</h2>
+
+<h3>8.1 访问方式</h3>
+<table>
+  <tr><th style="width:26%">方式</th><th>说明</th></tr>
+  <tr><td>在线体验（推荐）</td><td>打开 https://xinyu-soulisle.pages.dev —— 免登录、免配置，直接可用</td></tr>
+  <tr><td>备用地址</td><td>国内备用链路（腾讯云）。⚠️ 该地址为平台测试域名，首次打开会出现平台"风险提醒"中间页，点击"确定访问"即可继续</td></tr>
+  <tr><td>本地运行</td><td>在源码目录启动静态服务后访问本地端口，无需安装依赖（依赖库已本地化）</td></tr>
+  <tr><td>自托管</td><td>打包为可执行 jar 运行，或构建 Docker 镜像运行（含服务端与全部接口）</td></tr>
+</table>
+
+<h3>8.2 操作流程（约 30 秒走完）</h3>
+<table>
+  <tr><th class="c" style="width:8%">步</th><th style="width:24%">操作</th><th>系统反馈</th></tr>
+  <tr><td class="c">1</td><td>打开链接，向下滚动</td><td>星空随滚动推进，进入叙事</td></tr>
+  <tr><td class="c">2</td><td>在情绪探针输入框写下此刻感受（或使用语音输入），提交</td><td>显示情绪类别、强度、判定路径；星雾按情绪颜色点亮</td></tr>
+  <tr><td class="c">3</td><td>继续在对话区说话</td><td>收到共情回复，下方标注模式（在线 / 离线）与耗时</td></tr>
+  <tr><td class="c">4</td><td>滚动到情绪曲线</td><td>看到历次情绪记录与走势</td></tr>
+  <tr><td class="c">5</td><td>点击清除</td><td>本机记录归零（可重新累积）</td></tr>
+</table>
+
+<h3>8.3 交互指南与注意事项</h3>
+<ul>
+  <li><b>语音输入：</b>点击麦克风图标说话（需浏览器授权麦克风权限）。</li>
+  <li><b>模式识别：</b>界面始终显示当前是"在线大模型生成"还是"离线共情模板"，请以此判断当前 AI 是否真实接入。</li>
+  <li><b>数据存储：</b>默认情况下，对话与情绪记录<b>只保存在你自己的浏览器里</b>，不会上传；清除浏览器数据即清除记录。</li>
+  <li><b>无 WebGL 环境：</b>星雾会自动降级为渐变背景，其余功能不受影响。</li>
+  <li><b>免责：</b>本作品用于情感陪伴，<b>不提供医疗诊断或心理治疗</b>。如遇自伤风险请立即联系专业机构（全国心理援助热线 12356）。</li>
+</ul>
+
+<!-- ============ 9 应用前景与商业模式 ============ -->
+<h2 class="ch">九、应用前景与商业模式</h2>
+
+<h3>9.1 应用场景</h3>
+<table>
+  <tr><th style="width:22%">场景</th><th style="width:40%">价值</th><th>付费方</th></tr>
+  <tr><td>高校心理健康中心</td><td>作为咨询前的<b>轻量前置入口</b>：学生在预约前后有日常倾诉渠道；中心可查看群体情绪态势（需合规授权）</td><td>学校 / 院系</td></tr>
+  <tr><td>班级 / 社团</td><td>期末、考研季等高压时段的情绪自测与疏导</td><td>学校 / 社团</td></tr>
+  <tr><td>个人用户</td><td>隐私优先的个人情绪陪伴与记录</td><td>个人订阅</td></tr>
+</table>
+
+<h3>9.2 商业模式</h3>
+<table>
+  <tr><th style="width:20%">模式</th><th style="width:38%">内容</th><th>阶段判断</th></tr>
+  <tr><td>B 端部署</td><td>为高校提供私有化部署（数据在校内），按年收取部署与维护费</td><td><b>未开展，规划中</b></td></tr>
+  <tr><td>C 端订阅</td><td>个人高级功能（长期情绪报告、多端同步）</td><td><b>未开展，规划中</b></td></tr>
+  <tr><td>免费基础版</td><td>基础陪伴与可视化免费，用于获客与公益属性</td><td>当前形态</td></tr>
+</table>
+
+<h3>9.3 单位经济（估算，未经实证）</h3>
+<div class="box">
+  <div class="t">⚠️ 以下为成本量级估算，非实测数据</div>
+  单次对话的 token 消耗量级：系统提示 + 近 10 轮上下文 + 生成回复，约数百 token；情绪精判为一次独立的低成本短调用。<br>
+  单次成本 ≈（输入 token 单价 × 输入量）＋（输出 token 单价 × 输出量）。本方案<b>不引用具体单价数字</b>，请以大模型服务商官网实时公示价格代入计算。<br>
+  按量付费模式下，成本随用量线性增长，无最低消费；对高校场景可采用私有化部署 + 年度服务费的方式规避按量波动。
+</div>
+
+<h3>9.4 推广路径与局限</h3>
+<ol>
+  <li><b>近期：</b>以免费在线版本积累真实使用与反馈（当前阶段，尚无用户量数据）。</li>
+  <li><b>中期：</b>与高校心理健康中心接洽试点，需通过校内数据合规审查。</li>
+  <li><b>长期：</b>形成"情绪感知 + 可视化"的通用组件能力，向其他陪伴类场景输出。</li>
+</ol>
+<p class="muted"><b>局限与风险（如实声明）：</b>① 尚未开展真实用户试点，第 9.2、9.3 节均为规划与估算；② 情绪识别基于自建评测集，未做跨人群泛化验证；③ 涉及心理健康场景，正式落地需专业机构参与与合规审查；④ 大模型能力依赖第三方服务，存在服务与价格变动风险。</p>
+
+<!-- ============ 10 原创与数据声明 ============ -->
+<h2 class="ch">十、原创性与数据声明</h2>
+
+<h4>10.1 原创性</h4>
+<p>本作品的产品设计、情绪词典与评分公式、双路仲裁逻辑、危机拦截规则、3D 星雾可视化与五幕叙事交互，均为本团队原创实现。第三方依赖已如实列于第五章（Three.js、GSAP 为开源库；DeepSeek 为第三方大模型服务）。</p>
+
+<h4>10.2 数据声明（诚信条款）</h4>
+<ul>
+  <li>本方案第 1.1 节引用的心理健康数据来自公开出版物，已在页内标注来源；团队<b>未开展同等规模的一手调研</b>。</li>
+  <li>第 6.6 节的识别准确率、召回率、耗时等，均为团队<b>在自建评测集与自有环境下的实测</b>，用于回归与一致性校验，不代表真实用户分布或第三方权威测评。</li>
+  <li>产品界面中出现的情绪曲线等记录，如标注"示例数据 / 演示数据"，则为演示样例，<b>非真实用户数据</b>。</li>
+  <li>第 9.2、9.3 节的商业模式与单位经济为规划与估算，<b>未经试点验证</b>，不作为效果承诺。</li>
+</ul>
+
+<h4>10.3 引用来源</h4>
+<ol style="font-size:9pt">
+  <li>中国科学院心理研究所《中国国民心理健康发展报告（2021～2022）》（2022 版心理健康蓝皮书，2023 年 2 月发布）</li>
+  <li>《2020 年大学生心理健康现状与需求》（心理健康蓝皮书系列）</li>
+  <li>《心理健康蓝皮书：中国国民心理健康发展报告（2023—2024）》（中国科学院心理研究所、社会科学文献出版社，2025 年 4 月发布）</li>
+  <li>中国科学院心理研究所《2024 年大学生心理健康状况调查报告》</li>
+  <li>2026 年 iCAN 大学生创新创业大赛 AI 应用创新挑战赛官方通知（组委会发〔2026〕29 号）</li>
+</ol>
+
+<p class="muted" style="margin-top:8mm;font-size:9pt">
+本文档按官方要求的应用方案九项内容组织：①项目背景 ②痛点 ③需求分析 ④目标用户群体及功能需求 ⑤开发工具 ⑥技术方案 ⑦逐一说明作品功能（重点突出 AI 功能核心作用）⑧完整使用说明 ⑨应用前景与商业模式。
+</p>
+
+</body>
+</html>
