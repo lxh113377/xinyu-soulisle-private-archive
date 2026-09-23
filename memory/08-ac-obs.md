@@ -18,6 +18,8 @@
 - [x] AC-OBS-01: 3D 情绪星雾渲染且 WebGL 不可用时可降级 → `browser_check.py` 断言 `typeof THREE`/`gsap`/`ScrollTrigger` 已加载、`#gl` 活跃、五幕叙事存在 | 测试输出
 - [x] AC-OBS-02: 每句对话按其情绪点亮星雾并持久化 → 同套件断言 `LIT: init=0 after1=5 after2=17 reload=17 clear=0` | 测试输出
 - [x] AC-OBS-03: 双色星雾在**屏幕像素上**可分辨 → `pixel_dual_check.py` 判据**双条件**：两簇中心色距 > 0.25 **且** 少数簇占比 > 0.10；并带**单色对照**（对照不通过才算判据有效） | 测试输出
+  - **2026-09-23 补强（判据稳定性治理，阈值未放松）**：早前判据会因采样相位抖动而时好时坏（同色用例曾判出 0.338 色距的假双色；干净树基线对照同样复现 ⇒ 非回归、属判据本身不稳）。修法全在**测试侧**：① init script 定种子替换 `Math.random` → 星位可复现；② Playwright clock `pause_at` 固定时刻 → `performance.now()` 恒定 → 动画相位冻结；③ 新增**空白星图负对照**；④ console 报错改按**来源 URL** 精确豁免注入端点（不再"凡 CONNECTION_REFUSED 一律放行"）。**生产代码零测试钩子**（中途曾加 `?seed=` 生产侧钩子，终稿已移除）。
+  - **连跑实测**：(色距, 少数簇占比) multi ≈ (0.53~0.57, 0.27~0.35) / single ≈ (0.02~0.11, 0.004~0.04)；blank = (0.428, 0.004) 判不出双色。判据余量 ≥2.2×，`LIT-COLOR-CHECK-PASS`。
 - [x] AC-OBS-04: 一键点亮是"清屏 + 播放过程"而非瞬间切换 → `lightshow_check.py` 采**黑屏关键帧**有效像素 = 0（证明清屏真发生）+ 结束后六色各占 8.4%~20.9% | 测试输出
 - [x] AC-OBS-05: 叙事卡片随滚动淡入淡出且"明显可感" → `browser_check.py` 断言 `SCROLL_FADE: enter<0.6 / center>0.9 / leaving<0.5 且 <center` | 测试输出
 - [x] AC-OBS-06: 危机信号最高优先级拦截并推送求助热线 → 同套件断言 `CRISIS: True` | 测试输出
