@@ -1,19 +1,28 @@
 /* 心屿 · 本地情感引擎
  * 设计：词典 + 否定/程度修饰 + 多情绪加权 → {emotion, intensity, all}
  * 危机词表独立于情绪评分，命中即最高优先级（安全边界）。
+ *
+ * ⚠️ 词表不再内置在这里：唯一真相源是 `src/data/emotion-lexicon.js`
+ *    （window.__XINYU_LEXICON__），Java 侧 `EmotionLexicon.java` 读的是**同一份文件**。
+ *    改词表只改那一份，然后跑 `python _test/engine_consistency_check.py`。
  */
 window.EmotionEngine = (function () {
-  const LEX = {
-    joy:    { w: 1.0, color: [1.00, 0.82, 0.30], words: ["开心","高兴","快乐","爽","棒","太好了","爱","幸福","满足","期待","哈哈","嘿嘿","顺利","成功","上岸","录取","offer","涨薪","被夸","惊喜","小确幸","通过了","评上了","考上了"] },
-    sadness:{ w: 1.0, color: [0.30, 0.49, 1.00], words: ["难过","伤心","哭","想哭","失落","孤独","孤单","emo","抑郁","低落","难受","心碎","失望","遗憾","空落落","没意思","好累","疲惫","累","难受","心情不好","不开心","白费"] },
-    anger:  { w: 1.0, color: [1.00, 0.23, 0.19], words: ["生气","气死","烦","烦躁","火大","愤怒","讨厌","恶心","受不了","凭什么","骂","吵架","不公平","破防"] },
-    fear:   { w: 1.0, color: [0.62, 0.40, 0.95], words: ["害怕","恐惧","慌","紧张","担心","焦虑","不安","怕","吓人","噩梦","失眠","睡不着","压力","压力好大","崩溃","要死了","赶不上","挂科","施压","答辩","交代"] },
-    calm:   { w: 0.8, color: [0.25, 0.85, 0.75], words: ["平静","还行","一般","普通","安静","放松","舒服","还好","凑合","正常","平淡"] },
-    love:   { w: 0.9, color: [0.98, 0.42, 0.78], words: ["心动","暗恋","想他","想她","想TA","表白","在一起","分手","失恋","想念","舍不得","暧昧","喜欢上"] }
-  };
-  const NEG = ["不","没","没有","别","无","并非","不太","不算","不"];
-  const DEG = { "太":1.4,"好":1.3,"非常":1.5,"特别":1.4,"超":1.5,"真的":1.3,"巨":1.5,"有点":0.6,"有些":0.6,"稍微":0.5 };
-  const CRISIS = ["自杀","不想活","活不下去","结束生命","割腕","轻生","一了百了","死了算了","去死","自我了断","结束一切","想结束"];
+  const SRC = (typeof window !== "undefined" && window.__XINYU_LEXICON__) || null;
+  if (!SRC) {
+    throw new Error(
+      "[EmotionEngine] 词表未加载：请确认 index.html 在 emotion-engine.js 之前引入 data/emotion-lexicon.js"
+    );
+  }
+
+  const LEX = {};
+  for (const [emo, v] of Object.entries(SRC.lex)) {
+    LEX[emo] = { w: v.weight, color: v.color, words: v.words };
+  }
+  const NEG = SRC.neg;
+  const DEG = SRC.deg;
+  const CRISIS = SRC.crisis;
+  const LABELS = SRC.labels;
+  const CRISIS_COLOR = SRC.crisisColor;
 
   /**
    * 否定判定（2026-09-23 修缺陷）：否定词的字符若**被程度副词覆盖**，则该否定词不生效。
@@ -75,7 +84,7 @@ window.EmotionEngine = (function () {
       emotion: crisis ? "crisis" : emotion,
       intensity: crisis ? 1 : intensity,
       all: entries.map(([e, v]) => ({ emotion: e, score: +v.toFixed(2) })),
-      color: crisis ? [1.0, 0.2, 0.25] : (LEX[emotion] ? LEX[emotion].color : LEX.calm.color)
+      color: crisis ? CRISIS_COLOR.slice() : (LEX[emotion] ? LEX[emotion].color : LEX.calm.color)
     };
   }
 
@@ -90,11 +99,11 @@ window.EmotionEngine = (function () {
   }
 
   function colorOf(emotion) {
-    if (emotion === "crisis") return [1.0, 0.2, 0.25];
+    if (emotion === "crisis") return CRISIS_COLOR.slice();
     return (LEX[emotion] || LEX.calm).color;
   }
   function labelOf(emotion) {
-    return { joy:"愉悦", sadness:"低落", anger:"烦躁", fear:"焦虑", calm:"平静", love:"心动", crisis:"危机信号" }[emotion] || "平静";
+    return LABELS[emotion] || "平静";
   }
   /** 六色图例：情绪 → 实际渲染色（与 LEX.color 同源，保证图例色点和星雾一致）。
    *  六色的色相间隔已实测 ≥40°：愤怒红(3°) 愉悦金(46°) 平静青(170°) 低落蓝(224°) 焦虑紫(264°) 心动粉(321°) */
@@ -102,7 +111,7 @@ window.EmotionEngine = (function () {
     return Object.keys(LEX).map(k => ({ emotion: k, label: labelOf(k), color: LEX[k].color.slice() }));
   }
 
-  // NEG / DEG / CRISIS 一并导出：供 `_test/engine_consistency_check.py` 与 Java 侧逐项对账
+  // LEX / NEG / DEG / CRISIS 一并导出：供 `_test/engine_consistency_check.py` 与 Java 侧逐项对账
   // （一致性守卫需要比对词表**结构本身**，只比预测汇总可能因巧合相同而漏掉分叉）
   return { scan, colorOf, labelOf, secondaryOf, palette, LEX, NEG, DEG, CRISIS };
 })();

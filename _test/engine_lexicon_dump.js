@@ -12,10 +12,14 @@ const vm = require("vm");
 
 const sandbox = { window: {}, console };
 vm.createContext(sandbox);
-vm.runInContext(
-  fs.readFileSync(path.join(__dirname, "..", "src", "js", "emotion-engine.js"), "utf8"),
-  sandbox
-);
+/* 词表 SSOT 必须先加载：emotion-engine.js 启动即要求 window.__XINYU_LEXICON__ 已存在，
+ * 缺了会直接抛错（fail-fast，避免静默用空词表跑出「假通过」）。 */
+for (const f of ["data/emotion-lexicon.js", "js/emotion-engine.js"]) {
+  vm.runInContext(
+    fs.readFileSync(path.join(__dirname, "..", "src", f), "utf8"),
+    sandbox, { filename: f }
+  );
+}
 const E = sandbox.window.EmotionEngine;
 
 const lex = {};

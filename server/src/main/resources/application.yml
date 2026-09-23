@@ -34,6 +34,11 @@ xinyu:
   # 可选鉴权：留空 = 完全放行（演示默认）；非空则 /api/**（除 /api/health）需带 X-Xinyu-Token
   api-token: ${XINYU_API_TOKEN:}
   web-root: ${XINYU_WEB_ROOT:./src/}
+  # 情绪词表单一真相源（前端与服务端共用同一份文件）：
+  #   ${XINYU_LEXICON} 直接指向文件；未设则用 ${XINYU_WEB_ROOT}/data/emotion-lexicon.js
+  #   —— 即 src/data/emotion-lexicon.js（fat jar）或 /app/web/data/...（Docker）。
+  #   加载失败会 fail-fast 终止启动，绝不静默回退到旧词表。
+  lexicon: ${XINYU_LEXICON:}
   llm:
     # 密钥只从环境变量来：零落盘、零入库。J5 会进一步做外置与最小权限。
     base: ${DEEPSEEK_BASE:https://api.deepseek.com/v1}
