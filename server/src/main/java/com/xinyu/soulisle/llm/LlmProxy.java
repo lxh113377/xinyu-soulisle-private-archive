@@ -83,6 +83,13 @@ public class LlmProxy {
             if (body == null || body.isBlank()) {
                 return new Result(resp.statusCode(), "{\"error\":\"upstream-nonjson\"}");
             }
+            // 与 v1 Pages Function 对齐：上游非 JSON 体一律折成 upstream-nonjson（同状态码透传），
+            // 否则前端会把 HTML 错误页当 OpenAI 响应解析。
+            try {
+                mapper.readTree(body);
+            } catch (Exception parseFail) {
+                return new Result(resp.statusCode(), "{\"error\":\"upstream-nonjson\"}");
+            }
             return new Result(resp.statusCode(), body);
         } catch (Exception e) {
             return new Result(502, "{\"error\":\"upstream-error\"}");

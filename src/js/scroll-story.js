@@ -1,8 +1,5 @@
 /* 心屿 · 滚动叙事控制器
  * 有 GSAP+ScrollTrigger：滚动进度 → 镜头/文案动画；无则降级原生 scroll 监听。
- */
-/* 心屿 · 滚动叙事控制器
- * 有 GSAP+ScrollTrigger：滚动进度 → 镜头/文案动画；无则降级原生 scroll 监听。
  * ⚠️ 每幕只能有「一条」时间轴独占 .act-copy 的 y/opacity：
  *    旧实现用「进入 fromTo + 淡出 to(scrub)」两条补间争抢同一属性，
  *    淡出补间会把首次渲染时的值（尚未进入时的 opacity:0）记为起点，
@@ -15,6 +12,8 @@ window.ScrollStory = (function () {
 
     if (window.gsap && window.ScrollTrigger) {
       gsap.registerPlugin(ScrollTrigger);
+      // 字体/布局后到齐会改变幕高，load 后刷新一次触发器量程，避免淡入区间错位
+      addEventListener("load", () => { if (window.ScrollTrigger) window.ScrollTrigger.refresh(); });
       gsap.to({}, {
         scrollTrigger: {
           trigger: story, start: "top top", end: "bottom bottom", scrub: true,

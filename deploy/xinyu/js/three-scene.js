@@ -21,6 +21,7 @@ window.ThreeScene = (function () {
   // 0.22 在只点亮几十颗时屏幕有效像素只剩 ~113（肉眼看不清），故补到 0.26。
   const DIM_SIZE = 0.05, LIT_SIZE = 0.26;
   let litCount = 0;
+  let colorAttr = null; // aColor 属性引用：init 后缓存，tick 每帧复用，避免重复查表
   let cursor = 0;        // 有序点亮的游标（沿螺旋由内向外推进 → 每色形成一圈色环）
   let blackoutT0 = 0;    // 「清屏」黑屏的截止时刻（performance.now() 毫秒）
   let showTimers = [];
@@ -61,7 +62,7 @@ window.ThreeScene = (function () {
     }
     // 有序点亮要「由内向外」，所以游标走的是按半径升序的索引表（不是原始索引）
     for (let i = 0; i < COUNT; i++) order[i] = i;
-    Array.prototype.sort.call(order, (a, b) => radius[a] - radius[b]);
+    order.sort((a, b) => radius[a] - radius[b]); // TypedArray 原生排序：与旧 Array.prototype.sort.call 同序
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geo.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
     geo.setAttribute("aSize", new THREE.BufferAttribute(pSize, 1));
@@ -98,6 +99,7 @@ window.ThreeScene = (function () {
     scaleAttr();
     points = new THREE.Points(geo, mat);
     scene.add(points);
+    colorAttr = points.geometry.attributes.aColor;
 
     addEventListener("resize", () => {
       camera.aspect = innerWidth / innerHeight;
@@ -191,7 +193,7 @@ window.ThreeScene = (function () {
   // （700ms 时截图本身的耗时会让采样落在已点亮之后，测不出清屏）
   const SHOW_BLACKOUT = 1100, SHOW_GAP = 200, SHOW_STEP = 8;
   function lightShow(perEmotion = 180) {
-    if (!points) return [];
+    if (!points) return { palette: [], duration: 0 };
     cancelShow();
     douse();                                   // ① 清屏
     blackoutT0 = performance.now() + SHOW_BLACKOUT; // ② 先黑一下，让「点亮」有起点
@@ -214,7 +216,7 @@ window.ThreeScene = (function () {
 
   /** 熄灭整片星图（一键清除数据时调用） */
   function douse() {
-    litState.fill(0); litAt.fill(0); litCount = 0;
+    litState.fill(0); litAt.fill(0); litCount = 0; crisisPulse = 0;
     pSize.fill(DIM_SIZE); cursor = 0;
     if (points) points.geometry.attributes.aSize.needsUpdate = true;
   }
@@ -251,7 +253,7 @@ window.ThreeScene = (function () {
       dimK = left > 0 ? 0 : Math.min(1, (now - blackoutT0) / 600);
       if (dimK >= 1) blackoutT0 = 0;
     }
-    const attr = points.geometry.attributes.aColor;
+    const attr = colorAttr || points.geometry.attributes.aColor;
     const arr = attr.array;
     for (let i = 0; i < COUNT; i++) {
       const tw = 0.75 + 0.25 * Math.sin(time * 6 + i);

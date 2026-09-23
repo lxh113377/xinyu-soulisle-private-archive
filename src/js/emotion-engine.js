@@ -22,21 +22,28 @@ window.EmotionEngine = (function () {
    * - 修正后：「特别难受」→ 程度副词占位，否定不生效（正确）；
    *           「别难过」  → 窗口内无程度副词，否定照常生效（正确，保留）。
    */
+  /* 否定判定缓存：hasNegation 是 before（≤3 字窗口）的纯函数，同窗重复命中直接取缓存。
+   * 同一条消息里同一窗口会被每个候选词各算一次，缓存后只算一次，结果逐字一致。 */
+  const negCache = new Map();
   function hasNegation(before) {
+    if (negCache.has(before)) return negCache.get(before);
     const degSpans = [];
     for (const d of Object.keys(DEG)) {
       let p = before.indexOf(d);
       while (p !== -1) { degSpans.push([p, p + d.length]); p = before.indexOf(d, p + 1); }
     }
-    return NEG.some(n => {
+    let hit = false;
+    for (const n of NEG) {
       let q = before.indexOf(n);
       while (q !== -1) {
         const covered = degSpans.some(([a, b]) => q < b && q + n.length > a);
-        if (!covered) return true;
+        if (!covered) { hit = true; break; }
         q = before.indexOf(n, q + 1);
       }
-      return false;
-    });
+      if (hit) break;
+    }
+    negCache.set(before, hit);
+    return hit;
   }
 
   function scan(text) {

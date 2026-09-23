@@ -89,6 +89,7 @@
 
   // 4.5) 一键点亮：六种情绪各点一簇（仅演示，不写入记忆）；再点一次回到「我的记忆」
   let showMode = false;
+  let showTimer = null; // 声明前置：点击回调里读写它，禁止先用后声明
   $("#btn-lightshow").addEventListener("click", () => {
     if (!gl) return;
     showMode = !showMode;
@@ -111,7 +112,6 @@
   });
 
   // 演示态退出（清空演示点亮，回到真实记忆）—— 由坞里的「↺ 回到我的记忆」触发
-  let showTimer = null;
   function exitShow() {
     if (showTimer) { clearTimeout(showTimer); showTimer = null; }
     document.body.classList.remove("showtime");
@@ -170,8 +170,9 @@
       const modeLabel = { model: "在线大模型生成", fallback: "大模型暂不可用 · 离线共情模板", offline: "离线共情模板", guard: "安全转介策略" }[r.mode];
       pushMsg("ai", r.reply, `${modeLabel}${r.path ? " · 情绪双路：" + r.path : ""}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
       // 记住这条情绪 → 点亮一簇星（一个瞬间 = 1~8 颗，强度越高越多）
-      const lexLex = window.EmotionEngine.scan(text);
-      const sec = window.EmotionEngine.secondaryOf(lexLex.all, r.emotion);
+      // 复用 respond 里已算好的词典结果，避免同文本二次 scan；旧版本无 lexAll 时回落重扫
+      const lexAll = r.lexAll || window.EmotionEngine.scan(text).all;
+      const sec = window.EmotionEngine.secondaryOf(lexAll, r.emotion);
       let applied = null;
       if (gl) {
         if (r.emotion === "crisis") window.ThreeScene.setCrisis();
@@ -179,7 +180,7 @@
           sec && window.EmotionEngine.colorOf(sec));
       }
       syncStars();
-      renderReadout({ all: lexLex.all, emotion: r.emotion, intensity: r.intensity, secondary: sec,
+      renderReadout({ all: lexAll, emotion: r.emotion, intensity: r.intensity, secondary: sec,
         appliedSecondary: applied, path: r.path ? "双路情绪 · " + r.path : "词典快判" });
       drawChart();
     } catch (err) {
@@ -191,6 +192,7 @@
   // 6) 语音输入（Web Speech API，zh-CN；不支持则隐藏按钮）
   (function voiceInit() {
     const btn = $("#btn-voice");
+    btn.setAttribute("aria-pressed", "false");
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { btn.style.display = "none"; return; }
     const rec = new SR();
@@ -202,6 +204,7 @@
       if (listening) { rec.stop(); return; }
       listening = true;
       btn.classList.add("recording");
+      btn.setAttribute("aria-pressed", "true");
       btn.textContent = "●";
       rec.start();
     });
@@ -213,6 +216,7 @@
     rec.onend = rec.onerror = () => {
       listening = false;
       btn.classList.remove("recording");
+      btn.setAttribute("aria-pressed", "false");
       btn.textContent = "🎤";
     };
   })();
@@ -221,15 +225,22 @@
   function drawChart() {
     const cv = $("#mood-chart");
     const ctx = cv.getContext("2d");
+    // HiDPI：CSS 像素逻辑绘制 + setTransform 缩放，高分屏曲线不再发虚；布局宽变化时同步画布
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const vw = cv.clientWidth || 560, vh = 220;
+    if (cv.width !== Math.round(vw * dpr) || cv.height !== Math.round(vh * dpr)) {
+      cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const data = window.MemoryStore.all();
-    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.clearRect(0, 0, vw, vh);
     $("#chart-count").textContent = data.length ? `本机已记录 ${data.length} 条情绪（仅存于此浏览器）` : "还没有记录 — 聊几句就有了";
     if (!data.length) {
       ctx.fillStyle = "#8a93b2"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("暂无数据", cv.width / 2, cv.height / 2);
+      ctx.fillText("暂无数据", vw / 2, vh / 2);
       return;
     }
-    const W = cv.width, H = cv.height, pad = 26;
+    const W = vw, H = vh, pad = 26;
     const n = data.length;
     const x = (i) => pad + (W - pad * 2) * (n === 1 ? 0.5 : i / (n - 1));
     const y = (v) => H - pad - (H - pad * 2) * v;
@@ -265,6 +276,12 @@
     $("#probe-result").textContent = "星星已熄灭 —— 再和它说一句话，星雾会重新亮起来。";
     drawChart();
   });
+  // 视口/布局变化时曲线按新 CSS 宽重绘（防抖，避免拖动期高频重算；无数据时跳过）
+  let chartResizeTimer = 0;
+  addEventListener("resize", () => {
+    clearTimeout(chartResizeTimer);
+    chartResizeTimer = setTimeout(() => { if (window.MemoryStore.all().length) drawChart(); }, 200);
+  });
 
   // J4：远端记忆（默认关闭）。开启且服务端可达时，用数据库权威副本覆盖本地后重建星图；
   // 未开启/不可达 → 走下面这行，行为与 v1 完全一致（确保既有回归不受影响）。
@@ -284,11 +301,15 @@
   });
   dlg.addEventListener("close", () => {
     if (dlg.returnValue !== "save") return;
-    window.ChatAgent.setCfg({
+    // Key 留空 = 不改：输入框恒不回显旧 Key，空输入若直接覆盖会把已存 Key 洗掉；
+    // proxy 由运行环境持有，对话框不展示，合并写入予以保留
+    const patch = {
       base: $("#set-base").value.trim(),
-      key: $("#set-key").value.trim(),
       model: $("#set-model").value.trim()
-    });
+    };
+    const keyInput = $("#set-key").value.trim();
+    if (keyInput) patch.key = keyInput;
+    window.ChatAgent.setCfg(patch);
     refreshBadge();
   });
 })();

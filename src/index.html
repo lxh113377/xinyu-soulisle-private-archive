@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>心屿 · AI 情感陪伴 — 滚轮驱动的 3D 情绪叙事</title>
 <meta name="description" content="对话陪聊 + 情感陪伴：以 WebGL 3D 情绪星云承载 AI 共情对话，滚动即叙事。">
+<meta name="theme-color" content="#070b18">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%237c6cff'/><circle cx='12' cy='12' r='4' fill='%23b9aefe'/></svg>">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -65,7 +66,7 @@
       <p class="kicker">第四幕 · 记忆</p>
       <h2>情绪会留下潮汐</h2>
       <p class="lead">所有对话情绪在本机留存为情绪曲线（不上传、可一键清除），<br>它记得你来过的每一次天气。</p>
-      <canvas id="mood-chart" width="560" height="220" aria-label="情绪历史曲线"></canvas>
+      <canvas id="mood-chart" width="560" height="220" role="img" aria-label="情绪历史曲线"></canvas>
       <div class="chart-actions">
         <button id="btn-clear" class="ghost-btn danger">清除我的数据</button>
         <span id="chart-count" class="muted"></span>

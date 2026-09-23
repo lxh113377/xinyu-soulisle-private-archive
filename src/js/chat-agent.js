@@ -21,11 +21,22 @@ window.ChatAgent = (function () {
   function saveCfg(c) { localStorage.setItem(CFG_KEY, JSON.stringify(c)); }
   function isOnline() { const c = cfg(); return !!c.proxy || !!(c.base && c.key && c.model); }
 
-  /* 统一 LLM 请求：proxy 模式走同源 /api/chat（密钥在云端 Function）；否则前端直连（本地演示） */
+  /* 统一 LLM 请求：proxy 模式走同源 /api/chat（密钥在云端 Function）；否则前端直连（本地演示）。
+   * 60s 超时（与 Java 侧 LlmProxy 请求超时同值）：超时即抛错走离线兜底，避免 thinking 常转。 */
+  const LLM_TIMEOUT_MS = 60000;
+  async function fetchWithTimeout(url, opts, ms) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), ms || LLM_TIMEOUT_MS);
+    try {
+      return await fetch(url, { ...opts, signal: ctl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
   async function llmFetch(messages, temperature, max_tokens) {
     const c = cfg();
     if (c.proxy) {
-      const res = await fetch(c.proxy, {
+      const res = await fetchWithTimeout(c.proxy, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages, temperature, max_tokens })
@@ -33,7 +44,7 @@ window.ChatAgent = (function () {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
     }
-    const res = await fetch(c.base.replace(/\/$/, "") + "/chat/completions", {
+    const res = await fetchWithTimeout(c.base.replace(/\/$/, "") + "/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + c.key },
       body: JSON.stringify({ model: c.model, messages, temperature, max_tokens })
@@ -115,6 +126,7 @@ window.ChatAgent = (function () {
   // 次情绪判定统一走 EmotionEngine.secondaryOf（单一真相源），用于双色星雾
 
   async function respond(text) {
+    const t0 = performance.now(); // 计时起点含情绪分类：latency 如实反映整轮等待
     const { lex, final, path } = await classifyEmotion(text);
     const emo = final.emotion, intensity = final.intensity;
     // 次情绪一并入库：星图重放要能复现「主色 n 颗 + 次色 n/2 颗」的原始点亮形态
@@ -122,9 +134,8 @@ window.ChatAgent = (function () {
     if (emo === "crisis") {
       remember(text, CRISIS_REPLY);
       window.MemoryStore.record({ emotion: "crisis", intensity: 1, text: text.slice(0, 60) });
-      return { reply: CRISIS_REPLY, emotion: "crisis", mode: "guard", path, latency: 0 };
+      return { reply: CRISIS_REPLY, emotion: "crisis", mode: "guard", path, latency: 0, lexAll: lex.all };
     }
-    const t0 = performance.now();
     let reply, mode;
     if (isOnline()) {
       try { reply = await onlineReply(text, emo); mode = "model"; }
@@ -135,7 +146,7 @@ window.ChatAgent = (function () {
     const latency = Math.round(performance.now() - t0);
     remember(text, reply);
     window.MemoryStore.record({ emotion: emo, intensity, secondary, text: text.slice(0, 60) });
-    return { reply, emotion: emo, intensity, mode, path, latency, secondary };
+    return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all };
   }
 
   /** 记住一轮问答：本地 history 为主，远端（J4，默认关闭）尽力而为 */
@@ -149,9 +160,11 @@ window.ChatAgent = (function () {
     }
   }
 
-  function setCfg(c) { saveCfg(c); history = []; saveHistory(); }
+  /* setCfg 做合并写入：调用方没传的键（Key 为空不传 / proxy 由运行环境持有）一律保留，
+   * 避免"开一次设置面板就把已存 Key/proxy 洗掉"。历史照常清空（换模型上下文不混用）。 */
+  function setCfg(c) { saveCfg({ ...cfg(), ...c }); history = []; saveHistory(); }
   function getHistory() { return history.slice(); }
-  function getCfg() { const c = cfg(); return { base: c.base || "", key: "", model: c.model || "" }; }
+  function getCfg() { const c = cfg(); return { base: c.base || "", key: "", model: c.model || "", proxy: c.proxy || "" }; }
 
   return { respond, classifyEmotion, isOnline, setCfg, getCfg, getHistory };
 })();
