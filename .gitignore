@@ -39,3 +39,9 @@ server/data/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ===== 演示视频中间产物（成片 mp4 入库，其余可重录） =====
+交付物/提交包/demo_video_out/*.webm
+交付物/提交包/demo_video_out/video_raw/
+交付物/提交包/demo_video_out/qa_*.png
+交付物/提交包/demo_video_out/vo*.mp3

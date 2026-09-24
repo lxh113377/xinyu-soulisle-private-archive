@@ -1,0 +1,18 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+
+[V4 Styles]
+Style: Default,Microsoft YaHei,36,&H00FFFFFF,&H0000E7FF,&H00202020,&H96000000,0,0,0,0,1,2,0,2,60,60,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Text
+Dialogue: 0,0:00:00.00,0:00:24.55,Default,你心里的那座岛，今天是什么天气？
+Dialogue: 0,0:00:24.85,0:01:09.72,Default,超过三成大学生正被情绪困扰，倾诉出口却稀缺——数据见页内来源角标
+Dialogue: 0,0:01:10.02,0:01:33.55,Default,说一句“被导师批评了”：接收→识别→策略→生成→渲染
+Dialogue: 0,0:01:33.85,0:02:06.63,Default,逐字流式生成，情绪曲线同步生长——三模块实时协同
+Dialogue: 0,0:02:06.93,0:02:27.50,Default,危机信号出现时，系统跳过全部生成逻辑，优先转介求助热线 12356
+Dialogue: 0,0:02:27.80,0:02:46.21,Default,上游不可达？逐条明示“离线共情模板”，绝不伪装在线
+Dialogue: 0,0:02:46.51,0:03:05.19,Default,所有情绪默认只存这台设备。一键清除，星图与曲线即刻归零
+Dialogue: 0,0:03:05.49,0:03:36.70,Default,心屿 SoulIsle｜免登录在线演示 xinyu-soulisle.pages.dev｜2026 iCAN 软件赛道
