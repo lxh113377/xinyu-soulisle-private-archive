@@ -248,8 +248,10 @@
       const r = await window.ChatAgent.respond(text, onDelta);
       if (bubble) bubble.remove(); else thinking.remove();
       const modeLabel = { model: "在线大模型生成", fallback: "大模型暂不可用 · 离线共情模板", offline: "离线共情模板", guard: "安全转介策略" }[r.mode];
+      // 情绪识别来源必须如实标注：后端 /api/emotion 与本地词典是两套实现，界面不得含糊
+      const emoSrcLabel = r.emoSrc === "backend" ? " · 情绪:后端" : "";
       const aiMsg = pushMsg("ai", r.reply,
-        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
+        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
       aiMsg.dataset.emotion = r.emotion;
       speak(r.reply);   // 朗读开关打开时同步播出（失败静默，绝不影响主链路）
       // 记住这条情绪 → 点亮一簇星（一个瞬间 = 1~8 颗，强度越高越多）

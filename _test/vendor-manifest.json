@@ -1,0 +1,42 @@
+{
+  "generated": "2026-09-25",
+  "purpose": "首屏 vendor 三件套的唯一声明源：版本、完整性哈希、上游标识。守卫 = _test/vendor_freshness_check.py",
+  "libs": [
+    {
+      "file": "src/vendor/three.min.js",
+      "name": "three.js",
+      "version": "r128",
+      "upstream_repo": "mrdoob/three.js",
+      "upstream_kind": "release",
+      "detect": "\\be=\"(\\d{3})\"",
+      "status": "stale",
+      "note": "2021 版本；上游已 r186（2026-09-24）。跨 58 个大版本，升级属破坏性改动（色彩管理/编码器/着色器 API 断代），明令排到 09-30 复赛节点后，见 ROADMAP。",
+      "sha256": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2",
+      "size": 603445
+    },
+    {
+      "file": "src/vendor/gsap.min.js",
+      "name": "gsap",
+      "version": "3.15.0",
+      "upstream_repo": "greensock/GSAP",
+      "upstream_kind": "tag",
+      "detect": "\\* GSAP ([0-9.]+)",
+      "status": "stale",
+      "note": "上游 releases/latest 返回 404（该仓不发 release，只有 tag），故 upstream_kind=tag。",
+      "sha256": "92bb9a96476f983d212a2bc4f54c889039c1696dd4461d40a736860938570fbb",
+      "size": 72927
+    },
+    {
+      "file": "src/vendor/ScrollTrigger.min.js",
+      "name": "ScrollTrigger",
+      "version": "3.15.0",
+      "upstream_repo": "greensock/GSAP",
+      "upstream_kind": "tag",
+      "detect": "\\* ScrollTrigger ([0-9.]+)",
+      "status": "stale",
+      "note": "必须与 gsap.min.js 同版本（同一次发布产物），替换时两个文件一起换。",
+      "sha256": "b0b14d67b55b0c43c756ac0b106cfcb09d0879945f6ead64451065b0672916a2",
+      "size": 44575
+    }
+  ]
+}

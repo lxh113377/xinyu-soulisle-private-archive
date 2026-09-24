@@ -15,23 +15,50 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[1]
 
-# (相对路径, 预算 bytes)。总预算 = 首屏关键路径：index.html + style.css + 全部 js + vendor
+# (相对路径, 预算 bytes)。总预算 = 首屏关键路径：index.html + style.css + 全部 js + data + vendor
+# ⚠️ 本表必须**全覆盖**首屏源文件（下方 coverage() 机器强制）：r20 实测发现原 13 文件表
+#    漏登记了 src/data/emotion-strategy.js（4,720B），新增 emotion-remote.js 也不会被自动纳入
+#    —— 「逐文件预算」若靠手工维护，加文件这条最常见的退化路径恰好绕过门禁。
 BUDGETS = {
-    "src/index.html": 9_143,
-    "src/css/style.css": 13_367,
-    "src/js/app.js": 23_757,
-    "src/js/chat-agent.js": 11_266,
-    "src/js/emotion-engine.js": 5_597,
-    "src/js/scroll-story.js": 3_756,
+    "src/index.html": 9_191,
+    "src/css/style.css": 13_368,
+    "src/js/app.js": 23_979,
+    "src/js/chat-agent.js": 11_729,
+    "src/js/emotion-engine.js": 5_598,
+    "src/js/emotion-remote.js": 4_679,
+    "src/js/scroll-story.js": 3_757,
     "src/js/three-scene.js": 15_793,
-    "src/js/memory-store.js": 4_843,
-    "src/js/demo-config.js": 1_411,
-    "src/data/emotion-lexicon.js": 4_041,
+    "src/js/memory-store.js": 4_844,
+    "src/js/demo-config.js": 1_828,
+    "src/data/emotion-lexicon.js": 4_042,
+    "src/data/emotion-strategy.js": 4_956,
     "src/vendor/three.min.js": 633_617,
-    "src/vendor/gsap.min.js": 75_824,
+    "src/vendor/gsap.min.js": 75_825,
     "src/vendor/ScrollTrigger.min.js": 45_549,
 }
-TOTAL_KEY_PATH = 847_969  # 首屏关键路径总预算（含 vendor）
+TOTAL_KEY_PATH = 858_752  # 首屏关键路径总预算（含 vendor），2026-09-25 实测 817,859B + 5%
+
+# 参与覆盖校验的目录（src/functions 是 Pages Function 服务端源码，不在首屏路径）
+COVER_DIRS = ("src/js", "src/css", "src/data", "src/vendor")
+
+
+def coverage():
+    """返回 (未登记预算的新文件, 表里已不存在的死条目)。"""
+    on_disk = set()
+    for d in COVER_DIRS:
+        for p in (ROOT / d).glob("*"):
+            if p.is_file() and p.suffix in (".js", ".css", ".html"):
+                on_disk.add(p.relative_to(ROOT).as_posix())
+    html = "src/index.html"
+    if (ROOT / html).exists():
+        on_disk.add(html)
+    # demo-config.js：src 版含本机 Key 且被 .gitignore，两端形态本就不同 ⇒ 两侧都排除，
+    # 只做「存在则测预算」，不参与「必须登记」的覆盖对账
+    on_disk.discard("src/js/demo-config.js")
+    declared = set(BUDGETS) - {"src/js/demo-config.js"}
+    unregistered = sorted(on_disk - declared)
+    stale = sorted(declared - on_disk)
+    return unregistered, stale
 
 
 def measure():
@@ -77,11 +104,21 @@ def run(scale=1.0):
 
 
 if __name__ == "__main__":
+    unreg, stale = coverage()
     if "--selftest" in sys.argv:
+        # 覆盖判据自证：从表里抽掉一个真实存在的文件，coverage 必须抓到（否则恒真）
+        probe = "src/js/emotion-remote.js"
+        BUDGETS.pop(probe, None)
+        caught = probe in coverage()[0]
         rc = run(scale=0.90)
-        if rc == 1:
-            print("✅ SELFTEST-PASS：压缩预算后成功报红 ⇒ 判据非恒真")
+        if rc == 1 and caught:
+            print("✅ SELFTEST-PASS：压缩预算逐项报红 + 漏登记文件被 coverage 抓到 ⇒ 两判据非恒真")
             sys.exit(0)
-        print("🔴 SELFTEST-FAIL：预算压到 90% 仍未报红，判据恒真")
+        print(f"🔴 SELFTEST-FAIL：budget_rc={rc} coverage_caught={caught}")
         sys.exit(1)
+    if unreg:
+        print(f"BUDGET-FAIL: 首屏存在未登记预算的文件 {unreg}（新增文件必须同步进预算表）")
+        sys.exit(1)
+    if stale:
+        print(f"  WARN  预算表含磁盘已无的条目 {stale}（不阻塞，建议清理）")
     sys.exit(run())

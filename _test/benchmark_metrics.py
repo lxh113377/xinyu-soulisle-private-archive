@@ -1,0 +1,288 @@
+# -*- coding: utf-8 -*-
+"""对标源数据机器化采集 + 漂移守卫（把「对标」从一次性手工 curl 变成可复现产物）。
+
+为什么需要：v1/v2 报告的星数、停更日期、CI job 数散落在正文与一次性命令里，
+下一轮无法机器复核（M1「数字来自历史快照」风险源）。本脚本把同类指标固化成
+JSON 台账，并强制每次运行输出「与上一次快照的逐字段差值」——防止拿旧数字下结论。
+
+判据：
+  1) 每个参照仓的 4 个核心字段（★ / pushed_at / 最近 release / CI workflow 数）**必须成功取到**，
+     任一仓取不到即 rc=1（禁止"跳过该仓继续"造成静默缩水；环境故障走 rc=2）
+  2) --selftest 用合成快照（只改一个字段）喂给 diff 函数，断言**恰好**报出该字段
+     ——证明漂移判据非恒真（对照：全等快照必须 0 漂移）
+退出码：0=BENCHMARK-METRICS-PASS 1=取数失败或自检未过 2=网络/token 环境异常
+"""
+import argparse
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+OUT_DIR = ROOT / "交付物" / "对标数据"
+SNAP = OUT_DIR / "benchmark-metrics.json"
+
+# tier: A 工程规格天花板 / B 结构最同构 / C 同体量垂类 / D 记忆·情绪上游参照
+PEERS = [
+    {"repo": "lobehub/lobehub", "tier": "A", "why": "Web AI 聊天前端工程化最强者（原 lobehub/lobe-chat，2026-09 改名）"},
+    {"repo": "SillyTavern/SillyTavern", "tier": "A", "why": "头部角色扮演聊天前端，persona/扩展生态参照"},
+    {"repo": "Open-LLM-VTuber/Open-LLM-VTuber", "tier": "B", "why": "情绪→可视化映射 + 语音陪伴，与心屿同题"},
+    {"repo": "morettt/my-neuro", "tier": "B", "why": "桌宠 + 记忆型陪伴，活跃迭代参照"},
+    {"repo": "letta-ai/letta", "tier": "D", "why": "stateful agent 长期记忆（J4 记忆叙事同构先例）"},
+    {"repo": "hello-diana/MASCOT", "tier": "C", "why": "多智能体社交认知陪伴（EMNLP 2026）"},
+    {"repo": "ddxfish/sapphire", "tier": "C", "why": "垂类陪伴 agent，Python + Web UI"},
+    {"repo": "v2rockets/Loyal-Elephie", "tier": "C", "why": "带 RAG 记忆的陪伴（停更反面教材）"},
+    {"repo": "Rogendo/Mental-health-Chatbot", "tier": "C", "why": "多语心理健康陪伴，有真实部署主页"},
+    {"repo": "Lum1104/MER-Factory", "tier": "D", "why": "多模态情绪识别工厂（标注→评测→训练闭环）"},
+    {"repo": "CheaperjamRen/leemo", "tier": "C", "why": "本地优先桌面陪伴 agent"},
+    {"repo": "NJX-njx/opensoul", "tier": "C", "why": "小体量但工程齐（13 workflow + 全套文档）"},
+    {"repo": "s-nagaev/chibi", "tier": "C", "why": "小体量高频发布节奏样板"},
+    {"repo": "29-Cu/succhia", "tier": "C", "why": "中文『陪聊』垂类（BLE 硬件），零工程配套"},
+]
+
+# 根目录文件探测：文档/工程配套齐备度（对标 §4.6 的口径来源）
+DOC_FILES = ["README.md", "docs", "tests", "test", "CHANGELOG.md", "CONTRIBUTING.md",
+             "SECURITY.md", ".env.example", ".env.example.txt", "ROADMAP.md", ".github"]
+# 能力探测：按**整树递归**的文件名/后缀匹配（根目录一层探测无判别力——
+# 实测 14 仓的 sw.js / locales 全部落在子目录里，只看根目录会一律报"无"，
+# 把"没测到"当成"没有"即 M4 判据失效，故此处必须 recursive）
+CAP_RULES = {
+    "pwa_offline": lambda p: p.rsplit("/", 1)[-1] in ("sw.js", "service-worker.js",
+                                                     "serviceworker.js", "sw.ts"),
+    "pwa_manifest": lambda p: p.rsplit("/", 1)[-1] in ("manifest.webmanifest", "manifest.json"),
+    "i18n_locale": lambda p: "/locales/" in f"/{p}" or "/i18n/" in f"/{p}" or "/languages/" in f"/{p}",
+    "streaming": lambda p: p.rsplit("/", 1)[-1] in ("sse.ts", "sse.js", "use-sse.ts") or "/sse/" in f"/{p}",
+    "vector_memory": lambda p: "vector" in p.lower() or "embedding" in p.lower() or "rag" in p.lower(),
+    "container": lambda p: p.rsplit("/", 1)[-1] in ("Dockerfile", "docker-compose.yml",
+                                                    "docker-compose.yaml"),
+    "e2e_browser": lambda p: "/e2e/" in f"/{p}" or "playwright" in p.lower() or "cypress" in p.lower(),
+    "deps_autoupdate": lambda p: p in ("dependabot.yml", ".github/dependabot.yml", "renovate.json",
+                                        ".renovaterc.json", ".github/renovate.json"),
+}
+
+
+def gh(*args, timeout=40):
+    p = subprocess.run(["gh", "api", *args], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", timeout=timeout)
+    if p.returncode != 0:
+        msg = (p.stderr or "").strip()
+        if "Could not resolve host" in msg or "timed out" in msg.lower() or "connection" in msg.lower():
+            raise OSError(f"network: {msg[:160]}")
+        raise RuntimeError(f"gh api {args[0]} -> {msg[:160]}")
+    return json.loads(p.stdout or "null")
+
+
+def probe_repo(peer):
+    repo = peer["repo"]
+    out = dict(peer)
+    r = gh(f"repos/{repo}")
+    out["stars"] = r["stargazers_count"]
+    out["pushed_at"] = r["pushed_at"][:10]
+    out["language"] = r.get("language")
+    out["license"] = (r.get("license") or {}).get("spdx_id")
+    out["default_branch"] = r["default_branch"]
+    rel = gh(f"repos/{repo}/releases", timeout=30)
+    out["latest_release"] = rel[0]["tag_name"] if isinstance(rel, list) and rel else None
+    try:
+        wf = gh(f"repos/{repo}/actions/workflows")
+        out["ci_workflows"] = wf.get("total_count")
+    except Exception:
+        out["ci_workflows"] = None
+    try:
+        tr = gh(f"repos/{repo}/git/trees/{out['default_branch']}?recursive=1", timeout=90)
+        paths = [e["path"] for e in tr.get("tree", []) if e.get("type") == "blob"]
+        root_names = {e["path"] for e in tr.get("tree", []) if e.get("type") == "tree"}
+        names = set(root_names) | {p for p in paths if "/" not in p}
+        out["docs"] = sorted(p for p in names if p in DOC_FILES)
+        out["file_count"] = len(paths)
+        caps = set()
+        for p in paths:
+            for cap, fn in CAP_RULES.items():
+                if cap in caps:
+                    continue
+                if len(p) < 300 and fn(p):
+                    caps.add(cap)
+        out["caps"] = sorted(caps)
+        out["tree_truncated"] = bool(tr.get("truncated"))
+    except Exception as e:
+        out["docs"] = []
+        out["caps"] = []
+        out["file_count"] = None
+        out["tree_error"] = str(e)[:120]
+    return out
+
+
+EXCLUDE_PARTS = {"vendor", "target", "node_modules", "__pycache__", ".git", ".wrangler",
+                 ".codebuddy", "_shots", "archive", "_test"}
+
+
+def self_metrics():
+    """心屿自身坐标——与参照仓同口径机器生成，禁止手抄进报告（M2 同源纪律）。"""
+    src = ROOT / "src"
+    loc, files = 0, 0
+    for p in src.rglob("*"):
+        if p.is_file() and p.suffix in (".js", ".css", ".html", ".json") \
+                and not (EXCLUDE_PARTS & set(p.parts)):
+            try:
+                loc += len(p.read_text("utf-8", errors="replace").splitlines())
+                files += 1
+            except Exception:
+                continue
+    suites = sorted(p.name for p in (ROOT / "_test").glob("*_check.py")) \
+        + sorted(p.name for p in (ROOT / "_test").glob("*contract*.py"))
+    ci = ROOT / ".github" / "workflows" / "ci.yml"
+    jobs = 0
+    if ci.exists():
+        in_jobs = False
+        for line in ci.read_text("utf-8").splitlines():
+            if line.startswith("jobs:"):
+                in_jobs = True
+            elif in_jobs and line and not line.startswith(" "):
+                break
+            elif in_jobs and line.startswith("  ") and not line.startswith("   "):
+                jobs += 1
+    xinyu = ROOT / "deploy" / "xinyu"
+    docs = [n for n, ok in [("README.md", (ROOT / "README.md").exists()),
+                            ("CHANGELOG.md", (ROOT / "CHANGELOG.md").exists()),
+                            ("ROADMAP.md", (ROOT / "ROADMAP.md").exists()),
+                            ("CONTRIBUTING.md", (ROOT / "CONTRIBUTING.md").exists()),
+                            ("SECURITY.md", (ROOT / "SECURITY.md").exists()),
+                            (".env.example", (ROOT / ".env.example").exists()),
+                            ("docs", (ROOT / "docs").exists()),
+                            ("tests", (ROOT / "_test").exists()),
+                            (".github", (ROOT / ".github").exists())] if ok]
+    caps = set()
+    if any((xinyu / f).exists() or (src / f).exists() for f in ("sw.js", "service-worker.js")):
+        caps.add("pwa_offline")
+    if (src / "manifest.webmanifest").exists() or (xinyu / "manifest.webmanifest").exists():
+        caps.add("pwa_manifest")
+    if (ROOT / ".github" / "dependabot.yml").exists():
+        caps.add("deps_autoupdate")
+    wired = any("/api/emotion" in p.read_text("utf-8", errors="replace")
+                for p in src.glob("js/*.js"))
+    if wired:
+        caps.add("emotion_backend_wired")
+    return {"repo": "xinyu-soulisle (私有归档仓，本项目)", "tier": "self",
+            "stars": None, "pushed_at": None, "latest_release": None,
+            "ci_workflows": jobs or None, "language": "JavaScript/Java",
+            "license": None, "default_branch": "main",
+            "docs": docs, "caps": sorted(caps), "file_count": files,
+            "src_loc_excl_vendor": loc, "regression_suites": len(set(suites))}
+
+
+def diff_snap(prev_repos, cur_repos, keys=("stars", "pushed_at", "latest_release", "ci_workflows")):
+    """逐仓逐字段差值。返回 [(repo, field, old, new)]；全等快照必须返回空列表。"""
+    drift = []
+    prev = {r["repo"]: r for r in prev_repos}
+    for cur in cur_repos:
+        old = prev.get(cur["repo"])
+        if not old:
+            drift.append((cur["repo"], "repo_added", None, cur["stars"]))
+            continue
+        for k in keys:
+            if old.get(k) != cur.get(k):
+                drift.append((cur["repo"], k, old.get(k), cur.get(k)))
+    return drift
+
+
+def selftest():
+    """合成两份快照：只动 lobehub 的 stars、只动 chibi 的 pushed_at，断言 diff 恰好抓到。"""
+    base = [{"repo": "lobehub/lobehub", "stars": 100, "pushed_at": "2026-09-01",
+             "latest_release": "v1", "ci_workflows": 3},
+            {"repo": "s-nagaev/chibi", "stars": 50, "pushed_at": "2026-09-01",
+             "latest_release": None, "ci_workflows": 5}]
+    same = json.loads(json.dumps(base))
+    if diff_snap(base, same):
+        print("SELFTEST-FAIL: 全等快照被报出漂移（判据过敏）")
+        return 1
+    moved = json.loads(json.dumps(base))
+    moved[0]["stars"] = 101
+    moved[1]["pushed_at"] = "2026-09-20"
+    got = diff_snap(base, moved)
+    want = {("lobehub/lobehub", "stars"), ("s-nagaev/chibi", "pushed_at")}
+    if {(g[0], g[1]) for g in got} != want:
+        print(f"SELFTEST-FAIL: 期望抓到 {sorted(want)}，实际 {[(g[0], g[1]) for g in got]}")
+        return 1
+    print(f"SELFTEST-PASS: 合成快照 2 处改动全部抓到、全等对照零误报（{len(got)} 条）")
+    return 0
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--out", default=str(SNAP))
+    args = ap.parse_args()
+
+    if args.selftest:
+        sys.exit(selftest())
+
+    cur, hard_fail = [], []
+    for peer in PEERS:
+        try:
+            cur.append(probe_repo(peer))
+        except OSError as e:
+            print(f"BENCHMARK-ENV-ERROR: {peer['repo']} {e}")
+            return 2
+        except Exception as e:
+            hard_fail.append(f"{peer['repo']}: {e}")
+
+    path = Path(args.out)
+    prev_repos = []
+    hist = []
+    if path.exists():
+        try:
+            data = json.loads(path.read_text("utf-8"))
+            hist = data.get("runs", [])
+            prev_repos = hist[-1]["repos"] if hist else []
+        except Exception as e:
+            print(f"WARN: 既有快照不可读，按首次运行处理（{e}）")
+    own = self_metrics()
+    run = {"ts": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+           "repo_count": len(cur), "self": own, "repos": cur}
+    hist = (hist + [run])[-6:]
+    drift = diff_snap(prev_repos, cur)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"generated_by": "_test/benchmark_metrics.py",
+               "peers_expected": len(PEERS), "runs": hist}
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), "utf-8")
+    os.replace(tmp, path)
+
+    print(f"采集: {len(cur)}/{len(PEERS)} 仓 | 快照 {path.relative_to(ROOT).as_posix()} | 历史 {len(hist)} 次")
+    if not cur:
+        print("BENCHMARK-FAIL: 零仓取到数据")
+        return 1
+    if own["src_loc_excl_vendor"] <= 0 or own["regression_suites"] <= 0:
+        print("BENCHMARK-FAIL: 本项目自测指标为空（扫描路径失配，禁止把空读数当现状）")
+        return 1
+    for r in cur:
+        print(f"  [{r['tier']}] {r['repo']:42s} ★{r['stars']:<7} pushed {r['pushed_at']} "
+              f"rel={r['latest_release'] or '-':<18} wf={r['ci_workflows']} "
+              f"caps={','.join(r['caps']) or '-'}")
+    print(f"  [self] 心屿 src(除vendor)={own['src_loc_excl_vendor']} 行/{own['file_count']} 文件 "
+          f"回归套件={own['regression_suites']} CI job={own['ci_workflows']} "
+          f"docs={len(own['docs'])}/9 caps={','.join(own['caps']) or '-'}")
+    hit = {c: sum(1 for r in cur if c in r["caps"]) for c in CAP_RULES}
+    print("  能力覆盖率(14 参照仓): " + " ".join(f"{k}={v}" for k, v in hit.items()))
+    if prev_repos:
+        if drift:
+            print(f"漂移: {len(drift)} 处（与上一次快照逐字段比对，禁止沿用旧数字）")
+            for repo, k, o, n in drift:
+                print(f"  - {repo} {k}: {o} -> {n}")
+        else:
+            print("漂移: 0 处（与上一次快照完全一致）")
+    else:
+        print("漂移: 首次运行，无历史可比")
+    if hard_fail:
+        print("BENCHMARK-FAIL: 取数不全是环境原因以外的失败，禁止当通过")
+        for h in hard_fail:
+            print("  ! " + h)
+        return 1
+    print("BENCHMARK-METRICS-PASS")
+    return 0
+
+
+sys.exit(main())

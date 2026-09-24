@@ -186,14 +186,20 @@ window.ChatAgent = (function () {
   /** respond(text, onDelta?)：onDelta 存在且在线时逐字回调已生成文本（流式），否则一次性返回 */
   async function respond(text, onDelta) {
     const t0 = performance.now(); // 计时起点含情绪分类：latency 如实反映整轮等待
-    const { lex, final, path } = await classifyEmotion(text);
+    // 后端 /api/emotion 可用时以后端为准（消除 JS/Java 两份真相），不可用即回落本地；
+    // 危机词在 EmotionRemote 内部先本地短路，不会因为网络而延迟拦截。
+    const cls = window.EmotionRemote
+      ? await window.EmotionRemote.classifyWithBackend(text, classifyEmotion)
+      : { result: await classifyEmotion(text), from: "local" };
+    const { lex, final, path } = cls.result;
+    const emoSrc = cls.result.src || "local";
     const emo = final.emotion, intensity = final.intensity;
     // 次情绪一并入库：星图重放要能复现「主色 n 颗 + 次色 n/2 颗」的原始点亮形态
     const secondary = window.EmotionEngine.secondaryOf(lex.all, emo);
     if (emo === "crisis") {
       remember(text, CRISIS_REPLY);
       window.MemoryStore.record({ emotion: "crisis", intensity: 1, text: text.slice(0, 60) });
-      return { reply: CRISIS_REPLY, emotion: "crisis", mode: "guard", path, latency: 0, lexAll: lex.all };
+      return { reply: CRISIS_REPLY, emotion: "crisis", mode: "guard", path, latency: 0, lexAll: lex.all, emoSrc };
     }
     let reply, mode, streamed = false;
     if (isOnline()) {
@@ -208,7 +214,7 @@ window.ChatAgent = (function () {
     const latency = Math.round(performance.now() - t0);
     remember(text, reply);
     window.MemoryStore.record({ emotion: emo, intensity, secondary, text: text.slice(0, 60) });
-    return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all, streamed };
+    return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all, streamed, emoSrc };
   }
 
   /** 记住一轮问答：本地 history 为主，远端（J4，默认关闭）尽力而为 */
