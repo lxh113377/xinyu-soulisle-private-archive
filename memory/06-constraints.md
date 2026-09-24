@@ -23,6 +23,11 @@
     实测更正：**Maven（`server/pom.xml`）与 GitHub Actions（`.github/workflows`）两个 ecosystem 与 npm 无关，可以直接挂**
     ⇒ 已加 `.github/dependabot.yml`（maven@/server + github-actions@/，每周二 08:00 Asia/Shanghai，PR 上限 3/2）。
     本条剩余真实盲区只有 `src/vendor/` 那三个手工 vendored 的 JS 库，由上面的 manifest 守卫承担。
+- [x] [DEBT] **文档里的数字断言（"26 套件"/"四条门禁"）无机器责任** → 已闭环（r22）：
+      `_test/repo_config_check.py` G2/G4 把 README 声称值与 `ci.yml` job 数、`run_all_suites.py` SUITES 条目数做等值对账，
+      不等即红并入电池。上线当轮就抓到一次脱节（加 2 条套件后 README 仍旧）。
+      ⚠️ 已知残留：`AGENTS.md` 的 04/05 段仍是自动 sync 生成的陈旧描述（该项目结构使 sync 部分失效，见 08 的判据误报段），
+      **不在本判据覆盖面内**，改 AGENTS.md 需手工维护。
 - [DEBT] `src/js/app.js` 469 行单体编排（对话/星图/曲线/朗读/设置混在一个 IIFE）— 还债方式：voice/chart/window/编排 四模块纯切分，不改行为（排截止后）。
 - [DEBT] `tick()` 每帧遍历全部粒子做 CPU 侧着色（桌面档 2600 次/帧）；**真机帧率 ❌未实测** → 不进任何"性能领先"结论。
 - [DEBT] 情绪引擎仍是**两份实现**（JS 离线降级用 + Java 后端权威）。本轮已把前端接到后端，但**词表仍须两端同步改**

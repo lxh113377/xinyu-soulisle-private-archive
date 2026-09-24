@@ -5,6 +5,29 @@
 
 ## [Unreleased]
 
+> 对标 r22（2026-09-25 同日第三轮）：本轮对标数据**零漂移**（16 仓与上一轮逐字段相同），
+> 因此差距全部来自**对上一轮交付物自身的复审** —— 结果抓到两处真缺陷，都已修并配反例。
+
+### Added
+- **契约探测覆盖判据 C6/C6b**（`_test/api_contract_check.py`）：每条 OpenAPI 操作必须"被真实打"或"显式
+  `x-live-skip` + 理由"，且本项目当前要求**零豁免**。`docs/openapi.yaml` 补齐 3 条漏标操作
+  （`/api/memory/emotions`、`/api/memory/messages`、`/api/memory/message` POST）⇒ 探测数 **8 → 11 全覆盖**；
+  `--selftest` 增第 5 类篡改样本（抹掉一条标注必须被 C6 抓到）
+- **仓库配置自洽守卫** `_test/repo_config_check.py`（G1–G5 + selftest）：
+  G1 dependabot schema（ecosystem 在支持清单内 / `directory` 真实存在且含对应 manifest / interval 合法）
+  G2 CI job 数 == README 声称的门禁数 G3 `docs/openapi.yaml` 存在且被 `docs/README.md` 引用（不留孤文件）
+  G4 电池条目数 == README 声称的套件数 G5（`--online`）GitHub 默认分支上 dependabot 文件可见
+- 两条判据入全量电池（26 → **28** 套件）与 CI
+
+### Fixed
+- **C4 原先的 `done >= 8` 是"阈值低于总量即掩盖"**：真实操作 11 条，只探测 8 条也判绿。现改精确对账
+  `探测 + 豁免 == 操作总数` 且要求零豁免 —— 这是我自己上一轮留下的洞，本轮复审抓到
+- **文档数字断言与实值脱节**（守卫上线当场抓到）：往电池加 2 条后 README 仍写"26 套件"，
+  G4 立刻报红 `实测 28 | 声称 26`；已改并保留该红→绿过程作为反例证据（"文档写过的数字"从此有机器责任）
+- dependabot 由"配了就算"升级为"配了且被受理"：G5 实测默认分支可见
+  （`lxh113377/xinyu-soulisle-private-archive`），GitHub 只读默认分支 ⇒ 未 push 到默认分支的配置等于没配
+
+
 > 本轮（对标 r21，2026-09-25）只动文档 / CI / 判据，**未改服务端与前端运行代码** ⇒ 版本号暂留 1.4.0，
 > 下次含代码变更的轮次一并 bump（避免在截止前制造"版本号与产物不一致"的新债）。
 

@@ -110,16 +110,33 @@ def http(method, url, body=None, query=None):
         return e.code, e.read().decode("utf-8", "replace")
 
 
-def live_probes(spec):
-    """C4：按固定顺序跑（先写后查再删），不依赖 spec 里的书写顺序。"""
+def annotated_ops(spec):
+    """返回 {归一化路径|动词: 'live' | ('skip', 理由)}。缺标注的既不算 live 也不算 skip。"""
+    out = {}
+    for pa, it in (spec.get("paths") or {}).items():
+        for v in ("get", "post", "put", "delete", "patch"):
+            op = (it or {}).get(v)
+            if not isinstance(op, dict):
+                continue
+            if op.get("x-live-check"):
+                out[(norm(pa), v.upper())] = "live"
+            elif op.get("x-live-skip"):
+                out[(norm(pa), v.upper())] = ("skip", str(op.get("x-live-skip")))
+    return out
+
+
+def live_probes(spec, ann=None):
+    """C4：按固定顺序跑（先写后查再删），不依赖 spec 里的书写顺序。返回 (探测数, 豁免集合)。"""
     order = [("/api/health", "get"), ("/api/emotion/lexicon", "get"), ("/api/emotion/eval", "get"),
              ("/api/emotion", "post"), ("/api/chat", "post"),
              ("/api/memory/emotion", "post"), ("/api/memory/message", "post"),
              ("/api/memory/stats", "get"), ("/api/memory/emotions", "get"),
              ("/api/memory/messages", "get"), ("/api/memory/{sessionId}", "delete")]
-    live = {(norm(p), v.upper()): (spec["paths"][p][v.lower()].get("x-live-check") or {})
-            for p in spec.get("paths", {}) for v in ("get", "post", "delete")
-            if v in (spec["paths"][p] or {}) and (spec["paths"][p][v.lower()] or {}).get("x-live-check")}
+    ann = ann if ann is not None else annotated_ops(spec)
+    skipped = {k: v[1] for k, v in ann.items() if isinstance(v, tuple)}
+    live = {(norm(p), v.upper()): op.get("x-live-check") or {}
+            for p, it in (spec.get("paths") or {}).items() for v, op in (it or {}).items()
+            if v in ("get", "post", "put", "delete", "patch") and isinstance(op, dict) and op.get("x-live-check")}
     done = 0
     for path, verb in order:
         cfg = live.get((norm(path), verb.upper()))
@@ -143,7 +160,7 @@ def live_probes(spec):
                 ok, detail = False, detail + f" 缺键 {miss}"
         check(f"C4 运行态一致 {verb} {path}", ok, detail + ("" if ok else f" | body[:80]={bodytxt[:80]}"))
         done += 1
-    return done
+    return done, skipped
 
 
 def selftest():
@@ -168,7 +185,16 @@ def selftest():
     miss = [k for k in req if k not in parsed]
     if miss != ["not-present"]:
         bad.append(f"篡改④（响应缺 required 键）判据不生效：miss={miss}")
-    print("SELFTEST-PASS: 删文档/加幽灵/偷调用/缺键 四类样本均被抓到、原样零问题"
+    missing_ann = {k for k in spec_ops(spec)} - set(annotated_ops(spec))
+    if not missing_ann and len(spec_ops(spec)) == len(annotated_ops(spec)):
+        # 原样应全覆盖；再用"删掉一条标注"的样本证明 C6 会报红
+        pass
+    stripped = json.loads(json.dumps(spec))
+    stripped["paths"]["/api/memory/emotions"]["get"].pop("x-live-check", None)
+    a_full, a_strip = annotated_ops(spec), annotated_ops(stripped)
+    if len(a_strip) >= len(a_full):
+        bad.append("篡改⑤（抹掉一条 x-live-check 标注）未被 C6 抓到 ⇒ 覆盖判据恒真")
+    print("SELFTEST-PASS: 删文档/加幽灵/偷调用/缺键/抹标注 五类样本均被抓到、原样零问题"
           if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
     return 1 if bad else 0
 
@@ -194,9 +220,17 @@ def main():
     if st != 200:
         print("API-CONTRACT-ENV-ERROR: fat jar 未在 8123 运行（C4 需要它）")
         return 2
-    done = live_probes(spec)
-    check("C4 覆盖度：spec 标注的 x-live-check 端点全部跑过",
-          done >= 8, f"实跑 {done} 个（spec 内标注数应 ≥8）")
+    ops = spec_ops(spec)
+    ann = annotated_ops(spec)
+    done, skipped = live_probes(spec, ann)
+    # C6（r22）：覆盖度改为**精确对账**，不再用 "done >= 8" 这种会静静放过缺口的阈值。
+    # 上一轮真实操作 11 条、只探测 8 条，断言却绿 —— 典型"阈值低于总量即掩盖"。
+    check("C6 覆盖度：每条操作要么真实探测、要么显式 x-live-skip 并给理由",
+          done + len(skipped) == len(ops) and len(skipped) == 0 or (done + len(skipped) == len(ops)),
+          f"探测 {done} + 豁免 {len(skipped)} == 操作 {len(ops)}"
+          + ("" if done + len(skipped) == len(ops) else " ⇒ 有接口既不探测也不解释"))
+    check("C6b 零豁免（本项目 11 条接口全部可安全真实打；出现豁免必须有人复核）",
+          len(skipped) == 0, f"当前豁免 {len(skipped)} 条：{sorted(skipped)}")
     fails = [r for r in results if not r[1]]
     print(f"\n合计 {len(results)} 项，失败 {len(fails)} 项")
     for n, _, d in fails:

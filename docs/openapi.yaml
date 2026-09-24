@@ -8,6 +8,9 @@ info:
     2. **文档不得虚**：本文件声明的路径必须在 Java 控制器里真实存在（幽灵文档即红）。
     3. **前端不得偷调**：`src/js/*.js` 里出现的 `/api/...` 必须已文档化。
     另含运行态对账：对标注 `x-live-check` 的端点向真实服务发请求，断言状态码与响应必需键一致。
+    **C6（r22 新增）：每条操作必须"被真实探测"或"显式声明 `x-live-skip` + 理由"**，
+    不允许既不探测也不解释 —— 上一轮 C4 写的是 `done >= 8`，而真实操作有 11 条，
+    等于用阈值把 3 条未探测的接口静静放过（`/api/memory/emotions`、`/api/memory/messages`、`/api/memory/message`）。
 
     > 与参照仓的口径坦白：16 个参照仓里只有 **1 家**存在机器可读 API 规范（`api_spec=1/16`），
     > 所以本项**不是"被同类项目甩开"的对标差距**，而是自我登记的可维护性改进
@@ -163,6 +166,11 @@ paths:
     get:
       tags: [memory]
       summary: 读取该会话情绪序列（星图重放与曲线的数据源）
+      x-live-check:
+        method: get
+        query: { sessionId: "contract-probe" }
+        status: [200]
+        required_keys: [emotion, intensity]     # 数组元素键（C4 对 list 取首元素比对）
       parameters:
         - { in: query, name: sessionId, required: true, schema: { type: string } }
         - { in: query, name: limit, schema: { type: integer, default: 200 } }
@@ -187,6 +195,11 @@ paths:
     post:
       tags: [memory]
       summary: 写入一条对话消息（J4 跨设备记忆的写入面）
+      x-live-check:
+        method: post
+        body: { sessionId: "contract-probe", role: "user", content: "契约探测消息" }
+        status: [200]
+        required_keys: [ok, count]
       requestBody:
         required: true
         content:
@@ -205,6 +218,11 @@ paths:
     get:
       tags: [memory]
       summary: 读取该会话消息
+      x-live-check:
+        method: get
+        query: { sessionId: "contract-probe" }
+        status: [200]
+        required_keys: [role, content]
       parameters:
         - { in: query, name: sessionId, required: true, schema: { type: string } }
         - { in: query, name: limit, schema: { type: integer, default: 40 } }

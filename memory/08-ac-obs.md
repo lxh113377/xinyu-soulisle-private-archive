@@ -36,6 +36,8 @@
 - [x] AC-OBS-11: 密钥零落前端、零入库 → `public_check.py` 报 `KEY_LEAK: False`；`git grep -E "sk-[A-Za-z0-9]{20,}" HEAD` 0 命中 | 测试输出
 - [x] AC-OBS-12: 可选鉴权可开可关且边界正确 → 无 token 时全放行 200；有 token 时 无头 401 / 错头 401 / 对头 200，且 `/api/health` 与静态页**始终放行** | API响应
 - [x] AC-OBS-20: 接口契约与实现不脱节（r21）→ `api_contract_check.py`：C1 控制器 11 条路由全部已文档化、C2 spec 无幽灵路径、C3 前端未偷调未文档化端点、C4 真实打 8 个端点状态码与必需键一致（含 `/api/chat`、`/api/emotion` 在线调用；探测会话 `contract-probe` 由 DELETE 自清）、C5 `--selftest` 四类合成篡改全抓到 | 测试输出 + API响应
+- [x] AC-OBS-21: 接口探测覆盖率不掺水（r22）→ C6 要求 `真实探测 + 显式豁免 == spec 操作总数`，C6b 要求当前**零豁免**；实测 11/11 真实打（含 3 条上一轮静默漏掉的 memory 读接口）；`--selftest` 第 5 类样本（抹掉一条标注）必须被 C6 抓到 | 测试输出 + API响应
+- [x] AC-OBS-22: 仓库配置与文档数字自洽（r22）→ `repo_config_check.py` G1–G5：dependabot ecosystem/目录可达、CI job 数==README 声称、契约被索引引用、电池条目数==README 声称、`--online` 默认分支可见；**判别力实证**：加 2 条套件未改 README 时 G4 当场报红（实测 28、声称 26），改后转绿 | 测试输出
 - [x] AC-OBS-17: 情绪识别可切后端且降级不伪装（r20）→ `emotion_wiring_check.py` 9 项：W4 实测 `stats.ok≥1` 且气泡标「情绪:后端」；W5 拦掉 `/api/emotion` 即 `isDown()=True`、回复照常、**不出现**后端标注；W6 同句双端词典结论相同 | 测试输出
 - [x] AC-OBS-18: 危机拦截不因后端化而延迟（r20）→ W3 源码级判据（`lex.crisis` 分支先于 `fetchEmotion(text)`）+ W3b 实测 `crisisShortCircuit≥1 且 attempted=0`（后端一次都没被调） | 测试输出 + API响应
 - [x] AC-OBS-19: 首屏第三方库可溯源（r20）→ `vendor-manifest.json` 声明版本/sha256，`vendor_freshness_check.py` V1 完整性 V2 从文件内容解析版本对账（正则零命中即红）V3 新库漏登记即红；`--selftest` 4 类篡改全抓到 | 测试输出
