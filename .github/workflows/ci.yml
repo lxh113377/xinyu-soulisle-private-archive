@@ -80,6 +80,20 @@ jobs:
           node-version: "20"
       - name: mvn package
         run: mvn -B -ntp -f server/pom.xml package
+      # 产物自证（2026-09-25 r20 实证补）：本机曾在 **jar 进程存活时**跑 package —— Windows 文件锁让
+      # spring-boot:repackage 无法把 soulisle-server.jar 改名为 .original，BUILD FAILURE 且磁盘上留下
+      # 48,920B 的**瘦 jar**，而旧进程仍在内存里跑、/api/health 照常 200 ⇒ **假健康**。
+      # 判据：构建后必须校验产物体积与可执行性，不能只看 curl / 只看 exit code。
+      - name: 校验 fat jar 产物（防"瘦 jar 冒充 fat jar"）
+        run: |
+          set -e
+          SZ=$(stat -c%s server/target/soulisle-server.jar)
+          echo "soulisle-server.jar = $SZ bytes"
+          if [ "$SZ" -lt 20000000 ]; then
+            echo "🔴 产物仅 $SZ B ⇒ spring-boot repackage 未生效（或依赖未打进去），这不是可部署 fat jar"; exit 1
+          fi
+          unzip -l server/target/soulisle-server.jar | grep -q "BOOT-INF/lib/" || { echo "🔴 缺 BOOT-INF/lib ⇒ 瘦 jar"; exit 1; }
+          echo "✅ FAT-JAR-OK"
       # 项目铁律：情绪引擎 JS/Java 两份实现必须逐项一致（词表结构 / 73 条逐条预测 / 汇总指标）。
       # 此前这条红线**只写在 memory/AGENTS.md 里靠人记**，本步把它变成机器门禁。
       # /api/emotion/* 不调用上游 LLM ⇒ 无需任何密钥即可跑，公开仓库也安全。
