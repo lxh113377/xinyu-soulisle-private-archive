@@ -447,4 +447,23 @@
     window.ChatAgent.setCfg(patch);
     refreshBadge();
   });
+
+  // 9) 深浅主题切换（r15）：默认深色；选择持久化到 peiliao.theme.v1
+  (function () {
+    const KEY = "peiliao.theme.v1";
+    const btn = $("#btn-theme");
+    if (!btn) return;   // 头部无切换按钮（旧页面缓存等）时静默跳过，不炸主链路
+    function apply(t) {
+      if (t === "light") { document.documentElement.dataset.theme = "light"; btn.textContent = "☀ 浅色"; }
+      else { delete document.documentElement.dataset.theme; btn.textContent = "☾ 深色"; }
+    }
+    let saved = "dark";
+    try { saved = localStorage.getItem(KEY) || "dark"; } catch (e) {}
+    apply(saved);
+    btn.addEventListener("click", () => {
+      const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+      try { localStorage.setItem(KEY, next); } catch (e) {}
+      apply(next);
+    });
+  })();
 })();
