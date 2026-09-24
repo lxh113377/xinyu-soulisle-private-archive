@@ -1,0 +1,26 @@
+name: 功能建议
+description: 新能力 / 体验改进提案
+labels: ["enhancement"]
+body:
+  - type: textarea
+    attributes:
+      label: 想解决什么问题
+      description: 场景 + 痛点（"谁在什么情况下想要什么"），而不是直接给实现方案
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 期望的形态
+  - type: dropdown
+    attributes:
+      label: 涉及层
+      options:
+        - 前端叙事/星雾可视化
+        - 情绪引擎（词典 / 双路 / 词表）
+        - 对话与记忆（/api/chat, /api/memory）
+        - 部署与运维
+        - 文档
+  - type: textarea
+    attributes:
+      label: 与项目红线的关系
+      description: 是否触碰 密钥/同步/词表一致性/契约 四条红线？（见 CONTRIBUTING.md）

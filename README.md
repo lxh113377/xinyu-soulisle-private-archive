@@ -1,5 +1,18 @@
 # 心屿 SoulIsle
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/lxh113377/xinyu-soulisle-private-archive/actions/workflows/ci.yml/badge.svg)](https://github.com/lxh113377/xinyu-soulisle-private-archive/actions/workflows/ci.yml)
+[![情绪评测](https://img.shields.io/badge/%E6%83%85%E7%BB%AA%E8%AF%84%E6%B5%8B-98.6%25%20%2F%2073%E6%9D%A1-brightgreen)](#-验证)
+[![危机召回](https://img.shields.io/badge/%E5%8D%B1%E6%9C%BA%E5%8F%AC%E5%9B%9E-6%2F6-red)](#-功能概览)
+[![零密钥](https://img.shields.io/badge/%E5%AF%86%E9%92%A5%E6%B3%84%E9%9C%B2-0-blueviolet)](SECURITY.md)
+[English](README.en.md)
+
+<details open><summary><b>目录</b></summary>
+
+- [功能概览](#-功能概览) · [技术栈](#-技术栈) · [快速开始](#-快速开始) · [架构](#-架构) · [目录结构](#-目录结构) · [部署](#-部署) · [验证](#-验证) · [文档](#-文档) · [免责声明](#-免责声明) · [许可证](#-许可证) · [状态](#-状态)
+
+</details>
+
 > 对话陪聊 + 情感陪伴的 AI 网页应用：以滚轮驱动的 **3D 情绪叙事页**（WebGL + GSAP）承载一条真实的 AI 共情链路。
 >
 > 情绪识别 → 共情策略 → 在线 LLM 生成 → 情绪可视化（星雾变色与点亮）→ 记忆留存，形成闭环，而不是套壳聊天框。
@@ -157,6 +170,19 @@ node _test/emotion_eval.js               # 前端情绪评测集复跑
 ```
 
 最近实测（2026-09-23）：console 0 报错；情绪评测集 **73 条 / 准确率 98.6% / 危机召回 6-6**；`/api/chat` 在线 965ms、离线回落 3ms；Docker 镜像 482MB，`docker restart` 后数据仍在（H2 落在 `/app/data` 挂载卷）。
+
+---
+
+## 📚 文档
+
+| 文档 | 内容 |
+|---|---|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 环境要求、四条红线（密钥/同步/词表一致性/契约）、开发流程与提交规范 |
+| [SECURITY.md](SECURITY.md) | 密钥政策、接口安全、漏洞上报 |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更史（Keep a Changelog） |
+| [.env.example](.env.example) | 全部环境变量文档化（名称实读自配置与函数源码） |
+| [交付物/对标分析报告-2026-09-24.md](交付物/对标分析报告-2026-09-24.md) | 与 LobeChat / Open-LLM-VTuber / SillyTavern 的七维度对标与差距清单 |
+| `memory/` | 项目交接记忆（目标/结构/技术栈/决策记录/验收标准），工程过程档案 |
 
 ---
 

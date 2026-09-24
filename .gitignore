@@ -11,6 +11,8 @@ src/js/demo-config.js
 _test/cors_probe.py
 .env
 .env.*
+# 样例文件必须入库（R20 配置文档化）；gitignore 不支持行内注释，故单独成行
+!.env.example
 *.key
 
 # ===== 2. 可重建生成物 / 测试产物 =====

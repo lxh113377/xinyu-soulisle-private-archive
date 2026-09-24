@@ -6,6 +6,8 @@ const vm = require("vm");
 
 const sandbox = { window: {}, console };
 vm.createContext(sandbox);
+// SSOT（2026-09-24 e79025b 后）：词表唯一真相源是 src/data/emotion-lexicon.js，须先于引擎注入
+vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "src", "data", "emotion-lexicon.js"), "utf8"), sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "src", "js", "emotion-engine.js"), "utf8"), sandbox);
 const E = sandbox.window.EmotionEngine;
 

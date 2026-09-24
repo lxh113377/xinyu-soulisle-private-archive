@@ -1,0 +1,39 @@
+name: Bug 报告
+description: 功能缺陷 / 渲染异常 / 接口错误
+labels: ["bug"]
+body:
+  - type: textarea
+    attributes:
+      label: 现象描述
+      description: 发生了什么，与预期的差异
+      placeholder: 在 XX 页面做了 XX，出现 XX
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: 运行形态
+      options:
+        - 本地静态页（python -m http.server）
+        - fat jar（Spring Boot）
+        - Cloudflare Pages（xinyu-soulisle.pages.dev）
+        - CloudBase 静态托管
+        - Docker
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开 ...
+        2. 输入 ...
+        3. 看到 ...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 浏览器控制台报错
+      description: console 完整红字；若能附带 Network 面板对应请求状态更好
+  - type: input
+    attributes:
+      label: 环境信息
+      description: OS / 浏览器及版本 / （如涉及服务端）JDK 版本
