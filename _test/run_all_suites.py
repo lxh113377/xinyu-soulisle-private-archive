@@ -16,6 +16,8 @@ SUITES = [
     ("vendor_freshness", [sys.executable, "_test/vendor_freshness_check.py"]),
     ("vendor_freshness_selftest", [sys.executable, "_test/vendor_freshness_check.py", "--selftest"]),
     ("benchmark_selftest", [sys.executable, "_test/benchmark_metrics.py", "--selftest"]),
+    ("api_contract", [sys.executable, "_test/api_contract_check.py"]),
+    ("api_contract_selftest", [sys.executable, "_test/api_contract_check.py", "--selftest"]),
     ("engine_consistency", [sys.executable, "_test/engine_consistency_check.py"]),
     ("strategy", [sys.executable, "_test/strategy_check.py"]),
     ("strategy_selftest", [sys.executable, "_test/strategy_check.py", "--selftest"]),

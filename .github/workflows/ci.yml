@@ -111,6 +111,9 @@ jobs:
           done
           curl -sf http://127.0.0.1:8123/api/health
           python _test/engine_consistency_check.py
+          # 接口契约三方对账（控制器↔docs/openapi.yaml↔前端）+ 运行态一致 + selftest 反例
+          python _test/api_contract_check.py
+          python _test/api_contract_check.py --selftest
 
   browser-regression:
     name: 浏览器回归（降级链路 + 星雾点亮 + 危机拦截）

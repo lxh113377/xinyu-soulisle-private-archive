@@ -169,7 +169,7 @@ CloudBase 注意事项（实测得来）：
 ## ✅ 验证
 
 ```powershell
-python _test/run_all_suites.py           # ★ 全量电池（24 套件逐条直取 rc，聚合不掩盖单项失败）
+python _test/run_all_suites.py           # ★ 全量电池（26 套件逐条直取 rc，聚合不掩盖单项失败）
 python _test/browser_check.py            # 离线降级 / 双色 / 滚动淡入淡出，输出 ALL-ASSERT-PASS
 python _test/deploy_sync_check.py        # src → deploy/xinyu 三类比对（MISSING/DIFF/EXTRA 归零）
 python _test/engine_consistency_check.py # JS 引擎 ↔ Java 引擎逐项对账（词表结构级）
@@ -182,6 +182,7 @@ python _test/size_budget_check.py        # 首屏体积预算 + 「新文件必�
 python _test/vendor_freshness_check.py   # vendor 完整性哈希 + 版本对账；--check-upstream 报上游漂移
 python _test/benchmark_metrics.py        # 对标源数据台账（14 仓指标 + 与上次快照逐字段漂移）；联网采集，人工轮次跑
 python _test/live_sync_check.py          # 线上 `/` 与 deploy/xinyu 逐字节比对（部署未跟进即红）
+python _test/api_contract_check.py       # 接口契约三方对账（控制器↔docs/openapi.yaml↔前端）+ 运行态一致
 ```
 
 > 前置：多数判据需 fat jar 起在 8123（`java -jar server/target/soulisle-server.jar --server.port=8123`，
@@ -190,7 +191,7 @@ python _test/live_sync_check.py          # 线上 `/` 与 deploy/xinyu 逐字节
 GitHub Actions 四条门禁（`.github/workflows/ci.yml`）：同步守卫+评测+策略表+体积+**vendor 供给链**+密钥扫描、Java 构建+**词表一致性红线**（此前只写在 `memory/AGENTS.md` 靠人记，现已机器化）、浏览器回归（runner 无 GPU，强制 SwiftShader）、公网新鲜度。
 四条 job **均在 GitHub 真跑验证**；浏览器 job 首轮就抓到本机看不到的真实缺陷：`src/js/demo-config.js` 被 gitignore，全新 clone 下 `<script>` 静态引它 → 首屏 3 个 404 打破「console 0 报错」。修法＝CI 自动用公网零密钥 stub 补占位（本地按 `CONTRIBUTING.md` 第一步手工补一次）。
 
-最近实测（2026-09-25 对标轮 r20）：全量电池 **24 套件 rc 全 0**；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`emotion_wiring_check` 9/9（后端路径实测生效 + 不可达即熔断不伪装 + 危机未经后端）；gsap 3.15.0 升级后 `browser_check`/`lightshow`/`pixel_dual` 全绿；首屏关键路径 819,767 B（预算 858,752 B 内）；公网已重新部署并 `LIVE-SYNC-PASS`。
+最近实测（2026-09-25 对标轮 r20 + r21）：全量电池 **26 套件 rc 全 0**；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`emotion_wiring_check` 9/9（后端路径实测生效 + 不可达即熔断不伪装 + 危机未经后端）；gsap 3.15.0 升级后 `browser_check`/`lightshow`/`pixel_dual` 全绿；首屏关键路径 819,767 B（预算 858,752 B 内）；公网已重新部署并 `LIVE-SYNC-PASS`。
 
 
 ---
@@ -203,6 +204,7 @@ GitHub Actions 四条门禁（`.github/workflows/ci.yml`）：同步守卫+评�
 | [SECURITY.md](SECURITY.md) | 密钥政策、接口安全、漏洞上报 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本变更史（Keep a Changelog） |
 | [.env.example](.env.example) | 全部环境变量文档化（名称实读自配置与函数源码） |
+| [docs/openapi.yaml](docs/openapi.yaml) | 11 条接口的**唯一机器可读契约**，由 `api_contract_check.py` 与控制器/前端/运行态三方对账 |
 | [ROADMAP.md](ROADMAP.md) | 公开路线图（对标差距 → 已完成 / 进行中 / 计划 / 明确不做，含"为什么不做"） |
 | [交付物/对标分析报告-2026-09-24.md](交付物/对标分析报告-2026-09-24.md) | 与 LobeChat / Open-LLM-VTuber / SillyTavern 的七维度对标与差距清单 |
 | [交付物/对标分析报告-2026-09-24-v2.md](交付物/对标分析报告-2026-09-24-v2.md) | 第二轮：14 仓实测指标横向对账（含同体量垂类项目）+ 本轮已落地项与实证 |

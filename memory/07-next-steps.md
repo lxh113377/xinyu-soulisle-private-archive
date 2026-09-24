@@ -18,6 +18,17 @@
 > ⚠️ 本卷为**索引壳**（R199 自动拆卷后）。以下为**当前可执行摘要**（满足致命纪律 #1：主卷 P0 不得为空）；
 > 完整描述在分卷里（见文末「分卷目录」，主要落在 `07-next-steps.part6.md`）。
 
+- [x] **对标轮 r21（2026-09-25 同日第二轮）已落地**：① 接口契约唯一声明源 `docs/openapi.yaml`（11 条）+ 三方对账守卫
+      `_test/api_contract_check.py`（C1 不缺文档 / C2 不虚文档 / C3 前端偷调即红 / C4 运行态状态码与必需键 / C5 自证）
+      ② `.github/dependabot.yml`（maven@/server + github-actions@/）③ 测量装置自纠（漂移纳入 caps/docs；
+      self 套件数改取 `run_all_suites.py` 条目数为唯一分母）④ 参照池 14→16。电池 **26 套件**。
+      **同时勾销一处 r20 错误归因**："零构建挂不上 dependabot"→ 实测 Maven 与 Actions 两个 ecosystem 可直接挂，
+      更正注在 `06-constraints.md`（原条目保留，不删改历史）。
+- [ ] **r21 之后仍可自动化推进的下一件（不依赖外部信号）**：`src/js/app.js` 469 行按 voice/chart/window/编排 纯切分
+      （判据已有：`browser_check` + `ux_guards` + `emotion_wiring` 全覆盖行为面；改前须先跑一次全量电池留基线）。
+      ⚠️ 并行会话正在本 worktree 活动（本轮观测到 8123 的 jar 被外部重启过，PID 由 36932 变 30596）
+      ⇒ 动前端/重启服务前先 `netstat` 实测端口归属，避免互踩。
+
 - [ ] 🔴 **iCAN 提交硬截止 2026-09-30**（剩 5 天；截止即锁团队信息）：官网报名 + 提交。
       三项缺件现状（2026-09-25 r20 复核）：①《应用方案》PDF ✅ 已产出（18 页，成员署名位待 PII 齐后重渲染一次）
       ②演示视频 ✅ 已交付（217s/22.4MB，`_test/demo_video_pipeline.py` 可重录）

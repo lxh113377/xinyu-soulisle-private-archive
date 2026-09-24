@@ -1,0 +1,20 @@
+version: 2
+# 对标轮 r21：纠正 r20 自己写下的**错误归因**——
+# 上一轮技术债记的是"心屿零构建 ⇒ 挂不上 dependabot（没有 package.json）"。
+# 这话只对了一半：`src/vendor/` 里的三个前端库确实没有包管理器可托管（那部分由
+# `_test/vendor-manifest.json` + `vendor_freshness_check.py` 承担）；
+# 但 **Maven（server/pom.xml）与 GitHub Actions（.github/workflows）两个 ecosystem 与 npm 无关**，
+# 完全可以直接挂 dependabot。r20 的判断把"npm 挂不上"扩大成了"整个项目挂不上"，据此放弃了本可自动化的两半。
+updates:
+  - package-ecosystem: "maven"
+    directory: "/server"
+    schedule: { interval: "weekly", day: "tuesday", time: "08:00", timezone: "Asia/Shanghai" }
+    open-pull-requests-limit: 3
+    commit-message: { prefix: "chore(deps-maven)" }
+    labels: ["dependencies", "java"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule: { interval: "weekly", day: "tuesday", time: "08:00", timezone: "Asia/Shanghai" }
+    open-pull-requests-limit: 2
+    commit-message: { prefix: "chore(deps-actions)" }
+    labels: ["dependencies", "ci"]

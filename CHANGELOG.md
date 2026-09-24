@@ -5,6 +5,31 @@
 
 ## [Unreleased]
 
+> 本轮（对标 r21，2026-09-25）只动文档 / CI / 判据，**未改服务端与前端运行代码** ⇒ 版本号暂留 1.4.0，
+> 下次含代码变更的轮次一并 bump（避免在截止前制造"版本号与产物不一致"的新债）。
+
+### Added
+- **接口契约唯一声明源** `docs/openapi.yaml`（11 条接口，含错误码与 SSE 语义）+
+  守卫 `_test/api_contract_check.py`：C1 不缺文档 / C2 不虚文档（幽灵路径）/ C3 前端不得偷调未文档化端点 /
+  C4 运行态状态码与必需键一致（真实打 `/api/chat`、`/api/emotion`，探测会话 `contract-probe` 结尾 DELETE 自清）/
+  C5 `--selftest` 四类合成篡改全抓到。已入全量电池（24 → **26** 套件）与 CI `java-build`
+- **依赖自动更新** `.github/dependabot.yml`：`maven`（`/server`，即 `server/pom.xml`）+ `github-actions`（`/`）
+  两个 ecosystem，每周二 08:00 Asia/Shanghai，PR 上限 3 / 2
+
+### Fixed
+- **纠正 r20 自己写下的错误归因**：上一轮技术债记"零构建 ⇒ 挂不上 dependabot（没有 package.json）"，
+  把"npm 生态挂不上"扩大成"整个项目挂不上"，据此放弃了本可自动化的两半。实测更正见
+  `memory/06-constraints.md` 该条的**更正注**：真正无包管理器可托管的只有 `src/vendor/` 三个手工 vendored 的 JS 库
+- **对标测量装置两处自纠**（本轮第二次采集立刻抓到问题，说明守卫有效但也确有洞）：
+  ① 漂移比对只比 4 个数字字段 ⇒ `sapphire` 的 `container` 能力从清单消失却**零漂移报告**，现 `caps`/`docs` 纳入比对
+  （`--selftest` 加两键样本）；② self 的"回归套件数"此前用文件名 glob（19）与报告口径（24 套件）**两个分母混用**，
+  现唯一真相源改为 `run_all_suites.py` 的 SUITES 条目数，解析失败即报错、绝不回退 glob
+- 参照池由 14 扩到 **16 仓**（本轮 `search/repositories?sort=updated` 实跑新捞
+  `zeroa234/ryza-ai-revive` 190★/JS/09-22 活跃、`Bwcx-songyu/MoodChat` Java 同栈），漂移输出 `repo_added` 正常报告
+- 能力探测新增 `api_spec`（机器可读 API 规范）：**实测 1/16** ⇒ 据此把 `docs/openapi.yaml` 在报告里
+  登记为**自我改进**而非对标差距，不冒充竞品压力
+
+
 ## [1.4.0] - 2026-09-25 — 对标轮 r20：把"已经建好却没接上"的能力接上
 
 ### Added

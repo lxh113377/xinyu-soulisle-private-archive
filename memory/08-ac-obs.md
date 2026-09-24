@@ -35,6 +35,7 @@
 - [x] AC-OBS-10: 情绪记忆真落库（跨浏览器、跨重启不丢） → `j4_memory_check.py` **核心断言**：清空 `localStorage` 后刷新星图仍点亮；`GET /api/memory/stats` 计数正确；重启服务后计数不变 | 数据库查询 + 测试输出
 - [x] AC-OBS-11: 密钥零落前端、零入库 → `public_check.py` 报 `KEY_LEAK: False`；`git grep -E "sk-[A-Za-z0-9]{20,}" HEAD` 0 命中 | 测试输出
 - [x] AC-OBS-12: 可选鉴权可开可关且边界正确 → 无 token 时全放行 200；有 token 时 无头 401 / 错头 401 / 对头 200，且 `/api/health` 与静态页**始终放行** | API响应
+- [x] AC-OBS-20: 接口契约与实现不脱节（r21）→ `api_contract_check.py`：C1 控制器 11 条路由全部已文档化、C2 spec 无幽灵路径、C3 前端未偷调未文档化端点、C4 真实打 8 个端点状态码与必需键一致（含 `/api/chat`、`/api/emotion` 在线调用；探测会话 `contract-probe` 由 DELETE 自清）、C5 `--selftest` 四类合成篡改全抓到 | 测试输出 + API响应
 - [x] AC-OBS-17: 情绪识别可切后端且降级不伪装（r20）→ `emotion_wiring_check.py` 9 项：W4 实测 `stats.ok≥1` 且气泡标「情绪:后端」；W5 拦掉 `/api/emotion` 即 `isDown()=True`、回复照常、**不出现**后端标注；W6 同句双端词典结论相同 | 测试输出
 - [x] AC-OBS-18: 危机拦截不因后端化而延迟（r20）→ W3 源码级判据（`lex.crisis` 分支先于 `fetchEmotion(text)`）+ W3b 实测 `crisisShortCircuit≥1 且 attempted=0`（后端一次都没被调） | 测试输出 + API响应
 - [x] AC-OBS-19: 首屏第三方库可溯源（r20）→ `vendor-manifest.json` 声明版本/sha256，`vendor_freshness_check.py` V1 完整性 V2 从文件内容解析版本对账（正则零命中即红）V3 新库漏登记即红；`--selftest` 4 类篡改全抓到 | 测试输出

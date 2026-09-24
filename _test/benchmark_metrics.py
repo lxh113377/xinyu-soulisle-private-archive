@@ -15,6 +15,7 @@ JSON 台账，并强制每次运行输出「与上一次快照的逐字段差值
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -40,11 +41,15 @@ PEERS = [
     {"repo": "NJX-njx/opensoul", "tier": "C", "why": "小体量但工程齐（13 workflow + 全套文档）"},
     {"repo": "s-nagaev/chibi", "tier": "C", "why": "小体量高频发布节奏样板"},
     {"repo": "29-Cu/succhia", "tier": "C", "why": "中文『陪聊』垂类（BLE 硬件），零工程配套"},
+    # r21 新增（本轮 search/repositories?sort=updated 实跑捞到的同体量活跃垂类）
+    {"repo": "zeroa234/ryza-ai-revive", "tier": "C", "why": "190★、JS、2026-09-22 仍活跃的同体量陪伴项目"},
+    {"repo": "Bwcx-songyu/MoodChat", "tier": "C", "why": "Java 同栈情绪陪伴垂类（体量小，作技术栈对照）"},
 ]
 
 # 根目录文件探测：文档/工程配套齐备度（对标 §4.6 的口径来源）
 DOC_FILES = ["README.md", "docs", "tests", "test", "CHANGELOG.md", "CONTRIBUTING.md",
              "SECURITY.md", ".env.example", ".env.example.txt", "ROADMAP.md", ".github"]
+DOC_FILES_SET = set(DOC_FILES)
 # 能力探测：按**整树递归**的文件名/后缀匹配（根目录一层探测无判别力——
 # 实测 14 仓的 sw.js / locales 全部落在子目录里，只看根目录会一律报"无"，
 # 把"没测到"当成"没有"即 M4 判据失效，故此处必须 recursive）
@@ -60,6 +65,10 @@ CAP_RULES = {
     "e2e_browser": lambda p: "/e2e/" in f"/{p}" or "playwright" in p.lower() or "cypress" in p.lower(),
     "deps_autoupdate": lambda p: p in ("dependabot.yml", ".github/dependabot.yml", "renovate.json",
                                         ".renovaterc.json", ".github/renovate.json"),
+    # r21 加：机器可读 API 契约的存在性（对标"接口文档是否可被工具消费"，不是"有没有 README 介绍"）
+    "api_spec": lambda p: p.rsplit("/", 1)[-1].lower() in (
+        "openapi.yaml", "openapi.yml", "openapi.json", "swagger.yaml", "swagger.yml",
+        "swagger.json", "api.openapi.yaml"),
 }
 
 
@@ -130,8 +139,18 @@ def self_metrics():
                 files += 1
             except Exception:
                 continue
-    suites = sorted(p.name for p in (ROOT / "_test").glob("*_check.py")) \
-        + sorted(p.name for p in (ROOT / "_test").glob("*contract*.py"))
+    suites_files = len({p.name for p in (ROOT / "_test").glob("*_check.py")}
+                       | {p.name for p in (ROOT / "_test").glob("*contract*.py")})
+    # ⚠️ 口径分母（M3 纪律，r21 自纠）：`regression_suites` 必须是**电池里真正会跑的条目数**，
+    #    不是"文件名看起来像判据脚本"的个数 —— 上一轮 self 报 19、报告写 24，就是两个分母混用了。
+    #    唯一真相源 = run_all_suites.py 的 SUITES 列表；解析失败即报错，绝不回退到 glob 计数。
+    battery, battery_err = None, ""
+    try:
+        txt = (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace")
+        seg = txt.split("SUITES = [", 1)[1].split("\n]", 1)[0]
+        battery = len(re.findall(r'^\s*\("', seg, re.M))
+    except Exception as e:
+        battery_err = str(e)[:80]
     ci = ROOT / ".github" / "workflows" / "ci.yml"
     jobs = 0
     if ci.exists():
@@ -143,43 +162,52 @@ def self_metrics():
                 break
             elif in_jobs and line.startswith("  ") and not line.startswith("   "):
                 jobs += 1
-    xinyu = ROOT / "deploy" / "xinyu"
-    docs = [n for n, ok in [("README.md", (ROOT / "README.md").exists()),
-                            ("CHANGELOG.md", (ROOT / "CHANGELOG.md").exists()),
-                            ("ROADMAP.md", (ROOT / "ROADMAP.md").exists()),
-                            ("CONTRIBUTING.md", (ROOT / "CONTRIBUTING.md").exists()),
-                            ("SECURITY.md", (ROOT / "SECURITY.md").exists()),
-                            (".env.example", (ROOT / ".env.example").exists()),
-                            ("docs", (ROOT / "docs").exists()),
-                            ("tests", (ROOT / "_test").exists()),
-                            (".github", (ROOT / ".github").exists())] if ok]
+    # ⚠️ self 的 docs/caps **必须走与参照仓同一个匹配器**（r21 自纠）：上一版这里另写一套
+    #    手写存在性判断，等于"自己用尺 A、别人用尺 B"，横向对比不可信（M2 同源纪律）。
+    #    唯一真相源 = git ls-files 的整仓路径清单，喂给同一份 DOC_FILES / CAP_RULES。
+    tracked = []
+    try:
+        gp = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"],
+                            capture_output=True, timeout=60)
+        tracked = [x.decode("utf-8", "replace") for x in gp.stdout.split(b"\0") if x]
+    except Exception:
+        tracked = []
+    roots = {p.split("/")[0] if "/" in p else p for p in tracked}
+    dirs = {r for r in roots if (ROOT / r).is_dir()}
+    # 归一化：本项目用 `_test/` 承担参照仓 `tests/` 的角色，不同名但同职能 ⇒ 映射后计数，
+    # 否则"文档齐备度 8/9 vs 9/9"的差别只是目录取名不同，属于假差距
+    own = {("tests" if x == "_test" else x) for x in dirs} | {p for p in tracked if "/" not in p}
+    docs = sorted(DOC_FILES_SET & own)
     caps = set()
-    if any((xinyu / f).exists() or (src / f).exists() for f in ("sw.js", "service-worker.js")):
-        caps.add("pwa_offline")
-    if (src / "manifest.webmanifest").exists() or (xinyu / "manifest.webmanifest").exists():
-        caps.add("pwa_manifest")
-    if (ROOT / ".github" / "dependabot.yml").exists():
-        caps.add("deps_autoupdate")
-    wired = any("/api/emotion" in p.read_text("utf-8", errors="replace")
-                for p in src.glob("js/*.js"))
-    if wired:
+    for p in tracked:
+        for cap, fn in CAP_RULES.items():
+            if len(p) < 300 and fn(p):
+                caps.add(cap)
+    if any("/api/emotion" in f.read_text("utf-8", errors="replace") for f in src.glob("js/*.js")):
         caps.add("emotion_backend_wired")
     return {"repo": "xinyu-soulisle (私有归档仓，本项目)", "tier": "self",
             "stars": None, "pushed_at": None, "latest_release": None,
             "ci_workflows": jobs or None, "language": "JavaScript/Java",
             "license": None, "default_branch": "main",
             "docs": docs, "caps": sorted(caps), "file_count": files,
-            "src_loc_excl_vendor": loc, "regression_suites": len(set(suites))}
+            "src_loc_excl_vendor": loc, "regression_suites": battery,
+            "regression_script_files": suites_files,
+            "battery_parse_error": battery_err or None}
 
 
-def diff_snap(prev_repos, cur_repos, keys=("stars", "pushed_at", "latest_release", "ci_workflows")):
-    """逐仓逐字段差值。返回 [(repo, field, old, new)]；全等快照必须返回空列表。"""
+def diff_snap(prev_repos, cur_repos,
+              keys=("stars", "pushed_at", "latest_release", "ci_workflows", "caps", "docs")):
+    """逐仓逐字段差值。返回 [(repo, field, old, new)]；全等快照必须返回空列表。
+
+    r21 补：`caps` / `docs` 也纳入比对。根因是本轮第二次采集实测抓到 sapphire 的 `container`
+    能力**从清单里消失却零漂移报告** —— 只比 4 个数字字段的"漂移守卫"对能力矩阵变化是瞎的。
+    """
     drift = []
     prev = {r["repo"]: r for r in prev_repos}
     for cur in cur_repos:
         old = prev.get(cur["repo"])
         if not old:
-            drift.append((cur["repo"], "repo_added", None, cur["stars"]))
+            drift.append((cur["repo"], "repo_added", None, cur.get("stars")))
             continue
         for k in keys:
             if old.get(k) != cur.get(k):
@@ -188,11 +216,11 @@ def diff_snap(prev_repos, cur_repos, keys=("stars", "pushed_at", "latest_release
 
 
 def selftest():
-    """合成两份快照：只动 lobehub 的 stars、只动 chibi 的 pushed_at，断言 diff 恰好抓到。"""
+    """合成两份快照：动 stars / pushed_at / **caps / docs**（r21 新增两键），断言 diff 恰好抓到。"""
     base = [{"repo": "lobehub/lobehub", "stars": 100, "pushed_at": "2026-09-01",
-             "latest_release": "v1", "ci_workflows": 3},
+             "latest_release": "v1", "ci_workflows": 3, "caps": ["container"], "docs": ["README.md"]},
             {"repo": "s-nagaev/chibi", "stars": 50, "pushed_at": "2026-09-01",
-             "latest_release": None, "ci_workflows": 5}]
+             "latest_release": None, "ci_workflows": 5, "caps": ["vector_memory"], "docs": ["README.md"]}]
     same = json.loads(json.dumps(base))
     if diff_snap(base, same):
         print("SELFTEST-FAIL: 全等快照被报出漂移（判据过敏）")
@@ -200,12 +228,15 @@ def selftest():
     moved = json.loads(json.dumps(base))
     moved[0]["stars"] = 101
     moved[1]["pushed_at"] = "2026-09-20"
+    moved[0]["caps"] = []                     # 能力矩阵退化：第二次实采抓到 sapphire 掉 container 却零报告
+    moved[1]["docs"] = ["README.md", "docs"]  # 文档项增加
     got = diff_snap(base, moved)
-    want = {("lobehub/lobehub", "stars"), ("s-nagaev/chibi", "pushed_at")}
+    want = {("lobehub/lobehub", "stars"), ("s-nagaev/chibi", "pushed_at"),
+            ("lobehub/lobehub", "caps"), ("s-nagaev/chibi", "docs")}
     if {(g[0], g[1]) for g in got} != want:
         print(f"SELFTEST-FAIL: 期望抓到 {sorted(want)}，实际 {[(g[0], g[1]) for g in got]}")
         return 1
-    print(f"SELFTEST-PASS: 合成快照 2 处改动全部抓到、全等对照零误报（{len(got)} 条）")
+    print(f"SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（{len(got)} 条）")
     return 0
 
 
@@ -255,7 +286,7 @@ def main():
     if not cur:
         print("BENCHMARK-FAIL: 零仓取到数据")
         return 1
-    if own["src_loc_excl_vendor"] <= 0 or own["regression_suites"] <= 0:
+    if own["src_loc_excl_vendor"] <= 0 or not own["regression_suites"]:
         print("BENCHMARK-FAIL: 本项目自测指标为空（扫描路径失配，禁止把空读数当现状）")
         return 1
     for r in cur:
@@ -263,10 +294,10 @@ def main():
               f"rel={r['latest_release'] or '-':<18} wf={r['ci_workflows']} "
               f"caps={','.join(r['caps']) or '-'}")
     print(f"  [self] 心屿 src(除vendor)={own['src_loc_excl_vendor']} 行/{own['file_count']} 文件 "
-          f"回归套件={own['regression_suites']} CI job={own['ci_workflows']} "
+          f"电池套件={own['regression_suites']}(判据脚本文件={own['regression_script_files']}，两口径不同源即登记) CI job={own['ci_workflows']} "
           f"docs={len(own['docs'])}/9 caps={','.join(own['caps']) or '-'}")
     hit = {c: sum(1 for r in cur if c in r["caps"]) for c in CAP_RULES}
-    print("  能力覆盖率(14 参照仓): " + " ".join(f"{k}={v}" for k, v in hit.items()))
+    print(f"  能力覆盖率({len(cur)} 参照仓): " + " ".join(f"{k}={v}" for k, v in hit.items()))
     if prev_repos:
         if drift:
             print(f"漂移: {len(drift)} 处（与上一次快照逐字段比对，禁止沿用旧数字）")

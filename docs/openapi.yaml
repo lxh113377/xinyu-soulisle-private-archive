@@ -1,0 +1,315 @@
+openapi: 3.0.3
+info:
+  title: 心屿 SoulIsle 服务端接口契约
+  version: "1.4.0"
+  description: |
+    **唯一机器可读接口契约**（r21 新增）。三条使用约束，都由 `_test/api_contract_check.py` 机器强制：
+    1. **文档不得缺**：`server/**/api/*.java` 里每个 `@*Mapping` 路由必须出现在本文件（漏文档即红）。
+    2. **文档不得虚**：本文件声明的路径必须在 Java 控制器里真实存在（幽灵文档即红）。
+    3. **前端不得偷调**：`src/js/*.js` 里出现的 `/api/...` 必须已文档化。
+    另含运行态对账：对标注 `x-live-check` 的端点向真实服务发请求，断言状态码与响应必需键一致。
+
+    > 与参照仓的口径坦白：16 个参照仓里只有 **1 家**存在机器可读 API 规范（`api_spec=1/16`），
+    > 所以本项**不是"被同类项目甩开"的对标差距**，而是自我登记的可维护性改进
+    > （本项目已有 3 个契约测试，但契约分散在 `j2_chat_contract.py` / 前端常量 / 部署文档三处）。
+servers:
+  - url: http://127.0.0.1:8123
+    description: 本地 fat jar（Spring Boot 直读 `src/` 权威源）
+  - url: https://xinyu-soulisle.pages.dev
+    description: Cloudflare Pages（**只有 /api/chat**，由 Pages Function 实现；其余接口不在此形态暴露）
+tags:
+  - name: health
+  - name: chat
+  - name: emotion
+  - name: memory
+paths:
+  /api/health:
+    get:
+      tags: [health]
+      summary: 服务自证（回传可复核判据，不喊口号）
+      x-live-check: { method: get, status: [200] }
+      responses:
+        "200":
+          description: UP
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /api/chat:
+    post:
+      tags: [chat]
+      summary: LLM 代理（与 v1 Pages Function 契约 1:1，AC-OBS-08）
+      description: |
+        上游响应**逐字透传**（含上游状态码）。判定顺序与 v1 一致：**先查密钥再解析 body**。
+        `stream:true` 且上游返回 SSE ⇒ `text/event-stream` 逐块直通；否则整包 JSON。
+      x-live-check: { method: post, body: { messages: [{ role: user, content: "你好" }], max_tokens: 8 }, status: [200] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatRequest" }
+      responses:
+        "200":
+          description: 上游正常响应（OpenAI 兼容形状，透传）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatResponse" }
+            text/event-stream:
+              schema: { type: string, description: "SSE 分片，data: {choices[0].delta.content}" }
+        "400": { $ref: "#/components/responses/BadJson" }
+        "500":
+          description: 服务端未配置密钥（**先于** body 解析判定）
+          content:
+            application/json:
+              schema: { type: object, properties: { error: { type: string, example: no-key } } }
+        "502":
+          description: 上游不可达/失败
+          content:
+            application/json:
+              schema: { type: object, properties: { error: { type: string, example: upstream-error } } }
+  /api/emotion:
+    post:
+      tags: [emotion]
+      summary: 双路情绪识别（词典快判 + LLM 精判；分歧采信 LLM；危机最高优先）
+      description: |
+        前端接线自 r20 起（`src/js/emotion-remote.js`）。**危机命中不调用 LLM**（实测 `llm=null` 路径）。
+        与 JS 版引擎逐条全等由 `engine_consistency_check.py` 守，双端同句一致由 `emotion_wiring_check.py` W6 守。
+      x-live-check:
+        method: post
+        body: { text: "今天被导师批评了，心情很低落" }
+        status: [200]
+        required_keys: [lex, final, path]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 识别结果
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmotionOutcome" }
+        "400": { $ref: "#/components/responses/BadJson" }
+  /api/emotion/lexicon:
+    get:
+      tags: [emotion]
+      summary: 词表结构导出（JS↔Java 一致性对账的数据源）
+      x-live-check: { method: get, status: [200], required_keys: [lex, neg, deg, crisis] }
+      responses:
+        "200":
+          description: 词表 + 否定词 + 程度词 + 危机词
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lex, neg, deg, crisis]
+  /api/emotion/eval:
+    get:
+      tags: [emotion]
+      summary: 复跑评测集（直读 `_test/emotion-eval-dataset.json`，决策 #5 不复制进 jar）
+      parameters:
+        - in: query
+          name: detail
+          schema: { type: integer, enum: [0, 1], default: 0 }
+          description: 1 = 额外返回逐条 {text,expect,pred}，供逐条对账（只看汇总会漏个别分叉）
+      x-live-check: { method: get, status: [200], required_keys: [total, accuracy, crisis_recall, per_class] }
+      responses:
+        "200":
+          description: 评测汇总
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, accuracy, crisis_recall, per_class]
+                properties:
+                  total: { type: integer, example: 73 }
+                  accuracy: { type: string, example: "98.6%" }
+                  crisis_recall: { type: string, example: "6/6" }
+        "404":
+          description: 评测集文件不可读（`XINYU_EVAL_DATASET` 未指对）
+          content:
+            application/json:
+              schema: { type: object, properties: { error: { type: string, example: dataset-not-found } } }
+  /api/memory/emotion:
+    post:
+      tags: [memory]
+      summary: 写入一条情绪记录
+      x-live-check:
+        method: post
+        body: { sessionId: "contract-probe", emotion: "sadness", intensity: 0.6 }
+        status: [200]
+        required_keys: [ok, count]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, emotion]
+              properties:
+                sessionId: { type: string }
+                emotion: { type: string }
+                intensity: { type: number, default: 0.5 }
+                secondary: { type: string, nullable: true }
+                text: { type: string, maxLength: 60 }
+      responses:
+        "200": { $ref: "#/components/responses/OkCount" }
+        "400": { $ref: "#/components/responses/BadJson" }
+  /api/memory/emotions:
+    get:
+      tags: [memory]
+      summary: 读取该会话情绪序列（星图重放与曲线的数据源）
+      parameters:
+        - { in: query, name: sessionId, required: true, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer, default: 200 } }
+      responses:
+        "200":
+          description: 记录数组
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [emotion, intensity]
+                  properties:
+                    id: { type: integer }
+                    emotion: { type: string }
+                    intensity: { type: number }
+                    secondary: { type: string, nullable: true }
+                    text: { type: string }
+                    createdAt: { type: string, nullable: true }
+  /api/memory/message:
+    post:
+      tags: [memory]
+      summary: 写入一条对话消息（J4 跨设备记忆的写入面）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, role]
+              properties:
+                sessionId: { type: string }
+                role: { type: string, enum: [user, assistant] }
+                content: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/OkCount" }
+        "400": { $ref: "#/components/responses/BadJson" }
+  /api/memory/messages:
+    get:
+      tags: [memory]
+      summary: 读取该会话消息
+      parameters:
+        - { in: query, name: sessionId, required: true, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer, default: 40 } }
+      responses:
+        "200":
+          description: 消息数组
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, required: [role, content] }
+  /api/memory/stats:
+    get:
+      tags: [memory]
+      summary: 该会话计数（AC-OBS-10 的"真落库"判据接口）
+      parameters:
+        - { in: query, name: sessionId, required: true, schema: { type: string } }
+      x-live-check: { method: get, query: { sessionId: "contract-probe" }, status: [200], required_keys: [sessionId, emotions, messages] }
+      responses:
+        "200":
+          description: 计数
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessionId, emotions, messages]
+  /api/memory/{sessionId}:
+    delete:
+      tags: [memory]
+      summary: 清除该会话全部数据（对应界面「清除我的数据」）
+      x-live-check: { method: delete, path: "/api/memory/contract-probe", status: [200], required_keys: [ok, removed] }
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 已删除条数
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, removed]
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, webRoot, indexFound, vendorFound]
+      properties:
+        status: { type: string, example: UP }
+        stage: { type: string, example: J5 }
+        java: { type: string }
+        webRoot: { type: string, description: 绝对路径，自证"直读 src/ 权威源"是否成立 }
+        indexFound: { type: boolean }
+        vendorFound: { type: boolean }
+    ChatRequest:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items: { type: object, required: [role, content] }
+        temperature: { type: number }
+        max_tokens: { type: integer }
+        stream: { type: boolean, default: false }
+    ChatResponse:
+      type: object
+      description: 上游透传，形状由 OpenAI 兼容端决定，本项目不重包装
+    EmotionOutcome:
+      type: object
+      required: [lex, final, path]
+      properties:
+        lex:
+          type: object
+          required: [emotion, intensity, color, all]
+          properties:
+            crisis: { type: boolean }
+            emotion: { type: string }
+            intensity: { type: number }
+            color: { type: array, items: { type: number }, minItems: 3, maxItems: 3 }
+            all: { type: array, items: { type: object, required: [emotion, score] } }
+        llm:
+          nullable: true
+          type: object
+          properties:
+            emotion: { type: string }
+            intensity: { type: number }
+        final:
+          type: object
+          required: [emotion, intensity]
+        path: { type: string, description: 判定路径，界面如实展示（禁伪装在线） }
+        secondary: { type: string, nullable: true }
+        label: { type: string }
+        color: { type: array, items: { type: number } }
+  responses:
+    BadJson:
+      description: 请求体非法或缺必填（`bad-json`；/api/emotion 缺 text 亦此码）
+      content:
+        application/json:
+          schema: { type: object, properties: { error: { type: string, example: bad-json } } }
+    OkCount:
+      description: 写入成功并回该会话累计条数
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ok, count]
+            properties:
+              ok: { type: boolean }
+              count: { type: integer }

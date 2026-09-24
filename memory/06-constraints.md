@@ -16,9 +16,13 @@
   自定义 `ShaderMaterial` uniform 约定变更 ⇒ 星雾"暗星 0.05/点亮 0.26"与 `pixel_dual_check` 的双色像素级标定需整体重定）。
   截止前不动的理由 = 素材冻结期重做可视化不划算，不是拖延。
   **本条机器可见**：`python _test/vendor_freshness_check.py --check-upstream --strict`（现返回 rc=1，即"落后"不再可隐藏）。
-- [DEBT] **零构建 = 无 lockfile、无 dependabot**（14 参照仓里 2 家有 `deps_autoupdate`，且它们都有 package.json 可挂）
+- [DEBT] **`src/vendor/` 三个前端第三方库无包管理器可托管**（r21 更正本条范围，原写"零构建=挂不上 dependabot"是**错误归因**）
   — 已用 `_test/vendor-manifest.json`（版本 + sha256 唯一声明源）+ `vendor_freshness_check.py`（V1 完整性 /
-  V2 从文件内容解析版本对账 / V3 新库漏登记即红）承担同等职责。**代价**：上游发新版不会自动通知，须人工/复赛节点跑 `--check-upstream`。
+  V2 从文件内容解析版本对账 / V3 新库漏登记即红）承担同等职责。**代价**：这三个库的上游发新版不会自动通知，须人工跑 `--check-upstream`。
+  - ⚠️ **更正注（r21，2026-09-25）**：上一轮把"npm 生态挂不上 dependabot"扩大成"整个项目挂不上"，据此放弃了本可自动化的两半。
+    实测更正：**Maven（`server/pom.xml`）与 GitHub Actions（`.github/workflows`）两个 ecosystem 与 npm 无关，可以直接挂**
+    ⇒ 已加 `.github/dependabot.yml`（maven@/server + github-actions@/，每周二 08:00 Asia/Shanghai，PR 上限 3/2）。
+    本条剩余真实盲区只有 `src/vendor/` 那三个手工 vendored 的 JS 库，由上面的 manifest 守卫承担。
 - [DEBT] `src/js/app.js` 469 行单体编排（对话/星图/曲线/朗读/设置混在一个 IIFE）— 还债方式：voice/chart/window/编排 四模块纯切分，不改行为（排截止后）。
 - [DEBT] `tick()` 每帧遍历全部粒子做 CPU 侧着色（桌面档 2600 次/帧）；**真机帧率 ❌未实测** → 不进任何"性能领先"结论。
 - [DEBT] 情绪引擎仍是**两份实现**（JS 离线降级用 + Java 后端权威）。本轮已把前端接到后端，但**词表仍须两端同步改**
