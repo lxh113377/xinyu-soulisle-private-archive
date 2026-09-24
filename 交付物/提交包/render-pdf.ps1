@@ -21,13 +21,21 @@ $edge = @(
 if (-not $edge) { Write-Error "未找到 Microsoft Edge，无法渲染 PDF"; exit 1 }
 if (-not (Test-Path $html)) { Write-Error "缺少 $html"; exit 1 }
 
-if (Test-Path $out) { Remove-Item $out -Force }
-& $edge --headless=new --disable-gpu --no-sandbox `
-        --run-all-compositor-stages-before-draw --virtual-time-budget=15000 `
-        --print-to-pdf="$out" "$html" 2>&1 | Out-Null
+# 先渲染到临时文件、成功后再替换：禁止先删旧 PDF 再渲染（渲染中断 = 交付物丢失）。
+# Edge 的无害 stderr 噪音（如 QQBrowser 提示）必须走 Start-Process 重定向到文件，
+# 禁用 `2>&1 | Out-Null` —— EAP=Stop 下它会变成终止性 ErrorRecord 中断渲染。
+$tmp = Join-Path $here "_render_tmp.pdf"
+$errLog = Join-Path $env:TEMP "xinyu-render-edge-stderr.log"
+if (Test-Path $tmp) { Remove-Item $tmp -Force }
+$p = Start-Process -FilePath $edge -Wait -PassThru -RedirectStandardError $errLog -ArgumentList @(
+  '--headless=new', '--disable-gpu', '--no-sandbox', '--no-pdf-header-footer',
+  '--run-all-compositor-stages-before-draw', '--virtual-time-budget=15000',
+  "--print-to-pdf=$tmp", "$html"
+)
 Start-Sleep -Seconds 2
 
-if (-not (Test-Path $out)) { Write-Error "PDF 渲染失败（Edge 未产出文件）"; exit 1 }
+if (-not (Test-Path $tmp)) { Write-Error "PDF 渲染失败（Edge 未产出文件，stderr 见 $errLog，退出码 $($p.ExitCode)）"; exit 1 }
+Move-Item $tmp $out -Force
 
 $text  = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($out))
 $pages = ([regex]::Matches($text, "/Type\s*/Page[^s]")).Count
