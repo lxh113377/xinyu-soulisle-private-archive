@@ -28,12 +28,3 @@
 - [x] **M3 多模型 provider 适配层**：`LLM_BASE/LLM_MODEL/LLM_KEY`（`DEEPSEEK_*` 兼容别名，Java 用嵌套占位符）+ 设置面板 5 家预设（DeepSeek/OpenAI/通义/Kimi/本地 Ollama）
 
 - [x] **M4 回复朗读 TTS**：`speechSynthesis`（zh-CN）开关，零依赖；浏览器不支持即隐藏按钮；开关态持久化 `peiliao.speak.v1`（刻意**不**进对话配置，避免被 `setCfg` 牵连清历史）
-
-- [x] **M5 对话列表窗口化**：DOM 上界 60 + 配额制「展开较早」（每次放回 20 条并临时抬高配额，新消息收回）
-  - 实测证明**窗口化不截断模型上下文**：`getHistory()` 仍为既存 40 条上限、`MemoryStore` 45 条 = 发送条数
-
-- [x] **M6 响应式三档 + 粒子按视口降档**：480/768/1024 断点；粒子 900/1200/**2600**（桌面档恒 2600，保住 `browser_check` 的 `LIT` 标定与 `pixel_dual_check` 占比判据）
-
-- [x] **M7 CI 三条门禁**：新增 `java-build` 内**词表一致性红线机器化**（起无密钥 fat jar 跑 `engine_consistency_check.py`）+ 密钥零入库扫描（拼接生成对照组，防 workflow 自伤命中）+ 独立 `browser-regression` job（runner 无 GPU → `XINYU_BROWSER_ARGS` 强制 SwiftShader，本机已用同参数复跑 PASS）
-
-- [x] **M8 维护可见性**：`ROADMAP.md`（已完成/计划/**明确不做+理由**）、`server/pom.xml` `0.1.0-J1`→**1.3.0**、CHANGELOG `[1.3.0]`、标签 `v1.3.0`
