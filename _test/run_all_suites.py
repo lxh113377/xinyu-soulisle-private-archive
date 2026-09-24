@@ -23,6 +23,7 @@ SUITES = [
     ("lightshow", [sys.executable, "_test/lightshow_check.py"]),
     ("online_check", [sys.executable, "_test/online_check.py"]),
     ("public_check", [sys.executable, "_test/public_check.py"]),
+    ("live_sync", [sys.executable, "_test/live_sync_check.py"]),
     ("emotion_eval_js", ["node", "_test/emotion_eval.js"]),
 ]
 

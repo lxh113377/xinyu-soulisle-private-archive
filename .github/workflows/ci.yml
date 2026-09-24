@@ -136,3 +136,18 @@ jobs:
       # 判据本身自带对照组：不可达端点 18123 必须回落离线模板，出现「在线大模型生成」即 FAIL
       - name: 降级链路 + 情绪点亮 + 危机拦截 + 滚动淡入淡出
         run: python _test/browser_check.py
+
+  live-sync:
+    name: 线上↔权威源逐字节新鲜度（仅 main push，漂移告警不阻塞）
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # 公网 pages.dev 原样托管 deploy/xinyu（实测逐字节相等），比对失败=部署未跟进提交。
+      # 反例已证非恒真：指到 example.com 该脚本 rc=1。环境不可达 rc=2 与漂移 rc=1 分离。
+      - name: live_sync_check
+        run: python _test/live_sync_check.py
