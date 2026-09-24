@@ -20,8 +20,6 @@
 
 - [ ] 🔴 **iCAN 提交硬截止 2026-09-30**（2026-09-23 起**剩 7 天**；截止即锁团队信息）：官网报名 + 提交。**缺件三项（2026-09-24 对标轮实测更正）**：①《应用方案》PDF ✅ **已产出**（18 页，9d7442c；成员署名位待名单 PII 齐后重渲染一次）②演示视频 ✅ **自动产片完成**（`交付物/提交包/demo_video_out/心屿SoulIsle-演示视频.mp4`，217s/22.4MB，8 幕真链路+烧录字幕+中文旁白，可经 `_test/demo_video_pipeline.py` 重录；官方口径无人声强制）③报名名单 ⚠️ **5 人已定**（伍昊宇队长/吴涵/姜智文/江文斌/叶书阳，0638513），**仍缺**五人学号/手机号/邮箱 + 指导教师（≤2 非成员）+ 官网填报登录态（三项只有老大能给）→ 清单见 `交付物/提交包/报名信息-待填清单.md` 与 `演示视频-录制执行清单.md`
 - [ ] **J3/J4 变现**（「变现」= 让已建成但未启用的能力真正跑起来，非商业变现）：① ✅ **两端一致性常驻守卫**（`engine_consistency_check.py`，含自检与端到端对照）② ✅ **本地演示已开服务端持久化**（`demo-config.js` 置 `remote:true` + 熔断）③ ⏳ **fat jar / 容器部署**：**两条路都已就绪** —— (a) **部署包** `deploy/jar/`（`start.ps1` / `start.sh` / `README-部署.md`，实测从系统临时目录启动 + `-WebRoot` 指向仓库外静态副本，UP、静态全 200、公网版零密钥）；(b) **容器镜像**（2026-09-23 **真 Docker 全链路实测通过**：build 成功 482 MB / run 后 `/api/health` UP + 静态全 200 + 评测 73-98.6%-6-6 + **镜像内密钥 CLEAN** + `docker restart` 后数据仍在）。→ **唯一阻塞 = 老大提供目标机器**（IP / 登录方式 / 安全组放行端口）。**2026-09-24 老大裁决：先不办，降级至 10 月复赛节点**
-- [x] 🔴 ~~**P0（新）· 公网部署未跟进本轮改动**~~ → **2026-09-24 r17 已上线并复核关闭**：`wrangler pages deploy` 执行成功（deployment `09641d44`）。线上复核：`xinyu-soulisle.pages.dev/` 已含 `btn-theme` + `manifest.webmanifest`（manifest 200）；`online_check.py` rc=0（离线徽章正常）、`public_check.py` rc=0（`● 在线 AI` 徽章 / 体验条 True / **KEY_LEAK: False** / CONSOLE_ERRORS: 0）。⚠️ 复核坑记：Pages 对 `/index.html` 返回**空 body**，须按 `/` 抓页面，否则 grep 恒 0 误判"未上线"
-
 ## 分卷目录
 
 - **卷1** `07-next-steps.part1.md` — 已完成条目（历史）
@@ -35,3 +33,5 @@
 - **卷9** `07-next-steps.part9.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷10** `07-next-steps.part10.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷11** `07-next-steps.part11.md` — J3/J4 变现第 3 件：fat jar / 容器部署完整史（R199 人工拆卷自 part6）
+- **卷12** `07-next-steps.part12.md` — 07-next-steps 分卷（R199 自动拆卷）
+
