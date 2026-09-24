@@ -31,11 +31,26 @@
 | 项 | 对标差距来源 | 落地证据 |
 |---|---|---|
 | **情绪识别后端化（消除"两份真相"）** | 14 参照仓里 8 家已有向量/语义化记忆与后端化能力；心屿 J3 已做出 Java 引擎却**没被前端用上**（= 两份真相 + 卖点空转） | `src/js/emotion-remote.js`（三层开关与 J4 同口径）+ `_test/emotion_wiring_check.py` **9 项 PASS**：W4 实测 `stats.ok=1` 且气泡标「情绪:后端」/ W5 拦掉 `/api/emotion` 即熔断且**不冒充** / W3b 危机短路 `attempted=0` 未经后端 / W6 词典层双端同句同结论 |
-| **vendor 供给链守卫（完整性 + 版本对账 + 上游漂移）** | 心屿零构建 ⇒ 无 lockfile、无 dependabot，第三方库漂移**此前是纯盲区**（14 家里仅 2 家有自动更新，且它们都有 package.json 可挂） | `_test/vendor-manifest.json`（唯一声明源）+ `vendor_freshness_check.py`：V1 sha256 完整性 V2 从文件内容解析版本对账（正则零命中即红）V3 新库漏登记即红 V4 `--check-upstream` 报落后；`--selftest` 4 类篡改全抓到 |
+⚠️ 更正见下方 r21 表「依赖自动更新」行 | `_test/vendor-manifest.json`（唯一声明源）+ `vendor_freshness_check.py`：V1 sha256 完整性；V2 从文件内容解析版本对账（正则零命中即红，禁"没测到=通过"）；V3 新库漏登记即红；V4 `--check-upstream` 报落后（`--strict` 才判红）；`--selftest` 4 类篡改全抓到
 | **gsap + ScrollTrigger 3.12.5 → 3.15.0 成对升级** | 上游 greensock/GSAP tag 3.15.0（实测 releases/latest 404 ⇒ 该仓只发 tag，探测已按此实现） | 前端实际用到的 API 面**仅 5 处**（`gsap.to/timeline/registerPlugin`、`ScrollTrigger.refresh`、`window.gsap`）；升级后 `browser_check` / `lightshow_check` / `pixel_dual_check` **三套件 rc=0**；体积 +713B/+1,195B，关键路径 819,767/858,752 仍在预算内 |
 | **体积预算表覆盖判据（补一个真实存在的洞）** | 上一轮刚建的 `size_budget_check` 靠手工列表 ⇒ **"加文件"这条最常见的退化路径恰好绕过门禁** | 实测抓到 2 处：漏登记 `src/data/emotion-strategy.js`（4,720B）与本轮新增的 `emotion-remote.js`；新增 coverage 判据 + `--selftest` 同时证两条判据非恒真 |
 | **对标源数据机器化台账** | 前两轮报告的星数/停更日期来自一次性手工 curl，**下一轮无法机器复核**（度量可信度 M1「数字来自历史快照」风险源） | `_test/benchmark_metrics.py` → `交付物/对标数据/benchmark-metrics.json`：14 仓 ★/pushed/release/CI wf/文档/**递归整树能力矩阵** + 本项目 self 指标，每次运行输出**与上次快照的逐字段漂移**；`--selftest` 合成 2 处改动全抓到、全等对照零误报 |
 
+
+## ✅ 已完成（对标轮 r21，2026-09-25 同日第二轮）
+
+| 项 | 来源 | 落地证据 |
+|---|---|---|
+| **接口契约唯一声明源 + 三方对账** | **自我登记的可维护性债**（诚实口径：实测 16 参照仓 `api_spec` 命中仅 **1/16**，不是被同类甩开的差距；但本项目契约此前分散在 `j2_chat_contract.py`/`chat-agent.js` 常量/部署文档三处，改一端忘两端全靠人记） | `docs/openapi.yaml`（11 条，实读控制器与 `LlmProxy` 取得）+ `_test/api_contract_check.py` C1 缺文档即红 / C2 幽灵路径即红 / C3 前端偷调即红 / C4 真实打 8 端点状态码与必需键一致 / C5 `--selftest` 四类合成篡改全抓 |
+| **依赖自动更新（可自动化的一半）** | r20 我把这件事整体判为"做不了"，**属错误归因**（见下条更正） | `.github/dependabot.yml`：`maven`@`/server` + `github-actions`@`/`，weekly 08:00 CST，PR 上限 3/2；self 能力位 `deps_autoupdate` 由 0→1（台账机器可见） |
+| **测量装置自纠两处** | 第二次实采立刻暴露自己的洞 | ① 漂移原先只比 4 个数字字段 ⇒ `sapphire` 掉 `container` 却零报告，现 `caps`/`docs` 纳入比对（selftest 加样本）② self "回归套件数"原先 glob=19 与报告"24 套件"**两个分母混用** ⇒ 改取 `run_all_suites.py` 条目数为唯一真相源（现 26），解析失败即报错不回退 glob |
+| **账面文档齐备度补到 9/9** | 对标 §4.6 唯一缺项 | `docs/README.md` + `docs/openapi.yaml`；self `docs=9/9`，`api_spec` 位 0→1 |
+
+### 🔧 一条自我更正（r20 → r21）
+r20 的"vendor 供给链守卫"一行里我写了「心屿零构建 ⇒ 无 lockfile、**无 dependabot**」，并据此把依赖自动化整块判为不可做。
+**这把"npm 生态不适用"扩大成了"整个项目不适用"**：dependabot 的 `maven` ecosystem 对着 `server/pom.xml` 就能挂，
+`github-actions` ecosystem 连包管理器都不需要。r21 已配置并在 `memory/06-constraints.md` 原条目下加更正注（不删历史）。
+⇒ 真正的盲区只剩 `src/vendor/` 三个手工 vendored 的 JS 库，由 manifest 守卫承担。
 
 ## 🔜 计划（赛后 1–2 周，按投入产出排序）
 

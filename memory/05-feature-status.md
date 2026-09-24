@@ -43,6 +43,19 @@
       语义/persona 记忆（8/14 家有向量同族能力）、`app.js` 单体、`docs/` 站、真机帧率未测
 
 
+## ✅ 已实现（对标轮 r21，2026-09-25 同日第二轮：接口契约 + 依赖自动更新 + 测量装置自纠）
+
+> 详见 `交付物/对标分析报告-2026-09-25.md` §9。命令重发 = 完整重执行（刷新数据 → 执行 → 配判据 → 回归 → 回写）。
+
+- [x] **接口契约唯一声明源**：`docs/openapi.yaml`（11 条，实读控制器与 `LlmProxy` 取得）
+      + `_test/api_contract_check.py`（C1 缺文档 / C2 幽灵 / C3 前端偷调 / C4 运行态真实打 8 端点 / C5 自证非恒真）
+      → 实跑 **10/10 PASS**，电池 24 → **26** 套件，CI `java-build` 增 2 步；探测用 `contract-probe` 会话且结尾 DELETE 自清
+- [x] **`.github/dependabot.yml`**（`maven`@`/server` + `github-actions`@`/`）——
+      并**纠正 r20 自己的错误归因**"零构建挂不上 dependabot"（`06-constraints` 原条目保留 + 更正注）
+- [x] 测量装置自纠：漂移比对纳入 `caps`/`docs`；self 套件数改以电池 SUITES 为唯一分母；参照池 14 → **16**
+- [x] self 账面：`docs 8/9 → 9/9`、能力位 `api_spec` 与 `deps_autoupdate` 各 0 → 1（台账 `交付物/对标数据/benchmark-metrics.json`）
+- [ ] 下一件（不依赖外部信号）：`src/js/app.js` 469 行按 voice/chart/window/编排 纯切分（⚠️ 动前先看 8123 端口归属，本轮观测到并行会话重启过 jar）
+
 ## 分卷目录
 - **卷1** `05-feature-status.part1.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷2** `05-feature-status.part2.md` — 05-feature-status 分卷（R199 自动拆卷）
