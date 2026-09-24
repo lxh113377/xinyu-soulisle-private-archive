@@ -1,12 +1,23 @@
 /* 心屿 · 对话智能体
  * 共情链路：情绪识别(本地) → 策略选择 → 在线 LLM(OpenAI 兼容) 生成 → 失败降级离线共情模板
  * 降级必须显式标注，禁止把模板伪装成在线 AI。
+ *
+ * 共情模板 / SYSTEM 提示 / 危机话术的唯一真相源 = `src/data/emotion-strategy.js`
+ * （`window.__XINYU_STRATEGY__`，守卫：`_test/strategy_check.py`）。本文件只做编排，不再内置文案。
  */
 window.ChatAgent = (function () {
   const CFG_KEY = "peiliao.cfg.v1";
   const HIS_KEY = "peiliao.history.v1";
   const HISTORY_MAX = 10;
   let history = loadHistory();
+
+  const STR = (typeof window !== "undefined" && window.__XINYU_STRATEGY__) || null;
+  if (!STR) {
+    throw new Error(
+      "[ChatAgent] 共情策略表未加载：请确认 index.html 在 chat-agent.js 之前引入 data/emotion-strategy.js"
+    );
+  }
+  const FALLBACK_EMO = STR.fallback || "calm";
 
   function loadHistory() {
     try { return JSON.parse(localStorage.getItem(HIS_KEY) || "[]"); } catch { return []; }
@@ -33,75 +44,122 @@ window.ChatAgent = (function () {
       clearTimeout(timer);
     }
   }
-  async function llmFetch(messages, temperature, max_tokens) {
-    const c = cfg();
+
+  function endpoint(c, body) {
     if (c.proxy) {
-      const res = await fetchWithTimeout(c.proxy, {
+      return fetchWithTimeout(c.proxy, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, temperature, max_tokens })
+        body: JSON.stringify(body)
       });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.json();
     }
-    const res = await fetchWithTimeout(c.base.replace(/\/$/, "") + "/chat/completions", {
+    return fetchWithTimeout(c.base.replace(/\/$/, "") + "/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + c.key },
-      body: JSON.stringify({ model: c.model, messages, temperature, max_tokens })
+      body: JSON.stringify({ model: c.model, ...body })
     });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return res.json();
   }
 
-  const CRISIS_REPLY =
-    "我听到了你现在真的很痛苦，谢谢你愿意说出来。这种时候你不需要一个人扛。\n\n" +
-    "如果你出现了伤害自己的念头，请立刻联系专业的人：\n" +
-    "· 全国心理援助热线：12356（24 小时）\n" +
-    "· 北京心理危机研究与干预中心：010-82951332\n" +
-    "· 生命热线：400-161-9995\n\n" +
-    "我会一直在这里陪你，但请给专业的人一个帮你的机会。现在身边有可以叫一声的人吗？";
-
-  const SYSTEM = (emo) =>
-    "你是「心屿」，一个温和的大学生情感陪伴伙伴。用户刚说的话被识别为主要情绪「" +
-    window.EmotionEngine.labelOf(emo) + "」。要求：" +
-    "1) 先共情反映用户的感受，再轻轻陪伴展开，不说教、不评判；" +
-    "2) 回复 60-120 字，口语化、有温度，可用一个具体的意象；" +
-    "3) 结尾可抛出一个开放式的小问题延续对话；" +
-    "4) 你不是心理咨询师，不做诊断；涉及自伤他伤风险时引导求助热线。";
-
-  const TEMPLATES = {
-    joy:    ["听起来今天是个好日子！这份开心值得被放大一点——最想庆祝的是哪一刻？", "哇，能感觉到你语气里的光。这样的好状态，想和谁分享？"],
-    sadness:["难过的时候不用急着好起来。我在这儿，你想说多少，我听多少。", "心里空落落的感觉我接住了。今天发生了什么，让你这么累？"],
-    anger:  ["这事儿确实让人上火。先骂出来没关系，我陪你把这口气顺一顺。", "生气说明你在意。最让你受不了的那个点是什么？"],
-    fear:   ["压力大的时候，呼吸可以慢一点。你说的那几件担心的事，哪一件最大？", "慌是正常的，说明你在乎结果。我们一起把它拆小一点好不好？"],
-    calm:   ["平平淡淡的一天也挺好。有没有什么小事，是你最近想做还没做的？", "安静的时候最适合想想自己。今天有什么想和我聊聊的吗？"],
-    love:   ["心动这种事，藏不住也正常。想说说是谁，让你这样惦记吗？", "想念一个人的时候，心里是又甜又酸的。你们最近有联系吗？"]
-  };
-
-  async function offlineReply(text, emo) {
-    const pool = TEMPLATES[emo] || TEMPLATES.calm;
-    return pool[Math.floor(Math.random() * pool.length)];
-  }
-
-  async function onlineReply(text, emo) {
-    const messages = [{ role: "system", content: SYSTEM(emo) }];
-    for (const h of history.slice(-HISTORY_MAX)) messages.push(h);
-    messages.push({ role: "user", content: text });
-    const data = await llmFetch(messages, 0.85, 220);
+  function contentOf(data) {
     const content = data?.choices?.[0]?.message?.content;
     if (!content) throw new Error("empty");
     return content.trim();
   }
 
-  const EMOTIONS = ["joy","sadness","anger","fear","calm","love"];
-  const CLASSIFY_SYS = "你是情绪分类器。从 joy(愉悦)/sadness(低落)/anger(烦躁)/fear(焦虑)/calm(平静)/love(心动) 中选一个主导情绪，只输出 JSON：{\"emotion\":\"...\",\"intensity\":0到1的小数}。示例：输入「论文被拒了三次，感觉努力全白费」输出 {\"emotion\":\"sadness\",\"intensity\":0.8}；输入「今天天气不错」输出 {\"emotion\":\"calm\",\"intensity\":0.2}。";
+  /** SSE 解析：逐块喂 `data:` 行的 delta.content，返回整段文本。
+   *  只认标准 OpenAI 分片（choices[0].delta.content）；无法解析的行直接跳过，不让流式因噪声中断。 */
+  async function readSSE(res, onDelta) {
+    const reader = res.body.getReader();
+    const dec = new TextDecoder("utf-8");
+    let buf = "", full = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (payload === "[DONE]") continue;
+        try {
+          const j = JSON.parse(payload);
+          const piece = j?.choices?.[0]?.delta?.content;
+          if (typeof piece === "string" && piece) {
+            full += piece;
+            if (onDelta) onDelta(full);
+          }
+        } catch { /* 分片不完整或非 JSON 噪声行：跳过 */ }
+      }
+    }
+    if (!full.trim()) throw new Error("empty-stream");
+    return full.trim();
+  }
+
+  /**
+   * 一次 LLM 调用。给了 onDelta 就尝试流式（`cfg.stream !== false` 时）；
+   * 代理/上游不支持流式（响应不是 text/event-stream）或流式请求失败 → **自动回落整包 JSON**，
+   * 调用方无需感知，也不会因为回落而丢回复。
+   */
+  async function llmFetch(messages, temperature, max_tokens, onDelta) {
+    const c = cfg();
+    const wantStream = !!onDelta && c.stream !== false;
+    const body = { messages, temperature, max_tokens };
+    if (!wantStream) {
+      const res = await endpoint(c, body);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return contentOf(await res.json());
+    }
+    try {
+      const res = await endpoint(c, { ...body, stream: true });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("text/event-stream") && res.body) return await readSSE(res, onDelta);
+      return contentOf(await res.json());        // 代理回落成整包：按非流式解析
+    } catch (e) {
+      if (e && e.name === "AbortError") throw e;
+      const res = await endpoint(c, body);       // 流式路径任何异常 → 再走一次原整包路径
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return contentOf(await res.json());
+    }
+  }
+
+  const CRISIS_REPLY = STR.crisis.reply;
+
+  const strategyOf = (emo) => (STR.strategy[emo] || STR.strategy[FALLBACK_EMO]);
+
+  const SYSTEM = (emo) => {
+    const s = strategyOf(emo);
+    return STR.persona + "用户刚说的话被识别为主要情绪「" + window.EmotionEngine.labelOf(emo) + "」。" +
+      "当前共情要点：" + s.lead + "。要求：" + STR.rules.map((r, i) => (i + 1) + ")" + r).join("；") + "。";
+  };
+
+  function offlineReply(emo) {
+    const pool = strategyOf(emo).templates;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  async function onlineReply(text, emo, onDelta) {
+    const messages = [{ role: "system", content: SYSTEM(emo) }];
+    for (const h of history.slice(-HISTORY_MAX)) messages.push(h);
+    messages.push({ role: "user", content: text });
+    const s = strategyOf(emo);
+    return llmFetch(messages,
+      s.temperature ?? STR.defaultTemperature ?? 0.85,
+      s.maxTokens ?? STR.defaultMaxTokens ?? 220,
+      onDelta);
+  }
+
+  const EMOTIONS = Object.keys(STR.strategy);
 
   async function llmClassify(text) {
+    const cs = STR.classify;
     const data = await llmFetch(
-      [{ role: "system", content: CLASSIFY_SYS }, { role: "user", content: text.slice(0, 200) }],
-      0, 40
+      [{ role: "system", content: cs.sys }, { role: "user", content: text.slice(0, cs.maxInputChars || 200) }],
+      cs.temperature ?? 0, cs.maxTokens ?? 40
     );
-    const raw = data?.choices?.[0]?.message?.content || "";
+    const raw = data || "";
     const m = raw.match(/\{[\s\S]*\}/);
     if (!m) throw new Error("no-json");
     const j = JSON.parse(m[0]);
@@ -125,7 +183,8 @@ window.ChatAgent = (function () {
 
   // 次情绪判定统一走 EmotionEngine.secondaryOf（单一真相源），用于双色星雾
 
-  async function respond(text) {
+  /** respond(text, onDelta?)：onDelta 存在且在线时逐字回调已生成文本（流式），否则一次性返回 */
+  async function respond(text, onDelta) {
     const t0 = performance.now(); // 计时起点含情绪分类：latency 如实反映整轮等待
     const { lex, final, path } = await classifyEmotion(text);
     const emo = final.emotion, intensity = final.intensity;
@@ -136,17 +195,20 @@ window.ChatAgent = (function () {
       window.MemoryStore.record({ emotion: "crisis", intensity: 1, text: text.slice(0, 60) });
       return { reply: CRISIS_REPLY, emotion: "crisis", mode: "guard", path, latency: 0, lexAll: lex.all };
     }
-    let reply, mode;
+    let reply, mode, streamed = false;
     if (isOnline()) {
-      try { reply = await onlineReply(text, emo); mode = "model"; }
-      catch { reply = await offlineReply(text, emo); mode = "fallback"; }
+      try {
+        reply = await onlineReply(text, emo, onDelta);
+        mode = "model";
+        streamed = !!onDelta;
+      } catch { reply = offlineReply(emo); mode = "fallback"; }
     } else {
-      reply = await offlineReply(text, emo); mode = "offline";
+      reply = offlineReply(emo); mode = "offline";
     }
     const latency = Math.round(performance.now() - t0);
     remember(text, reply);
     window.MemoryStore.record({ emotion: emo, intensity, secondary, text: text.slice(0, 60) });
-    return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all };
+    return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all, streamed };
   }
 
   /** 记住一轮问答：本地 history 为主，远端（J4，默认关闭）尽力而为 */
@@ -164,7 +226,11 @@ window.ChatAgent = (function () {
    * 避免"开一次设置面板就把已存 Key/proxy 洗掉"。历史照常清空（换模型上下文不混用）。 */
   function setCfg(c) { saveCfg({ ...cfg(), ...c }); history = []; saveHistory(); }
   function getHistory() { return history.slice(); }
-  function getCfg() { const c = cfg(); return { base: c.base || "", key: "", model: c.model || "", proxy: c.proxy || "" }; }
+  function getCfg() { const c = cfg(); return { base: c.base || "", key: "", model: c.model || "", proxy: c.proxy || "", stream: c.stream !== false }; }
+  /** 策略表对外只读视图：供设置面板的 provider 预设与文档展示，禁外部改写 */
+  function strategyInfo() {
+    return { version: STR.version, emotions: EMOTIONS.slice(), rules: STR.rules.slice(), fallback: FALLBACK_EMO };
+  }
 
-  return { respond, classifyEmotion, isOnline, setCfg, getCfg, getHistory };
+  return { respond, classifyEmotion, isOnline, setCfg, getCfg, getHistory, strategyInfo };
 })();

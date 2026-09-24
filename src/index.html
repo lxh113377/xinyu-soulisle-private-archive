@@ -102,6 +102,7 @@
   <form id="chat-form" class="chat-form">
     <input id="chat-input" type="text" maxlength="500" placeholder="和心屿说说今天…" autocomplete="off" aria-label="对话输入">
     <button type="button" id="btn-voice" class="ghost-btn voice-btn" aria-label="语音输入" title="语音输入">🎤</button>
+    <button type="button" id="btn-speak" class="ghost-btn voice-btn" aria-label="朗读回复" aria-pressed="false" title="朗读回复（需浏览器支持语音合成）">🔊</button>
     <button type="submit" class="primary-btn">发送</button>
   </form>
   <div class="chat-meta">
@@ -121,9 +122,20 @@
 <dialog id="dlg-settings">
   <form method="dialog" class="settings-form">
     <h3>模型设置（OpenAI 兼容接口）</h3>
+    <label>快捷预设
+      <select id="set-provider" aria-label="模型预设">
+        <option value="">自定义 / 同源代理</option>
+        <option value="https://api.deepseek.com/v1|deepseek-chat">DeepSeek</option>
+        <option value="https://api.openai.com/v1|gpt-4o-mini">OpenAI</option>
+        <option value="https://dashscope.aliyuncs.com/compatible-mode/v1|qwen-plus">阿里云通义千问</option>
+        <option value="https://api.moonshot.cn/v1|moonshot-v1-8k">月之暗面 Kimi</option>
+        <option value="http://127.0.0.1:11434/v1|qwen2.5:7b">本地 Ollama</option>
+      </select>
+    </label>
     <label>API Base URL<input id="set-base" type="url" placeholder="https://api.deepseek.com/v1"></label>
     <label>API Key<input id="set-key" type="password" placeholder="sk-…（仅存本机）"></label>
     <label>模型名<input id="set-model" type="text" placeholder="deepseek-chat"></label>
+    <label class="check"><input id="set-stream" type="checkbox">逐字流式输出（回复边生成边显示；代理不支持时自动回落整包）</label>
     <p class="muted">留空则使用离线共情模板引擎。Key 仅保存在本机 localStorage，不上传。</p>
     <div class="dlg-actions">
       <button value="cancel" class="ghost-btn">取消</button>
@@ -136,6 +148,7 @@
 <script src="vendor/gsap.min.js"></script>
 <script src="vendor/ScrollTrigger.min.js"></script>
 <script src="data/emotion-lexicon.js"></script>
+<script src="data/emotion-strategy.js"></script>
 <script src="js/emotion-engine.js"></script>
 <script src="js/memory-store.js"></script>
 <script src="js/demo-config.js"></script>

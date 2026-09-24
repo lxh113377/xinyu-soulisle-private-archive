@@ -138,12 +138,82 @@
 
   // 5) 对话（刷新后恢复历史，多轮上下文不丢）
   const log = $("#chat-log");
-  function pushMsg(who, text, tag) {
+  /* 对话窗口化（对标 LobeChat 的 react-virtuoso 思路，零依赖版）：
+   * 长会话（评委连续演示 / 长期自用）会让 #chat-log 的 DOM 单调增长，滚动与重排成本随之上升。
+   * 这里只保留最近 RENDER_MAX 条在 DOM 里，被折叠的最旧若干条缓存在 trimmedBuf，
+   * 点「展开较早」可分批放回 —— 完整历史始终在 ChatAgent.getHistory() 与本机存储里，不受影响。 */
+  const RENDER_MAX = 60, TRIM_BATCH = 20;
+  const trimmedBuf = [];
+  /* 折叠配额：默认 = RENDER_MAX。点「展开较早」时临时抬高（否则刚放回就被同一条上限裁掉，
+   * 展开等于没展开）；用户再发新消息时回落，保证 DOM 上界长期受控。 */
+  let quota = RENDER_MAX;
+  function setTag(el, tag) {
+    let t = el.querySelector(".tag");
+    if (!t) { t = document.createElement("span"); t.className = "tag"; el.appendChild(t); }
+    t.textContent = tag;
+  }
+  function setBody(el, text) {
+    const s = el.querySelector(".msg-text");
+    if (s) s.textContent = text; else el.textContent = text;
+  }
+  function nodeToItem(d) {
+    return { who: d.classList.contains("user") ? "user" : "ai",
+      text: d.querySelector(".msg-text") ? d.querySelector(".msg-text").textContent : d.textContent,
+      tag: d.querySelector(".tag") ? d.querySelector(".tag").textContent : "" };
+  }
+  function foldHint() {
+    let hint = log.querySelector(".log-fold");
+    if (!hint) {
+      hint = document.createElement("div");
+      hint.className = "log-fold";
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "ghost-btn tiny";
+      b.id = "btn-expand-log";
+      b.addEventListener("click", expandLog);
+      hint.appendChild(b);
+      log.insertBefore(hint, log.firstChild);
+    }
+    hint.firstChild.textContent = `↑ 展开较早记录（已折叠 ${trimmedBuf.length} 条）`;
+  }
+  function trimLog() {
+    const nodes = log.querySelectorAll(".msg");
+    if (nodes.length <= quota) return;
+    const over = nodes.length - quota;
+    for (let i = 0; i < over; i++) {
+      trimmedBuf.push(nodeToItem(nodes[i]));
+      nodes[i].remove();
+    }
+    foldHint();
+  }
+  /** 分批放回：取最近折叠的 TRIM_BATCH 条按原时间顺序前插，并临时抬高配额（下一步新消息会收回） */
+  function expandLog() {
+    const back = trimmedBuf.splice(-TRIM_BATCH, TRIM_BATCH);
+    if (!back.length) return;
+    const fold = log.querySelector(".log-fold");
+    if (fold) fold.remove();
+    quota += back.length;
+    const frag = document.createDocumentFragment();
+    for (const it of back) frag.appendChild(makeMsgNode(it.who, it.text, it.tag));
+    const first = log.querySelector(".msg");
+    if (first) log.insertBefore(frag, first); else log.appendChild(frag);
+    if (trimmedBuf.length) foldHint();
+  }
+  function makeMsgNode(who, text, tag) {
     const d = document.createElement("div");
     d.className = "msg " + who;
-    d.textContent = text;
-    if (tag) { const t = document.createElement("span"); t.className = "tag"; t.textContent = tag; d.appendChild(t); }
+    const s = document.createElement("span");
+    s.className = "msg-text";
+    s.textContent = text;
+    d.appendChild(s);
+    if (tag) setTag(d, tag);
+    return d;
+  }
+  function pushMsg(who, text, tag) {
+    quota = RENDER_MAX;                       // 新消息 → 窗口收回默认档（展开是临时查看，不是永久扩容）
+    const d = makeMsgNode(who, text, tag);
     log.appendChild(d);
+    trimLog();
     log.scrollTop = log.scrollHeight;
     return d;
   }
@@ -164,11 +234,24 @@
     pushMsg("user", text);
     const thinking = pushMsg("ai", "心屿正在感受你的话…", "");
     thinking.classList.add("thinking");
-    try {
-      const r = await window.ChatAgent.respond(text);
+    /* 流式：首个增量到达时才把 thinking 换成正式气泡并逐字覆写；
+     * 上游/代理不支持流式时 onDelta 永不触发，收尾按整包一次性渲染（与旧行为一致）。 */
+    let bubble = null;
+    const onDelta = (full) => {
+      if (bubble) { setBody(bubble, full); log.scrollTop = log.scrollHeight; return; }
+      window.__seenStreamingBubble = true;   // 供 _test/stream_contract.py 断言「确实出现过逐字气泡」
       thinking.remove();
+      bubble = pushMsg("ai", full, "逐字生成中…");
+      bubble.classList.add("streaming");
+    };
+    try {
+      const r = await window.ChatAgent.respond(text, onDelta);
+      if (bubble) bubble.remove(); else thinking.remove();
       const modeLabel = { model: "在线大模型生成", fallback: "大模型暂不可用 · 离线共情模板", offline: "离线共情模板", guard: "安全转介策略" }[r.mode];
-      pushMsg("ai", r.reply, `${modeLabel}${r.path ? " · 情绪双路：" + r.path : ""}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
+      const aiMsg = pushMsg("ai", r.reply,
+        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
+      aiMsg.dataset.emotion = r.emotion;
+      speak(r.reply);   // 朗读开关打开时同步播出（失败静默，绝不影响主链路）
       // 记住这条情绪 → 点亮一簇星（一个瞬间 = 1~8 颗，强度越高越多）
       // 复用 respond 里已算好的词典结果，避免同文本二次 scan；旧版本无 lexAll 时回落重扫
       const lexAll = r.lexAll || window.EmotionEngine.scan(text).all;
@@ -188,6 +271,47 @@
       pushMsg("ai", "刚才我走神了一下（网络不稳定）。你可以再发一次，或点右上角「模型设置」检查连接。", "友好错误态");
     }
   });
+
+  // 6.2) 回复朗读（Web Speech Synthesis，zh-CN，零依赖）。
+  //      对标 Open-LLM-VTuber / LobeChat 的 TTS：陪伴产品「只打字不出声」是明显短板。
+  //      与语音输入同理：浏览器不支持即隐藏按钮；开关持久化在 peiliao.speak.v1（不进对话配置，
+  //      避免 ChatAgent.setCfg 清历史时被牵连）。
+  const SPEAK_KEY = "peiliao.speak.v1";
+  let speakOn = false;
+  try { speakOn = localStorage.getItem(SPEAK_KEY) === "1"; } catch { /* 内存态 */ }
+  (function speakInit() {
+    const btn = $("#btn-speak");
+    btn.setAttribute("aria-pressed", String(speakOn));
+    if (!("speechSynthesis" in window) || typeof window.SpeechSynthesisUtterance !== "function") {
+      btn.style.display = "none";
+      btn.disabled = true;
+      return;
+    }
+    const paint = () => {
+      btn.classList.toggle("on", speakOn);
+      btn.setAttribute("aria-pressed", String(speakOn));
+      btn.textContent = speakOn ? "🔊" : "🔇";
+      btn.title = speakOn ? "正在朗读回复，点击关闭" : "点击开启回复朗读";
+    };
+    paint();
+    btn.addEventListener("click", () => {
+      speakOn = !speakOn;
+      try { localStorage.setItem(SPEAK_KEY, speakOn ? "1" : "0"); } catch { /* 内存态 */ }
+      if (!speakOn) { try { window.speechSynthesis.cancel(); } catch { /* 忽略 */ } }
+      paint();
+    });
+  })();
+  /** 朗读一条回复。任何异常一律吞掉：朗读是增益功能，绝不能把主对话链路带崩。 */
+  function speak(text) {
+    if (!speakOn || !("speechSynthesis" in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new window.SpeechSynthesisUtterance(String(text).replace(/\s+/g, " ").slice(0, 400));
+      u.lang = "zh-CN";
+      u.rate = 1.02;
+      window.speechSynthesis.speak(u);
+    } catch { /* 无可用语音/被浏览器策略拦截 → 静默 */ }
+  }
 
   // 6) 语音输入（Web Speech API，zh-CN；不支持则隐藏按钮）
   (function voiceInit() {
@@ -297,7 +421,17 @@
   $("#btn-settings").addEventListener("click", () => {
     const c = window.ChatAgent.getCfg();
     $("#set-base").value = c.base; $("#set-model").value = c.model; $("#set-key").value = "";
+    $("#set-stream").checked = c.stream !== false;
+    $("#set-provider").value = "";
     dlg.showModal();
+  });
+  // 快捷预设：选一家就把 base+model 填进输入框（Key 仍需用户自己填，前端永不代存他人密钥）
+  $("#set-provider").addEventListener("change", (e) => {
+    const v = e.target.value;
+    if (!v) return;
+    const [base, model] = v.split("|");
+    $("#set-base").value = base;
+    $("#set-model").value = model;
   });
   dlg.addEventListener("close", () => {
     if (dlg.returnValue !== "save") return;
@@ -305,7 +439,8 @@
     // proxy 由运行环境持有，对话框不展示，合并写入予以保留
     const patch = {
       base: $("#set-base").value.trim(),
-      model: $("#set-model").value.trim()
+      model: $("#set-model").value.trim(),
+      stream: $("#set-stream").checked
     };
     const keyInput = $("#set-key").value.trim();
     if (keyInput) patch.key = keyInput;

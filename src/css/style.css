@@ -111,6 +111,50 @@ dialog::backdrop{background:rgba(4,6,14,.7)}
 #act5{padding-bottom:220px}
 #lit-count,#mem-count,#lit-count-dock,#mem-count-dock{color:var(--accent2)}
 
+/* ── 新增件样式：策略表驱动的可读文本节点 / 折叠提示 / 朗读开关 / 预设下拉 ── */
+.msg .msg-text{display:block}
+.msg.streaming .msg-text::after{content:"▍";color:var(--accent2);animation:blink 1s steps(2,start) infinite}
+@keyframes blink{50%{opacity:0}}
+.log-fold{align-self:center;margin-bottom:4px}
+.voice-btn.on{color:var(--accent2);border-color:rgba(57,208,196,.55)}
+.settings-form select{width:100%;margin-top:6px;background:rgba(255,255,255,.022);border:1px solid var(--line);
+  border-radius:12px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:var(--font);outline:none}
+.settings-form select:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.settings-form label.check{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--muted);cursor:pointer}
+.settings-form label.check input{width:auto;margin:4px 0 0;flex:0 0 auto;accent-color:var(--accent)}
+
+/* 响应式三档（对标项目普遍 3 断点；旧版只有一条 640px，平板与折叠屏下坞会挤掉叙事卡片） */
+@media(max-width:1024px){
+  .act{padding:88px 20px 140px}
+  .act-copy{padding:36px 32px}
+  #chat-dock .chat-log{height:min(30vh,260px)}
+}
+@media(max-width:768px){
+  #topbar{padding:12px 18px}
+  .act{padding:80px 16px 132px}
+  .act-copy{padding:32px 26px}
+  .lead{font-size:14.5px}
+  .chat-log{padding:14px;gap:10px}
+  .msg{font-size:14.5px;max-width:88%}
+  #chat-dock .chat-log{height:min(34vh,240px)}
+  #mood-chart{max-width:100%}
+}
+@media(max-width:480px){
+  #topbar{padding:10px 14px}
+  .brand-sub,.dock-title .muted{display:none}
+  .act{padding:72px 12px 190px;min-height:92vh}
+  .act-copy{padding:26px 20px;border-radius:14px}
+  h1{font-size:27px}
+  h2{font-size:22px}
+  .chat-form{padding:10px;gap:8px}
+  .primary-btn{padding:11px 16px;font-size:14px}
+  .voice-btn{padding:9px 11px;font-size:15px}
+  #chat-dock{max-height:72vh}
+  #chat-dock .chat-log{height:min(30vh,210px)}
+  #btn-lightshow{display:none}
+}
+
+/* 旧断点保留为兜底（<640px 时上述两档已覆盖大部分，这里补坞内边距与幕底留白） */
 @media(max-width:640px){
   .act-copy{padding:30px 24px}
   .chat-log{height:280px}

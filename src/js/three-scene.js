@@ -5,15 +5,20 @@
 window.ThreeScene = (function () {
   let renderer, scene, camera, points, crisisPulse = 0;
   let scrollT = 0; // 0..1 全局进度
-  const COUNT = 2600;
+  /* 粒子数按视口降档（对标项目移动端普遍降粒子/降 DPR）：手机跑满 2600 颗会掉帧。
+   * ⚠️ 桌面档（≥1100px）必须是 2600 —— `_test/browser_check.py` 的
+   *    `LIT: init=0 after1=5 after2=17` 与 `pixel_dual_check.py` 的双色占比判据都在 1280×800 下标定。 */
+  function pickCount() {
+    const w = (typeof innerWidth !== "undefined" ? innerWidth : 1280);
+    if (w >= 1100) return 2600;
+    if (w >= 768) return 1800;
+    if (w >= 480) return 1200;
+    return 900;
+  }
+  let COUNT = 2600;
   /* 情绪点亮机制（核心叙事）：每颗星独立记录「是否点亮 / 被哪种情绪点亮 / 点亮时刻」。
      未点亮 = 极暗灰白微光轮廓（能看出在转，但没有颜色）——“还没被了解”。 */
-  const litState = new Uint8Array(COUNT);
-  const litRGB = new Float32Array(COUNT * 3);
-  const litAt = new Float64Array(COUNT); // performance.now()；0 = 历史重放，不闪
-  const pSize = new Float32Array(COUNT); // 逐粒子尺寸：暗星小，点亮后变大发光
-  const radius = new Float32Array(COUNT);
-  const order = new Uint32Array(COUNT);  // 按半径升序的索引表（有序点亮用）
+  let litState, litRGB, litAt, pSize, radius, order;
   /* 未点亮必须是「中性灰」：带蓝调的灰会落在低落蓝的色相区间里，
      被像素判据误读成「低落已经出现」（实测对照图里凭空多出 1% 的低落色像素）。 */
   const DIM = [0.105, 0.105, 0.115];
@@ -31,6 +36,13 @@ window.ThreeScene = (function () {
     try {
       renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     } catch { return false; }
+    COUNT = pickCount();
+    litState = new Uint8Array(COUNT);
+    litRGB = new Float32Array(COUNT * 3);
+    litAt = new Float64Array(COUNT);      // performance.now()；0 = 历史重放，不闪
+    pSize = new Float32Array(COUNT);      // 逐粒子尺寸：暗星小，点亮后变大发光
+    radius = new Float32Array(COUNT);
+    order = new Uint32Array(COUNT);       // 按半径升序的索引表（有序点亮用）
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setSize(innerWidth, innerHeight);
 
