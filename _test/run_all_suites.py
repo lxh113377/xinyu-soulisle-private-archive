@@ -9,6 +9,8 @@ BASE = "http://127.0.0.1:8123"
 
 SUITES = [
     ("deploy_sync", [sys.executable, "_test/deploy_sync_check.py"]),
+    ("size_budget", [sys.executable, "_test/size_budget_check.py"]),
+    ("size_budget_selftest", [sys.executable, "_test/size_budget_check.py", "--selftest"]),
     ("engine_consistency", [sys.executable, "_test/engine_consistency_check.py"]),
     ("strategy", [sys.executable, "_test/strategy_check.py"]),
     ("strategy_selftest", [sys.executable, "_test/strategy_check.py", "--selftest"]),

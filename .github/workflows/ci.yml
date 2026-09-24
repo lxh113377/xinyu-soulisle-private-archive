@@ -19,6 +19,10 @@ jobs:
           node-version: "20"
       - name: src → deploy/xinyu SHA256 三类归零
         run: python _test/deploy_sync_check.py
+      - name: 静态资源体积预算守卫（首屏优势不回涨，含 --selftest 防恒真）
+        run: |
+          python _test/size_budget_check.py
+          python _test/size_budget_check.py --selftest
       - name: 情绪评测集门禁（accuracy ≥ 95% 且危机全召回）
         run: |
           node _test/emotion_eval.js > /tmp/eval.json
