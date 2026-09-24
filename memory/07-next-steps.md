@@ -21,9 +21,6 @@
 - [ ] 🔴 **iCAN 提交硬截止 2026-09-30**（2026-09-23 起**剩 7 天**；截止即锁团队信息）：官网报名 + 提交。**缺件三项**：①《应用方案》PDF（仍冻结）②演示视频 MP4（未录）③报名名单（只能老大填）。⚠️ 后两项此前**从未进过台账**，2026-09-23 补登 → 清单见 `交付物/提交包/报名信息-待填清单.md` 与 `演示视频-录制执行清单.md`
 - [ ] **J3/J4 变现**（「变现」= 让已建成但未启用的能力真正跑起来，非商业变现）：① ✅ **两端一致性常驻守卫**（`engine_consistency_check.py`，含自检与端到端对照）② ✅ **本地演示已开服务端持久化**（`demo-config.js` 置 `remote:true` + 熔断）③ ⏳ **fat jar / 容器部署**：**两条路都已就绪** —— (a) **部署包** `deploy/jar/`（`start.ps1` / `start.sh` / `README-部署.md`，实测从系统临时目录启动 + `-WebRoot` 指向仓库外静态副本，UP、静态全 200、公网版零密钥）；(b) **容器镜像**（2026-09-23 **真 Docker 全链路实测通过**：build 成功 482 MB / run 后 `/api/health` UP + 静态全 200 + 评测 73-98.6%-6-6 + **镜像内密钥 CLEAN** + `docker restart` 后数据仍在）。→ **唯一阻塞 = 老大提供目标机器**（IP / 登录方式 / 安全组放行端口）
 - [ ] ⏸ **PDF 起草（2026-09-23 老大明确维持冻结）**：本轮只更新台账与诊断结论，不动交付物正文。解冻需老大一句话
-- [x] ✅ **对标轮第二轮 M1–M8 全部落地（2026-09-24）**：流式 SSE / 共情策略表 SSOT / provider 别名 / TTS 朗读 / 对话窗口化 / 响应式+粒子降档 / CI 三门禁 / ROADMAP+`v1.3.0` 标签。
-      判据全绿：`stream_contract` A/B/C、`strategy_check`（+`--selftest` 防恒真）、`ux_guards_check` 21/21、`browser_check` ALL-ASSERT-PASS、`engine_consistency` 98.6%/6-6 双端全等、`deploy_sync` 三类归零。
-      详表见 `05-feature-status.md`「对标轮第二轮」，架构取舍见 `03-tech-stack.md` 决策 #6–#9，对标数据见 `交付物/对标分析报告-2026-09-24-v2.md`
 - [ ] 🔴 **P0（新）· 公网部署未跟进本轮改动**：`deploy/xinyu/` + `deploy/functions/` 内容已同步且 SHA256 三类归零，但**线上仍是旧版**（评委在 `xinyu-soulisle.pages.dev` 看不到流式/TTS/新策略表）。
       命令：`npx wrangler pages deploy deploy/xinyu --project-name xinyu-soulisle` → 跑完 `python _test/public_check.py` 复核 `KEY_LEAK: False` + `CONSOLE_ERRORS: 0`。
       **本轮未代跑的理由（必须记清）**：这是**评委可见的外发变更**，超出"改代码 + Git 版本控制即备份"的授权半径；距 09-30 截止 6 天，上线前需老大一句话（同 `PDF 冻结` 口径）
@@ -41,4 +38,3 @@
 - **卷9** `07-next-steps.part9.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷10** `07-next-steps.part10.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷11** `07-next-steps.part11.md` — J3/J4 变现第 3 件：fat jar / 容器部署完整史（R199 人工拆卷自 part6）
-
