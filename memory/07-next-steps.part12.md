@@ -9,3 +9,12 @@
 - [x] ~~⏸ PDF 起草（2026-09-23 老大明确维持冻结）~~ → **2026-09-24 解冻并已产出**：18 页 PDF + 盲审遗留处置 + 路径泄露修复（9d7442c 与当日日志），本项关闭
 
 - [x] 🔴 ~~**P0（新）· 公网部署未跟进本轮改动**~~ → **2026-09-24 r17 已上线并复核关闭**：`wrangler pages deploy` 执行成功（deployment `09641d44`）。线上复核：`xinyu-soulisle.pages.dev/` 已含 `btn-theme` + `manifest.webmanifest`（manifest 200）；`online_check.py` rc=0（离线徽章正常）、`public_check.py` rc=0（`● 在线 AI` 徽章 / 体验条 True / **KEY_LEAK: False** / CONSOLE_ERRORS: 0）。⚠️ 复核坑记：Pages 对 `/index.html` 返回**空 body**，须按 `/` 抓页面，否则 grep 恒 0 误判"未上线"。**r18 补机器守卫**：`_test/live_sync_check.py`（线上 `/` 与 `deploy/xinyu/index.html` 逐字节比对，rc 0/1/2 分离漂移与环境，反例 example.com→rc=1 证非恒真）已入 17 套件电池 + CI `live-sync` job
+
+- [x] 🔴 ~~**J3/J4 变现第①件：前端切 `/api/emotion`（消除情绪引擎"两份真相"）~~ → **2026-09-25 对标轮 r20 已落地并配判据**：
+      新增 `src/js/emotion-remote.js`（三层开关与 J4 完全同口径：代码层 `cfg.emotionRemote === true` 默认关闭 /
+      本地演示 `src/js/demo-config.js` 置 true / **公网 `deploy/xinyu/js/demo-config.js` 刻意不含**——Pages Function 无 `/api/emotion`）。
+      **危机词在函数体内先本地短路，绝不为网络等待**；404/超时/响应形状不合法即熔断回落本地引擎；气泡如实标注「情绪:后端」。
+      判据 `_test/emotion_wiring_check.py` **9 项 PASS**（W1 接线顺序 / W2 公网零开关 / W2b 副本一致 /
+      W3 危机短路顺序 + W3b 实测 `attempted=0` 未经后端 / W4 后端路径生效且如实标注 / W5 不可达熔断不伪装 /
+      W6 词典层双端同句同结论 / W7 零 pageerror）+ `--selftest` 3 类篡改全抓到（证判据非恒真）。
+      本地那份 JS 引擎**按设计保留为离线降级**，未删。详见 `交付物/对标分析报告-2026-09-25.md`

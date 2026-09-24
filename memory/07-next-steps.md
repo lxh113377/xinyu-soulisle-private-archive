@@ -18,14 +18,6 @@
 > ⚠️ 本卷为**索引壳**（R199 自动拆卷后）。以下为**当前可执行摘要**（满足致命纪律 #1：主卷 P0 不得为空）；
 > 完整描述在分卷里（见文末「分卷目录」，主要落在 `07-next-steps.part6.md`）。
 
-- [x] 🔴 ~~**J3/J4 变现第①件：前端切 `/api/emotion`（消除情绪引擎"两份真相"）~~ → **2026-09-25 对标轮 r20 已落地并配判据**：
-      新增 `src/js/emotion-remote.js`（三层开关与 J4 完全同口径：代码层 `cfg.emotionRemote === true` 默认关闭 /
-      本地演示 `src/js/demo-config.js` 置 true / **公网 `deploy/xinyu/js/demo-config.js` 刻意不含**——Pages Function 无 `/api/emotion`）。
-      **危机词在函数体内先本地短路，绝不为网络等待**；404/超时/响应形状不合法即熔断回落本地引擎；气泡如实标注「情绪:后端」。
-      判据 `_test/emotion_wiring_check.py` **9 项 PASS**（W1 接线顺序 / W2 公网零开关 / W2b 副本一致 /
-      W3 危机短路顺序 + W3b 实测 `attempted=0` 未经后端 / W4 后端路径生效且如实标注 / W5 不可达熔断不伪装 /
-      W6 词典层双端同句同结论 / W7 零 pageerror）+ `--selftest` 3 类篡改全抓到（证判据非恒真）。
-      本地那份 JS 引擎**按设计保留为离线降级**，未删。详见 `交付物/对标分析报告-2026-09-25.md`
 - [ ] 🔴 **iCAN 提交硬截止 2026-09-30**（剩 5 天；截止即锁团队信息）：官网报名 + 提交。
       三项缺件现状（2026-09-25 r20 复核）：①《应用方案》PDF ✅ 已产出（18 页，成员署名位待 PII 齐后重渲染一次）
       ②演示视频 ✅ 已交付（217s/22.4MB，`_test/demo_video_pipeline.py` 可重录）
@@ -48,4 +40,3 @@
 - **卷10** `07-next-steps.part10.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷11** `07-next-steps.part11.md` — J3/J4 变现第 3 件：fat jar / 容器部署完整史（R199 人工拆卷自 part6）
 - **卷12** `07-next-steps.part12.md` — 07-next-steps 分卷（R199 自动拆卷）
-
