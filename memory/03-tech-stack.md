@@ -56,6 +56,10 @@
 | 3 | J4 前端远端记忆**默认关闭**（`cfg.remote===true` 才启用） | 2026-09-22 | 已执行 |
 | 4 | 鉴权用**轻量 token 过滤器**，不引入 Spring Security | 2026-09-22 | 已执行 |
 | 5 | 情绪评测集 `_test/emotion-eval-dataset.json` **不复制进 jar**，服务端直读 | 2026-09-22 | 已执行 |
+| 6 | 流式输出走**同端点 + 可选 `stream` 字段**，不新建 `/api/chat/stream` | 2026-09-24 对标轮 | 已执行（`stream_contract.py` A/B/C PASS） |
+| 7 | 共情策略/提示词/危机话术抽为 **`src/data/emotion-strategy.js` SSOT**（纯 JSON 字面量） | 2026-09-24 对标轮 | 已执行 |
+| 8 | provider 适配层用**环境变量嵌套占位符 + 兼容别名**，不引入 provider 注册表代码 | 2026-09-24 对标轮 | 已执行 |
+| 9 | 长会话用 **DOM 上界 + 配额制折叠展开**，不引入虚拟滚动列表 | 2026-09-24 对标轮 | 已执行 |
 
 ### 决策 #1 —— 后端语言：Java(Spring Boot) vs Python(FastAPI)
 
@@ -148,3 +152,43 @@
 ## 运行时要求
 - 前端：现代浏览器（WebGL2 + ES Module）；无 WebGL 时降级 CSS 渐变
 - v2 服务端：JDK 17+；MySQL 8（或 H2 演示模式）；需出网访问 `api.deepseek.com`
+
+---
+
+## 📋 选型决策记录 · 详表（对标轮第二轮 2026-09-24，决策 #6–#9）
+
+### 决策 #6 —— 流式输出：同端点 + 可选 `stream` 字段（而非新建 `/api/chat/stream`）
+
+- **背景**：对标 LobeChat（`@lobehub/fetch-sse`）/ Open-LLM-VTuber（WebSocket 流水线）/ SillyTavern 均有流式，心屿原为整包返回（实测在线 965ms 全等）。首轮把此项推到"赛后"，理由是"破坏 AC-OBS-08 契约 1:1"。本轮老大指令为「按优先级直接开工」，故必须在不破契约的前提下落地。
+- **选项对比**：
+  | 方案 | 优点 | 代价 |
+  |---|---|---|
+  | A 新建 `/api/chat/stream` 端点 | 职责分离清晰 | 前端要加分支选择逻辑；v1/v2/公网三处各多一个端点；鉴权与日志面翻倍 |
+  | B **同端点 + `stream` 可选字段**（选定） | 不带该字段的请求**逐字不变**，AC-OBS-08 自动守住；前端只是"传个 bool" | 一个方法两种返回形态，Spring 侧签名要统一（实测踩坑见下） |
+- **结论**：**B**。`stream:true` 属新增可选字段，不是破坏性变更（已写进 CONTRIBUTING 红线 4）。
+- **实测踩坑（必须留痕）**：Controller 返回类型若声明 `ResponseEntity<?>`，流式分支报
+  `No converter for [...Lambda...] with preset Content-Type 'text/event-stream'` → **HTTP 500**；
+  改成 `ResponseEntity<StreamingResponseBody>`（整包 JSON 也用同一个签名写）才通过。
+- **已知代价**：① CloudBase 云函数受"HTTP 请求-响应"模型限制**不做流式**（前端按 `content-type` 自动回落整包，属设计内行为，已在函数头注释与 `.env.example` 写明）；② 流式失败重试会多一次请求（先试流式再回落非流式）。
+- **重评触发条件**：若要做"中途打断/停止生成"（OLV 的语音打断能力），SSE 单向通道不够，需上 WebSocket 或 `AbortController` + 服务端取消语义 —— 届时另立决策。
+
+### 决策 #7 —— 共情策略表 SSOT：`.js` 纯 JSON 字面量（而非 `.json` + fetch）
+
+- **背景**：`chat-agent.js` 内硬编码 6 类情绪的共情模板与 SYSTEM 提示，"加一类情绪"要改代码，与首轮词表 SSOT 化（e79025b）方向冲突。对标项目里只有 LobeChat 有 prompt 模板库概念，垂类项目普遍硬编码。
+- **选项**：① `.json` + `fetch()` —— 会把同步链路 `respond()` 变异步，波及 `app.js` 全链；② **`.js` 挂全局（选定，与词表同形态）**；③ 继续硬编码但加注释 —— 已被证伪（静默回落风险）。
+- **结论**：`.js` 文件体为**纯 JSON 字面量**赋给 `window.__XINYU_STRATEGY__`；新增情绪 = 改词表 + 改本表，代码零改动。
+- **已知代价**：新风险从"改代码忘同步"变成"**只改一个数据文件**"——由 `_test/strategy_check.py` 兜（键序一致 / 覆盖完备 / 反向不遗 / 危机话术与分类器提示词自洽），并用 `--selftest` 注入分叉证明判据非恒真。
+- **重评触发条件**：若共情链路要做"多步策略"（识别→澄清→反映→行动建议）而非单轮模板，本表结构需升级为带阶段/顺序的流程定义。
+
+### 决策 #8 —— provider 适配层：环境变量别名（而非 provider 注册表）
+
+- **背景**：对标三家均多模型；心屿只有 `DEEPSEEK_*`。
+- **结论**：`LLM_BASE/LLM_MODEL/LLM_KEY` 为通用名，`DEEPSEEK_*` 保留兼容，Java 侧用 Spring **嵌套占位符** `${LLM_BASE:${DEEPSEEK_BASE:默认}}`，Function 侧用 `||` 短路。**不写注册表代码**——因为上游本来就是 OpenAI 兼容，端点/模型名就是全部差异。
+- **已知代价**：非 OpenAI 兼容协议（如 Anthropic 原生 `/v1/messages`）仍接不进来；届时才需要真正的 provider 适配层。
+- **前端配套**：设置面板加 5 家快捷预设（只填 base+model，Key 必须用户自己填，前端永不代存）。
+
+### 决策 #9 —— 长会话窗口化：DOM 上界 + 配额展开（而非虚拟滚动）
+
+- **背景**：LobeChat 用 `react-virtuoso`；心屿 `#chat-log` 单调 append。
+- **结论**：上界 60 条 + 「展开较早」每次放回 20 条并**临时抬高配额**（否则放回即被同一上限裁回 = 等于没展开，实测踩坑并已修），新消息到达即收回上界。零依赖，符合"零构建"约束。
+- **已知代价**：不是真正的虚拟化——无滚动位置锚定，>500 条时反复展开会有视觉跳动。列入 ROADMAP 计划 #2 赛后再做。

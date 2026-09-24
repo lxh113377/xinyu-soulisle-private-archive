@@ -49,6 +49,15 @@
   **持久化（Docker 专属坑）**：写 2 情绪 + 1 消息 → `docker restart` → 重启后仍 2 / 1 ⇒ DB 确实落在挂载卷（Dockerfile 用 `XINYU_DB_URL` 显式覆盖相对路径 + 声明 `VOLUME /app/data` 是有效设计）。
   ⚠️ **前置坑（不解决则永远 build 不了）**：本机**无法访问 Docker Hub**（`registry-1.docker.io` 探测 = **000**），`docker build` 报 `failed to authorize ... dial tcp 88.191.249.182:443`。解法 = 先从可用源拉基础镜像并本地打标（本次用 `docker.1ms.run`，实测 401=通），之后 build 走本地镜像。
 
+### 对标轮第二轮（2026-09-24，证据来源：`_test/stream_contract.py` / `strategy_check.py` / `ux_guards_check.py`）
+
+- [x] AC-OBS-13: 加 `stream:true` 后**逐字流式**可用，且**不带该字段的旧契约逐字不变** → `stream_contract.py` 判据 A（非流式仍回整包 JSON + `choices[0].message.content`）+ 判据 B（`text/event-stream`，实测 32 个 data 帧中 **30 帧含 `delta.content`**、拼回 51 字）。分片数 ≥2 是"边生成边下发"的机器证据，防"整包塞进一个帧"糊过去 | API响应
+- [x] AC-OBS-14: 代理不支持流式时**自动回落且不冒充** → 同脚本判据 C 对照组：不可达端点必须落「离线共情模板」，标签出现「逐字流式」或「在线大模型生成」即 FAIL | 测试输出
+- [x] AC-OBS-15: 共情策略表与词表**成对成立**（只改一处必被拦） → `strategy_check.py` PASS（键序一致 / 6 情绪覆盖完备 / 危机热线号确实出现在话术里 / `classify.sys` 提及所有情绪键）+ `--selftest` 删 love 策略与抹热线 → 报 2 问题 = 判据非恒真 | 测试输出
+- [x] AC-OBS-16: 朗读、窗口化、响应式三项**行为可证伪** → `ux_guards_check.py` 21 项：U1 注入计数器实测 `SpeechSynthesisUtterance` 构造数（开→1，关→不再增长，证"关得掉"）；U2 `.msg` DOM ≤60 且 `getHistory()`/`MemoryStore` 未被窗口化截断 + 展开真放回 + 新消息收回上界；U3 375/700/1300 三档无横向溢出且粒子 900<1200<**2600**（桌面档恒 2600，与 `browser_check` LIT 标定互不破坏）| 测试输出
+
+---
+
 ## 已识别的判据误报（保留记录，不修改数据）
 
 - ⚠️ `handoff.py review` 的「交叉一致性」会对 05 已完成项与 07 P0 未勾选项做**关键词重叠**匹配。

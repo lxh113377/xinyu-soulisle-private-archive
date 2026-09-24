@@ -35,7 +35,12 @@
 | 危机优先拦截 | 危机词命中即最高优先级，**不调用 LLM**，直接返回求助热线转介（实测危机召回 6/6） |
 | 情绪曲线 | Canvas 2D 绘制历次情绪强度变化 |
 | 对话与记忆 | 在线 LLM 生成共情回复；本机 `localStorage` 持久化，服务端持久化可选开启（`cfg.remote`） |
-| 语音输入 | Web Speech API（zh-CN） |
+| **逐字流式输出** | `stream:true` → 同源代理 SSE 直通，回复边生成边显示；代理不支持流式时**按 content-type 自动回落整包**，不留半成品气泡 |
+| **共情策略表 SSOT** | 每种情绪的共情要点 / 离线模板 / 采样参数集中在 `src/data/emotion-strategy.js`（与词表同形态的纯 JSON），**加一类情绪只改数据文件，代码零改动** |
+| **多模型 provider** | `LLM_BASE/LLM_MODEL/LLM_KEY` 通用环境变量（`DEEPSEEK_*` 保留兼容），设置面板内置 DeepSeek / OpenAI / 通义 / Kimi / 本地 Ollama 快捷预设 |
+| 语音输入 + 回复朗读 | Web Speech API：ASR（zh-CN）语音输入 ＋ `speechSynthesis` 逐条朗读（可开关，实测关得掉）；浏览器不支持即隐藏按钮 |
+| 长会话窗口化 | 对话列表 DOM 上界 60 条，较早记录折叠可分批展开；模型上下文与情绪记忆不受窗口化影响（判据实测） |
+| 响应式与降档 | 480/768/1024 三档断点 + 星雾粒子按视口降档（手机 900 / 平板 1200 / 桌面 2600），移动端无横向溢出 |
 | 优雅降级 | WebGL 不可用 → CSS 渐变；LLM 不可用 → 离线共情模板。⚠️ **降级在界面上明示，绝不把模板伪装成在线 AI** |
 
 ---
@@ -48,7 +53,7 @@
 | 前端存储 | `localStorage`（键 `peiliao.*.v1`） | 离线可用 |
 | 服务端 | Spring Boot 3.2.5 / JDK 17 / MyBatis-Plus 3.5.7 | `server/`，单体应用 |
 | 数据库 | H2 file（默认，`server/data/`）；MySQL 8 驱动已引入可切 | 表：`chat_message` / `emotion_record` |
-| LLM | DeepSeek（OpenAI 兼容 `/chat/completions`）；JDK 内置 `HttpClient` 转发 | 密钥走环境变量，**零落前端、零入库** |
+| LLM | 任意 OpenAI 兼容上游（默认 DeepSeek）；JDK 内置 `HttpClient` 转发 | `LLM_*`／`DEEPSEEK_*` 双名，密钥走环境变量，**零落前端、零入库** |
 | 鉴权 | 轻量 token 过滤器（`xinyu.api-token`，留空 = 放行） | 私有部署时可选开启 |
 | 部署 | 静态托管 / fat jar / Docker | 三选一，互不影响 |
 
@@ -166,10 +171,15 @@ CloudBase 注意事项（实测得来）：
 python _test/browser_check.py            # 离线降级 / 双色 / 滚动淡入淡出，输出 ALL-ASSERT-PASS
 python _test/deploy_sync_check.py        # src → deploy/xinyu 三类比对（MISSING/DIFF/EXTRA 归零）
 python _test/engine_consistency_check.py # JS 引擎 ↔ Java 引擎逐项对账（词表结构级）
+python _test/strategy_check.py           # 共情策略表 ↔ 词表成对性（--selftest 注入分叉证判据非恒真）
 node _test/emotion_eval.js               # 前端情绪评测集复跑
+python _test/stream_contract.py          # A 非流式契约不破 / B SSE 含内容帧≥2 / C 前端逐字且回落不冒充
+python _test/ux_guards_check.py          # TTS 朗读 / 对话窗口化 / 响应式与粒子降档（逐项 21 判据）
 ```
 
-最近实测（2026-09-23）：console 0 报错；情绪评测集 **73 条 / 准确率 98.6% / 危机召回 6-6**；`/api/chat` 在线 965ms、离线回落 3ms；Docker 镜像 482MB，`docker restart` 后数据仍在（H2 落在 `/app/data` 挂载卷）。
+GitHub Actions 三条门禁（`.github/workflows/ci.yml`）：同步守卫+评测+策略表+密钥扫描、Java 构建+**词表一致性红线**（此前只写在 `memory/AGENTS.md` 靠人记，现已机器化）、浏览器回归（runner 无 GPU，强制 SwiftShader）。
+
+最近实测（2026-09-24 对标轮）：`browser_check` ALL-ASSERT-PASS；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`stream_contract` A/B/C 全 PASS（SSE 32 帧 / 30 含内容帧 / 拼回 51 字）；`ux_guards_check` 21/21；`deploy_sync_check` 三类归零。
 
 ---
 
@@ -177,11 +187,13 @@ node _test/emotion_eval.js               # 前端情绪评测集复跑
 
 | 文档 | 内容 |
 |---|---|
-| [CONTRIBUTING.md](CONTRIBUTING.md) | 环境要求、四条红线（密钥/同步/词表一致性/契约）、开发流程与提交规范 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 环境要求、五条红线（密钥/同步/词表一致性/契约/策略表成对性）、开发流程与提交规范 |
 | [SECURITY.md](SECURITY.md) | 密钥政策、接口安全、漏洞上报 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本变更史（Keep a Changelog） |
 | [.env.example](.env.example) | 全部环境变量文档化（名称实读自配置与函数源码） |
+| [ROADMAP.md](ROADMAP.md) | 公开路线图（对标差距 → 已完成 / 进行中 / 计划 / 明确不做，含"为什么不做"） |
 | [交付物/对标分析报告-2026-09-24.md](交付物/对标分析报告-2026-09-24.md) | 与 LobeChat / Open-LLM-VTuber / SillyTavern 的七维度对标与差距清单 |
+| [交付物/对标分析报告-2026-09-24-v2.md](交付物/对标分析报告-2026-09-24-v2.md) | 第二轮：14 仓实测指标横向对账（含同体量垂类项目）+ 本轮已落地项与实证 |
 | `memory/` | 项目交接记忆（目标/结构/技术栈/决策记录/验收标准），工程过程档案 |
 
 ---

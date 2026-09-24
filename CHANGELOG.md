@@ -5,10 +5,33 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-24 — 对标轮第二轮：把"赛后再做"直接落地
+
 ### Added
-- GitHub Actions CI（同步守卫 + 情绪评测门禁 + Java 构建）
-- `.env.example` / `CONTRIBUTING.md` / `SECURITY.md` / Issue & PR 模板 / 英文 README
-- 对标分析报告（交付物/对标分析报告-2026-09-24.md）
+- 工程化七件套（本轮前一并入 1.3.0 发版）：GitHub Actions CI、`.env.example`、`SECURITY.md`、
+  Issue & PR 模板、英文 README、首轮对标分析报告
+- **逐字流式输出（SSE）**：`/api/chat` 认 `stream:true`；Pages Function 与 Java 侧 SSE 直通，
+  前端 `onDelta` 逐字渲染；代理不支持流式时按 `content-type` 自动回落整包，不留半成品气泡
+- **共情策略表 SSOT** `src/data/emotion-strategy.js`：persona / rules / 分类器提示 / 危机话术 /
+  每种情绪的共情要点·离线模板·采样参数集中一处，新增情绪类别代码零改动
+- **多模型 provider 适配层**：`LLM_BASE/LLM_MODEL/LLM_KEY`（`DEEPSEEK_*` 保留兼容别名）
+  + 设置面板 5 家快捷预设（DeepSeek / OpenAI / 通义 / Kimi / 本地 Ollama）
+- **回复朗读**：`speechSynthesis`（zh-CN）开关，零依赖；浏览器不支持即隐藏按钮
+- **对话列表窗口化**：DOM 上界 60 条 + 配额制「展开较早」；模型上下文与情绪记忆不受影响
+- **响应式三档**（480/768/1024）+ **星雾粒子按视口降档**（900/1200/2600）
+- 新判据三条：`_test/strategy_check.py`（含 `--selftest` 防恒真）、`_test/stream_contract.py`
+  （A 非流式不破 / B 含内容帧≥2 / C 前端逐字且回落不冒充）、`_test/ux_guards_check.py`（21 项逐项判定）
+- CI 增两条门禁 job：`java-build` 起**无密钥** fat jar 跑词表一致性红线（此前只写在 `memory/AGENTS.md` 靠人记）、
+  `browser-regression` 跑浏览器回归（runner 无 GPU，强制 ANGLE/SwiftShader）；密钥扫描带拼接生成的对照组
+- `ROADMAP.md`：对标差距 → 已完成 / 计划 / **明确不做（附理由）**
+
+### Changed
+- 红线从 4 条增至 5 条（新增「策略表成对红线」），`CONTRIBUTING.md` 同步
+- CloudBase 云函数按 HTTP 请求-响应模型**刻意不做流式**（注释写明属设计内回落，非缺陷）
+
+### Fixed
+- CI 密钥扫描自伤：写死在 workflow 里的对照密钥会命中自身扫描 → 改拼接生成（本机实跑抓出）
+- 「展开较早记录」原先放回即被同一上限裁回（等于没展开）→ 改配额制，新消息才收回上界
 
 ## [1.2.0] - 2026-09-24 — 提交包产出
 

@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 """心屿原型浏览器实测：console 零报错 + 底部对话坞 / 星雾点亮 / 持久化 / 危机 / 回滚 全链路断言"""
-import sys, io
+import sys, io, os
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
 
 errors = []
+
+# CI（GitHub ubuntu runner 无 GPU）需要软件光栅化 WebGL；本机留空即走默认。
+# 不加这行 → headless 里 `#gl` 起不来 → `lit1 > 0` 断言必然失败（判据环境性假红）。
+LAUNCH_ARGS = [a for a in os.environ.get("XINYU_BROWSER_ARGS", "").split() if a]
 
 
 def lit(pg):
@@ -13,9 +17,9 @@ def lit(pg):
 
 with sync_playwright() as p:
     try:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(args=LAUNCH_ARGS)
     except Exception:
-        browser = p.chromium.launch(channel="msedge")
+        browser = p.chromium.launch(channel="msedge", args=LAUNCH_ARGS)
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
     page.on("pageerror", lambda e: errors.append(str(e)))

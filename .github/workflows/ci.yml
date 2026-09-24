@@ -7,7 +7,7 @@ on:
 
 jobs:
   frontend-checks:
-    name: 同步守卫 + 情绪评测门禁
+    name: 同步守卫 + 情绪评测/策略表门禁 + 密钥扫描
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,9 +32,28 @@ jobs:
           if acc < 95.0 or hit != total:
               sys.exit(1)
           EOF
+      - name: 共情策略表 ↔ 词表成对性门禁（含 --selftest 防判据恒真）
+        run: |
+          python _test/strategy_check.py
+          python _test/strategy_check.py --selftest
+      - name: 密钥零入库扫描（含"判据必须能抓到东西"的对照组）
+        run: |
+          set -e
+          # 对照组：先证明这条正则在**本环境**确实抓得到东西，否则"0 命中"没有意义（R247）。
+          # 密钥串必须**拼接生成** —— 直接写死 30 位字面量会让本文件自己命中这条扫描（本机实测踩过）。
+          printf 'demo sk-%s\n' "$(printf 'a%.0s' $(seq 1 30))" > /tmp/keycanary
+          if ! grep -lE "sk-[A-Za-z0-9]{20,}" /tmp/keycanary >/dev/null; then
+            echo "对照组失败：正则抓不到已知密钥 ⇒ 本步判据恒真，拒绝放行"; exit 1
+          fi
+          rm -f /tmp/keycanary
+          # 真实扫描：只扫 git 跟踪的文件（工作区可能含未跟踪的本机演示配置，如 src/js/demo-config.js）
+          if git ls-files -z | xargs -0 -r grep -lIE "sk-[A-Za-z0-9]{20,}" 2>/dev/null; then
+            echo "🔴 检出疑似真实密钥，禁止入库"; exit 1
+          fi
+          echo "✅ KEY-SCAN-PASS（跟踪文件 0 命中，对照组已证非恒真）"
 
   java-build:
-    name: Java 服务端构建
+    name: Java 服务端构建 + 词表一致性红线
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,5 +62,61 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - name: mvn package
         run: mvn -B -ntp -f server/pom.xml package
+      # 项目铁律：情绪引擎 JS/Java 两份实现必须逐项一致（词表结构 / 73 条逐条预测 / 汇总指标）。
+      # 此前这条红线**只写在 memory/AGENTS.md 里靠人记**，本步把它变成机器门禁。
+      # /api/emotion/* 不调用上游 LLM ⇒ 无需任何密钥即可跑，公开仓库也安全。
+      - name: 起 fat jar（无密钥，仅情绪接口）并跑双端一致性对账
+        env:
+          XINYU_WEB_ROOT: ${{ github.workspace }}/src
+        run: |
+          set -e
+          java -jar server/target/soulisle-server.jar --server.port=8123 > /tmp/xinyu-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:8123/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8123/api/health
+          python _test/engine_consistency_check.py
+
+  browser-regression:
+    name: 浏览器回归（降级链路 + 星雾点亮 + 危机拦截）
+    runs-on: ubuntu-latest
+    env:
+      # runner 无 GPU：强制 ANGLE/SwiftShader 软件光栅化，否则 WebGL 起不来会假红
+      # （判据里 `lit1 > 0` 依赖 ThreeScene 真在跑）
+      XINYU_BROWSER_ARGS: "--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 安装 Playwright
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+      - name: 起 fat jar（工作目录=仓库根，直读 src/）
+        run: |
+          mvn -B -ntp -f server/pom.xml package -DskipTests
+          java -jar server/target/soulisle-server.jar --server.port=8123 > /tmp/xinyu-server.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:8123/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+      # 判据本身自带对照组：不可达端点 18123 必须回落离线模板，出现「在线大模型生成」即 FAIL
+      - name: 降级链路 + 情绪点亮 + 危机拦截 + 滚动淡入淡出
+        run: python _test/browser_check.py
