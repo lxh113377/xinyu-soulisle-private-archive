@@ -45,3 +45,5 @@ desktop.ini
 交付物/提交包/demo_video_out/video_raw/
 交付物/提交包/demo_video_out/qa_*.png
 交付物/提交包/demo_video_out/vo*.mp3
+# Mimosa 安全扫描钩子活跃工具态（R269 例外：运行态禁迁 _trash）
+.mimosa/
