@@ -4,6 +4,11 @@
 
 ## 环境要求
 
+> **全新 clone 第一步**：`cp deploy/xinyu/js/demo-config.js src/js/demo-config.js`
+> `src/js/demo-config.js` 持本机真实 Key，被 `.gitignore` 永久排除；但 `index.html` 用 `<script>` 静态引它 ——
+> 不补就会首屏 3 个 404，并打破 `browser_check` 的「console 0 报错」判据（CI 已自动化这一步，本地需手工补一次）。
+> 复制来的是**零密钥同源代理版**（按域名自适应）；只有需要浏览器直连跑演示时，才自己填入 Key。
+
 | 工具 | 版本 | 说明 |
 |---|---|---|
 | JDK | **17**（必须显式设置 `JAVA_HOME`） | 系统默认可能是 JDK 8，Spring Boot 3 会编译失败 |

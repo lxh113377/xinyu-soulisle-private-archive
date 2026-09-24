@@ -178,6 +178,7 @@ python _test/ux_guards_check.py          # TTS 朗读 / 对话窗口化 / 响应
 ```
 
 GitHub Actions 三条门禁（`.github/workflows/ci.yml`）：同步守卫+评测+策略表+密钥扫描、Java 构建+**词表一致性红线**（此前只写在 `memory/AGENTS.md` 靠人记，现已机器化）、浏览器回归（runner 无 GPU，强制 SwiftShader）。
+三条 job **均在 GitHub 真跑验证**；浏览器 job 首轮就抓到本机看不到的真实缺陷：`src/js/demo-config.js` 被 gitignore，全新 clone 下 `<script>` 静态引它 → 首屏 3 个 404 打破「console 0 报错」。修法＝CI 自动用公网零密钥 stub 补占位（本地按 `CONTRIBUTING.md` 第一步手工补一次）。
 
 最近实测（2026-09-24 对标轮）：`browser_check` ALL-ASSERT-PASS；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`stream_contract` A/B/C 全 PASS（SSE 32 帧 / 30 含内容帧 / 拼回 51 字）；`ux_guards_check` 21/21；`deploy_sync_check` 三类归零。
 
