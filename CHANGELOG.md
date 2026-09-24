@@ -5,6 +5,44 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-25 — 对标轮 r20：把"已经建好却没接上"的能力接上
+
+### Added
+- **情绪识别后端化接线** `src/js/emotion-remote.js`：共情链路的分类在后端 `/api/emotion`
+  可用时以后端为准，**消除 J3 遗留的 JS/Java 两份真相**。开关口径与 J4 完全一致（三层）：
+  代码层 `cfg.emotionRemote === true` 默认关闭 → 本地演示（fat jar）开启 → **公网版刻意不开**
+  （Pages Function 没有 `/api/emotion`）。危机词在本地词典先判、**绝不为网络等待**；
+  404/超时/响应形状不合法即熔断并回落本地引擎；气泡元信息如实标注「情绪:后端」，禁伪装
+- **vendor 供给链守卫** `_test/vendor-manifest.json` + `_test/vendor_freshness_check.py`：
+  三个首屏第三方库的**完整性哈希 + 版本声明对账 + 上游漂移探测**（零构建项目没有 lockfile，
+  此前第三方库漂移是纯盲区）。V2 判据从文件内容解析版本，**正则零命中即判红**（不把"没测到"当"通过"）
+- **对标源数据台账** `_test/benchmark_metrics.py` → `交付物/对标数据/benchmark-metrics.json`：
+  14 个参照仓的 ★/最近推送/最新 release/CI workflow 数/文档齐备度/**递归整树能力矩阵**
+  与本项目 self 指标同一份产物，每次运行输出**与上次快照的逐字段漂移**（治"数字来自历史快照"）
+- 新判据入电池（19 → 24 套件）：`emotion_wiring_check`（9 项 + `--selftest` 3 类篡改全抓到）、
+  `vendor_freshness_check`（+ `--selftest` 4 类篡改全抓到）、`benchmark_metrics --selftest`；
+  CI `frontend-checks` 同步增 3 步
+
+### Changed
+- **gsap + ScrollTrigger 3.12.5 → 3.15.0（成对升级）**：前端实际用到的 API 面仅 5 处，
+  升级后 `browser_check` / `lightshow_check` / `pixel_dual_check` 三套件全绿；
+  首屏关键路径 819,767 B（预算 858,752 B 内）
+- **体积预算表加"必须全覆盖"判据**：实测抓到原 13 文件表漏登记 `src/data/emotion-strategy.js`，
+  且新增文件本会静默绕过体积门禁 —— 现在漏登记即红
+
+### Removed
+- 从 ROADMAP 计划里**撤下**「PWA / service worker 离线缓存」：本轮机器实测 14 个参照仓
+  `pwa_offline` 命中 **0/14**（含 LobeChat / SillyTavern / Open-LLM-VTuber），
+  即"同类优质项目都靠 SW 做离线"是首轮未经核实的推断；撤销理由与替代动作（`live_sync_check`
+  机器守新鲜度）已写入 ROADMAP「本轮撤下的两项」
+
+### Known issues（登记不隐瞒）
+- `src/vendor/three.min.js` 实测为 **r128（2021）**，上游 **r186（2026-09-24）**，落后 58 个大版本。
+  截止前不升级的理由与迁移风险（色彩管理默认变更 / `Geometry` 移除 / 自定义着色器约定 /
+  星雾双色像素级标定需整体重定）已写入 ROADMAP 计划第 1 项，可用
+  `python _test/vendor_freshness_check.py --check-upstream --strict` 机器复现
+
+
 ## [1.3.0] - 2026-09-24 — 对标轮第二轮：把"赛后再做"直接落地
 
 ### Added

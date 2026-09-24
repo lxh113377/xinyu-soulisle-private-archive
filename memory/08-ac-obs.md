@@ -35,6 +35,9 @@
 - [x] AC-OBS-10: 情绪记忆真落库（跨浏览器、跨重启不丢） → `j4_memory_check.py` **核心断言**：清空 `localStorage` 后刷新星图仍点亮；`GET /api/memory/stats` 计数正确；重启服务后计数不变 | 数据库查询 + 测试输出
 - [x] AC-OBS-11: 密钥零落前端、零入库 → `public_check.py` 报 `KEY_LEAK: False`；`git grep -E "sk-[A-Za-z0-9]{20,}" HEAD` 0 命中 | 测试输出
 - [x] AC-OBS-12: 可选鉴权可开可关且边界正确 → 无 token 时全放行 200；有 token 时 无头 401 / 错头 401 / 对头 200，且 `/api/health` 与静态页**始终放行** | API响应
+- [x] AC-OBS-17: 情绪识别可切后端且降级不伪装（r20）→ `emotion_wiring_check.py` 9 项：W4 实测 `stats.ok≥1` 且气泡标「情绪:后端」；W5 拦掉 `/api/emotion` 即 `isDown()=True`、回复照常、**不出现**后端标注；W6 同句双端词典结论相同 | 测试输出
+- [x] AC-OBS-18: 危机拦截不因后端化而延迟（r20）→ W3 源码级判据（`lex.crisis` 分支先于 `fetchEmotion(text)`）+ W3b 实测 `crisisShortCircuit≥1 且 attempted=0`（后端一次都没被调） | 测试输出 + API响应
+- [x] AC-OBS-19: 首屏第三方库可溯源（r20）→ `vendor-manifest.json` 声明版本/sha256，`vendor_freshness_check.py` V1 完整性 V2 从文件内容解析版本对账（正则零命中即红）V3 新库漏登记即红；`--selftest` 4 类篡改全抓到 | 测试输出
 - [x] AC-OBS-13: 情绪引擎两端（JS/Java）**不静默分叉** → `engine_consistency_check.py` 三层判据全等（词表结构含重复项与顺序 / 逐条预测 / 汇总指标）；**判据非恒真已证**：`--selftest` 注入分叉报错 + 端到端改真词表 → FAIL 并精确指出差异 | 测试输出
 - [x] AC-OBS-14: 远端记忆不可用时**熔断且不制造噪音** → `j4_remote_down_check.py`：无 `/api/memory` 时请求数上界 = 页面加载次数（3 句对话仅 2 请求）、本地存储照常写入、`isRemote()` 熔断后为 False | 测试输出
 - [x] **AC-OBS-15（2026-09-23）**：fat jar **可脱离项目根独立部署** → 从系统临时目录启动 `deploy/jar/start.ps1 -Port 8125 -WebRoot <仓库外静态副本>`，`/api/health` = `UP` + `indexFound/vendorFound=true`，`/`、`/js/*`、`/vendor/*`、`/css/*` 全 200，公网版 `js/demo-config.js` `KEY_LEAK=False` | 启动日志 + HTTP 实测
@@ -59,6 +62,13 @@
 ---
 
 ## 已识别的判据误报（保留记录，不修改数据）
+
+- ⚠️ **AC 编号碰撞（既有，2026-09-25 r20 实测发现，未改写历史条目）**：`AC-OBS-13`/`AC-OBS-14`/`AC-OBS-15`
+  在本文件里**各出现两次**（「后端服务」节 与 「对标轮第二轮」节各自取了同一号），
+  根因 = 两轮各自追加时只看了自己那节的尾部编号、没全文件对账。
+  处置：r20 新增项**改用 17/18/19 避让**（不改他人已交付条目，避免 07/报告里对 `AC-OBS-13` 的引用失效）；
+  **待办**：若日后统一重排，须同步改 `memory/07-next-steps*`、`交付物/` 里对旧编号的引用，并留更正注。
+  教训固化：**取号必须全文件 grep 对账，不能只看本节尾部**。
 
 - ⚠️ `handoff.py review` 的「交叉一致性」会对 05 已完成项与 07 P0 未勾选项做**关键词重叠**匹配。
   2026-09-22 实测报出 5 条「05 已完成 X ↔ 07 P0 未勾选 J3/J4 变现」—— 核对后确认**全部为误报**

@@ -9,10 +9,11 @@
       "upstream_repo": "mrdoob/three.js",
       "upstream_kind": "release",
       "detect": "\\be=\"(\\d{3})\"",
-      "status": "stale",
-      "note": "2021 版本；上游已 r186（2026-09-24）。跨 58 个大版本，升级属破坏性改动（色彩管理/编码器/着色器 API 断代），明令排到 09-30 复赛节点后，见 ROADMAP。",
+      "status": "stale-deferred",
+      "note": "2021 版本；上游已 r186（2026-09-24 实测）。跨 58 个大版本，升级属破坏性改动（r152 起默认色彩管理改写、Geometry 移除、自定义 ShaderMaterial uniform 约定变更，且星雾双色像素级标定需整体重定）⇒ 明令排到 iCAN 截止后，见 ROADMAP 计划第 1 项。",
       "sha256": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2",
-      "size": 603445
+      "size": 603445,
+      "upstream_seen": "r186 (2026-09-24)"
     },
     {
       "file": "src/vendor/gsap.min.js",
@@ -21,10 +22,11 @@
       "upstream_repo": "greensock/GSAP",
       "upstream_kind": "tag",
       "detect": "\\* GSAP ([0-9.]+)",
-      "status": "stale",
-      "note": "上游 releases/latest 返回 404（该仓不发 release，只有 tag），故 upstream_kind=tag。",
+      "status": "current",
+      "note": "2026-09-25 r20 由 3.12.5 升到 3.15.0（成对升级，升级后 browser/lightshow/pixel 三套件全绿）。上游 releases/latest 返回 404（该仓不发 release，只有 tag），故 upstream_kind=tag。",
       "sha256": "92bb9a96476f983d212a2bc4f54c889039c1696dd4461d40a736860938570fbb",
-      "size": 72927
+      "size": 72927,
+      "upstream_seen": "3.15.0 (tag, 2026-09-25 实测)"
     },
     {
       "file": "src/vendor/ScrollTrigger.min.js",
@@ -33,10 +35,11 @@
       "upstream_repo": "greensock/GSAP",
       "upstream_kind": "tag",
       "detect": "\\* ScrollTrigger ([0-9.]+)",
-      "status": "stale",
-      "note": "必须与 gsap.min.js 同版本（同一次发布产物），替换时两个文件一起换。",
+      "status": "current",
+      "note": "2026-09-25 r20 由 3.12.5 升到 3.15.0；必须与 gsap.min.js 同版本（同一次发布产物），替换时两个文件一起换。",
       "sha256": "b0b14d67b55b0c43c756ac0b106cfcb09d0879945f6ead64451065b0672916a2",
-      "size": 44575
+      "size": 44575,
+      "upstream_seen": "3.15.0 (tag, 2026-09-25 实测)"
     }
   ]
 }

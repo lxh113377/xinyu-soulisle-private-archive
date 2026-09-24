@@ -32,6 +32,7 @@
 | 3D 情绪星雾 | Three.js 粒子星云，滚动驱动镜头；检测到的情绪会点亮对应颜色的星（主色 n 颗 + 次色 n/2 颗） |
 | 五幕滚动叙事 | GSAP + ScrollTrigger 驱动的叙事页：相遇 → 情绪探针 → AI 对话 → 情绪曲线 → 陪伴 |
 | 双路情绪识别 | **词典快判**（本地，零延迟）+ **LLM 精判**，两路一致采信 LLM、分歧亦采信 LLM、LLM 失败回落词典；判定路径在界面上明示 |
+| **情绪识别后端化（可选）** | `cfg.emotionRemote === true` 时改由服务端 `/api/emotion`（Java 版词典+LLM 双路，与本地 JS 引擎逐条全等）给出分类 ⇒ **消除 JS/Java 两份真相**；404／超时／响应不合法即**熔断回落本地引擎**，**危机词永远先走本地短路、绝不为网络等待**，界面如实标注「情绪:后端」绝不伪装。公网版刻意不开（Pages Function 无此接口） |
 | 危机优先拦截 | 危机词命中即最高优先级，**不调用 LLM**，直接返回求助热线转介（实测危机召回 6/6） |
 | 情绪曲线 | Canvas 2D 绘制历次情绪强度变化 |
 | 对话与记忆 | 在线 LLM 生成共情回复；本机 `localStorage` 持久化，服务端持久化可选开启（`cfg.remote`） |
@@ -168,19 +169,29 @@ CloudBase 注意事项（实测得来）：
 ## ✅ 验证
 
 ```powershell
+python _test/run_all_suites.py           # ★ 全量电池（24 套件逐条直取 rc，聚合不掩盖单项失败）
 python _test/browser_check.py            # 离线降级 / 双色 / 滚动淡入淡出，输出 ALL-ASSERT-PASS
 python _test/deploy_sync_check.py        # src → deploy/xinyu 三类比对（MISSING/DIFF/EXTRA 归零）
 python _test/engine_consistency_check.py # JS 引擎 ↔ Java 引擎逐项对账（词表结构级）
+python _test/emotion_wiring_check.py     # 情绪后端化接线：接线顺序/公网零开关/危机短路/熔断回落/双端一致（9 项 + --selftest）
 python _test/strategy_check.py           # 共情策略表 ↔ 词表成对性（--selftest 注入分叉证判据非恒真）
 node _test/emotion_eval.js               # 前端情绪评测集复跑
 python _test/stream_contract.py          # A 非流式契约不破 / B SSE 含内容帧≥2 / C 前端逐字且回落不冒充
 python _test/ux_guards_check.py          # TTS 朗读 / 对话窗口化 / 响应式与粒子降档（逐项 21 判据）
+python _test/size_budget_check.py        # 首屏体积预算 + 「新文件必须登记」覆盖判据（漏登记即红）
+python _test/vendor_freshness_check.py   # vendor 完整性哈希 + 版本对账；--check-upstream 报上游漂移
+python _test/benchmark_metrics.py        # 对标源数据台账（14 仓指标 + 与上次快照逐字段漂移）；联网采集，人工轮次跑
+python _test/live_sync_check.py          # 线上 `/` 与 deploy/xinyu 逐字节比对（部署未跟进即红）
 ```
 
-GitHub Actions 三条门禁（`.github/workflows/ci.yml`）：同步守卫+评测+策略表+密钥扫描、Java 构建+**词表一致性红线**（此前只写在 `memory/AGENTS.md` 靠人记，现已机器化）、浏览器回归（runner 无 GPU，强制 SwiftShader）。
-三条 job **均在 GitHub 真跑验证**；浏览器 job 首轮就抓到本机看不到的真实缺陷：`src/js/demo-config.js` 被 gitignore，全新 clone 下 `<script>` 静态引它 → 首屏 3 个 404 打破「console 0 报错」。修法＝CI 自动用公网零密钥 stub 补占位（本地按 `CONTRIBUTING.md` 第一步手工补一次）。
+> 前置：多数判据需 fat jar 起在 8123（`java -jar server/target/soulisle-server.jar --server.port=8123`，
+> 工作目录 = 项目根，`DEEPSEEK_KEY` 走进程环境）。⚠️ 改 `src/` 后**必须重启 jar** 再验（进程内静态资源有缓存）。
 
-最近实测（2026-09-24 对标轮）：`browser_check` ALL-ASSERT-PASS；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`stream_contract` A/B/C 全 PASS（SSE 32 帧 / 30 含内容帧 / 拼回 51 字）；`ux_guards_check` 21/21；`deploy_sync_check` 三类归零。
+GitHub Actions 四条门禁（`.github/workflows/ci.yml`）：同步守卫+评测+策略表+体积+**vendor 供给链**+密钥扫描、Java 构建+**词表一致性红线**（此前只写在 `memory/AGENTS.md` 靠人记，现已机器化）、浏览器回归（runner 无 GPU，强制 SwiftShader）、公网新鲜度。
+四条 job **均在 GitHub 真跑验证**；浏览器 job 首轮就抓到本机看不到的真实缺陷：`src/js/demo-config.js` 被 gitignore，全新 clone 下 `<script>` 静态引它 → 首屏 3 个 404 打破「console 0 报错」。修法＝CI 自动用公网零密钥 stub 补占位（本地按 `CONTRIBUTING.md` 第一步手工补一次）。
+
+最近实测（2026-09-25 对标轮 r20）：全量电池 **24 套件 rc 全 0**；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`emotion_wiring_check` 9/9（后端路径实测生效 + 不可达即熔断不伪装 + 危机未经后端）；gsap 3.15.0 升级后 `browser_check`/`lightshow`/`pixel_dual` 全绿；首屏关键路径 819,767 B（预算 858,752 B 内）；公网已重新部署并 `LIVE-SYNC-PASS`。
+
 
 ---
 

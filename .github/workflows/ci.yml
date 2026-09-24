@@ -23,6 +23,12 @@ jobs:
         run: |
           python _test/size_budget_check.py
           python _test/size_budget_check.py --selftest
+      - name: vendor 供给链守卫（完整性哈希 + 版本声明对账 + 漏登记即红，含 --selftest）
+        run: |
+          python _test/vendor_freshness_check.py
+          python _test/vendor_freshness_check.py --selftest
+      - name: 对标源数据台账自证（漂移判据非恒真；联网采集属人工轮次动作，不在 CI 里跑）
+        run: python _test/benchmark_metrics.py --selftest
       - name: 情绪评测集门禁（accuracy ≥ 95% 且危机全召回）
         run: |
           node _test/emotion_eval.js > /tmp/eval.json
