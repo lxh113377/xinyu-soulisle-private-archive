@@ -18,13 +18,6 @@
 > ⚠️ 本卷为**索引壳**（R199 自动拆卷后）。以下为**当前可执行摘要**（满足致命纪律 #1：主卷 P0 不得为空）；
 > 完整描述在分卷里（见文末「分卷目录」，主要落在 `07-next-steps.part6.md`）。
 
-- [x] **对标轮 r22（2026-09-25 第三轮）已落地**：本轮 16 参照仓指标**零漂移** ⇒ 差距全部来自复审自己上一轮的交付物，
-      抓到两处真缺陷并修：① 契约探测原先 `done >= 8` 而真实操作 11 条（阈值低于总量即掩盖），现 C6 精确对账
-      `探测+豁免==操作数` + C6b 零豁免，`docs/openapi.yaml` 补齐 3 条 `x-live-check`（探测 8 → 11 全覆盖）；
-      ② 新增 `_test/repo_config_check.py`（G1 dependabot schema/目录可达、G2 CI job 数==README 声称、
-      G3 契约被索引引用、G4 电池条目数==README 声称、G5 `--online` 默认分支受理面）——**上线当场抓到真实脱节**：
-      加 2 条套件后 README 仍写 26，G4 报「实测 28、声称 26」，改文档转绿（红→绿即判别力证明）。
-      电池 26 → **28** 套件；G5 实测 dependabot 在默认分支可见。
 - [ ] **下一件（不依赖外部信号）**：`src/js/app.js` 469 行按 voice/chart/window/编排 纯切分
       （行为面已被 `browser_check` + `ux_guards` + `emotion_wiring` 覆盖；**切分后 README/文档的套件数不用改**，
       但 `size_budget` 表必须同步登记新文件，否则 G4/coverage 判据会拦）。
@@ -52,3 +45,5 @@
 - **卷10** `07-next-steps.part10.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷11** `07-next-steps.part11.md` — J3/J4 变现第 3 件：fat jar / 容器部署完整史（R199 人工拆卷自 part6）
 - **卷12** `07-next-steps.part12.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷13** `07-next-steps.part13.md` — 07-next-steps 分卷（R199 自动拆卷）
+

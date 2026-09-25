@@ -11,3 +11,9 @@
 - [x] [BUG] `handoff.py sync` 02 树混入 `.codebuddy/`/`.wrangler/`——`EXCLUDE_DIRS` 硬编码不读 `.gitignore` — 影响 02 自动块 | 状态：已修复（V3.44.0 sync 时并入 `.gitignore` 目录条目）
 
 - [x] [BUG] `handoff.py review` 交叉一致性误报——「任意 ≥1 词交集即报」，陪聊 3 条误报的 07 项均内嵌 ✅ 子项且交集仅 `js` 巧合 — 影响 review 判分 | 状态：已修复（V3.44.0 复合未完成项跳过 + 过滤标签/扩展名 token；实测误报归零 9/9）
+
+- [x] [DEBT] **文档里的数字断言（"26 套件"/"四条门禁"）无机器责任** → 已闭环（r22）：
+      `_test/repo_config_check.py` G2/G4 把 README 声称值与 `ci.yml` job 数、`run_all_suites.py` SUITES 条目数做等值对账，
+      不等即红并入电池。上线当轮就抓到一次脱节（加 2 条套件后 README 仍旧）。
+      ⚠️ 已知残留：`AGENTS.md` 的 04/05 段仍是自动 sync 生成的陈旧描述（该项目结构使 sync 部分失效，见 08 的判据误报段），
+      **不在本判据覆盖面内**，改 AGENTS.md 需手工维护。
