@@ -43,6 +43,10 @@ SUITES = [
     ("emotion_eval_js", ["node", "_test/emotion_eval.js"]),
 ]
 
+# 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），
+# CI runner 上没有密钥 ⇒ 只能显式豁免，且豁免必须被 G10 复核（见 repo_config_check.py）
+LLM_SUITES = {"j2_chat_contract", "stream_contract"}
+
 # r22 加：`--only <子串>` / `--slice <起> <止>` 分段取数。
 # ⚠️ 本版第一稿是**死代码**（先滤掉 "--" 开头的参数再判 args[0] == "--slice"，永不命中），
 #    跑 "--slice 0 14" 却把 28 条全跑了个遍 —— "配了开关但开关没生效"正是本轮 repo_config 判据要防的那类事，
@@ -53,6 +57,16 @@ def main():
     if "--list" in argv:
         print("SUITES:", len(SUITES))
         return 0
+    if "--exclude-llm" in argv:
+        # CI runner 没有真实上游密钥（密钥不落仓，见 CONTRIBUTING），这两条必须走在线链路才能判绿。
+        # 关键约束：**踢掉谁必须点名 + 恒等式**，否则"CI 全绿"会被读成"33 条都跑过了"（同行踩过：装了等于没装）。
+        drop = [s for s in SUITES if s[0] in LLM_SUITES]
+        SUITES = [s for s in SUITES if s[0] not in LLM_SUITES]
+        print(f"(--exclude-llm → 实跑 {len(SUITES)} + 豁免 {len(drop)} == 总数 {len(SUITES) + len(drop)}；"
+              f"豁免={[s[0] for s in drop]}，原因=runner 无上游密钥)")
+        if not drop:
+            print("BATTERY-FAIL: --exclude-llm 却零豁免 ⇒ 豁免名单与实际套件漂移，判据失效")
+            return 1
     if "--only" in argv:
         key = argv[argv.index("--only") + 1]
         SUITES = [s for s in SUITES if key in s[0]]

@@ -16,13 +16,18 @@
   G5（--online）远端受理面：默认分支上 `.github/dependabot.yml` 确实存在（GitHub 只看默认分支）
   G6 第三方授权：`src/vendor/*.js` 每一个文件都必须在 `docs/THIRD-PARTY-NOTICES.md` 里被点名
   G7 README 必须含指向该授权清单的口径行（否则读者只会看到"MIT"，而 GSAP 其实不是 MIT）
-  G8 --selftest：十一类合成篡改（ecosystem 拼错 / 目录不存在 / interval 非法 / updates 清空 /
-     抹 gsap 登记 / 抹 README 引用 / 抹评测集行 / 评测条数改小 / 删整节 / 表退回模板原句 /
-     无 __main__ 守卫）
+  G8 --selftest：合成篡改类**逐轮累积**（条数以 --selftest 实际输出为准，正文不抄数字——
+     抄过两次都脱节）：ecosystem 拼错 / 目录不存在 / interval 非法 / updates 清空 / 抹 gsap 登记 /
+     抹 README 引用 / 抹评测集行 / 评测条数改小 / 删整节 / 表退回模板原句 / 无 __main__ 守卫 /
+     CI 只跑单条判据 / CI 不声明豁免 / 幽灵豁免
      必须各自报红，原样必须零问题 —— 证判据非恒真
   G9 判据脚本 import-safe：`_test/*.py` 的顶层入口调用（sys.exit(main()) 等）必须落在
      `if __name__ == "__main__":` 守卫之后 —— 判据脚本会被互相 import（--only 自查 / 聚合 runner 对账 /
      CI 复用），无守卫 = "一 import 就跑全套或跑网络，且退出码 0"（r26 实测第五次同族坑）
+  G10 判据必须挂在**真会走的路径**上：CI 步骤里要整跑电池（run_all_suites.py）且声明 --exclude-llm 豁免，
+     豁免项必须是真实存在的套件（幽灵豁免=恒真风险）。根因两条：① 本项目 CI 长期只跑 browser_check 一条，
+     r26-r28 新加的 patch_apply / settings_panel / offline_shell 全在发布路径之外（本地绿≠有人管）；
+     ② 同行实证 CodeQL 30 次全 success 但 refs/heads/main 分析数为 0——有运行记录不等于覆盖主路径。
 
 退出码：0=REPO-CONFIG-PASS 1=任一判据失败 2=环境异常（缺 PyYAML / --online 但 gh 不可用）
 """
@@ -215,6 +220,32 @@ def import_safety(text):
     return bad
 
 
+def ci_battery_audit(ci_text, suites_text):
+    """G10 纯函数：判据必须挂在**真会走的路径**上，且豁免分母可自证。
+
+    r28 加，根因有两处一手实证：① 本项目 CI 的 browser-regression job 长期只跑 `browser_check` 一条，
+    r26-r28 新加的 patch_apply / settings_panel / offline_shell 全都不在发布路径上（本地绿≠线上有人管）；
+    ② 同行事故形态更狠：CodeQL 30 次全 success，但 `refs/heads/main` 分析数为 0 —— 有运行记录不等于覆盖主路径。
+    本判据不检查"跑没跑绿"，检查的是"该跑的东西在不在路径上 + 豁免是不是真豁免"。
+    """
+    bad = []
+    if "run_all_suites.py" not in ci_text:
+        bad.append("CI 里没有整跑电池的步骤 ⇒ 新增判据只在本地生效（装了不等于在用）")
+    elif "--exclude-llm" not in ci_text:
+        bad.append("CI 跑电池却未声明无密钥豁免 ⇒ 要么 runner 必红，要么有人偷偷删套件")
+    names = re.findall(r'^\s+\("([a-z0-9_]+)",', suites_text, re.M)
+    if not names:
+        bad.append("解析不到 SUITES 名单 ⇒ G10 在读空气")
+    m = re.search(r"LLM_SUITES = \{([^}]*)\}", suites_text, re.S)
+    exempt = re.findall(r"\"([^\"]+)\"", m.group(1)) if m else []
+    if not exempt:
+        bad.append("缺 LLM_SUITES 声明 ⇒ --exclude-llm 无豁免可算，CI 覆盖分母不可证")
+    ghost = [e for e in exempt if e not in names]
+    if ghost:
+        bad.append(f"豁免项不在实跑清单内（幽灵豁免，恒真风险）：{ghost}")
+    return bad, len(names), exempt
+
+
 def selftest():
     bad = []
     cfg = load_yaml(".github/dependabot.yml")
@@ -265,11 +296,35 @@ def selftest():
         bad.append("篡改⑪b（有守卫的脚本）被判失败 ⇒ G9 恒假，判据只会刷红")
     if import_safety("import sys\ndef main():\n    if len(sys.argv) > 9:\n        sys.exit(2)\n    return 0\nif __name__ == '__main__':\n    sys.exit(main())\n"):
         bad.append("篡改⑪c（函数体内缩进的 sys.exit 被判违规）⇒ G9 没分清顶层与函数内")
+    # 篡改⑫：CI 覆盖面的正反两侧（缺电池步骤 / 幽灵豁免 必须报红；原样必须零违规）
+    st = (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace")
+    ci0 = (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace")
+    g0, n_all, ex0 = ci_battery_audit(ci0, st)
+    if g0:
+        bad.append(f"原样 CI 覆盖被判失败：{g0}")
+    if ci_battery_audit(ci0.replace("run_all_suites.py --exclude-llm", "browser_check.py"), st)[0] == []:
+        bad.append("篡改⑫a（CI 退回只跑单条判据）未被 G10 抓到 ⇒ G10 恒真")
+    if ci_battery_audit(ci0.replace(" --exclude-llm", ""), st)[0] == []:
+        bad.append("篡改⑫b（CI 跑电池但不声明豁免）未被 G10 抓到")
+    # 变异必须**只动豁免集合**：上一版用裸 replace('"stream_contract"', ...) 把 SUITES 里的同名条目
+    # 一起改了，于是"幽灵"自己变得合法 —— 反例造得不干净，等于没造（r28 实测这条报"未被抓到"）。
+    ghost_src = st.replace('LLM_SUITES = {"j2_chat_contract", "stream_contract"}',
+                           'LLM_SUITES = {"j2_chat_contract", "no_such_suite"}')
+    if ghost_src == st:
+        bad.append("篡改⑫c 的锚点没命中 ⇒ 变异未生效（这种「没变却以为变了」必须单独抓）")
+    elif ci_battery_audit(ci0, ghost_src)[0] == []:
+        bad.append("篡改⑫c（幽灵豁免：豁免了一个不存在的套件）未被 G10 抓到")
+    if ci_battery_audit(ci0.replace("run_all_suites.py --exclude-llm", "run_all_suites.py --exclude-llm --exclude-llm"), st)[0]:
+        bad.append("篡改⑫d 对照失效：重复 flag 不应触发任何违规（判据过敏）")
     real = sorted((ROOT / "_test").glob("*.py"))
     viol = [p.name for p in real if import_safety(p.read_text("utf-8", errors="replace"))]
     if viol:
         bad.append(f"篡改⑪d（真实判据脚本 {len(real)} 个里有 {len(viol)} 个 import 即执行：{viol}）")
-    print("SELFTEST-PASS: 十一类合成篡改全部被抓到、原样零问题" if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
+    # 反例条数**从代码里算**，不手抄：上一版写"十一类"、这一版写"十五类"，两次都与实际断言数脱节
+    # ——这正是本项目反复登记的"文档手抄数字"同一族，判据自己也不能例外。
+    n_mut = Path(__file__).read_text("utf-8").count('bad.append("篡改')
+    print(f"SELFTEST-PASS: {n_mut} 条合成篡改断言全部被抓到、原样零问题（CI 实跑 {n_all} 套件 / 豁免 {len(ex0)}）"
+          if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
     return 1 if bad else 0
 
 
@@ -333,6 +388,14 @@ def main():
     ebad = eval_scope(seg, dfiles, eval_counts(seg))
     check("G8 评测集来源已登记且声称条数==实际条数（R196 红线机器化）", not ebad, " ; ".join(ebad)
           + f" | 裁决用数据 {dfiles} | 登记表抽到条数 {eval_counts(seg)}")
+
+    gbad, n_all, ex0 = ci_battery_audit(
+        (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace")
+        if (ROOT / ".github" / "workflows" / "ci.yml").exists() else "",
+        (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace"))
+    check("G10 判据挂在真会走的路径上（CI 跑电池 + 豁免可自证）", not gbad,
+          f"CI 整跑电池，实跑 {n_all - len(ex0)} + 豁免 {len(ex0)} == {n_all} 套件（豁免={sorted(ex0)}，原因=runner 无上游密钥）"
+          + (" ; " + " ; ".join(gbad) if gbad else ""))
 
     scripts = sorted((ROOT / "_test").glob("*.py"))
     iviol = [f"{p.name} → {import_safety(p.read_text('utf-8', errors='replace'))[0]}"
