@@ -53,8 +53,19 @@
 
 ## 评测集隔离（R196）
 <!-- 标注测试专用文件，禁止把训练数据写入测试集；新增评测数据先登记 provenance -->
-- 测试专用文件清单：（如 eval/testset_provenance.json / blindset / frozen）
+- 测试专用文件清单（r23 填实，此前长期是 init 模板占位符 ⇒ 判据 `repo_config_check.py` G8 现在会盯这张表）：
+  | 文件 | 条数 | 用途（谁在裁决时读它） | 来源 / provenance | 冻结状态 |
+  |---|---|---|---|---|
+  | `_test/emotion-eval-dataset.json` | **73 条** | `node _test/emotion_eval.js`（JS 侧）、`GET /api/emotion/eval`（Java 侧直读，决策 #5 不复制进 jar）、`engine_consistency_check.py` 双端逐条对账 | 团队自建：按 7 类情绪（joy/sadness/anger/fear/calm/love/crisis）人工撰写，**不来自任何模型输出或线上对话日志**；2026-09-23 由 36 条扩至 73 条（扩充部分同样人工写，含 6 条危机样本） | 结构冻结：新增只允许"人工写 + 双端复跑全绿"，禁止用 LLM 批量生成 |
+  | `_test/vendor-manifest.json` | 3 条 | `vendor_freshness_check.py` 的完整性/版本对账声明源 | 本项目自维护（r21 建），非评测数据，列此仅为明确它**不属于**裁决用评测集 | 随 vendor 变更同步（`--refresh` 后人工核对 diff） |
 - 红线：训练/生产数据禁止写入测试专用文件；新增评测数据先登记来源（provenance）
+  - **为什么本项目特别要盯这条**：情绪评测集的准确率会被写进《应用方案》PDF 与答辩材料（当前 98.6% / 危机 6-6），
+    一旦把"模型自己生成的样本"或"用户真实对话"混进测试集，这个数字就从"可复现的能力度量"退化成"自证循环"，
+    而且双端对账（JS ↔ Java）会同时被污染 —— 两边都错也照样"全等"。
+  - 真实对话落库走的是**另一张表**（`chat_message` / `emotion_record`，服务端持久化），与本清单物理分离，
+    禁止把库里的用户文本直接回填评测集（既是污染，也是 PII 风险，见 iCAN 待办「③ PII 挂账」同源问题）。
+- 机器责任：`python _test/repo_config_check.py` 的 **G8** 断言 ①本章节非占位符 ②清单里的文件真实存在
+  ③`声称条数 == 文件实际 items 数`（改条数不改这里即红）。`--selftest` 用三类反例自证（抹登记行 / 改小条数 / 删章节）
 
 ## 分卷目录
 - **卷1** `06-constraints.part1.md` — 已完成条目归档（R224 主壳自愈）

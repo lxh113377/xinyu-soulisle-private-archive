@@ -19,6 +19,17 @@
   G4 电池条目数 == README 声称的套件数 G5（`--online`）GitHub 默认分支上 dependabot 文件可见
 - 两条判据入全量电池（26 → **28** 套件）与 CI
 
+### Added（r23 追加：R196 强制项从未落地）
+- **评测集来源登记判据 G8**：实测 `memory/06-constraints.md` 的「测试专用文件清单」至今是 **init 模板占位符**
+  （`（如 eval/testset_provenance.json / blindset / frozen）`）⇒ R196「新增评测数据先登记 provenance」这条红线**从未真正落地**，
+  而评测集 accuracy（73 条 / 98.6%）是要写进《应用方案》与答辩材料的数字。
+  - 06 该节填实为登记表：文件 / 条数 / 谁在裁决时读它 / provenance（人工撰写、**不用模型生成样本**）/ 冻结状态，
+    并写明"真实对话走 `chat_message` 表、与评测集物理分离，禁止回流刷分"（同源 PII 风险）
+  - 判据化 `repo_config_check.py` **G8**：① 不得残留模板原句（锚定 `清单：（如 `，不用泛指括号示例 —— 第一版因此把已填实的表判成假红）
+    ② 登记的文件必须真实存在（R240）③ **声称条数 == JSON 实际 items 数**（改数据不改台账即红）
+    ④ 只对裁决用数据核条数，不对配置声明件核（第一版把 `vendor-manifest.json` 的"3 条"当成 3 个样本 ⇒ 分母混用假红）
+  - `--selftest` 扩到 **十类**合成篡改全抓（新增：抹评测集行 / 条数改小 / 删整节 / 表退回模板原句）
+
 ### Fixed（授权口径 —— 自审第三条发现）
 - **整仓标 MIT 是不准确的声明**：`LICENSE` + README 中英双语均挂 MIT，但 `src/vendor/gsap.min.js`、
   `ScrollTrigger.min.js` 文件头自证为 **GreenSock Standard License**（非 MIT、非 OSI），只有 `three.min.js` 是 MIT。

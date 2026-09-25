@@ -16,7 +16,8 @@
   G5（--online）远端受理面：默认分支上 `.github/dependabot.yml` 确实存在（GitHub 只看默认分支）
   G6 第三方授权：`src/vendor/*.js` 每一个文件都必须在 `docs/THIRD-PARTY-NOTICES.md` 里被点名
   G7 README 必须含指向该授权清单的口径行（否则读者只会看到"MIT"，而 GSAP 其实不是 MIT）
-  G8 --selftest：六类合成篡改（ecosystem 拼错 / 目录不存在 / interval 非法 / README 数字造假 / 删引用）
+  G8 --selftest：十类合成篡改（ecosystem 拼错 / 目录不存在 / interval 非法 / updates 清空 /
+     抹 gsap 登记 / 抹 README 引用 / 抹评测集行 / 评测条数改小 / 删整节 / 表退回模板原句）
      必须各自报红，原样必须零问题 —— 证判据非恒真
 
 退出码：0=REPO-CONFIG-PASS 1=任一判据失败 2=环境异常（缺 PyYAML / --online 但 gh 不可用）
@@ -120,6 +121,76 @@ def license_scope(notices_txt, readme_txt, vendor_files):
     return bad
 
 
+EVAL_KEYS = ("eval", "dataset", "provenance", "blindset", "frozen")
+CONSTR = "memory/06-constraints.md"
+# 只承担"裁决数据"角色的文件才要求登记；vendor 台账是配置声明件，不属评测集（分母不同）
+MANAGED_DATA = ("emotion-eval-dataset.json",)
+
+
+def eval_data_files():
+    """磁盘上承担裁决作用的数据文件（按文件名关键词），另并入显式白名单防漏。"""
+    out = set(MANAGED_DATA)
+    for p in sorted((ROOT / "_test").glob("*.json")):
+        if any(k in p.name.lower() for k in EVAL_KEYS):
+            out.add(p.name)
+    return sorted(out)
+
+
+def eval_section(text):
+    i = text.find("评测集隔离")
+    if i < 0:
+        return ""
+    rest = text[i:].split("\n## ")[0].split("\n---\n")[0]
+    return rest
+
+
+def eval_scope(seg, files, counts):
+    """G8 纯函数：评测集红线必须真落地。
+
+    ⚠️ 两处口径修正（本轮实测踩到后写死，别再用错分母）：
+    ① 占位符判据**锚定 init 模板原句**（"清单：（如 "），不能泛指"段里出现（如 "就算占位符"
+       —— 登记表的说明行本身合法地含中文括号示例，第一版因此把已填实的表判成红（假红同样是缺陷）。
+    ② 条数只对**裁决用数据文件**（`files`，按 eval/dataset/provenance/blind/frozen/testset 关键词判定）核，
+       不对手登记的配置件（如 `_test/vendor-manifest.json`，它是 3 个库不是 3 条样本）核 ——
+       第一版对全部登记文件比 `len(items)`，把 vendor 台账判成"实际 0 条、声称 3 条"。
+    """
+    bad = []
+    if not seg.strip():
+        return ["06 缺「评测集隔离」章节（R196 init 必填项）"]
+    if "清单：（如 " in seg or "清单: (如 " in seg:
+        bad.append("清单仍是 init 模板占位符（未填实际文件）⇒ 这条红线等于没落地")
+    for f in files:
+        if f not in seg:
+            bad.append(f"承担裁决作用的 {f} 未在 06 登记来源（provenance）")
+    for f, declared in (counts or {}).items():
+        if f not in files:
+            continue                      # 配置声明件只要求"存在"，不按样本条数核
+        p = ROOT / "_test" / f
+        if not p.exists():
+            bad.append(f"06 登记的 {f} 磁盘上不存在（文档写了≠磁盘有，R240）")
+            continue
+        try:
+            d = json.loads(p.read_text("utf-8"))
+        except Exception as e:
+            bad.append(f"{f} 不可解析：{e}")
+            continue
+        items = d if isinstance(d, list) else (d.get("items") or d.get("cases") or d.get("data") or [])
+        if declared != len(items):
+            bad.append(f"{f} 实际 {len(items)} 条，06 声称 {declared} 条")
+    return bad
+
+
+def eval_counts(seg):
+    """从登记段落抽「文件名 … N 条」配对（同一行内）。"""
+    out = {}
+    for line in seg.splitlines():
+        name = re.search(r"([A-Za-z0-9_.-]+\.json)", line)
+        num = re.search(r"(\d+)\s*条", line)
+        if name and num:
+            out[name.group(1)] = int(num.group(1))
+    return out
+
+
 def selftest():
     bad = []
     cfg = load_yaml(".github/dependabot.yml")
@@ -148,7 +219,21 @@ def selftest():
         bad.append("篡改⑤（授权清单里抹掉 gsap.min.js）未被抓到 ⇒ G6 恒真")
     if not license_scope(nt, rt.replace("THIRD-PARTY-NOTICES", "zzz"), vf):
         bad.append("篡改⑥（README 去掉指向授权清单的口径行）未被抓到 ⇒ G7 恒真")
-    print("SELFTEST-PASS: 六类合成篡改全部被抓到、原样零问题" if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
+    ct = (ROOT / "memory" / "06-constraints.md").read_text("utf-8")
+    seg0, files0 = eval_section(ct), eval_data_files()
+    if eval_scope(seg0, files0, eval_counts(seg0)):
+        bad.append(f"原样评测集登记被判失败：{eval_scope(seg0, files0, eval_counts(seg0))}")
+    if not eval_scope(seg0.replace("emotion-eval-dataset.json", "zzz.json"), files0, eval_counts(seg0)):
+        bad.append("篡改⑦（抹掉评测集登记行）未被抓到 ⇒ G8 恒真")
+    shrunk = seg0.replace("**73 条**", "**9 条**")
+    if not eval_scope(shrunk, files0, eval_counts(shrunk)):
+        bad.append("篡改⑧（把声称条数改小）未被抓到 ⇒ G8 条数判据恒真")
+    if not eval_scope(eval_section(ct.replace("评测集隔离", "zzz节")), files0, eval_counts(seg0)):
+        bad.append("篡改⑨（删掉整节标题）未被抓到 ⇒ G8 恒真")
+    back = seg0.replace("- 测试专用文件清单（r23", "- 测试专用文件清单：（如 eval/x.json / blindset / frozen）\n  - 备注（r23")
+    if not eval_scope(back, files0, eval_counts(back)):
+        bad.append("篡改⑩（表退回 init 模板原句）未被抓到 ⇒ 占位符判据恒真")
+    print("SELFTEST-PASS: 十类合成篡改全部被抓到、原样零问题" if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
     return 1 if bad else 0
 
 
@@ -206,6 +291,12 @@ def main():
     vfiles = sorted(x.name for x in (ROOT / "src" / "vendor").glob("*.js"))
     lbad = license_scope(ntxt, (ROOT / "README.md").read_text("utf-8"), vfiles)
     check("G6+G7 第三方授权边界已声明且逐文件登记（GSAP 非 MIT 不可含糊）", not lbad, " ; ".join(lbad))
+
+    ct = (ROOT / "memory" / "06-constraints.md").read_text("utf-8") if (ROOT / "memory" / "06-constraints.md").exists() else ""
+    seg, dfiles = eval_section(ct), eval_data_files()
+    ebad = eval_scope(seg, dfiles, eval_counts(seg))
+    check("G8 评测集来源已登记且声称条数==实际条数（R196 红线机器化）", not ebad, " ; ".join(ebad)
+          + f" | 裁决用数据 {dfiles} | 登记表抽到条数 {eval_counts(seg)}")
 
     fails = [r for r in results if not r[1]]
     print(f"\n合计 {len(results)} 项，失败 {len(fails)} 项")
