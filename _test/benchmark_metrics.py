@@ -228,6 +228,26 @@ def classify_drift(drift):
     return sub, noise
 
 
+def coverage_hits(rows):
+    """能力覆盖率的**分母证明** ⇒ (hits, usable, blind)。
+
+    r27 加：`pwa_offline=0/16` 这种"全零"最容易是探测失效而非真没有，而旧版直接把 16 当分母打印，
+    读的人无法区分"对手都没有离线 SW"与"我没数到"。实测核查：lobehub `main` 树 20,740 个对象、
+    `truncated=false`、`sw.js|service-worker.js|sw.ts` 零命中 ⇒ 本次全零是真的。
+    规则：**树被截断或取数失败的仓不得计入分母**，并且必须逐条点名（豁免需理由，对齐 C6b 口径）。
+    """
+    usable, blind = [], []
+    for r in rows:
+        if r.get("tree_truncated"):
+            blind.append(f"{r['repo']}(树截断)")
+        elif r.get("tree_error"):
+            blind.append(f"{r['repo']}(树取数失败)")
+        else:
+            usable.append(r)
+    hits = {c: sum(1 for r in usable if c in (r.get("caps") or [])) for c in CAP_RULES}
+    return hits, usable, blind
+
+
 def selftest():
     """合成两份快照：动 stars / pushed_at / **caps / docs**（r21 新增两键），断言 diff 恰好抓到。"""
     base = [{"repo": "lobehub/lobehub", "stars": 100, "pushed_at": "2026-09-01",
@@ -262,8 +282,23 @@ def selftest():
     if s2 or len(n2) != 1:
         print(f"SELFTEST-FAIL: 纯 ★ 抖动被误判为实质（分类器恒真）：sub={s2}")
         return 1
-    print(f"SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（{len(got)} 条）"
-          f"；分档正确（实质 {len(sub)} / 抖动 {len(noise)}）且纯抖动场景零实质")
+    # 分母证明（r27）：截断/取数失败的仓必须出局并点名，否则"全零"无法区分真假
+    rows = [{"repo": "a/a", "caps": ["container"], "file_count": 10},
+            {"repo": "b/b", "caps": [], "file_count": 10, "tree_truncated": True},
+            {"repo": "c/c", "caps": [], "file_count": 10, "tree_error": "boom"}]
+    hits, usable, blind = coverage_hits(rows)
+    if len(usable) != 1 or len(blind) != 2 or hits.get("container") != 1:
+        print(f"SELFTEST-FAIL: 分母证明失效（usable={len(usable)} 应为 1，blind={blind} 应点名 b/b 与 c/c）")
+        return 1
+    if not any("树截断" in x for x in blind) or not any("树取数失败" in x for x in blind):
+        print(f"SELFTEST-FAIL: 盲区原因未逐条点名（豁免无原因 = 等于没豁免）：{blind}")
+        return 1
+    if any(x.startswith("a/a") for x in blind):
+        print("SELFTEST-FAIL: 健康仓被误踢出分母 ⇒ 判据过敏")
+        return 1
+    print("SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（"
+          f"{len(got)} 条）；分档正确（实质 {len(sub)} / 抖动 {len(noise)}）且纯抖动场景零实质；"
+          "分母证明正确（1 有效 / 2 盲区点名，健康仓不误踢）")
     return 0
 
 
@@ -323,8 +358,13 @@ def main():
     print(f"  [self] 心屿 src(除vendor)={own['src_loc_excl_vendor']} 行/{own['file_count']} 文件 "
           f"电池套件={own['regression_suites']}(判据脚本文件={own['regression_script_files']}，两口径不同源即登记) CI job={own['ci_workflows']} "
           f"docs={len(own['docs'])}/9 caps={','.join(own['caps']) or '-'}")
-    hit = {c: sum(1 for r in cur if c in r["caps"]) for c in CAP_RULES}
-    print(f"  能力覆盖率({len(cur)} 参照仓): " + " ".join(f"{k}={v}" for k, v in hit.items()))
+    hit, usable, blind = coverage_hits(cur)
+    if len(usable) + len(blind) != len(cur):
+        print(f"BENCHMARK-FAIL: 分母对不上（有效 {len(usable)} + 盲区 {len(blind)} != 总数 {len(cur)}）")
+        return 1
+    print(f"  能力覆盖率(有效分母 {len(usable)}/{len(cur)} 仓): " + " ".join(f"{k}={v}" for k, v in hit.items()))
+    if blind:
+        print(f"  ⚠️ 盲区点名（这些仓的 caps 不计入分母，全零不可解读为「对手没有」）: " + " ; ".join(blind))
     if prev_repos:
         if drift:
             sub, noise = classify_drift(drift)
