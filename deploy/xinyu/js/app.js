@@ -137,93 +137,10 @@
   $("#story").addEventListener("click", (e) => { if (!e.target.closest("#chat-dock")) setDock(false); });
 
   // 5) 对话（刷新后恢复历史，多轮上下文不丢）
-  const log = $("#chat-log");
-  /* 对话窗口化（对标 LobeChat 的 react-virtuoso 思路，零依赖版）：
-   * 长会话（评委连续演示 / 长期自用）会让 #chat-log 的 DOM 单调增长，滚动与重排成本随之上升。
-   * 这里只保留最近 RENDER_MAX 条在 DOM 里，被折叠的最旧若干条缓存在 trimmedBuf，
-   * 点「展开较早」可分批放回 —— 完整历史始终在 ChatAgent.getHistory() 与本机存储里，不受影响。 */
-  const RENDER_MAX = 60, TRIM_BATCH = 20;
-  const trimmedBuf = [];
-  /* 折叠配额：默认 = RENDER_MAX。点「展开较早」时临时抬高（否则刚放回就被同一条上限裁掉，
-   * 展开等于没展开）；用户再发新消息时回落，保证 DOM 上界长期受控。 */
-  let quota = RENDER_MAX;
-  function setTag(el, tag) {
-    let t = el.querySelector(".tag");
-    if (!t) { t = document.createElement("span"); t.className = "tag"; el.appendChild(t); }
-    t.textContent = tag;
-  }
-  function setBody(el, text) {
-    const s = el.querySelector(".msg-text");
-    if (s) s.textContent = text; else el.textContent = text;
-  }
-  function nodeToItem(d) {
-    return { who: d.classList.contains("user") ? "user" : "ai",
-      text: d.querySelector(".msg-text") ? d.querySelector(".msg-text").textContent : d.textContent,
-      tag: d.querySelector(".tag") ? d.querySelector(".tag").textContent : "" };
-  }
-  function foldHint() {
-    let hint = log.querySelector(".log-fold");
-    if (!hint) {
-      hint = document.createElement("div");
-      hint.className = "log-fold";
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "ghost-btn tiny";
-      b.id = "btn-expand-log";
-      b.addEventListener("click", expandLog);
-      hint.appendChild(b);
-      log.insertBefore(hint, log.firstChild);
-    }
-    hint.firstChild.textContent = `↑ 展开较早记录（已折叠 ${trimmedBuf.length} 条）`;
-  }
-  function trimLog() {
-    const nodes = log.querySelectorAll(".msg");
-    if (nodes.length <= quota) return;
-    const over = nodes.length - quota;
-    for (let i = 0; i < over; i++) {
-      trimmedBuf.push(nodeToItem(nodes[i]));
-      nodes[i].remove();
-    }
-    foldHint();
-  }
-  /** 分批放回：取最近折叠的 TRIM_BATCH 条按原时间顺序前插，并临时抬高配额（下一步新消息会收回） */
-  function expandLog() {
-    const back = trimmedBuf.splice(-TRIM_BATCH, TRIM_BATCH);
-    if (!back.length) return;
-    const fold = log.querySelector(".log-fold");
-    if (fold) fold.remove();
-    quota += back.length;
-    const frag = document.createDocumentFragment();
-    for (const it of back) frag.appendChild(makeMsgNode(it.who, it.text, it.tag));
-    const first = log.querySelector(".msg");
-    if (first) log.insertBefore(frag, first); else log.appendChild(frag);
-    if (trimmedBuf.length) foldHint();
-  }
-  function makeMsgNode(who, text, tag) {
-    const d = document.createElement("div");
-    d.className = "msg " + who;
-    const s = document.createElement("span");
-    s.className = "msg-text";
-    s.textContent = text;
-    d.appendChild(s);
-    if (tag) setTag(d, tag);
-    return d;
-  }
-  function pushMsg(who, text, tag) {
-    quota = RENDER_MAX;                       // 新消息 → 窗口收回默认档（展开是临时查看，不是永久扩容）
-    const d = makeMsgNode(who, text, tag);
-    log.appendChild(d);
-    trimLog();
-    log.scrollTop = log.scrollHeight;
-    return d;
-  }
-  const hist = window.ChatAgent.getHistory();
-  if (hist.length) {
-    for (const h of hist.slice(-20)) pushMsg(h.role === "user" ? "user" : "ai", h.content, h.role === "assistant" ? "上次会话记录" : "");
-    pushMsg("ai", "欢迎回来，我们接着聊。刚才说到哪儿了？", "上下文已恢复");
-  } else {
-    pushMsg("ai", "你好，我是心屿。今天过得怎么样？说什么都行，我会先听懂你的情绪，再陪你聊。", "在线 AI · 共情模式");
-  }
+  //    窗口化（DOM 上界 60 / 折叠配额 / 展开较早）r26 外提到 `src/js/chat-window.js`；
+  //    判据 = `ux_guards_check.py` U2a–U2f（浏览器实跑行为，不是源码 grep，搬错即红）。
+  const CW = window.ChatWindow;
+  CW.init("#chat-log", { history: () => window.ChatAgent.getHistory() });
 
   $("#chat-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -231,17 +148,17 @@
     const text = input.value.trim();
     if (!text) return;
     input.value = "";
-    pushMsg("user", text);
-    const thinking = pushMsg("ai", "心屿正在感受你的话…", "");
+    CW.push("user", text);
+    const thinking = CW.push("ai", "心屿正在感受你的话…", "");
     thinking.classList.add("thinking");
     /* 流式：首个增量到达时才把 thinking 换成正式气泡并逐字覆写；
      * 上游/代理不支持流式时 onDelta 永不触发，收尾按整包一次性渲染（与旧行为一致）。 */
     let bubble = null;
     const onDelta = (full) => {
-      if (bubble) { setBody(bubble, full); log.scrollTop = log.scrollHeight; return; }
+      if (bubble) { CW.update(bubble, full); return; }
       window.__seenStreamingBubble = true;   // 供 _test/stream_contract.py 断言「确实出现过逐字气泡」
       thinking.remove();
-      bubble = pushMsg("ai", full, "逐字生成中…");
+      bubble = CW.push("ai", full, "逐字生成中…");
       bubble.classList.add("streaming");
     };
     try {
@@ -250,7 +167,7 @@
       const modeLabel = { model: "在线大模型生成", fallback: "大模型暂不可用 · 离线共情模板", offline: "离线共情模板", guard: "安全转介策略" }[r.mode];
       // 情绪识别来源必须如实标注：后端 /api/emotion 与本地词典是两套实现，界面不得含糊
       const emoSrcLabel = r.emoSrc === "backend" ? " · 情绪:后端" : "";
-      const aiMsg = pushMsg("ai", r.reply,
+      const aiMsg = CW.push("ai", r.reply,
         `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
       aiMsg.dataset.emotion = r.emotion;
       window.Voice.speak(r.reply);   // 朗读开关打开时同步播出（失败静默，绝不影响主链路）
@@ -270,7 +187,7 @@
       window.Chart.render();
     } catch (err) {
       thinking.remove();
-      pushMsg("ai", "刚才我走神了一下（网络不稳定）。你可以再发一次，或点右上角「模型设置」检查连接。", "友好错误态");
+      CW.push("ai", "刚才我走神了一下（网络不稳定）。你可以再发一次，或点右上角「模型设置」检查连接。", "友好错误态");
     }
   });
 
