@@ -18,6 +18,7 @@ SUITES = [
     ("benchmark_selftest", [sys.executable, "_test/benchmark_metrics.py", "--selftest"]),
     ("api_contract", [sys.executable, "_test/api_contract_check.py"]),
     ("api_contract_selftest", [sys.executable, "_test/api_contract_check.py", "--selftest"]),
+    ("patch_apply_selftest", [sys.executable, "_test/patch_apply.py", "--selftest"]),
     ("repo_config", [sys.executable, "_test/repo_config_check.py"]),
     ("repo_config_selftest", [sys.executable, "_test/repo_config_check.py", "--selftest"]),
     ("engine_consistency", [sys.executable, "_test/engine_consistency_check.py"]),
