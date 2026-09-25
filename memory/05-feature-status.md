@@ -33,32 +33,33 @@
 
 ## ✅ 已实现（对标轮 r22，2026-09-25 同日第三轮）
 
-- [x] **接口契约探测 8 → 11 全覆盖**：C6 `探测 + 豁免 == 操作总数` + C6b 零豁免，
-      取代上一轮"阈值低于总量"的 `done >= 8`（我上一轮自己留的洞）
-- [x] **仓库配置自洽守卫** `_test/repo_config_check.py`（G1 dependabot schema/目录可达、
-      G2 CI job 数==README 声称、G3 契约被索引引用、G4 电池条目数==README 声称、G5 `--online` 默认分支可见）
-      → 实跑 5/5 PASS，`--selftest` 四类合成篡改全抓到
-- [x] **该守卫上线当场抓到一个真实脱节**（红→绿留证）：加 2 条套件后 README 仍写 26 ⇒ G4 报
-      实测 28、声称 26，改文档后转绿
-- [x] 电池 26 → **28** 套件；本轮 16 参照仓数据**零漂移**（对标对象侧无新变化）
 - [ ] 下一件不变：`app.js` 469 行纯切分（⚠️ 并行会话在活动，动前先测 8123 端口归属）
 
 ## ✅ 已实现（对标轮 r23，2026-09-25 第四轮：把从没落地的 R196 强制项做成判据）
 
-- [x] **发现并填补 R196 强制项空壳**：`memory/06-constraints.md` 的「测试专用文件清单」至今是 init 模板占位符
-      （`（如 eval/testset_provenance.json / blindset / frozen）`）⇒ 「新增评测数据先登记 provenance」这条红线从未真正落地，
-      而评测集 accuracy（73 条 / 98.6%）是要进《应用方案》和答辩材料的数字。
-      现填为登记表：文件 / 条数 / 谁在裁决时读它 / provenance（人工撰写，不用模型生成样本）/ 冻结状态，
-      并写明「真实对话走 `chat_message` 表，与评测集物理分离，禁止回流刷分」（同源 PII 风险）
-- [x] **判据化**：`repo_config_check.py` 新增 **G8**（模板原句残留 / 登记文件不存在 R240 / 声称条数≠实际 items 数 /
-      未登记的裁决数据文件），`--selftest` 扩到 **十类**合成篡改全抓；判据自身两次假红已修并写进注释：
-      ① 用"段里出现（如 "当占位符 → 已填实的表被误判 ② 对所有登记文件比 items 长度 → 把
-      `vendor-manifest.json` 的「3 条」当成 3 个样本 ⇒ 分母混用。教训同族：**判据错、不是数据错，先修判据**
-- [x] 回归：`repo_config --online` 7 项全 PASS、`--selftest` 十类全抓；全量电池 `--slice 0 14` 14/14 + `--slice 14 28` 14/14 ⇒ **28/28 rc=0**
 - [ ] 下一件仍是 `app.js` 469 行切分（本轮未做，见 07）
+
+## ✅ 已实现（对标轮 r24，2026-09-25 第五轮：把连续两轮推迟的「下一件」真正做掉）
+
+> 本轮外部数据**有漂移**（4 处：lobehub ★82,805→82,807 且 pushed 09-24→09-25、SillyTavern 33,743→33,744、OLV 13,901→13,902），
+> 但主要产出是**结构性还债**：`app.js` 切分第一刀。
+
+- [x] **`src/js/voice.js` 外提**（`app.js` 471 → 403 行，语音 99 行独立模块）：
+      `window.Voice = { init(), speak(), isSpeaking() }`；保留原三条约束注释（不支持即隐藏 / 异常一律吞掉不带崩主链路 /
+      开关走独立键 `peiliao.speak.v1` 不进 `cfg`）。选它当第一刀的理由是**与编排零耦合 + 判据最密**
+      （`ux_guards` U1 实测 utterance 构造计数与开关、`voice_check` A1-A6 盯 ASR 与按钮）
+- [x] 接线与交付链完整：`index.html` 在 `app.js` 前引入（实测 6813 < 6849）→ `deploy/xinyu` 同步（`DEPLOY-SYNC-PASS`）
+      → `size_budget` 登记新文件（4,148B / 预算 4,355B，关键路径 821,901 / 858,752）→ 公网重部署 `41dea397`
+      → `live_sync` / `public_check` / `online_check` 三判据 rc=0
+- [x] 回归：`--slice 0 14` 14/14 + `--slice 14 28` 14/14 ⇒ **28/28 rc=0 ALL-GREEN**；`node --check` 双文件通过
+- [ ] **切分未完成**：`app.js` 仍 403 行，剩余可摘模块 = 情绪曲线 `drawChart()`、对话窗口化（`RENDER_MAX`/`trimmedBuf`/配额）、
+      设置面板；每一刀都须沿用同一套动作（外提 → index.html 顺序 → deploy 同步 → size_budget 登记 → 电池全绿 → 重部署）
+- ⚠️ **本轮自伤（留痕）**：同步时把 `src/index.html` 误 `cp` 进 `deploy/xinyu/js/` 且用 `2>/dev/null` 吞掉报错
+      ⇒ `deploy_sync` 报 EXTRA 一项；核实该副本未被跟踪且与源字节相同后删除。**我自己上一轮才把这条记进 lessons，本轮又踩**。
 
 ## 分卷目录
 - **卷1** `05-feature-status.part1.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷2** `05-feature-status.part2.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷3** `05-feature-status.part3.md` — 05-feature-status 分卷（R199 自动拆卷）
+- **卷4** `05-feature-status.part4.md` — 05-feature-status 分卷（R199 自动拆卷）
 

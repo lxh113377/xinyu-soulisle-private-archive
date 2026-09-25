@@ -23,7 +23,7 @@
     实测更正：**Maven（`server/pom.xml`）与 GitHub Actions（`.github/workflows`）两个 ecosystem 与 npm 无关，可以直接挂**
     ⇒ 已加 `.github/dependabot.yml`（maven@/server + github-actions@/，每周二 08:00 Asia/Shanghai，PR 上限 3/2）。
     本条剩余真实盲区只有 `src/vendor/` 那三个手工 vendored 的 JS 库，由上面的 manifest 守卫承担。
-- [DEBT] `src/js/app.js` 469 行单体编排（对话/星图/曲线/朗读/设置混在一个 IIFE）— 还债方式：voice/chart/window/编排 四模块纯切分，不改行为（排截止后）。
+- [DEBT] `src/js/app.js` 单体编排 —— **r24 已切第一刀**：语音（TTS+ASR）外提为 `src/js/voice.js`，471 → 403 行；剩余 曲线 / 窗口化 / 设置面板 三块待切（同法：外提 → index.html 顺序 → deploy 同步 → `size_budget` 登记 → 电池全绿 → 重部署）。⚠️ 原条目写 469 行系 r23 手测值，实际当时已 471 行 —— 数字断言再次与实值脱节（G4/G2 只覆盖 README 与 CI，未覆盖 06）。
 - [DEBT] `tick()` 每帧遍历全部粒子做 CPU 侧着色（桌面档 2600 次/帧）；**真机帧率 ❌未实测** → 不进任何"性能领先"结论。
 - [DEBT] 情绪引擎仍是**两份实现**（JS 离线降级用 + Java 后端权威）。本轮已把前端接到后端，但**词表仍须两端同步改**
   （红线不变，判据 `engine_consistency_check.py`）；`emotion_wiring_check.py` W6 另加一条"同句双端词典结论必须相同"。

@@ -64,6 +64,17 @@ r20 的"vendor 供给链守卫"一行里我写了「心屿零构建 ⇒ 无 lock
 `github-actions` ecosystem 连包管理器都不需要。r21 已配置并在 `memory/06-constraints.md` 原条目下加更正注（不删历史）。
 ⇒ 真正的盲区只剩 `src/vendor/` 三个手工 vendored 的 JS 库，由 manifest 守卫承担。
 
+## ✅ 已完成（对标轮 r24，2026-09-25 第五轮）
+
+| 项 | 内容 | 证据 |
+|---|---|---|
+| **`app.js` 模块化第一刀（连续两轮登记的「下一件」，本轮做完）** | 语音（TTS 朗读 + ASR 输入）与编排零耦合，且行为面已被两条专门判据盯住 ⇒ 适合先摘；外提为 `src/js/voice.js`，`window.Voice = {init, speak, isSpeaking}` | `app.js` 471 → 403 行；`ux_guards` U1 六项 + `voice_check` A1-A6 + `browser_check` 全断言 rc=0；电池 `--slice 0 14` 14/14、`--slice 14 28` 14/14 ⇒ **28/28** |
+| 交付链完整性 | 切分不能只改 `src/` | `index.html` 引入顺序实测（voice.js 6813 < app.js 6849）；`DEPLOY-SYNC-PASS`；`size_budget` 登记 4,148B/预算 4,355B，关键路径 821,901 / 858,752；公网 `41dea397` 后 `live_sync`/`public_check`/`online_check` 全 rc=0 |
+
+> 剩余切分（同法，每刀单独一轮）：情绪曲线 `drawChart()` → 对话窗口化（`RENDER_MAX` / `trimmedBuf` / 配额）→ 设置面板。
+> ⚠️ 排产自省：这项在 r22、r23 都被写成「下一件」却没做。**登记两次而未执行 = 排产缺陷，不是待办**；
+> 今后凡 07 里连续两轮未推进的条目，下一轮**必须优先做它**或显式写明"为何本轮仍不能做"，禁止第三次登记。
+
 ## 🔜 计划（赛后 1–2 周，按投入产出排序）
 
 1. **three.js r128 → r186 升级**（对标轮 r20 新登记的**头号技术债**）——
