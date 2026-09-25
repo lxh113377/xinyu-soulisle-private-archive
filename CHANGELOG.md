@@ -5,6 +5,29 @@
 
 ## [Unreleased]
 
+> 对标 r29–r30（2026-09-25 第十、十一轮）：**受理面优先** —— 查 CI 真结论，查出"CI 全红"其实是
+> GitHub 账户账单导致 runner 从未启动；同时清掉我自己写进聚合器的 3.12-only 语法。外部漂移全为 ★ 抖动。
+
+### Added
+- **`_test/ci_status_check.py`（K1–K4，电池 33 → 35 套件）**：把"CI 红"分成 `CODE_FAIL` / `ENV_BLOCKED` / `PASS`
+  三态。ENV 判据 = 全部 job 在 15s 内失败 **且** run 的 ANNOTATIONS 命中账单/配额类措辞 ⇒ rc=2，
+  并明写「本轮不得声称 CI 已验」。结论只取 HEAD 那次 run（历史红只作上下文）；在 CI 内部自动 SKIP（自指）。
+  自证含两条反向断言：去掉账单措辞必须翻判 CODE；不 SKIP 就 selftest 红。实测三态均正确。
+- 离线壳能力的台账自证：`benchmark_metrics.py` 的 self 行现已报 `caps=...,pwa_offline`
+  ⇒ "16 个同类都没做的能力我们有"这句话由台账复算，而不是写在报告里自说（r28 的 claim 至此闭环）。
+
+### Fixed
+- **聚合器自己是 3.12-only 语法**：r28 给失败明细写的 `print(f"{" " * 25}· {d}")` 依赖 PEP 701，
+  本机 3.12 全绿、CI pin 3.11 直接 SyntaxError（30 条判据一条没跑）。改字符串拼接；
+  另全仓扫两类 3.11 雷（嵌套同引号 f-string 1 处已修、f-string 花括号内反斜杠 0 处），
+  并在 CI 最早一步加 `python -m compileall -q _test`（版本兼容差要以最小失败面暴露）。
+- 交付物 `G4`/`G10` 数字随套件数同步（README 声称 35 == 实测 35；CI 恒等式 实跑 32 + 豁免 3 == 35）。
+
+### Known issue（待老大，非代码）
+- GitHub Actions 连续 3 次 run 判 `ENV_BLOCKED`：annotations 原文
+  "The job was not started because recent account payments have failed or your spending limit needs to be increased."
+  ⇒ r28 的 CI 覆盖面修复**至今无法在受理面验证**；本轮不声称已验。
+
 > 对标 r28（2026-09-25 第九轮）：**把对标的"全零"读成机会** —— 只读离线壳 `sw.js` 上线（判据先行），
 > 并把判据挂上 CI 真发布路径。外部漂移 3 处全为 ★ 抖动（实质 0）。
 
