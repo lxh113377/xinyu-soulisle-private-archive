@@ -7,14 +7,16 @@
   - 本项目文档里散落着"四条门禁 / 26 套件"这类**数字断言**，改配置或加套件时极易与实值脱节
     （AGENTS.md 的 04/05 段就已长期陈旧，是同一类问题的既成实证）。
 
-判据（逐项独立，G1–G4 离线恒跑；G5 需 --online）：
+判据（逐项独立，G1–G4、G6–G7 离线恒跑；G5 需 --online）：
   G1 dependabot schema：version==2、ecosystem 在支持清单内、`directory` 指向**仓库里真实存在**的目录、
      schedule.interval 合法、PR 上限为整数
   G2 CI 拓扑：`.github/workflows/ci.yml` 可解析，且 job 数 == README 声称的"N 条门禁"（数字对不上即红）
   G3 契约可发现：`docs/openapi.yaml` 存在、可解析，且被 `docs/README.md` 引用（孤文件即红）
   G4 判据清单自洽：`run_all_suites.py` 的 SUITES 条目数 == README 声称的"（N 套件）"
   G5（--online）远端受理面：默认分支上 `.github/dependabot.yml` 确实存在（GitHub 只看默认分支）
-  G6 --selftest：五类合成篡改（ecosystem 拼错 / 目录不存在 / interval 非法 / README 数字造假 / 删引用）
+  G6 第三方授权：`src/vendor/*.js` 每一个文件都必须在 `docs/THIRD-PARTY-NOTICES.md` 里被点名
+  G7 README 必须含指向该授权清单的口径行（否则读者只会看到"MIT"，而 GSAP 其实不是 MIT）
+  G8 --selftest：六类合成篡改（ecosystem 拼错 / 目录不存在 / interval 非法 / README 数字造假 / 删引用）
      必须各自报红，原样必须零问题 —— 证判据非恒真
 
 退出码：0=REPO-CONFIG-PASS 1=任一判据失败 2=环境异常（缺 PyYAML / --online 但 gh 不可用）
@@ -102,6 +104,22 @@ def remote_has_file(rel, repo):
     return True, "默认分支可见"
 
 
+NOTICES = "docs/THIRD-PARTY-NOTICES.md"
+
+
+def license_scope(notices_txt, readme_txt, vendor_files):
+    """G6/G7 纯函数：第三方授权边界必须被正式声明且不漏登记。"""
+    bad = []
+    if "GreenSock" not in notices_txt:
+        bad.append("授权清单未点明 GSAP 的实际条款（把整仓说成 MIT 是不准确的声明）")
+    missing = [f for f in vendor_files if f not in notices_txt]
+    if missing:
+        bad.append(f"vendor 文件未在授权清单登记 {missing}")
+    if "THIRD-PARTY-NOTICES" not in readme_txt:
+        bad.append("README 没有指向授权清单的口径行（读者只会看到 MIT）")
+    return bad
+
+
 def selftest():
     bad = []
     cfg = load_yaml(".github/dependabot.yml")
@@ -121,7 +139,16 @@ def selftest():
         bad.append("README 数字解析本身就是 999 ⇒ 判据读的是空气")
     if validate_dependabot({"version": 2, "updates": []}) == []:
         bad.append("篡改④（updates 清空）未被抓到 ⇒ 恒真")
-    print("SELFTEST-PASS: 四类合成篡改全部被抓到、原样零问题" if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
+    nt = (ROOT / NOTICES).read_text("utf-8") if (ROOT / NOTICES).exists() else ""
+    rt = (ROOT / "README.md").read_text("utf-8")
+    vf = sorted(x.name for x in (ROOT / "src" / "vendor").glob("*.js"))
+    if license_scope(nt, rt, vf):
+        bad.append(f"原样授权声明被判失败：{license_scope(nt, rt, vf)}")
+    if not license_scope(nt.replace("gsap.min.js", "zzz"), rt, vf):
+        bad.append("篡改⑤（授权清单里抹掉 gsap.min.js）未被抓到 ⇒ G6 恒真")
+    if not license_scope(nt, rt.replace("THIRD-PARTY-NOTICES", "zzz"), vf):
+        bad.append("篡改⑥（README 去掉指向授权清单的口径行）未被抓到 ⇒ G7 恒真")
+    print("SELFTEST-PASS: 六类合成篡改全部被抓到、原样零问题" if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
     return 1 if bad else 0
 
 
@@ -171,6 +198,14 @@ def main():
             return 2
     else:
         print("  SKIP  G5 远端受理面（加 --online 才查 GitHub 默认分支）")
+
+    ntxt = (ROOT / NOTICES).read_text("utf-8") if (ROOT / NOTICES).exists() else ""
+    if not ntxt:
+        print("REPO-CONFIG-FAIL: 缺 docs/THIRD-PARTY-NOTICES.md（vendor 里有第三方库，必须逐文件声明授权）")
+        return 1
+    vfiles = sorted(x.name for x in (ROOT / "src" / "vendor").glob("*.js"))
+    lbad = license_scope(ntxt, (ROOT / "README.md").read_text("utf-8"), vfiles)
+    check("G6+G7 第三方授权边界已声明且逐文件登记（GSAP 非 MIT 不可含糊）", not lbad, " ; ".join(lbad))
 
     fails = [r for r in results if not r[1]]
     print(f"\n合计 {len(results)} 项，失败 {len(fails)} 项")

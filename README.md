@@ -205,6 +205,7 @@ GitHub Actions 四条门禁（`.github/workflows/ci.yml`）：同步守卫+评�
 | [SECURITY.md](SECURITY.md) | 密钥政策、接口安全、漏洞上报 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本变更史（Keep a Changelog） |
 | [.env.example](.env.example) | 全部环境变量文档化（名称实读自配置与函数源码） |
+| [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md) | 第三方资产逐文件授权清单（GSAP 非 MIT 这一事实的正式边界声明），由 `repo_config_check.py` G6/G7 保证不漏登记 |
 | [docs/openapi.yaml](docs/openapi.yaml) | 11 条接口的**唯一机器可读契约**，由 `api_contract_check.py` 与控制器/前端/运行态三方对账 |
 | [ROADMAP.md](ROADMAP.md) | 公开路线图（对标差距 → 已完成 / 进行中 / 计划 / 明确不做，含"为什么不做"） |
 | [交付物/对标分析报告-2026-09-24.md](交付物/对标分析报告-2026-09-24.md) | 与 LobeChat / Open-LLM-VTuber / SillyTavern 的七维度对标与差距清单 |
@@ -222,7 +223,7 @@ GitHub Actions 四条门禁（`.github/workflows/ci.yml`）：同步守卫+评�
 
 ## 📄 许可证
 
-[MIT License](LICENSE) © 2026 心屿 SoulIsle 团队
+[MIT License](LICENSE) © 2026 心屿 SoulIsle 团队 —— **仅覆盖本项目自研代码**。`src/vendor/` 三个第三方库各有授权（three.js = MIT；GSAP / ScrollTrigger = GreenSock Standard License，非 MIT），逐文件见 [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md)
 
 ---
 

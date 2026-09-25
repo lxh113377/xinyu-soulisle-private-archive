@@ -19,6 +19,21 @@
   G4 电池条目数 == README 声称的套件数 G5（`--online`）GitHub 默认分支上 dependabot 文件可见
 - 两条判据入全量电池（26 → **28** 套件）与 CI
 
+### Fixed（授权口径 —— 自审第三条发现）
+- **整仓标 MIT 是不准确的声明**：`LICENSE` + README 中英双语均挂 MIT，但 `src/vendor/gsap.min.js`、
+  `ScrollTrigger.min.js` 文件头自证为 **GreenSock Standard License**（非 MIT、非 OSI），只有 `three.min.js` 是 MIT。
+  对公网分发的参赛作品属可被挑出的合规瑕疵。
+  - 新增 `docs/THIRD-PARTY-NOTICES.md`：逐文件列 库/版本/授权/上游/再分发注意，并写明适用口径
+    （高校参赛演示、不用 GSAP 构建竞争性动画产品 ⇒ 落在 Standard License 免费使用范围）
+  - README 中英授权段改为「MIT **仅覆盖自研代码**」+ 指向该清单
+  - 判据化：**G6** `src/vendor/*.js` 每个文件必须在清单中被点名（漏登记即红）、**G7** README 必须含指向清单的口径行
+    （防改回"整仓 MIT"）；`--selftest` 两类新反例（抹 `gsap.min.js` 行、抹 README 引用行）均被抓到
+- **本轮新加的 `--slice` 开关第一稿是死代码**（先滤掉 `--` 参数再判 `args[0] == "--slice"`，永不命中，
+  于是 `--slice 0 14` 把 28 条全跑还报全绿）：改为按 `sys.argv` 原样解析 + `--list` 打印过滤后条数 +
+  **过滤后零套件直接 rc=1**（禁止把 0/0 当通过）。实证 `--slice 3 3` → FAIL rc=1、`--only repo_config` → 2 条
+- 撤回并在复跑后重写一条**先于证据**的结论（`28/28` 曾在两次后台运行输出 0 字节时被写进报告）
+  ⇒ 记录为报告 §10.6：**后台任务 `exit 0` 不等于产物存在**
+
 ### Fixed
 - **C4 原先的 `done >= 8` 是"阈值低于总量即掩盖"**：真实操作 11 条，只探测 8 条也判绿。现改精确对账
   `探测 + 豁免 == 操作总数` 且要求零豁免 —— 这是我自己上一轮留下的洞，本轮复审抓到

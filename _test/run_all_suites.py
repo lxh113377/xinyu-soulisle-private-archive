@@ -38,6 +38,27 @@ SUITES = [
     ("emotion_eval_js", ["node", "_test/emotion_eval.js"]),
 ]
 
+# r22 加：`--only <子串>` / `--slice <起> <止>` 分段取数。
+# ⚠️ 本版第一稿是**死代码**（先滤掉 "--" 开头的参数再判 args[0] == "--slice"，永不命中），
+#    跑 "--slice 0 14" 却把 28 条全跑了个遍 —— "配了开关但开关没生效"正是本轮 repo_config 判据要防的那类事，
+#    结果自己又踩了一次。故此处直接按 sys.argv 原样解析，并由 --list 提供可复核的"过滤后到底剩几条"。
+argv = sys.argv[1:]
+if "--list" in argv:
+    print("SUITES:", len(SUITES))
+    sys.exit(0)
+if "--only" in argv:
+    key = argv[argv.index("--only") + 1]
+    SUITES = [s for s in SUITES if key in s[0]]
+    print(f"(--only {key!r} → {len(SUITES)} 条)")
+if "--slice" in argv:
+    i = argv.index("--slice")
+    lo, hi = int(argv[i + 1]), int(argv[i + 2])
+    SUITES = SUITES[lo:hi]
+    print(f"(--slice {lo}:{hi} → {len(SUITES)} 条)")
+if not SUITES:
+    print("BATTERY-FAIL: 过滤后零套件（空跑出来的全绿没有意义，禁止把 0/0 当通过）")
+    sys.exit(1)
+
 results = []
 for name, cmd in SUITES:
     p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,

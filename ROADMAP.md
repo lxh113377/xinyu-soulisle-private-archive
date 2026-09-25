@@ -54,7 +54,8 @@
 | 项 | 抓到的问题 | 落地证据 |
 |---|---|---|
 | **契约探测从"够数就行"改成精确对账** | 上一轮 C4 写的是 `done >= 8`，而 spec 真实操作有 **11** 条 ⇒ 3 条接口既不探测也不解释，判据却绿（阈值低于总量即掩盖） | `docs/openapi.yaml` 补齐 3 条 `x-live-check`，探测 **8 → 11 全覆盖**；新增 C6 `探测 + 豁免 == 操作总数`、C6b 要求**零豁免**；`--selftest` 加第 5 类篡改（抹标注必被抓） |
-| **仓库配置自洽守卫** | dependabot「配了」≠「生效」：GitHub 只读默认分支、ecosystem/目录拼错时**静默不跑**；且项目文档里"26 套件 / 四条门禁"这类数字断言无机器责任 | `_test/repo_config_check.py` G1 schema+目录可达 / G2 CI job 数==README 声称 / G3 契约被索引引用 / G4 电池条目数==README 声称 / G5 `--online` 默认分支可见。实测 **G5 PASS**（`...-private-archive` 默认分支可见） |
+| **第三方授权边界精确到文件**（自审第三条） | 仓库整体标 **MIT**，但 `src/vendor/gsap.min.js`/`ScrollTrigger.min.js` 文件头自证是 **GreenSock Standard License**（非 MIT、非 OSI），只有 three.js 是 MIT ⇒ 公网分发参赛作品的可挑出合规瑕疵 | 新增 `docs/THIRD-PARTY-NOTICES.md`（逐文件：库/版本/授权/上游/再分发注意 + 本项目适用口径）；README 中英改为「MIT 仅覆盖自研代码」并指向清单；判据 **G6**（vendor 每个 .js 必须在清单点名）+ **G7**（README 必须引用清单，防改回"整仓 MIT"），`--selftest` 两类新反例（抹 gsap 行 / 抹 README 引用行）均被抓到 |
+| **仓库配置自洽守卫** | dependabot「配了」≠「生效」：GitHub 只读默认分支、ecosystem/目录拼错时**静默不跑**；且文档数字断言无机器责任 | `_test/repo_config_check.py` G1 schema+目录含 manifest / G2 CI job 数==README 声称 / G3 契约被索引引用 / G4 电池条目数==README 声称 / G5 `--online` 默认分支可见（实测 PASS）/ G6+G7 授权边界。`--selftest` 六类篡改全抓 |跑**；且项目文档里"26 套件 / 四条门禁"这类数字断言无机器责任 | `_test/repo_config_check.py` G1 schema+目录可达 / G2 CI job 数==README 声称 / G3 契约被索引引用 / G4 电池条目数==README 声称 / G5 `--online` 默认分支可见。实测 **G5 PASS**（`...-private-archive` 默认分支可见） |
 | **守卫上线即抓到一个真实脱节（红→绿留证）** | 往电池加 2 条后 README 仍写"26 套件" | G4 当场报 `FAIL 实测 28、声称 26` → 改文档 → 转绿。此过程即该判据的判别力证明 |
 
 ### 🔧 一条自我更正（r20 → r21）
