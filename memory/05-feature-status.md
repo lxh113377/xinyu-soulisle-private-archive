@@ -46,7 +46,9 @@
 
 ## ✅ 已实现（对标轮 r26，2026-09-25 第七轮：切分第三刀 + 把"验证动作本身"纳入判据）
 
-- [ ] 剩余切分一块：设置面板 → `src/js/settings.js`（同法，每刀一轮，07 已登记为必须推进项）
+## ✅ 已实现（对标轮 r27，2026-09-25 第八轮：判据先行 + 切分第四刀 + 全零补分母）
+
+- [ ] 下一件（07 P0）：公网版只读离线壳 `sw.js`（对标反读：16 个同类全零 = 差异化机会），**必须先立时效判据再上线**
 ## 分卷目录
 - **卷1** `05-feature-status.part1.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷2** `05-feature-status.part2.md` — 05-feature-status 分卷（R199 自动拆卷）
@@ -55,4 +57,5 @@
 - **卷5** `05-feature-status.part5.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷6** `05-feature-status.part6.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷7** `05-feature-status.part7.md` — 05-feature-status 分卷（R199 自动拆卷）
+- **卷8** `05-feature-status.part8.md` — 05-feature-status 分卷（R199 自动拆卷）
 
