@@ -51,7 +51,7 @@
 
 | 症状 / 报错原文 | 真因 | 处置 |
 |---|---|---|
-| `[GATE:dag-fail] ... 块内找不到本次改动标识 require_mark=` 但 `blocks` 数在涨 | `dag_precheck.py` 的块体＝**锚点行之后到空行之前**；把"本次标识"写在 `##` 标题行 = 在块体外 | 标识必须写在 `【数据流假设】` 锚点**下面的块体内**（如 `本次标识: xxx`）；且该工具只扫 GM 日志 `D:/global_memory/memory/`，写项目日志无效 |
+| `[GATE:dag-fail] ... 块内找不到本次改动标识 require_mark=` 但 `blocks` 数在涨 | `dag_precheck.py` 的块体＝**锚点行之后到空行之前**；把"本次标识"写在 `##` 标题行 = 在块体外 | 标识必须写在 `【数据流假设】` 锚点**下面的块体内**（如 `本次标识: xxx`）；工具只扫 GM `D:/global_memory/memory/` 与焚诀 `.workbuddy/memory/`，写项目日志无效。**V10.72.0 起这条判据已直接写进报错面**，不必再读源码 |
 | `gh api` 调用抛 `json.decoder.JSONDecodeError` / 结果恒空 | 本仓 `_test/benchmark_metrics.py:gh()` 会 `json.loads(整个响应)` 且非零退出即抛 ⇒ 带 `--jq` 出来的**裸字符串不是合法 JSON** | 取整份 dict 再自己挑字段（`gh("repos/x")["description"]`）；要用 `--jq` 就得绕开该 helper |
 | 文档里某条红线/条目**表头整行消失**，只剩续行 | 用"既有条目行的前缀"当 Edit 锚点，替换文本里没把原表头回写（长行台账同族第四形态） | 锚点须含被改动的**整行**并在 new 里回写；改完必查 `git diff --stat`：**只有 +N 无 -M** 才算没吞行 |
 | `SyntaxError: bytes can only contain ASCII literal characters` | 写了 `b"中文"`（bytes 字面量不能含非 ASCII） | 用 `文本.decode/encode` 或先 `.decode("utf-8", errors="replace")` 再做子串判断 |
