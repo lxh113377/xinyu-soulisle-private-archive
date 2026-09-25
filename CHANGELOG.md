@@ -5,6 +5,30 @@
 
 ## [Unreleased]
 
+> 对标 r33（2026-09-25 第十四轮）：**公网重部署追平本地** —— r32 改的降级徽章与诚实标签此前只在本地，
+> 公网仍是旧版；本轮上线并四项复验。外部漂移 **0 处**（首次连 ★ 都没动，但两次采集只差 22 分钟，
+> 不能读成"对手停止演进"）。
+
+### Changed
+- **公网部署**：deployment `b5f46ecf`（回滚锚 `ec881aaa`）。部署前发现一个会让线上挂掉的坑：
+  `deploy/xinyu/` 里**没有** `functions/` 目录，Functions 源在 `deploy/functions/`，
+  wrangler 的 Functions 目录是**按 cwd 解析**的 ⇒ 必须 `cd deploy` 再 `npx wrangler pages deploy xinyu ...`；
+  部署日志须出现 **`Uploading Functions bundle`**，否则 `/api/chat` 会在新 deployment 里消失（404）。
+- 复验四项全绿：`live_sync_check`（线上 `/` 与本地 `index.html` 逐字节等 9,463B）、
+  `public_check`（浏览器级：标签实测「在线大模型生成 · 逐字流式 · 词典+LLM 分歧 → 采信 LLM · 2184ms」、
+  危机 True、CONSOLE_ERRORS 0、KEY_LEAK False）、`POST /api/chat` 200、
+  公网 `app.js` 含「网络不可用」×3 / `chat-window.js` 含「本机开场白」×1（证明 r32 两处修复**在线上生效**）。
+- 提交清单第 3 行的验收判据改为**带部署命令与 Functions 守卫**的可复算式，并记下 deployment id。
+
+### Fixed
+- **自抓一条"拿旧数当本轮结论"**：本轮第一次读快照算漂移时，误把 r31→r32 的差当成 r33 的（快照末条 ts
+  是上一轮的），核对 ts 后重采两次（11:12 / 11:13 UTC）才取到本轮真值 0 处。
+  教训：`与上一次快照比对` 必须先证明"上一次"确实是上一轮，而不是"文件里最后一条"。
+
+### 下一件（已登记 07）
+- 成片（217.6s）录在 r32 徽章/开场白修复**之前**，画面里仍是「在线 AI · 共情模式」旧标签
+  ⇒ 按刚落地的 consulting-analysis M6「材料须追上构建」，下一件重录成片。
+
 > 对标 r32（2026-09-25 第十三轮）：**交付物回扫（R242）** —— 方案正文对三项已建成能力 0 命中，
 > 顺手抓出两处"伪装在线"出口并机器化封死。外部漂移 4 处 = 实质 1（`my-neuro` 今日推送：移除 PyQt 桌面 UI、
 > 转 Web UI + 插件广场）+ 抖动 3 ⇒ 对手正往"浏览器化 + 扩展生态"收敛，印证可扩展性维度的既有差距，

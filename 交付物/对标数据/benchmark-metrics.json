@@ -3,836 +3,6 @@
  "peers_expected": 16,
  "runs": [
   {
-   "ts": "2026-09-25 08:11 UTC",
-   "repo_count": 16,
-   "self": {
-    "repo": "xinyu-soulisle (私有归档仓，本项目)",
-    "tier": "self",
-    "stars": null,
-    "pushed_at": null,
-    "latest_release": null,
-    "ci_workflows": 4,
-    "language": "JavaScript/Java",
-    "license": null,
-    "default_branch": "main",
-    "docs": [
-     ".env.example",
-     ".github",
-     "CHANGELOG.md",
-     "CONTRIBUTING.md",
-     "README.md",
-     "ROADMAP.md",
-     "SECURITY.md",
-     "docs",
-     "tests"
-    ],
-    "caps": [
-     "api_spec",
-     "container",
-     "deps_autoupdate",
-     "emotion_backend_wired",
-     "pwa_manifest",
-     "pwa_offline"
-    ],
-    "file_count": 18,
-    "src_loc_excl_vendor": 2244,
-    "regression_suites": 35,
-    "regression_script_files": 24,
-    "battery_parse_error": null
-   },
-   "repos": [
-    {
-     "repo": "lobehub/lobehub",
-     "tier": "A",
-     "why": "Web AI 聊天前端工程化最强者（原 lobehub/lobe-chat，2026-09 改名）",
-     "stars": 82814,
-     "pushed_at": "2026-09-25",
-     "language": "TypeScript",
-     "license": "NOASSERTION",
-     "default_branch": "canary",
-     "latest_release": "v2.2.19-canary.18",
-     "ci_workflows": 49,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CHANGELOG.md",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 17304,
-     "caps": [
-      "api_spec",
-      "container",
-      "deps_autoupdate",
-      "e2e_browser",
-      "i18n_locale",
-      "streaming",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "SillyTavern/SillyTavern",
-     "tier": "A",
-     "why": "头部角色扮演聊天前端，persona/扩展生态参照",
-     "stars": 33753,
-     "pushed_at": "2026-09-23",
-     "language": "JavaScript",
-     "license": "AGPL-3.0",
-     "default_branch": "release",
-     "latest_release": "1.19.0",
-     "ci_workflows": 15,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "tests"
-     ],
-     "file_count": 1010,
-     "caps": [
-      "container",
-      "e2e_browser",
-      "i18n_locale",
-      "pwa_manifest",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
-     "tier": "B",
-     "why": "情绪→可视化映射 + 语音陪伴，与心屿同题",
-     "stars": 13907,
-     "pushed_at": "2026-05-15",
-     "language": "Python",
-     "license": "NOASSERTION",
-     "default_branch": "main",
-     "latest_release": "v1.2.1",
-     "ci_workflows": 13,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md"
-     ],
-     "file_count": 253,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "morettt/my-neuro",
-     "tier": "B",
-     "why": "桌宠 + 记忆型陪伴，活跃迭代参照",
-     "stars": 1377,
-     "pushed_at": "2026-09-18",
-     "language": "JavaScript",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v6.7.2",
-     "ci_workflows": 4,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "docs"
-     ],
-     "file_count": 666,
-     "caps": [
-      "i18n_locale",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "letta-ai/letta",
-     "tier": "D",
-     "why": "stateful agent 长期记忆（J4 记忆叙事同构先例）",
-     "stars": 24876,
-     "pushed_at": "2026-09-10",
-     "language": null,
-     "license": "Apache-2.0",
-     "default_branch": "main",
-     "latest_release": "0.16.8",
-     "ci_workflows": 2,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md"
-     ],
-     "file_count": 12,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "hello-diana/MASCOT",
-     "tier": "C",
-     "why": "多智能体社交认知陪伴（EMNLP 2026）",
-     "stars": 637,
-     "pushed_at": "2026-08-24",
-     "language": "Python",
-     "license": "Apache-2.0",
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": 1,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 81,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "ddxfish/sapphire",
-     "tier": "C",
-     "why": "垂类陪伴 agent，Python + Web UI",
-     "stars": 287,
-     "pushed_at": "2026-09-25",
-     "language": "Python",
-     "license": "AGPL-3.0",
-     "default_branch": "main",
-     "latest_release": "v2.13.1",
-     "ci_workflows": 3,
-     "docs": [
-      ".github",
-      "README.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 1230,
-     "caps": [
-      "container",
-      "pwa_manifest",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "v2rockets/Loyal-Elephie",
-     "tier": "C",
-     "why": "带 RAG 记忆的陪伴（停更反面教材）",
-     "stars": 352,
-     "pushed_at": "2025-02-28",
-     "language": "Python",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": 0,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 124,
-     "caps": [
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Rogendo/Mental-health-Chatbot",
-     "tier": "C",
-     "why": "多语心理健康陪伴，有真实部署主页",
-     "stars": 213,
-     "pushed_at": "2026-09-08",
-     "language": "CSS",
-     "license": null,
-     "default_branch": "master",
-     "latest_release": null,
-     "ci_workflows": 1,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 10,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Lum1104/MER-Factory",
-     "tier": "D",
-     "why": "多模态情绪识别工厂（标注→评测→训练闭环）",
-     "stars": 119,
-     "pushed_at": "2026-03-13",
-     "language": "Python",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v0.1.2",
-     "ci_workflows": 1,
-     "docs": [
-      ".env.example",
-      ".github",
-      "README.md",
-      "docs",
-      "test"
-     ],
-     "file_count": 158,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "CheaperjamRen/leemo",
-     "tier": "C",
-     "why": "本地优先桌面陪伴 agent",
-     "stars": 101,
-     "pushed_at": "2026-08-27",
-     "language": "TypeScript",
-     "license": "Apache-2.0",
-     "default_branch": "main",
-     "latest_release": "v0.1.10",
-     "ci_workflows": 1,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 1518,
-     "caps": [
-      "pwa_manifest",
-      "streaming",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "NJX-njx/opensoul",
-     "tier": "C",
-     "why": "小体量但工程齐（13 workflow + 全套文档）",
-     "stars": 58,
-     "pushed_at": "2026-06-04",
-     "language": "TypeScript",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v0.2.4",
-     "ci_workflows": 13,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CHANGELOG.md",
-      "CONTRIBUTING.md",
-      "README.md",
-      "ROADMAP.md",
-      "SECURITY.md",
-      "docs",
-      "test"
-     ],
-     "file_count": 6141,
-     "caps": [
-      "container",
-      "deps_autoupdate",
-      "e2e_browser",
-      "pwa_manifest",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "s-nagaev/chibi",
-     "tier": "C",
-     "why": "小体量高频发布节奏样板",
-     "stars": 56,
-     "pushed_at": "2026-09-25",
-     "language": "Python",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v1.16.1.dev202609230728",
-     "ci_workflows": 5,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 249,
-     "caps": [
-      "container",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "29-Cu/succhia",
-     "tier": "C",
-     "why": "中文『陪聊』垂类（BLE 硬件），零工程配套",
-     "stars": 78,
-     "pushed_at": "2026-07-25",
-     "language": "HTML",
-     "license": "NOASSERTION",
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": 0,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 7,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "zeroa234/ryza-ai-revive",
-     "tier": "C",
-     "why": "190★、JS、2026-09-22 仍活跃的同体量陪伴项目",
-     "stars": 190,
-     "pushed_at": "2026-09-22",
-     "language": "JavaScript",
-     "license": "MIT",
-     "default_branch": "master",
-     "latest_release": "v1.2.22",
-     "ci_workflows": 0,
-     "docs": [
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "docs"
-     ],
-     "file_count": 1762,
-     "caps": [
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Bwcx-songyu/MoodChat",
-     "tier": "C",
-     "why": "Java 同栈情绪陪伴垂类（体量小，作技术栈对照）",
-     "stars": 1,
-     "pushed_at": "2026-09-09",
-     "language": "Java",
-     "license": null,
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": 0,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 54,
-     "caps": [],
-     "tree_truncated": false
-    }
-   ]
-  },
-  {
-   "ts": "2026-09-25 08:13 UTC",
-   "repo_count": 16,
-   "self": {
-    "repo": "xinyu-soulisle (私有归档仓，本项目)",
-    "tier": "self",
-    "stars": null,
-    "pushed_at": null,
-    "latest_release": null,
-    "ci_workflows": 4,
-    "language": "JavaScript/Java",
-    "license": null,
-    "default_branch": "main",
-    "docs": [
-     ".env.example",
-     ".github",
-     "CHANGELOG.md",
-     "CONTRIBUTING.md",
-     "README.md",
-     "ROADMAP.md",
-     "SECURITY.md",
-     "docs",
-     "tests"
-    ],
-    "caps": [
-     "api_spec",
-     "container",
-     "deps_autoupdate",
-     "emotion_backend_wired",
-     "pwa_manifest",
-     "pwa_offline"
-    ],
-    "file_count": 18,
-    "src_loc_excl_vendor": 2244,
-    "regression_suites": 35,
-    "regression_script_files": 24,
-    "battery_parse_error": null
-   },
-   "repos": [
-    {
-     "repo": "lobehub/lobehub",
-     "tier": "A",
-     "why": "Web AI 聊天前端工程化最强者（原 lobehub/lobe-chat，2026-09 改名）",
-     "stars": 82814,
-     "pushed_at": "2026-09-25",
-     "language": "TypeScript",
-     "license": "NOASSERTION",
-     "default_branch": "canary",
-     "latest_release": "v2.2.19-canary.18",
-     "ci_workflows": 49,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CHANGELOG.md",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 17304,
-     "caps": [
-      "api_spec",
-      "container",
-      "deps_autoupdate",
-      "e2e_browser",
-      "i18n_locale",
-      "streaming",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "SillyTavern/SillyTavern",
-     "tier": "A",
-     "why": "头部角色扮演聊天前端，persona/扩展生态参照",
-     "stars": 33753,
-     "pushed_at": "2026-09-23",
-     "language": "JavaScript",
-     "license": "AGPL-3.0",
-     "default_branch": "release",
-     "latest_release": "1.19.0",
-     "ci_workflows": 15,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "tests"
-     ],
-     "file_count": 1010,
-     "caps": [
-      "container",
-      "e2e_browser",
-      "i18n_locale",
-      "pwa_manifest",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
-     "tier": "B",
-     "why": "情绪→可视化映射 + 语音陪伴，与心屿同题",
-     "stars": 13907,
-     "pushed_at": "2026-05-15",
-     "language": "Python",
-     "license": "NOASSERTION",
-     "default_branch": "main",
-     "latest_release": "v1.2.1",
-     "ci_workflows": 13,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md"
-     ],
-     "file_count": 253,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "morettt/my-neuro",
-     "tier": "B",
-     "why": "桌宠 + 记忆型陪伴，活跃迭代参照",
-     "stars": 1377,
-     "pushed_at": "2026-09-18",
-     "language": "JavaScript",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v6.7.2",
-     "ci_workflows": 4,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "docs"
-     ],
-     "file_count": 666,
-     "caps": [
-      "i18n_locale",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "letta-ai/letta",
-     "tier": "D",
-     "why": "stateful agent 长期记忆（J4 记忆叙事同构先例）",
-     "stars": 24876,
-     "pushed_at": "2026-09-10",
-     "language": null,
-     "license": "Apache-2.0",
-     "default_branch": "main",
-     "latest_release": "0.16.8",
-     "ci_workflows": 2,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md"
-     ],
-     "file_count": 12,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "hello-diana/MASCOT",
-     "tier": "C",
-     "why": "多智能体社交认知陪伴（EMNLP 2026）",
-     "stars": 637,
-     "pushed_at": "2026-08-24",
-     "language": "Python",
-     "license": "Apache-2.0",
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": 1,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 81,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "ddxfish/sapphire",
-     "tier": "C",
-     "why": "垂类陪伴 agent，Python + Web UI",
-     "stars": 287,
-     "pushed_at": "2026-09-25",
-     "language": "Python",
-     "license": "AGPL-3.0",
-     "default_branch": "main",
-     "latest_release": "v2.13.1",
-     "ci_workflows": 3,
-     "docs": [
-      ".github",
-      "README.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 1230,
-     "caps": [
-      "container",
-      "pwa_manifest",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "v2rockets/Loyal-Elephie",
-     "tier": "C",
-     "why": "带 RAG 记忆的陪伴（停更反面教材）",
-     "stars": 352,
-     "pushed_at": "2025-02-28",
-     "language": "Python",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": 0,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 124,
-     "caps": [
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Rogendo/Mental-health-Chatbot",
-     "tier": "C",
-     "why": "多语心理健康陪伴，有真实部署主页",
-     "stars": 213,
-     "pushed_at": "2026-09-08",
-     "language": "CSS",
-     "license": null,
-     "default_branch": "master",
-     "latest_release": null,
-     "ci_workflows": 1,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 10,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Lum1104/MER-Factory",
-     "tier": "D",
-     "why": "多模态情绪识别工厂（标注→评测→训练闭环）",
-     "stars": 119,
-     "pushed_at": "2026-03-13",
-     "language": "Python",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v0.1.2",
-     "ci_workflows": 1,
-     "docs": [
-      ".env.example",
-      ".github",
-      "README.md",
-      "docs",
-      "test"
-     ],
-     "file_count": 158,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "CheaperjamRen/leemo",
-     "tier": "C",
-     "why": "本地优先桌面陪伴 agent",
-     "stars": 101,
-     "pushed_at": "2026-08-27",
-     "language": "TypeScript",
-     "license": "Apache-2.0",
-     "default_branch": "main",
-     "latest_release": "v0.1.10",
-     "ci_workflows": 1,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 1518,
-     "caps": [
-      "pwa_manifest",
-      "streaming",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "NJX-njx/opensoul",
-     "tier": "C",
-     "why": "小体量但工程齐（13 workflow + 全套文档）",
-     "stars": 58,
-     "pushed_at": "2026-06-04",
-     "language": "TypeScript",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v0.2.4",
-     "ci_workflows": 13,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CHANGELOG.md",
-      "CONTRIBUTING.md",
-      "README.md",
-      "ROADMAP.md",
-      "SECURITY.md",
-      "docs",
-      "test"
-     ],
-     "file_count": 6141,
-     "caps": [
-      "container",
-      "deps_autoupdate",
-      "e2e_browser",
-      "pwa_manifest",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "s-nagaev/chibi",
-     "tier": "C",
-     "why": "小体量高频发布节奏样板",
-     "stars": 56,
-     "pushed_at": "2026-09-25",
-     "language": "Python",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v1.16.1.dev202609230728",
-     "ci_workflows": 5,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 249,
-     "caps": [
-      "container",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "29-Cu/succhia",
-     "tier": "C",
-     "why": "中文『陪聊』垂类（BLE 硬件），零工程配套",
-     "stars": 78,
-     "pushed_at": "2026-07-25",
-     "language": "HTML",
-     "license": "NOASSERTION",
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": 0,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 7,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "zeroa234/ryza-ai-revive",
-     "tier": "C",
-     "why": "190★、JS、2026-09-22 仍活跃的同体量陪伴项目",
-     "stars": 190,
-     "pushed_at": "2026-09-22",
-     "language": "JavaScript",
-     "license": "MIT",
-     "default_branch": "master",
-     "latest_release": "v1.2.22",
-     "ci_workflows": 0,
-     "docs": [
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "docs"
-     ],
-     "file_count": 1762,
-     "caps": [
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Bwcx-songyu/MoodChat",
-     "tier": "C",
-     "why": "Java 同栈情绪陪伴垂类（体量小，作技术栈对照）",
-     "stars": 1,
-     "pushed_at": "2026-09-09",
-     "language": "Java",
-     "license": null,
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": 0,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 54,
-     "caps": [],
-     "tree_truncated": false
-    }
-   ]
-  },
-  {
    "ts": "2026-09-25 08:38 UTC",
    "repo_count": 16,
    "self": {
@@ -2236,6 +1406,844 @@
       "tests"
      ],
      "file_count": 17306,
+     "caps": [
+      "api_spec",
+      "container",
+      "deps_autoupdate",
+      "e2e_browser",
+      "i18n_locale",
+      "streaming",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "SillyTavern/SillyTavern",
+     "tier": "A",
+     "why": "头部角色扮演聊天前端，persona/扩展生态参照",
+     "stars": 33756,
+     "pushed_at": "2026-09-23",
+     "language": "JavaScript",
+     "license": "AGPL-3.0",
+     "default_branch": "release",
+     "latest_release": "1.19.0",
+     "ci_workflows": 15,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "tests"
+     ],
+     "file_count": 1010,
+     "caps": [
+      "container",
+      "e2e_browser",
+      "i18n_locale",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
+     "tier": "B",
+     "why": "情绪→可视化映射 + 语音陪伴，与心屿同题",
+     "stars": 13910,
+     "pushed_at": "2026-05-15",
+     "language": "Python",
+     "license": "NOASSERTION",
+     "default_branch": "main",
+     "latest_release": "v1.2.1",
+     "ci_workflows": 13,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md"
+     ],
+     "file_count": 253,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "morettt/my-neuro",
+     "tier": "B",
+     "why": "桌宠 + 记忆型陪伴，活跃迭代参照",
+     "stars": 1377,
+     "pushed_at": "2026-09-25",
+     "language": "JavaScript",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v6.7.2",
+     "ci_workflows": 4,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "docs"
+     ],
+     "file_count": 638,
+     "caps": [
+      "i18n_locale",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "letta-ai/letta",
+     "tier": "D",
+     "why": "stateful agent 长期记忆（J4 记忆叙事同构先例）",
+     "stars": 24877,
+     "pushed_at": "2026-09-10",
+     "language": null,
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": "0.16.8",
+     "ci_workflows": 2,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md"
+     ],
+     "file_count": 12,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "hello-diana/MASCOT",
+     "tier": "C",
+     "why": "多智能体社交认知陪伴（EMNLP 2026）",
+     "stars": 637,
+     "pushed_at": "2026-08-24",
+     "language": "Python",
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 1,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 81,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "ddxfish/sapphire",
+     "tier": "C",
+     "why": "垂类陪伴 agent，Python + Web UI",
+     "stars": 287,
+     "pushed_at": "2026-09-25",
+     "language": "Python",
+     "license": "AGPL-3.0",
+     "default_branch": "main",
+     "latest_release": "v2.13.1",
+     "ci_workflows": 3,
+     "docs": [
+      ".github",
+      "README.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 1230,
+     "caps": [
+      "container",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "v2rockets/Loyal-Elephie",
+     "tier": "C",
+     "why": "带 RAG 记忆的陪伴（停更反面教材）",
+     "stars": 352,
+     "pushed_at": "2025-02-28",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 124,
+     "caps": [
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Rogendo/Mental-health-Chatbot",
+     "tier": "C",
+     "why": "多语心理健康陪伴，有真实部署主页",
+     "stars": 213,
+     "pushed_at": "2026-09-08",
+     "language": "CSS",
+     "license": null,
+     "default_branch": "master",
+     "latest_release": null,
+     "ci_workflows": 1,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 10,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Lum1104/MER-Factory",
+     "tier": "D",
+     "why": "多模态情绪识别工厂（标注→评测→训练闭环）",
+     "stars": 119,
+     "pushed_at": "2026-03-13",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v0.1.2",
+     "ci_workflows": 1,
+     "docs": [
+      ".env.example",
+      ".github",
+      "README.md",
+      "docs",
+      "test"
+     ],
+     "file_count": 158,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "CheaperjamRen/leemo",
+     "tier": "C",
+     "why": "本地优先桌面陪伴 agent",
+     "stars": 101,
+     "pushed_at": "2026-08-27",
+     "language": "TypeScript",
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": "v0.1.10",
+     "ci_workflows": 1,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 1518,
+     "caps": [
+      "pwa_manifest",
+      "streaming",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "NJX-njx/opensoul",
+     "tier": "C",
+     "why": "小体量但工程齐（13 workflow + 全套文档）",
+     "stars": 58,
+     "pushed_at": "2026-06-04",
+     "language": "TypeScript",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v0.2.4",
+     "ci_workflows": 13,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "README.md",
+      "ROADMAP.md",
+      "SECURITY.md",
+      "docs",
+      "test"
+     ],
+     "file_count": 6141,
+     "caps": [
+      "container",
+      "deps_autoupdate",
+      "e2e_browser",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "s-nagaev/chibi",
+     "tier": "C",
+     "why": "小体量高频发布节奏样板",
+     "stars": 56,
+     "pushed_at": "2026-09-25",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v1.16.1.dev202609230728",
+     "ci_workflows": 5,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 249,
+     "caps": [
+      "container",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "29-Cu/succhia",
+     "tier": "C",
+     "why": "中文『陪聊』垂类（BLE 硬件），零工程配套",
+     "stars": 78,
+     "pushed_at": "2026-07-25",
+     "language": "HTML",
+     "license": "NOASSERTION",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 7,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "zeroa234/ryza-ai-revive",
+     "tier": "C",
+     "why": "190★、JS、2026-09-22 仍活跃的同体量陪伴项目",
+     "stars": 190,
+     "pushed_at": "2026-09-22",
+     "language": "JavaScript",
+     "license": "MIT",
+     "default_branch": "master",
+     "latest_release": "v1.2.22",
+     "ci_workflows": 0,
+     "docs": [
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs"
+     ],
+     "file_count": 1762,
+     "caps": [
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Bwcx-songyu/MoodChat",
+     "tier": "C",
+     "why": "Java 同栈情绪陪伴垂类（体量小，作技术栈对照）",
+     "stars": 1,
+     "pushed_at": "2026-09-09",
+     "language": "Java",
+     "license": null,
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 54,
+     "caps": [],
+     "tree_truncated": false
+    }
+   ]
+  },
+  {
+   "ts": "2026-09-25 11:12 UTC",
+   "repo_count": 16,
+   "self": {
+    "repo": "xinyu-soulisle (私有归档仓，本项目)",
+    "tier": "self",
+    "stars": null,
+    "pushed_at": null,
+    "latest_release": null,
+    "ci_workflows": 4,
+    "language": "JavaScript/Java",
+    "license": null,
+    "default_branch": "main",
+    "docs": [
+     ".env.example",
+     ".github",
+     "CHANGELOG.md",
+     "CONTRIBUTING.md",
+     "README.md",
+     "ROADMAP.md",
+     "SECURITY.md",
+     "docs",
+     "tests"
+    ],
+    "caps": [
+     "api_spec",
+     "container",
+     "deps_autoupdate",
+     "emotion_backend_wired",
+     "pwa_manifest",
+     "pwa_offline"
+    ],
+    "file_count": 18,
+    "caps_blind": [
+     "e2e_browser",
+     "streaming"
+    ],
+    "src_loc_excl_vendor": 2252,
+    "regression_suites": 37,
+    "regression_script_files": 25,
+    "battery_parse_error": null
+   },
+   "repos": [
+    {
+     "repo": "lobehub/lobehub",
+     "tier": "A",
+     "why": "Web AI 聊天前端工程化最强者（原 lobehub/lobe-chat，2026-09 改名）",
+     "stars": 82817,
+     "pushed_at": "2026-09-25",
+     "language": "TypeScript",
+     "license": "NOASSERTION",
+     "default_branch": "canary",
+     "latest_release": "v2.2.19-canary.19",
+     "ci_workflows": 49,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 17307,
+     "caps": [
+      "api_spec",
+      "container",
+      "deps_autoupdate",
+      "e2e_browser",
+      "i18n_locale",
+      "streaming",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "SillyTavern/SillyTavern",
+     "tier": "A",
+     "why": "头部角色扮演聊天前端，persona/扩展生态参照",
+     "stars": 33756,
+     "pushed_at": "2026-09-23",
+     "language": "JavaScript",
+     "license": "AGPL-3.0",
+     "default_branch": "release",
+     "latest_release": "1.19.0",
+     "ci_workflows": 15,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "tests"
+     ],
+     "file_count": 1010,
+     "caps": [
+      "container",
+      "e2e_browser",
+      "i18n_locale",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
+     "tier": "B",
+     "why": "情绪→可视化映射 + 语音陪伴，与心屿同题",
+     "stars": 13910,
+     "pushed_at": "2026-05-15",
+     "language": "Python",
+     "license": "NOASSERTION",
+     "default_branch": "main",
+     "latest_release": "v1.2.1",
+     "ci_workflows": 13,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md"
+     ],
+     "file_count": 253,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "morettt/my-neuro",
+     "tier": "B",
+     "why": "桌宠 + 记忆型陪伴，活跃迭代参照",
+     "stars": 1377,
+     "pushed_at": "2026-09-25",
+     "language": "JavaScript",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v6.7.2",
+     "ci_workflows": 4,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "docs"
+     ],
+     "file_count": 638,
+     "caps": [
+      "i18n_locale",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "letta-ai/letta",
+     "tier": "D",
+     "why": "stateful agent 长期记忆（J4 记忆叙事同构先例）",
+     "stars": 24877,
+     "pushed_at": "2026-09-10",
+     "language": null,
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": "0.16.8",
+     "ci_workflows": 2,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md"
+     ],
+     "file_count": 12,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "hello-diana/MASCOT",
+     "tier": "C",
+     "why": "多智能体社交认知陪伴（EMNLP 2026）",
+     "stars": 637,
+     "pushed_at": "2026-08-24",
+     "language": "Python",
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 1,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 81,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "ddxfish/sapphire",
+     "tier": "C",
+     "why": "垂类陪伴 agent，Python + Web UI",
+     "stars": 287,
+     "pushed_at": "2026-09-25",
+     "language": "Python",
+     "license": "AGPL-3.0",
+     "default_branch": "main",
+     "latest_release": "v2.13.1",
+     "ci_workflows": 3,
+     "docs": [
+      ".github",
+      "README.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 1230,
+     "caps": [
+      "container",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "v2rockets/Loyal-Elephie",
+     "tier": "C",
+     "why": "带 RAG 记忆的陪伴（停更反面教材）",
+     "stars": 352,
+     "pushed_at": "2025-02-28",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 124,
+     "caps": [
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Rogendo/Mental-health-Chatbot",
+     "tier": "C",
+     "why": "多语心理健康陪伴，有真实部署主页",
+     "stars": 213,
+     "pushed_at": "2026-09-08",
+     "language": "CSS",
+     "license": null,
+     "default_branch": "master",
+     "latest_release": null,
+     "ci_workflows": 1,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 10,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Lum1104/MER-Factory",
+     "tier": "D",
+     "why": "多模态情绪识别工厂（标注→评测→训练闭环）",
+     "stars": 119,
+     "pushed_at": "2026-03-13",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v0.1.2",
+     "ci_workflows": 1,
+     "docs": [
+      ".env.example",
+      ".github",
+      "README.md",
+      "docs",
+      "test"
+     ],
+     "file_count": 158,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "CheaperjamRen/leemo",
+     "tier": "C",
+     "why": "本地优先桌面陪伴 agent",
+     "stars": 101,
+     "pushed_at": "2026-08-27",
+     "language": "TypeScript",
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": "v0.1.10",
+     "ci_workflows": 1,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 1518,
+     "caps": [
+      "pwa_manifest",
+      "streaming",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "NJX-njx/opensoul",
+     "tier": "C",
+     "why": "小体量但工程齐（13 workflow + 全套文档）",
+     "stars": 58,
+     "pushed_at": "2026-06-04",
+     "language": "TypeScript",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v0.2.4",
+     "ci_workflows": 13,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "README.md",
+      "ROADMAP.md",
+      "SECURITY.md",
+      "docs",
+      "test"
+     ],
+     "file_count": 6141,
+     "caps": [
+      "container",
+      "deps_autoupdate",
+      "e2e_browser",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "s-nagaev/chibi",
+     "tier": "C",
+     "why": "小体量高频发布节奏样板",
+     "stars": 56,
+     "pushed_at": "2026-09-25",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v1.16.1.dev202609230728",
+     "ci_workflows": 5,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 249,
+     "caps": [
+      "container",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "29-Cu/succhia",
+     "tier": "C",
+     "why": "中文『陪聊』垂类（BLE 硬件），零工程配套",
+     "stars": 78,
+     "pushed_at": "2026-07-25",
+     "language": "HTML",
+     "license": "NOASSERTION",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 7,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "zeroa234/ryza-ai-revive",
+     "tier": "C",
+     "why": "190★、JS、2026-09-22 仍活跃的同体量陪伴项目",
+     "stars": 190,
+     "pushed_at": "2026-09-22",
+     "language": "JavaScript",
+     "license": "MIT",
+     "default_branch": "master",
+     "latest_release": "v1.2.22",
+     "ci_workflows": 0,
+     "docs": [
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs"
+     ],
+     "file_count": 1762,
+     "caps": [
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Bwcx-songyu/MoodChat",
+     "tier": "C",
+     "why": "Java 同栈情绪陪伴垂类（体量小，作技术栈对照）",
+     "stars": 1,
+     "pushed_at": "2026-09-09",
+     "language": "Java",
+     "license": null,
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 54,
+     "caps": [],
+     "tree_truncated": false
+    }
+   ]
+  },
+  {
+   "ts": "2026-09-25 11:13 UTC",
+   "repo_count": 16,
+   "self": {
+    "repo": "xinyu-soulisle (私有归档仓，本项目)",
+    "tier": "self",
+    "stars": null,
+    "pushed_at": null,
+    "latest_release": null,
+    "ci_workflows": 4,
+    "language": "JavaScript/Java",
+    "license": null,
+    "default_branch": "main",
+    "docs": [
+     ".env.example",
+     ".github",
+     "CHANGELOG.md",
+     "CONTRIBUTING.md",
+     "README.md",
+     "ROADMAP.md",
+     "SECURITY.md",
+     "docs",
+     "tests"
+    ],
+    "caps": [
+     "api_spec",
+     "container",
+     "deps_autoupdate",
+     "emotion_backend_wired",
+     "pwa_manifest",
+     "pwa_offline"
+    ],
+    "file_count": 18,
+    "caps_blind": [
+     "e2e_browser",
+     "streaming"
+    ],
+    "src_loc_excl_vendor": 2252,
+    "regression_suites": 37,
+    "regression_script_files": 25,
+    "battery_parse_error": null
+   },
+   "repos": [
+    {
+     "repo": "lobehub/lobehub",
+     "tier": "A",
+     "why": "Web AI 聊天前端工程化最强者（原 lobehub/lobe-chat，2026-09 改名）",
+     "stars": 82817,
+     "pushed_at": "2026-09-25",
+     "language": "TypeScript",
+     "license": "NOASSERTION",
+     "default_branch": "canary",
+     "latest_release": "v2.2.19-canary.19",
+     "ci_workflows": 49,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 17307,
      "caps": [
       "api_spec",
       "container",

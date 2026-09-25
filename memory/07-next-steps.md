@@ -18,9 +18,14 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
 - [ ] **J3/J4 变现**（= 让已建成能力真跑起来）：① 两端一致性守卫 ✅ ② 本地演示 `remote:true` ✅
       ③ fat jar 部署包 + Docker 镜像**两条路均已实测就绪** ⇒ **唯一阻塞 = 老大提供目标机器**（IP/登录/安全组）。
       2026-09-24 老大裁决：先不办，降级至 10 月复赛节点。完整段见 `part17`。
-- [ ] 🔴 **下一件（r32 登记，agent 可自驱）**：公网副本落后本地（`app.js`/`chat-window.js` 已改、PDF 已重做）
-      ⇒ 需 `wrangler pages deploy deploy/xinyu --project-name xinyu-soulisle` 后复算 `live_sync` + `public_check`；
-      部署属线上动作，**缺凭据/未成功就如实记"公网未部署"，不得让文档声称两端一致**。
+- [x] ✅ **r33 公网已重部署并复核**（deployment `b5f46ecf`）：`LIVE-SYNC-PASS`（逐字节等）+
+      `PUBLIC-ONLINE-ALL-PASS`（标签实测「在线大模型生成 · 逐字流式」/ 危机 True / console 0）+
+      `/api/chat` 200 + 公网 `app.js` 含降级徽章、`chat-window.js` 含诚实标签。
+      ⚠️ 部署命令必须 `cd deploy` 再跑（Functions 目录按 cwd 解析，日志须见 "Uploading Functions bundle"）。
+- [ ] 🔴 **下一件（r33 登记）**：成片（217.6s）录在 r32 徽章/开场白修复**之前**，画面里仍是
+      「在线 AI · 共情模式」旧标签 ⇒ 按 M6 材料须追上构建，重录一次：
+      `src/js/demo-config.js` 按 sha256 存档 → 临时改**同源相对** `proxy: "/api/chat"` →
+      `python _test/demo_video_pipeline.py` → 按哈希还原 → 复跑 `public_check` + 更新提交清单第 2 行指纹。
 - [ ] ⛔ **只有老大能解（agent 侧无入口）**：GitHub Actions 账户账单/配额 —— HEAD 最近 run 判 `ENV_BLOCKED`
       （runner 从未启动）⇒ r28 的 CI 覆盖面修复**至今无法在受理面验证，我不声称已验**。
       复算：`python _test/ci_status_check.py`（解除后应转 `PASS`，电池那条红随之消失）
