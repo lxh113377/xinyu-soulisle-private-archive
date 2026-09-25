@@ -13,7 +13,7 @@
   // 2) 滚动叙事
   window.ScrollStory.init(
     (t) => { if (gl) window.ThreeScene.setScrollProgress(t); },
-    (act) => { if (act === 4) drawChart(); }
+    (act) => { if (act === 4) window.Chart.render(); }
   );
 
   // 3) 引擎徽章
@@ -267,7 +267,7 @@
       syncStars();
       renderReadout({ all: lexAll, emotion: r.emotion, intensity: r.intensity, secondary: sec,
         appliedSecondary: applied, path: r.path ? "双路情绪 · " + r.path : "词典快判" });
-      drawChart();
+      window.Chart.render();
     } catch (err) {
       thinking.remove();
       pushMsg("ai", "刚才我走神了一下（网络不稳定）。你可以再发一次，或点右上角「模型设置」检查连接。", "友好错误态");
@@ -279,73 +279,21 @@
   //    先摘这块是因为它与对话编排零耦合，能让剩余作用域只剩「编排 + 星图 + 曲线 + 窗口化 + 设置」。
   window.Voice.init();
 
-  // 7) 情绪曲线（折线=强度，色点=情绪类别，图例=6情绪分布计数）
-  function drawChart() {
-    const cv = $("#mood-chart");
-    const ctx = cv.getContext("2d");
-    // HiDPI：CSS 像素逻辑绘制 + setTransform 缩放，高分屏曲线不再发虚；布局宽变化时同步画布
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const vw = cv.clientWidth || 560, vh = 220;
-    if (cv.width !== Math.round(vw * dpr) || cv.height !== Math.round(vh * dpr)) {
-      cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
-    }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const data = window.MemoryStore.all();
-    ctx.clearRect(0, 0, vw, vh);
-    $("#chart-count").textContent = data.length ? `本机已记录 ${data.length} 条情绪（仅存于此浏览器）` : "还没有记录 — 聊几句就有了";
-    if (!data.length) {
-      ctx.fillStyle = "#8a93b2"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("暂无数据", vw / 2, vh / 2);
-      return;
-    }
-    const W = vw, H = vh, pad = 26;
-    const n = data.length;
-    const x = (i) => pad + (W - pad * 2) * (n === 1 ? 0.5 : i / (n - 1));
-    const y = (v) => H - pad - (H - pad * 2) * v;
-    ctx.strokeStyle = "rgba(255,255,255,.07)";
-    for (let g = 0; g <= 4; g++) { const gy = y(g / 4); ctx.beginPath(); ctx.moveTo(pad, gy); ctx.lineTo(W - pad, gy); ctx.stroke(); }
-    ctx.beginPath();
-    data.forEach((d, i) => { const px = x(i), py = y(d.intensity); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
-    ctx.strokeStyle = "rgba(124,108,255,.8)"; ctx.lineWidth = 2; ctx.stroke();
-    data.forEach((d, i) => {
-      const c = window.EmotionEngine.colorOf(d.emotion);
-      ctx.fillStyle = `rgb(${c.map(v => Math.round(v * 255)).join(",")})`;
-      ctx.beginPath(); ctx.arc(x(i), y(d.intensity), d.emotion === "crisis" ? 6 : 4, 0, Math.PI * 2); ctx.fill();
-    });
-    // 图例：6 情绪分布
-    const counts = {};
-    data.forEach(d => { counts[d.emotion] = (counts[d.emotion] || 0) + 1; });
-    let lx = pad, ly = 14;
-    ctx.font = "11px sans-serif"; ctx.textAlign = "left";
-    for (const [emo, cnt] of Object.entries(counts)) {
-      const c = window.EmotionEngine.colorOf(emo);
-      ctx.fillStyle = `rgb(${c.map(v => Math.round(v * 255)).join(",")})`;
-      ctx.beginPath(); ctx.arc(lx + 4, ly, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#8a93b2";
-      const label = `${window.EmotionEngine.labelOf(emo)} ${cnt}`;
-      ctx.fillText(label, lx + 12, ly + 4);
-      lx += ctx.measureText(label).width + 34;
-    }
-  }
   $("#btn-clear").addEventListener("click", () => {
     window.MemoryStore.clear();
     if (gl) { window.ThreeScene.cancelShow(); window.ThreeScene.douse(); }   // 星星同步熄灭
     syncStars();
     $("#probe-result").textContent = "星星已熄灭 —— 再和它说一句话，星雾会重新亮起来。";
-    drawChart();
+    window.Chart.render();
   });
-  // 视口/布局变化时曲线按新 CSS 宽重绘（防抖，避免拖动期高频重算；无数据时跳过）
-  let chartResizeTimer = 0;
-  addEventListener("resize", () => {
-    clearTimeout(chartResizeTimer);
-    chartResizeTimer = setTimeout(() => { if (window.MemoryStore.all().length) drawChart(); }, 200);
-  });
+  // 7) 情绪曲线：r25 外提到 `src/js/chart.js`（行为零改动；判据=browser_check 的曲线计数断言）
+  window.Chart.init();
 
   // J4：远端记忆（默认关闭）。开启且服务端可达时，用数据库权威副本覆盖本地后重建星图；
   // 未开启/不可达 → 走下面这行，行为与 v1 完全一致（确保既有回归不受影响）。
   if (window.MemoryStore.isRemote()) {
     window.MemoryStore.hydrate()
-      .then(ok => { if (ok) { replayStars(); drawChart(); } })
+      .then(ok => { if (ok) { replayStars(); window.Chart.render(); } })
       .catch(() => { /* 服务端不可达 → 保持本地记忆 */ });
   }
   replayStars(); // 进页面先按本机记忆把星图重建出来

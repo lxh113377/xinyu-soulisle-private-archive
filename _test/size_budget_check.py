@@ -27,6 +27,7 @@ BUDGETS = {
     "src/js/emotion-engine.js": 5_598,
     "src/js/emotion-remote.js": 4_679,
     "src/js/voice.js": 4355,
+    "src/js/chart.js": 3969,
     "src/js/scroll-story.js": 3_757,
     "src/js/three-scene.js": 15_793,
     "src/js/memory-store.js": 4_844,
