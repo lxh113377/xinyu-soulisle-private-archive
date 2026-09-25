@@ -43,3 +43,16 @@
 - **J4 远端记忆默认关闭**（`cfg.remote`）—— 零回归风险；代价 = 不主动开启则"跨设备记住你"不成立
 - **鉴权用轻量 token 过滤器**（未引 Spring Security）—— 够用 + 依赖最小；代价 = 无多用户/角色/会话管理
 - **评测集不复制进 jar**（服务端直读 `_test/`）—— 保证 Java 侧与 JS 侧跑的是同一份数据
+
+
+## 排障手册（本轮一手实测，进仓即读）
+
+> 只登记**本机本仓亲测复现过**的报错特征，一条一测；未复现的传闻不写（写进来就会有人当真理）。
+
+| 症状 / 报错原文 | 真因 | 处置 |
+|---|---|---|
+| `[GATE:dag-fail] ... 块内找不到本次改动标识 require_mark=` 但 `blocks` 数在涨 | `dag_precheck.py` 的块体＝**锚点行之后到空行之前**；把"本次标识"写在 `##` 标题行 = 在块体外 | 标识必须写在 `【数据流假设】` 锚点**下面的块体内**（如 `本次标识: xxx`）；且该工具只扫 GM 日志 `D:/global_memory/memory/`，写项目日志无效 |
+| `gh api` 调用抛 `json.decoder.JSONDecodeError` / 结果恒空 | 本仓 `_test/benchmark_metrics.py:gh()` 会 `json.loads(整个响应)` 且非零退出即抛 ⇒ 带 `--jq` 出来的**裸字符串不是合法 JSON** | 取整份 dict 再自己挑字段（`gh("repos/x")["description"]`）；要用 `--jq` 就得绕开该 helper |
+| 文档里某条红线/条目**表头整行消失**，只剩续行 | 用"既有条目行的前缀"当 Edit 锚点，替换文本里没把原表头回写（长行台账同族第四形态） | 锚点须含被改动的**整行**并在 new 里回写；改完必查 `git diff --stat`：**只有 +N 无 -M** 才算没吞行 |
+| `SyntaxError: bytes can only contain ASCII literal characters` | 写了 `b"中文"`（bytes 字面量不能含非 ASCII） | 用 `文本.decode/encode` 或先 `.decode("utf-8", errors="replace")` 再做子串判断 |
+| Python 里 `/tmp/xxx` 报 `FileNotFoundError: '\tmp\xxx'` | Git Bash 的 `/tmp` ≠ Windows Python 的 `/tmp`（后者按当前盘根解析） | 跨 bash/python 传文件用显式 `C:/Users/37533/AppData/Local/Temp/...` |

@@ -9,6 +9,17 @@
 > GitHub 账户账单导致 runner 从未启动；同时清掉我自己写进聚合器的 3.12-only 语法。外部漂移全为 ★ 抖动。
 
 ### Added
+- **离线能力的「第二条观测通道」（r31）**：`pwa_offline=0/16` 原本只靠**文件名法**
+  （`sw.js|service-worker.js|serviceworker.js|sw.ts`）—— 而 r30 刚证明文件名法会假阴性，对自己如此，对参照仓亦然。
+  新增 `offline_signal_class()`（纯函数，读 description+README）把 "offline" 分四类
+  `app_shell / local_models_offline / ml_training_offline / none`，**先归因再计数**；台账 `--offline-audit` 跑，
+  结果只写快照 `runs[-1].offline_audit` 与复核行，**不参与 `caps` 计数**。实测 16 仓：
+  `app_shell=0`、`local_models_offline=1`（Open-LLM-VTuber「run completely offline using local models」，
+  桌面自托管形态而非网页壳）、`ml_training_offline=1`（hello-diana/MASCOT 的 **offline DPO 训练** = 误报源）、
+  `unverified=0` ⇒ 差异结论从"单观测法 + 手工抽查 1 仓"升级为"双独立通道 + 逐仓点名"。
+  判据自证：四类各一合成样本 + 两条反向（训练语境不得判成离线壳 / 真 SW 语境必须判成离线壳）+ 零输入判 `none`；
+  两个变异体（恒判 app_shell、恒判 none）实测 `SELFTEST-FAIL rc=1`，还原后 rc=0。
+  复算：`python _test/benchmark_metrics.py --selftest` + `python _test/benchmark_metrics.py --offline-audit`
 - **`_test/ci_status_check.py`（K1–K4，电池 33 → 35 套件）**：把"CI 红"分成 `CODE_FAIL` / `ENV_BLOCKED` / `PASS`
   三态。ENV 判据 = 全部 job 在 15s 内失败 **且** run 的 ANNOTATIONS 命中账单/配额类措辞 ⇒ rc=2，
   并明写「本轮不得声称 CI 已验」。结论只取 HEAD 那次 run（历史红只作上下文）；在 CI 内部自动 SKIP（自指）。

@@ -13,6 +13,7 @@ JSON 台账，并强制每次运行输出「与上一次快照的逐字段差值
 退出码：0=BENCHMARK-METRICS-PASS 1=取数失败或自检未过 2=网络/token 环境异常
 """
 import argparse
+import base64
 import json
 import os
 import re
@@ -81,6 +82,80 @@ BLIND_PROBES = {
     "streaming": ((".js", ".java", ".ts"), ("text/event-stream", "ReadableStream")),
     "e2e_browser": ((".py", ".js", ".ts"), ("sync_playwright", "from playwright", "chromium.launch")),
 }
+
+
+def _blind_probe_hit(root, rel, needles):
+    pass
+
+
+# ── 第二条观测通道（r31）：文件名法只看 sw.js 之类，对**参照仓同样是下限**（与 self 的盲区点名同一原理）。
+#     内容法读 description+README，但 "offline" 一词有三种完全不同的含义，必须先归因再计数，
+#     否则会把"离线训练"读成"离线可用"（r31 实测：hello-diana/MASCOT 的 offline DPO 即是误报源）。
+OFFLINE_CLASSES = ("app_shell", "local_models_offline", "ml_training_offline", "none")
+RE_APP_SHELL = re.compile(r"service.?worker|workbox|precache|app.?shell|offline.?first|caches\.match|sw\.js", re.I)
+RE_ML_TRAIN = re.compile(r"offline\s+(dpo|rl|rlhf|train|training|preference|fine.?tun|evaluation\s+pipeline)"
+                         r"|dpo\b|\brlhf\b|rollout", re.I)
+RE_LOCAL_OFF = re.compile(r"(run|runs|work|works|use|deploy).{0,40}offline|offline\s+mode|completely\s+offline"
+                          r"|no\s+internet\s+required|离线运行|完全离线", re.I)
+
+
+def offline_signal_class(text):
+    """纯函数：无网络无副作用 ⇒ 可离线自证。返回 (类别, 证据片段)。
+
+    判定顺序即归因顺序：训练语境最窄，先判掉；否则"offline DPO"会被本地离线那条误吞。
+    """
+    t = text or ""
+    if "offline" not in t.lower() and not RE_APP_SHELL.search(t):
+        return "none", ""
+    m = RE_ML_TRAIN.search(t)
+    if m and not RE_APP_SHELL.search(t):
+        return "ml_training_offline", _snippet(t, m)
+    m = RE_APP_SHELL.search(t)
+    if m:
+        return "app_shell", _snippet(t, m)
+    m = RE_LOCAL_OFF.search(t)
+    if m:
+        return "local_models_offline", _snippet(t, m)
+    # 只剩"见过 offline 字样但三种语境都不匹配"的情形 ⇒ 判 none。
+    # 故意**不设兜底**：兜底会把"任何 offline 措辞"升格成某种能力，而这条通道的用途只是复核，
+    # 宁可漏计对手（与文件名法同为下限），也不许凭空造出一格能力。
+    return "none", ""
+
+
+def _snippet(t, m):
+    s = re.sub(r"\s+", " ", t[max(0, m.start() - 60):m.end() + 60]).strip()
+    return s[:120]
+
+
+def offline_audit(repos):
+    """对每个参照仓取 description+README，跑第二条通道。取不到的仓**必须**记 unverified 并点名。
+
+    `gh()` 的返回形态要注意两件事：它 `json.loads` 整个响应，且**非零退出即抛**
+    —— 所以这里不能带 `--jq`（--jq 输出的裸字符串不是合法 JSON，loads 会炸），
+    必须取整份 dict 再自己挑字段（r31 首跑即栽在这上面）。
+    """
+    out = {}
+    for r in repos:
+        full = r["repo"]
+        parts, errs = [], []
+        try:
+            meta = gh("repos/" + full)
+            parts.append(f"{meta.get('description') or ''} | {meta.get('homepage') or ''}")
+        except Exception as e:
+            errs.append("meta:" + str(e)[:70])
+        try:
+            rd = gh("repos/" + full + "/readme")
+            parts.append(base64.b64decode((rd.get("content") or "").strip())
+                         .decode("utf-8", errors="replace")[:200000])
+        except Exception as e:
+            errs.append("readme:" + str(e)[:70])
+        hay = "\n".join(parts)
+        if not hay.strip():
+            out[full] = {"class": "unverified", "evidence": "; ".join(errs) or "两路均空"}
+            continue
+        cls, ev = offline_signal_class(hay)
+        out[full] = {"class": cls, "evidence": ev, "partial": bool(errs)}
+    return out
 
 
 def blind_spot_caps(root, tracked, caps_found):
@@ -353,16 +428,50 @@ def selftest():
         if blind_spot_caps(troot, ["src/chat.js"], {"streaming"}):
             print("SELFTEST-FAIL: 文件名匹配器已看见的能力仍进盲区名单（重复计数）")
             return 1
+    # 第二条离线观测通道（r31）：四类各一条 + 两条反向 + 一个变异体，缺任一 = 判据不可信
+    samples = {
+        "app_shell": ("This PWA ships a **service worker** (sw.js) using workbox precaching, "
+                      "so the page still opens offline-first."),
+        "local_models_offline": ("🔒 **Offline mode support**: Run completely offline using local "
+                                 "models - no internet required."),
+        "ml_training_offline": ("The Director is optimized with GRPO; an offline **DPO** trainer is "
+                                "retained as an optional alternative."),
+        "none": "A chat UI built with React + FastAPI, deployed on Kubernetes.",
+    }
+    for want, text in samples.items():
+        got = offline_signal_class(text)[0]
+        if got != want:
+            print(f"SELFTEST-FAIL: 离线分类判错（{want} 被判成 {got}）样本={text[:50]!r}")
+            return 1
+    if offline_signal_class(samples["ml_training_offline"])[0] == "app_shell":
+        print("SELFTEST-FAIL: 训练语境的 offline 被判成离线壳 ⇒ 会伪造出对手的假能力")
+        return 1
+    _g = globals()
+    _mt, _ms = _g["RE_ML_TRAIN"], _g["RE_APP_SHELL"]
+    try:
+        _g["RE_ML_TRAIN"] = re.compile(r"(?!)")    # 变异体：摘掉最窄那条归因规则（必须写 globals，函数内赋值改不到模块态）
+        _g["RE_APP_SHELL"] = re.compile(r"(?!)")
+        if offline_signal_class(samples["ml_training_offline"])[0] == "ml_training_offline":
+            print("SELFTEST-FAIL: 摘掉归因正则后仍判对 ⇒ 该类根本没在被判的东西上（判据恒真）")
+            return 1
+    finally:
+        _g["RE_ML_TRAIN"], _g["RE_APP_SHELL"] = _mt, _ms
+    if offline_signal_class("")[0] != "none" or offline_signal_class(None)[0] != "none":
+        print("SELFTEST-FAIL: 零输入被判成有能力 ⇒ 违反「零输入不得记 PASS」")
+        return 1
     print("SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（"
           f"{len(got)} 条）；分档正确（实质 {len(sub)} / 抖动 {len(noise)}）且纯抖动场景零实质；"
           "分母证明正确（1 有效 / 2 盲区点名，健康仓不误踢）；"
-          "r30 盲区点名三侧正确（有证据→点名、无证据→空、已看见→不重复）")
+          "r30 盲区点名三侧正确（有证据→点名、无证据→空、已看见→不重复）；"
+          "r31 离线四分类各判对 + 训练语境不冒充离线壳 + 摘掉归因正则即翻判（变异体）+ 零输入判 none")
     return 0
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--offline-audit", action="store_true",
+                    help="跑第二条离线观测通道（16 仓 × 2 次 API，较慢；判据本体由 --selftest 常驻守着）")
     ap.add_argument("--out", default=str(SNAP))
     args = ap.parse_args()
 
@@ -392,6 +501,20 @@ def main():
     own = self_metrics()
     run = {"ts": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
            "repo_count": len(cur), "self": own, "repos": cur}
+    if args.offline_audit:
+        # 只用于**交叉验证**"0/16"这类全零结论，不参与 caps 计数（参与就成了第二把尺）
+        audit = offline_audit(cur)
+        run["offline_audit"] = audit
+        unv = sorted(k for k, v in audit.items() if v["class"] == "unverified")
+        shell = sorted(k for k, v in audit.items() if v["class"] == "app_shell")
+        local = sorted(k for k, v in audit.items() if v["class"] == "local_models_offline")
+        train = sorted(k for k, v in audit.items() if v["class"] == "ml_training_offline")
+        print(f"  离线双通道（内容法，仅供复核）: app_shell={len(shell)}/{len(audit)} "
+              f"local_models_offline={len(local)} ml_training_offline(误报源)={len(train)} unverified={len(unv)}")
+        if unv:
+            print(f"  ⚠️ 分母不全（{len(unv)} 仓未取到：{'、'.join(unv)}）⇒ **不得**据全零下差异结论")
+        for k in shell + local:
+            print(f"    ▶ {k} [{audit[k]['class']}] {audit[k]['evidence'][:90]}")
     hist = (hist + [run])[-6:]
     drift = diff_snap(prev_repos, cur)
 

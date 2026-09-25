@@ -18,24 +18,26 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
 - [ ] **J3/J4 变现**（= 让已建成能力真跑起来）：① 两端一致性守卫 ✅ ② 本地演示 `remote:true` ✅
       ③ fat jar 部署包 + Docker 镜像**两条路均已实测就绪** ⇒ **唯一阻塞 = 老大提供目标机器**（IP/登录/安全组）。
       2026-09-24 老大裁决：先不办，降级至 10 月复赛节点。完整段见 `part17`。
-- [x] ✅ **重录演示成片（r30 已交付）**：8 幕 217.6s，S3 标签含「在线大模型生成 · 逐字流式 · 情绪:后端」，
-      成片 sha256=`fc810f65…`；录后 `public_check`/`live_sync`/`deploy_sync` 三项 PASS。
-      下一步仍可复算：`python _test/demo_video_pipeline.py`（守卫要求**同源相对** `proxy="/api/chat"`，
-      绝对 URL 跨源被 CORS 拦成离线模板；切换与还原按 sha256）。全文见 `part20` 三 + 提交清单红线。
+- [ ] 🔴 **下一件（r31 登记，agent 可自驱）**：按 R242 回扫交付物与当前构建的一致性 —— PDF 与 8 张截图取证于
+      09-24，而 09-25 之后新增了设置面板 / 离线壳 / 曲线外提 / 后端情绪链路 ⇒ 交付材料大概率落后。
+      动作：`_test/screenshots_resubmit.py` 重截 → `render-pdf.ps1` 重渲染 → 「离线壳」写进方案正文 →
+      复跑 `public_check` + 更新提交清单第 1 行（页数与取证时刻须重测，禁沿用旧值）。
 - [ ] ⛔ **只有老大能解（agent 侧无入口）**：GitHub Actions 账户账单/配额 —— HEAD 最近 run 判 `ENV_BLOCKED`
       （runner 从未启动）⇒ r28 的 CI 覆盖面修复**至今无法在受理面验证，我不声称已验**。
-      复算：`python _test/ci_status_check.py`（解除后此条应转 `PASS`，电池那条红随之消失）
-- [ ] **同族坑收口**：前五次台账见 `part18`，r30 增补（索引壳超限）见 `part20`；判据 G9 常驻 `repo_config_check.py`。
+      复算：`python _test/ci_status_check.py`（解除后应转 `PASS`，电池那条红随之消失）
+- [ ] **同族坑收口**：台账见 `part18`/`part20`（r30 增补=索引壳超限）；G9 常驻 `repo_config_check.py`。
 - [x] ✅ **技能治理链挂账四条全闭环（r30；挂账理由被实测推翻）**：A-get-memory **V4.32.0**（失败面须与成功面同条
       登记）+ **V4.33.0**（同族坑第三次起禁写"下次注意"，当轮须交付机器可判载体）+ consulting-analysis **V1.7.0**
       （M5⑧ 同一把尺对双方是否同构：盲区单列、不并入 `caps`）+ **一条改判**（r25 第二条已由 Step 2.7 承接，
       按 M5⑥ 不复制第二处）。门禁全绿序列与逐条理由见 `part21`。
-      复算：`grep -n "^version:" D:/global_skills/A-get-memory/SKILL.md D:/global_skills/consulting-analysis/SKILL.md`
+      复算：`grep -n "^version:" D:/global_skills/{A-get-memory,consulting-analysis}/SKILL.md`
+- [x] ✅ r30 成片重录（sha `fc810f65…`/217.6s，含后端引擎画面，详见 part20 三）；r31 差异结论补第二条观测通道
+      （`offline_signal_class()` 四类归因，`app_shell=0/16` 两法一致；措辞禁写"没人做离线"，红线已入 06）。
 
 ## 分卷目录
 
 - **卷1–7** `part1..part7.md` — J1–J5 逐阶段验收证据与命令（卷1–4）/ P1·P2 与对话摘要（卷5）/
   **P0 未完成项完整描述**（卷6）/ P0 已完成项 + 改造不变量 + J4·J5 详情（卷7）
 - **卷8–16** `partN.md` — R199 自动拆卷（历次已完成条目）；含**卷11** = fat jar / 容器部署完整史（人工自卷6拆出）
-- **卷17–21** `partN.md` — 17 主线背景块 + J3/J4 完整段｜18 切分做法 + 八步序列 + 同族坑前五讲｜
-  19 离线壳做法五条 + 时效门槛｜20 CI 三条判据 + 同族坑 r30 增补 + 成片重录全程｜**21 技能治理链四条闭环全记录（r30）**
+- **卷17–21** `partN.md` — 17 主线背景+J3/J4 段｜18 切分做法+八步序列+同族坑前五讲｜19 离线壳做法｜
+  20 CI 三判据+成片重录全程｜**21 技能治理链四条闭环全记录**
