@@ -388,8 +388,7 @@ def selftest():
         bad.append("篡改⑫b（CI 跑电池但不声明豁免）未被 G10 抓到")
     # 变异必须**只动豁免集合**：上一版用裸 replace('"stream_contract"', ...) 把 SUITES 里的同名条目
     # 一起改了，于是"幽灵"自己变得合法 —— 反例造得不干净，等于没造（r28 实测这条报"未被抓到"）。
-    ghost_src = st.replace('LLM_SUITES = {"j2_chat_contract", "stream_contract"}',
-                           'LLM_SUITES = {"j2_chat_contract", "no_such_suite"}')
+    ghost_src = st.replace('"stream_contract", "online_check"}', '"stream_contract", "no_such_suite"}')
     if ghost_src == st:
         bad.append("篡改⑫c 的锚点没命中 ⇒ 变异未生效（这种「没变却以为变了」必须单独抓）")
     elif ci_battery_audit(ci0, ghost_src)[0] == []:

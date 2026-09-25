@@ -12,7 +12,7 @@
  *
  * 另外：`js/demo-config.js` 本地版含密钥 ⇒ **永不预缓存、永不写缓存**（判据 O6 盯着）。
  */
-const VENDOR_STAMP = "b84ce922be";                       // 由 _test/offline_shell_check.py O7 复算校验（占位值即判红）
+const VENDOR_STAMP = "ca0f2b633c";                       // 由 _test/offline_shell_check.py O7 复算校验（占位值即判红）
 const CACHE = "xinyu-shell-" + VENDOR_STAMP;
 const PRECACHE = [
   "/", "/index.html", "/manifest.webmanifest",

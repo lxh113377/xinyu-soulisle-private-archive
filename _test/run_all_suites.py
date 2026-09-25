@@ -45,7 +45,12 @@ SUITES = [
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），
 # CI runner 上没有密钥 ⇒ 只能显式豁免，且豁免必须被 G10 复核（见 repo_config_check.py）
-LLM_SUITES = {"j2_chat_contract", "stream_contract"}
+# 需要真实上游密钥的三条：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），
+# CI runner 上没有密钥 ⇒ 只能显式豁免，且豁免必须被 G10 复核。
+# online_check 也在其中：它断言的就是「对话走了在线模型」，无密钥时该断言必然红 ——
+# 放宽它等于把这条判据作废（r28 CI 等效复现实测：它在无密钥环境报 6 条 500，
+# 那 500 是契约内响应，但"必须出现 在线大模型生成"这一条本就不可能在无密钥环境成立）。
+LLM_SUITES = {"j2_chat_contract", "stream_contract", "online_check"}
 
 # r22 加：`--only <子串>` / `--slice <起> <止>` 分段取数。
 # ⚠️ 本版第一稿是**死代码**（先滤掉 "--" 开头的参数再判 args[0] == "--slice"，永不命中），
@@ -85,8 +90,19 @@ def main():
         p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=600)
         tail = (p.stdout or "").strip().splitlines()
-        results.append((name, p.returncode, tail[-1][:110] if tail else (p.stderr or "").strip()[:110]))
+        # 聚合器只留最后一行 ⇒ 判据说 FAIL 却答不出"哪一条 FAIL"，等于没判（r28 CI 实测踩到）。
+        # 现在：rc≠0 时把该套件里所有 FAIL/🔴/异常行原样吐出来（成功路径仍只有一行，不制造噪声）。
+        # 聚合器只留最后一行 ⇒ 判据说 FAIL 却答不出"哪一条 FAIL"，等于没判（r28 CI 实测踩到）。
+        # 现在：rc≠0 时把该套件的 FAIL/🔴/异常行原样带出来；成功仍是一行，不制造噪声。
+        detail = []
+        if p.returncode != 0 and tail:
+            keys = ("FAIL", "🔴", "Error", "error:", "Traceback", "SKIP")
+            hit = [x.strip()[:170] for x in tail if any(k in x for k in keys)]
+            detail = hit or tail[-6:]
+        results.append((name, p.returncode, (tail[-1][:110] if tail else (p.stderr or "").strip()[:110])))
         print(f"{name:22s} rc={p.returncode} | {results[-1][2]}")
+        for d in detail:
+            print(f"{" " * 25}· {d}")
 
     bad = [r for r in results if r[1] != 0]
     print("=" * 60)

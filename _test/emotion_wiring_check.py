@@ -57,7 +57,17 @@ def static_wiring(html, agent, cfgjs):
         bad.append(f"脚本顺序不成立 engine={i_engine} remote={i_remote} agent={i_agent}")
     if "EmotionRemote.classifyWithBackend" not in agent:
         bad.append("chat-agent.js 未走 EmotionRemote.classifyWithBackend")
-    if "emotionRemote" not in cfgjs:
+    # 三层开关：代码默认 off / 本机演示 on（含 Key，被 gitignore）/ 公网 stub **刻意 off**。
+    # CI 是全新 clone，`src/js/demo-config.js` 由公网零密钥 stub 代填 ⇒ 那里「没有 emotionRemote」是设计，
+    # 不是缺陷。判据必须分环境各断言各的，否则红的是"我没在我电脑上"（r28 CI 实测踩到）。
+    stub_path = ROOT / "deploy" / "xinyu" / "js" / "demo-config.js"
+    is_stub = stub_path.exists() and cfgjs == stub_path.read_text("utf-8", errors="replace")
+    if is_stub:
+        if "emotionRemote" in cfgjs:
+            bad.append("公网零密钥 stub 里出现了 emotionRemote（公网应当刻意不开后端情绪链路）")
+        else:
+            print("  NOTE  当前 demo-config 是公网零密钥 stub（CI 等效环境）⇒ 断言翻转为「公网必须不开 emotionRemote」")
+    elif "emotionRemote" not in cfgjs:
         bad.append("本地演示配置未置 emotionRemote")
     return bad
 

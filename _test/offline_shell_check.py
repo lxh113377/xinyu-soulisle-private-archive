@@ -61,10 +61,19 @@ def check(name, ok, detail=""):
 
 
 def vendor_stamp():
-    """与 sw.js 的 VENDOR_STAMP 同一算法：按文件名排序拼接 src/vendor/*.js 的 sha256，取前 10 位"""
+    """vendor 内容指纹 ⇒ 离线壳的 cache 名（换库忘 bump 即判红）。
+
+    跨环境必须稳定，三条都实测踩过：① 行尾（本机 checkout 可能 CRLF、runner 是 LF）；
+    ② 文件名排序（`ScrollTrigger` 与 `gsap` 大小写混排，按原样排序与按 lower() 排序给出不同拼接顺序，
+    拼接哈希就不同 —— r28 CI 算出 8418cd7985 而本地是 b84ce922be，正是这类不稳定）；
+    ③ 逐文件先摘要再按名字排序合并，彻底与 glob 顺序无关。
+    """
+    per = []
+    for p in sorted((ROOT / "src" / "vendor").glob("*.js"), key=lambda q: q.name.lower()):
+        per.append((p.name.lower(), hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()))
     h = hashlib.sha256()
-    for p in sorted((ROOT / "src" / "vendor").glob("*.js")):
-        h.update(p.read_bytes())
+    for name, dg in sorted(per):
+        h.update(name.encode() + b"=" + dg.encode() + b";")
     return h.hexdigest()[:10]
 
 

@@ -90,7 +90,10 @@ def main() -> int:
     if unexpected_extra:
         fails.append(f"EXTRA {len(unexpected_extra)} 项")
 
-    # 红线复核：白名单里的 stub 必须存在、零密钥、且与含 Key 的 src 版不同
+    # 红线复核：公网 stub 必须存在且**零密钥**。
+    # 「两份必须不同」只在 src 版真的含 Key 时才是红线 —— r28 CI 实测：全新 clone 里没有 src 版
+    # （被 gitignore），CI 会先把公网 stub 复制成 src 版 ⇒ 两份必然相同 ⇒ 被误判红。
+    # 那是判据把"本机状态"当成了"普适不变量"；真不变量是"公网副本永不带密钥"。
     for r in WHITELIST_EXTRA:
         stub = DST / r
         origin = SRC / r
@@ -98,12 +101,16 @@ def main() -> int:
             fails.append(f"缺少公网零密钥 stub: {r}")
             continue
         text = stub.read_text(encoding="utf-8", errors="replace")
-        if re.search(KEY_RE, text):
+        src_txt = origin.read_text(encoding="utf-8", errors="replace") if origin.is_file() else ""
+        stub_key = bool(re.search(KEY_RE, text))
+        src_key = bool(re.search(KEY_RE, src_txt))
+        same = origin.is_file() and sha256(stub) == sha256(origin)
+        if stub_key:
             fails.append(f"红线：公网 stub 含真实 Key -> {r}")
-        if origin.is_file() and sha256(stub) == sha256(origin):
-            fails.append(f"红线：公网 stub 与 src 版相同（src 版含 Key）-> {r}")
-        print(f"  红线复核 {r}: 零密钥={not re.search(KEY_RE, text)} 与src不同="
-              f"{not origin.is_file() or sha256(stub) != sha256(origin)}")
+        if src_key and same:
+            fails.append(f"红线：src 含 Key 却与公网副本相同（会把密钥推上公网）-> {r}")
+        print(f"  红线复核 {r}: 公网零密钥={not stub_key} src含Key={src_key} 两份相同={same}"
+              + ("（CI 等效：src 版由 stub 代填，相同属预期）" if same and not src_key else ""))
 
     print()
     if fails:

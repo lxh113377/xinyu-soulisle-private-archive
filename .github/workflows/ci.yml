@@ -167,9 +167,9 @@ jobs:
       # 判据必须挂在**真会走的路径**上：原先本 job 只跑 browser_check 一条，
       # 其余 30+ 条判据（含 r26-r28 新加的 patch_apply / settings_panel / offline_shell）只在本地跑
       # ⇒ 与同行踩过的「CodeQL 只挂 PR、main 零分析」同族：装了不等于在用。现改为整跑电池。
-      # runner 没有上游密钥（密钥不落仓）⇒ 用 --exclude-llm 显式豁免两条在线链路套件，
+      # runner 没有上游密钥（密钥不落仓）⇒ 用 --exclude-llm 显式豁免三条在线链路套件，
       # 且豁免数与总数由脚本自证恒等式；CI 覆盖面本身另有 repo_config 的 G10 常驻判据盯着。
-      - name: 全量回归电池（31 条实跑 + 2 条无密钥豁免，豁免必须点名）
+      - name: 全量回归电池（30 条实跑 + 3 条无密钥豁免，豁免必须点名）
         run: python _test/run_all_suites.py --exclude-llm
 
   live-sync:
