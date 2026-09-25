@@ -13,7 +13,8 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
 
 - [ ] 🔴 **iCAN 提交硬截止 2026-09-30（剩 5 天；截止即锁团队信息）**：官网报名 + 提交。
       缺件只剩一项：**报名名单 PII（五人学号/手机号/邮箱 + 指导教师 ≤2 非成员 + 官网填报登录态）只有老大能给**。
-      PDF ✅ 18 页（PII 齐后重渲染署名）；视频 ✅ **217.6s，r30 已重录含后端引擎链路**（非"待录"）。
+      PDF ✅（页数不抄数，复算：`powershell -File 交付物/提交包/render-pdf.ps1` 末行 `PAGES=` 须 ≤20）；
+      视频 ✅ **218.5s，r34 已再录含诚实标签画面**（非"待录"）。
       完整复核记录见 `part6`。
 - [ ] **J3/J4 变现**（= 让已建成能力真跑起来）：① 两端一致性守卫 ✅ ② 本地演示 `remote:true` ✅
       ③ fat jar 部署包 + Docker 镜像**两条路均已实测就绪** ⇒ **唯一阻塞 = 老大提供目标机器**（IP/登录/安全组）。
@@ -22,10 +23,12 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
       `PUBLIC-ONLINE-ALL-PASS`（标签实测「在线大模型生成 · 逐字流式」/ 危机 True / console 0）+
       `/api/chat` 200 + 公网 `app.js` 含降级徽章、`chat-window.js` 含诚实标签。
       ⚠️ 部署命令必须 `cd deploy` 再跑（Functions 目录按 cwd 解析，日志须见 "Uploading Functions bundle"）。
-- [ ] 🔴 **下一件（r33 登记）**：成片（217.6s）录在 r32 徽章/开场白修复**之前**，画面里仍是
-      「在线 AI · 共情模式」旧标签 ⇒ 按 M6 材料须追上构建，重录一次：
-      `src/js/demo-config.js` 按 sha256 存档 → 临时改**同源相对** `proxy: "/api/chat"` →
-      `python _test/demo_video_pipeline.py` → 按哈希还原 → 复跑 `public_check` + 更新提交清单第 2 行指纹。
+- [x] ✅ **r34 成片再录完成**：`RECORD-PASS scenes: 8` + `VIDEO-PIPELINE-PASS dur=218.5s`，抽帧目检画面已含
+      「本机开场白 · 未经大模型」+「● 在线 AI」；配置按 sha256 逐字节还原、公网 stub 未触碰、
+      `public_check` → `KEY_LEAK: False`。指纹与代际**不抄在这里**：见提交清单第 2 行。
+- [ ] 🔴 **下一件（r34 登记，agent 可自驱）**：`memory/05-feature-status.md` 是功能状态权威清单，
+      r32（徽章三态 + 诚实标签）与 r34（成片代际）之后大概率落后 ⇒ 按"材料须追上构建"复扫并补条目；
+      复算：`grep -n "在线 AI\|本机开场白\|演示视频" memory/05-feature-status.md*` 命中数须 >0 且逐条对得上实测。
 - [ ] ⛔ **只有老大能解（agent 侧无入口）**：GitHub Actions 账户账单/配额 —— HEAD 最近 run 判 `ENV_BLOCKED`
       （runner 从未启动）⇒ r28 的 CI 覆盖面修复**至今无法在受理面验证，我不声称已验**。
       复算：`python _test/ci_status_check.py`（解除后应转 `PASS`，电池那条红随之消失）
