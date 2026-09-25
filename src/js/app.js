@@ -253,7 +253,7 @@
       const aiMsg = pushMsg("ai", r.reply,
         `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
       aiMsg.dataset.emotion = r.emotion;
-      speak(r.reply);   // 朗读开关打开时同步播出（失败静默，绝不影响主链路）
+      window.Voice.speak(r.reply);   // 朗读开关打开时同步播出（失败静默，绝不影响主链路）
       // 记住这条情绪 → 点亮一簇星（一个瞬间 = 1~8 颗，强度越高越多）
       // 复用 respond 里已算好的词典结果，避免同文本二次 scan；旧版本无 lexAll 时回落重扫
       const lexAll = r.lexAll || window.EmotionEngine.scan(text).all;
@@ -274,78 +274,10 @@
     }
   });
 
-  // 6.2) 回复朗读（Web Speech Synthesis，zh-CN，零依赖）。
-  //      对标 Open-LLM-VTuber / LobeChat 的 TTS：陪伴产品「只打字不出声」是明显短板。
-  //      与语音输入同理：浏览器不支持即隐藏按钮；开关持久化在 peiliao.speak.v1（不进对话配置，
-  //      避免 ChatAgent.setCfg 清历史时被牵连）。
-  const SPEAK_KEY = "peiliao.speak.v1";
-  let speakOn = false;
-  try { speakOn = localStorage.getItem(SPEAK_KEY) === "1"; } catch { /* 内存态 */ }
-  (function speakInit() {
-    const btn = $("#btn-speak");
-    btn.setAttribute("aria-pressed", String(speakOn));
-    if (!("speechSynthesis" in window) || typeof window.SpeechSynthesisUtterance !== "function") {
-      btn.style.display = "none";
-      btn.disabled = true;
-      return;
-    }
-    const paint = () => {
-      btn.classList.toggle("on", speakOn);
-      btn.setAttribute("aria-pressed", String(speakOn));
-      btn.textContent = speakOn ? "🔊" : "🔇";
-      btn.title = speakOn ? "正在朗读回复，点击关闭" : "点击开启回复朗读";
-    };
-    paint();
-    btn.addEventListener("click", () => {
-      speakOn = !speakOn;
-      try { localStorage.setItem(SPEAK_KEY, speakOn ? "1" : "0"); } catch { /* 内存态 */ }
-      if (!speakOn) { try { window.speechSynthesis.cancel(); } catch { /* 忽略 */ } }
-      paint();
-    });
-  })();
-  /** 朗读一条回复。任何异常一律吞掉：朗读是增益功能，绝不能把主对话链路带崩。 */
-  function speak(text) {
-    if (!speakOn || !("speechSynthesis" in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const u = new window.SpeechSynthesisUtterance(String(text).replace(/\s+/g, " ").slice(0, 400));
-      u.lang = "zh-CN";
-      u.rate = 1.02;
-      window.speechSynthesis.speak(u);
-    } catch { /* 无可用语音/被浏览器策略拦截 → 静默 */ }
-  }
-
-  // 6) 语音输入（Web Speech API，zh-CN；不支持则隐藏按钮）
-  (function voiceInit() {
-    const btn = $("#btn-voice");
-    btn.setAttribute("aria-pressed", "false");
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { btn.style.display = "none"; return; }
-    const rec = new SR();
-    rec.lang = "zh-CN";
-    rec.interimResults = true;
-    rec.continuous = false;
-    let listening = false;
-    btn.addEventListener("click", () => {
-      if (listening) { rec.stop(); return; }
-      listening = true;
-      btn.classList.add("recording");
-      btn.setAttribute("aria-pressed", "true");
-      btn.textContent = "●";
-      rec.start();
-    });
-    rec.onresult = (e) => {
-      let t = "";
-      for (const res of e.results) t += res[0].transcript;
-      $("#chat-input").value = t.slice(0, 500);
-    };
-    rec.onend = rec.onerror = () => {
-      listening = false;
-      btn.classList.remove("recording");
-      btn.setAttribute("aria-pressed", "false");
-      btn.textContent = "🎤";
-    };
-  })();
+  // 6) 语音（回复朗读 TTS + 语音输入 ASR）
+  //    对标轮 r24 整体外提到 `src/js/voice.js`：行为零改动（同一套 DOM 与 localStorage 键），
+  //    先摘这块是因为它与对话编排零耦合，能让剩余作用域只剩「编排 + 星图 + 曲线 + 窗口化 + 设置」。
+  window.Voice.init();
 
   // 7) 情绪曲线（折线=强度，色点=情绪类别，图例=6情绪分布计数）
   function drawChart() {

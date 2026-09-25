@@ -26,6 +26,7 @@ BUDGETS = {
     "src/js/chat-agent.js": 11_729,
     "src/js/emotion-engine.js": 5_598,
     "src/js/emotion-remote.js": 4_679,
+    "src/js/voice.js": 4355,
     "src/js/scroll-story.js": 3_757,
     "src/js/three-scene.js": 15_793,
     "src/js/memory-store.js": 4_844,
