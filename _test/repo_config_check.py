@@ -220,6 +220,86 @@ def import_safety(text):
     return bad
 
 
+REQ_ALIAS = {"pyyaml": "yaml", "pillow": "PIL"}   # 发行名 → import 名（清单写 PyYAML/Pillow，代码 import yaml/PIL）
+
+
+def ci_invoked_scripts(ci_text, suites_text):
+    """CI 真会执行的判据脚本 = workflow 的 run 里点名的 ∪ 电池 SUITES 里的。
+    审计面必须按这个集合来，否则会把"本地工具的重依赖"算进 CI 清单（G11 反过来判它幽灵依赖）。"""
+    names = set(re.findall(r"_test/([A-Za-z0-9_]+\.py)", ci_text)) | set(re.findall(r'"_test/([A-Za-z0-9_]+\.py)"', suites_text))
+    return sorted(ROOT / "_test" / n for n in names if (ROOT / "_test" / n).exists())
+
+
+def third_party_imports(files=None):
+    """AST 扫给定脚本的真实第三方 import（stdlib 与本目录模块排除）；files=None 时扫全部 _test。"""
+    import ast as _ast
+    std = set(getattr(sys, "stdlib_module_names", set()))
+    local = {p.stem for p in (ROOT / "_test").glob("*.py")}
+    out = set()
+    for p in sorted(files if files is not None else (ROOT / "_test").glob("*.py")):
+        try:
+            tree = _ast.parse(p.read_text("utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+        for n in _ast.walk(tree):
+            mods = []
+            if isinstance(n, _ast.Import):
+                mods = [a.name.split(".")[0] for a in n.names]
+            elif isinstance(n, _ast.ImportFrom) and n.module and n.level == 0:
+                mods = [n.module.split(".")[0]]
+            for m in mods:
+                if m and m not in std and m not in local and not m.startswith("_"):
+                    out.add(m)
+    return out
+
+
+def req_names(text):
+    out = set()
+    for ln in (text or "").splitlines():
+        ln = ln.split("#")[0].strip()
+        if not ln:
+            continue
+        name = re.split(r"[<>=!;\[]", ln)[0].strip().lower()
+        if name:
+            out.add(REQ_ALIAS.get(name, name))
+    return out
+
+
+def ci_deps_audit(ci_text, req_text, imports):
+    """G11 纯函数：依赖清单 == 判据实际 import，且每个跑判据的 job 都装了清单。
+
+    r28 加。根因是实测：CI 的 java-build job 长期红着（`api_contract_check.py` 要 PyYAML，
+    那个 job 只 setup-python 没装依赖 ⇒ rc=2），而**本机装了所以永远看不见** ——
+    与同行「本地全绿、CI 判红」同族（两处实现/两份环境）。清单化 + 本判据 = 少写一处就报红。
+    """
+    bad = []
+    req = req_names(req_text)
+    if not req:
+        bad.append("G11 requirements.txt 为空或缺失 ⇒ 依赖全靠各 job 口头安装（就是本次事故形态）")
+    if not imports:
+        bad.append("待审脚本集合为空 ⇒ G11 在读空气（先疑 CI 解析失效）")
+    miss = sorted(imports - req)
+    if miss:
+        bad.append(f"判据实际 import 未登记进清单：{miss}")
+    ghost = sorted(req - imports)
+    if ghost:
+        bad.append(f"清单里有但没有任何判据 import（幽灵依赖，装了就没人查）：{ghost}")
+    body = ci_text.split("jobs:", 1)[1] if "jobs:" in ci_text else ""
+    blocks = re.split(r"(?m)^  ([a-z][a-z0-9_-]*):$", body)
+    runs = installs = 0
+    for i in range(1, len(blocks) - 1, 2):
+        txt = blocks[i + 1]
+        if "_test/" in txt:
+            runs += 1
+            if "requirements.txt" not in txt:
+                bad.append(f"job「{blocks[i]}」跑 _test 判据却没装 requirements.txt")
+            else:
+                installs += 1
+    if not runs:
+        bad.append("CI 里没有任何 job 跑 _test 判据 ⇒ G11 在读空气（先疑解析失效）")
+    return bad, runs, installs
+
+
 def ci_battery_audit(ci_text, suites_text):
     """G10 纯函数：判据必须挂在**真会走的路径**上，且豁免分母可自证。
 
@@ -316,6 +396,21 @@ def selftest():
         bad.append("篡改⑫c（幽灵豁免：豁免了一个不存在的套件）未被 G10 抓到")
     if ci_battery_audit(ci0.replace("run_all_suites.py --exclude-llm", "run_all_suites.py --exclude-llm --exclude-llm"), st)[0]:
         bad.append("篡改⑫d 对照失效：重复 flag 不应触发任何违规（判据过敏）")
+    # 篡改⑬：依赖清单与 CI 装依赖（本次事故的机器化封口）
+    ci_full = (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace")
+    req_full = (ROOT / "_test" / "requirements.txt").read_text("utf-8", errors="replace")
+    imps = third_party_imports(ci_invoked_scripts(ci_full, (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace")))
+    g11_0, r_run, r_ins = ci_deps_audit(ci_full, req_full, imps)
+    if g11_0:
+        bad.append(f"原样 CI 依赖被判失败：{g11_0}")
+    if ci_deps_audit(ci_full.replace("pip install -r _test/requirements.txt", "pip install nothing"), req_full, imps)[0] == []:
+        bad.append("篡改⑬a（job 不装清单）未被 G11 抓到 ⇒ 恒真")
+    if ci_deps_audit(ci_full, req_full.replace("PyYAML", ""), imps)[0] == []:
+        bad.append("篡改⑬b（清单漏一个真实依赖）未被 G11 抓到")
+    if ci_deps_audit(ci_full, req_full + "\nrequests\n", imps)[0] == []:
+        bad.append("篡改⑬c（清单里的幽灵依赖，没人 import）未被 G11 抓到")
+    if not r_run:
+        bad.append("篡改⑬ 反例组失效：CI 里根本没解析到跑判据的 job（G11 在读空气）")
     real = sorted((ROOT / "_test").glob("*.py"))
     viol = [p.name for p in real if import_safety(p.read_text("utf-8", errors="replace"))]
     if viol:
@@ -388,6 +483,16 @@ def main():
     ebad = eval_scope(seg, dfiles, eval_counts(seg))
     check("G8 评测集来源已登记且声称条数==实际条数（R196 红线机器化）", not ebad, " ; ".join(ebad)
           + f" | 裁决用数据 {dfiles} | 登记表抽到条数 {eval_counts(seg)}")
+
+    reqp = ROOT / "_test" / "requirements.txt"
+    g11bad, n_runs, n_inst = ci_deps_audit(
+        (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace"),
+        reqp.read_text("utf-8", errors="replace") if reqp.exists() else "",
+        third_party_imports(ci_invoked_scripts(
+            (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace"),
+            (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace"))))
+    check("G11 依赖清单==判据实际 import，且跑判据的 job 都装了清单", not g11bad,
+          f"{n_runs} 个 job 跑判据 / {n_inst} 个装了 requirements.txt；清单={sorted(req_names(reqp.read_text('utf-8', errors='replace')) if reqp.exists() else [])}")
 
     gbad, n_all, ex0 = ci_battery_audit(
         (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace")

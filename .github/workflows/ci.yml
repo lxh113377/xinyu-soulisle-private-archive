@@ -14,6 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: 装判据第三方依赖（单一清单；漏装会让 job 以 rc=2 报"环境异常"，本地装了看不出来）
+        run: pip install -r _test/requirements.txt
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -75,6 +77,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: 装判据第三方依赖（单一清单；漏装会让 job 以 rc=2 报"环境异常"，本地装了看不出来）
+        run: pip install -r _test/requirements.txt
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -132,10 +136,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: 安装 Playwright
-        run: |
-          pip install playwright
-          playwright install --with-deps chromium
+      - name: 装判据第三方依赖（单一清单；漏装会让 job 以 rc=2 报"环境异常"，本地装了看不出来）
+        run: pip install -r _test/requirements.txt
+      - name: 安装 Chromium 本体（依赖已由 requirements.txt 装好）
+        run: playwright install --with-deps chromium
       # 全新 clone 里没有 src/js/demo-config.js（它持本机真实 Key，被 .gitignore 排除）。
       # index.html 用 <script> 静态引它 → 缺失就是首屏 3 个 404，会打破 browser_check 的
       # 「console 0 报错」判据（本机看不到这个坑，CI 第一次跑就抓到了）。
@@ -178,6 +182,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: 装判据第三方依赖（单一清单；漏装会让 job 以 rc=2 报"环境异常"，本地装了看不出来）
+        run: pip install -r _test/requirements.txt
       # 公网 pages.dev 原样托管 deploy/xinyu（实测逐字节相等），比对失败=部署未跟进提交。
       # 反例已证非恒真：指到 example.com 该脚本 rc=1。环境不可达 rc=2 与漂移 rc=1 分离。
       - name: live_sync_check

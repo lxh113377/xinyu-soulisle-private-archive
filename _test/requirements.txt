@@ -1,0 +1,10 @@
+# 判据脚本的第三方依赖（单一清单：CI 与本地都从这里装，不在 workflow 里各写各的）
+# 为什么要有这个文件并被 G11 钉住：CI 的 java-build job 曾长期红着，原因是 api_contract_check
+# 需要 PyYAML 而那个 job 只 `setup-python` 没装依赖 ⇒ rc=2「ENV-ERROR」。
+# 本地装了所以永远看不见 —— 典型「本地全绿、CI 判红」。G11 会 AST 扫 _test/*.py 的实际 import，
+# 与这份清单对账：新判据引入新依赖而未登记，CI 覆盖判据立刻报红。
+playwright
+PyYAML
+Pillow          # 由 pixel_dual / lightshow 两条像素级判据引入（CI 整跑电池后必装）
+# 注：清单只覆盖「CI 真会执行的判据」的 import。如 demo_video_pipeline 需要 edge-tts，
+# 但它是本地重录工具、不在电池也不在 CI ⇒ 不进清单（否则 CI 白装依赖，G11 也会判幽灵依赖）。
