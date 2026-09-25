@@ -5,6 +5,26 @@
 
 ## [Unreleased]
 
+> 对标 r25（2026-09-25 第六轮）：切分第二刀 —— 情绪曲线外提；外部漂移 3 处（★ lobehub 82,808 / ST 33,745 / OLV 13,903），
+> 能力矩阵与 release/pushed 无变化 ⇒ 七维无翻牌，本轮差距继续来自自身结构。
+
+### Changed
+- **`src/js/chart.js` 外提**（`app.js` 403 → **351** 行，行为零改动）：`window.Chart = { render(), init() }`；
+  原约束随迁（HiDPI `setTransform` 逻辑绘制 / resize 200ms 防抖且无数据跳过），新增缺画布时静默返回。
+  `#btn-clear` 处理器留在编排内（它还管星图熄灭，不属于曲线）。
+- 交付链同步完成：`index.html` 引入顺序 voice→chart→app（实测 6813 / 6845 / 6885）、`DEPLOY-SYNC-PASS`、
+  `size_budget` 登记（17 文件，关键路径 822,936 / 858,752）、公网重部署 `0c90a2d9`、三判据 rc=0。
+
+### Fixed
+- 两处「工具没报错 ≠ 生效了」（同族坑连续第三轮）：
+  ① 给 `size_budget` 打补丁时锚点写成 `4_355`（文件实为 `4355`），`str.replace` 未命中却照常打印"已登记"数字
+    ⇒ 由 coverage 判据报「未登记预算的文件 ['src/js/chart.js']」暴露；补丁脚本改为**替换前 assert 锚点存在、替换后 assert 内容变化**。
+  ② 抽曲线的脚本锚点条件过窄（依赖 `measureText` 前一行）⇒ `StopIteration` 半路死；
+    改用 `#btn-clear` / resize 注释等**语义锚点**并 assert 边界行内容后再删段。
+- `memory/07-next-steps.md` 的 P0 自驱条目在 r24 savepoint 时被迁进分卷未回补 ⇒ 壳内一度只剩"等老大"的两条，
+  违反「P0 必须有一条可执行指令」的精神；已补回第三、四刀条目（含每刀的固定动作序列）。
+
+
 > 对标 r24（2026-09-25 第五轮）：**结构性还债第一刀**，外部漂移 4 处（lobehub ★82,807 / pushed 09-25 等）。
 
 ### Changed

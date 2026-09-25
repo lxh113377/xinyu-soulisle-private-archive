@@ -26,6 +26,19 @@
       旧成片仍是 3.12.5 时代画面；重录成本约 10 分钟，走 `_test/demo_video_pipeline.py` 一键
 
 - [ ] **J3/J4 变现**（「变现」= 让已建成但未启用的能力真正跑起来，非商业变现）：① ✅ **两端一致性常驻守卫**（`engine_consistency_check.py`，含自检与端到端对照）② ✅ **本地演示已开服务端持久化**（`demo-config.js` 置 `remote:true` + 熔断）③ ⏳ **fat jar / 容器部署**：**两条路都已就绪** —— (a) **部署包** `deploy/jar/`（`start.ps1` / `start.sh` / `README-部署.md`，实测从系统临时目录启动 + `-WebRoot` 指向仓库外静态副本，UP、静态全 200、公网版零密钥）；(b) **容器镜像**（2026-09-23 **真 Docker 全链路实测通过**：build 成功 482 MB / run 后 `/api/health` UP + 静态全 200 + 评测 73-98.6%-6-6 + **镜像内密钥 CLEAN** + `docker restart` 后数据仍在）。→ **唯一阻塞 = 老大提供目标机器**（IP / 登录方式 / 安全组放行端口）。**2026-09-24 老大裁决：先不办，降级至 10 月复赛节点**
+- [ ] **agent 可自驱、不依赖外部信号的下一件（禁止第三次登记而不做）**：`app.js` 切分第三、四刀。
+      进度实测：r24 语音（471→403）、r25 曲线（403→**351**，`src/js/chart.js`），
+      ① 第三刀 = 对话窗口化（`RENDER_MAX` / `trimmedBuf` / 折叠配额 → `src/js/chat-window.js`，
+      判据 = `ux_guards_check.py` U2 六项 + `browser_check` 的 LIT 计数）；
+      ② 第四刀 = 设置面板（provider 预设与 Key 录入 → `src/js/settings.js`）。
+      每刀固定动作序列（缺一即不算完成）：外提 → `index.html` 引入顺序核对 → `deploy_sync` 归零 →
+      `size_budget` 登记新文件 → 全量电池 28 套件全绿 → 公网重部署 + `live_sync` 复验 → 05/06/07 回写。
+- [ ] **同类待修（本轮又复发的同族坑）**：三连续轮复发的「工具没报错 ≠ 生效了」——
+      r23 `done >= 8` 阈值掺水、r24 `2>/dev/null` 吞掉 cp 报错、r25 `str.replace` 锚点不匹配仍打印"已登记"。
+      已在本轮把补丁脚本改成「替换前 assert 锚点存在 + 替换后 assert 内容变化」，
+      **但仍缺一个通用工具**：建议做一个 `_test/patch_apply.py`（结构化补丁器，内置双向 assert 与 dry-run），
+      让"改文件"这件事本身也有判据，而不是每轮靠人记得住。
+
 ## 分卷目录
 
 - **卷1** `07-next-steps.part1.md` — 已完成条目（历史）
