@@ -62,4 +62,5 @@ def main():
     print("LIVE-SYNC-PASS")
     return 0
 
-sys.exit(main())
+if __name__ == "__main__":
+    sys.exit(main())   # 守卫：import 只取 BASE/比较函数，不应触发联网对账（R161 同族的 import-safe）

@@ -43,32 +43,40 @@ SUITES = [
 # ⚠️ 本版第一稿是**死代码**（先滤掉 "--" 开头的参数再判 args[0] == "--slice"，永不命中），
 #    跑 "--slice 0 14" 却把 28 条全跑了个遍 —— "配了开关但开关没生效"正是本轮 repo_config 判据要防的那类事，
 #    结果自己又踩了一次。故此处直接按 sys.argv 原样解析，并由 --list 提供可复核的"过滤后到底剩几条"。
-argv = sys.argv[1:]
-if "--list" in argv:
-    print("SUITES:", len(SUITES))
-    sys.exit(0)
-if "--only" in argv:
-    key = argv[argv.index("--only") + 1]
-    SUITES = [s for s in SUITES if key in s[0]]
-    print(f"(--only {key!r} → {len(SUITES)} 条)")
-if "--slice" in argv:
-    i = argv.index("--slice")
-    lo, hi = int(argv[i + 1]), int(argv[i + 2])
-    SUITES = SUITES[lo:hi]
-    print(f"(--slice {lo}:{hi} → {len(SUITES)} 条)")
-if not SUITES:
-    print("BATTERY-FAIL: 过滤后零套件（空跑出来的全绿没有意义，禁止把 0/0 当通过）")
-    sys.exit(1)
+def main():
+    global SUITES
+    argv = sys.argv[1:]
+    if "--list" in argv:
+        print("SUITES:", len(SUITES))
+        return 0
+    if "--only" in argv:
+        key = argv[argv.index("--only") + 1]
+        SUITES = [s for s in SUITES if key in s[0]]
+        print(f"(--only {key!r} → {len(SUITES)} 条)")
+    if "--slice" in argv:
+        i = argv.index("--slice")
+        lo, hi = int(argv[i + 1]), int(argv[i + 2])
+        SUITES = SUITES[lo:hi]
+        print(f"(--slice {lo}:{hi} → {len(SUITES)} 条)")
+    if not SUITES:
+        print("BATTERY-FAIL: 过滤后零套件（空跑出来的全绿没有意义，禁止把 0/0 当通过）")
+        return 1
 
-results = []
-for name, cmd in SUITES:
-    p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", timeout=600)
-    tail = (p.stdout or "").strip().splitlines()
-    results.append((name, p.returncode, tail[-1][:110] if tail else (p.stderr or "").strip()[:110]))
-    print(f"{name:22s} rc={p.returncode} | {results[-1][2]}")
+    results = []
+    for name, cmd in SUITES:
+        p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=600)
+        tail = (p.stdout or "").strip().splitlines()
+        results.append((name, p.returncode, tail[-1][:110] if tail else (p.stderr or "").strip()[:110]))
+        print(f"{name:22s} rc={p.returncode} | {results[-1][2]}")
 
-bad = [r for r in results if r[1] != 0]
-print("=" * 60)
-print(f"BATTERY: {len(results) - len(bad)}/{len(results)} rc=0", "ALL-GREEN" if not bad else "RED: " + ",".join(b[0] for b in bad))
-sys.exit(1 if bad else 0)
+    bad = [r for r in results if r[1] != 0]
+    print("=" * 60)
+    print(f"BATTERY: {len(results) - len(bad)}/{len(results)} rc=0", "ALL-GREEN" if not bad else "RED: " + ",".join(b[0] for b in bad))
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    # 守卫必须有：r26 前本文件是**顶层直跑**，任何 `import run_all_suites` 都会把 29 条套件重跑一遍
+    # （聚合 runner 最该 import-safe，因为别的判据会拿它的 SUITES 做对账）。
+    sys.exit(main())

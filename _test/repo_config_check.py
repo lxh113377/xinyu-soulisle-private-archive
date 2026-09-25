@@ -16,9 +16,13 @@
   G5（--online）远端受理面：默认分支上 `.github/dependabot.yml` 确实存在（GitHub 只看默认分支）
   G6 第三方授权：`src/vendor/*.js` 每一个文件都必须在 `docs/THIRD-PARTY-NOTICES.md` 里被点名
   G7 README 必须含指向该授权清单的口径行（否则读者只会看到"MIT"，而 GSAP 其实不是 MIT）
-  G8 --selftest：十类合成篡改（ecosystem 拼错 / 目录不存在 / interval 非法 / updates 清空 /
-     抹 gsap 登记 / 抹 README 引用 / 抹评测集行 / 评测条数改小 / 删整节 / 表退回模板原句）
+  G8 --selftest：十一类合成篡改（ecosystem 拼错 / 目录不存在 / interval 非法 / updates 清空 /
+     抹 gsap 登记 / 抹 README 引用 / 抹评测集行 / 评测条数改小 / 删整节 / 表退回模板原句 /
+     无 __main__ 守卫）
      必须各自报红，原样必须零问题 —— 证判据非恒真
+  G9 判据脚本 import-safe：`_test/*.py` 的顶层入口调用（sys.exit(main()) 等）必须落在
+     `if __name__ == "__main__":` 守卫之后 —— 判据脚本会被互相 import（--only 自查 / 聚合 runner 对账 /
+     CI 复用），无守卫 = "一 import 就跑全套或跑网络，且退出码 0"（r26 实测第五次同族坑）
 
 退出码：0=REPO-CONFIG-PASS 1=任一判据失败 2=环境异常（缺 PyYAML / --online 但 gh 不可用）
 """
@@ -191,6 +195,26 @@ def eval_counts(seg):
     return out
 
 
+ENTRY_RE = re.compile(r"^(sys\.exit\(|main\(|raise SystemExit)")
+
+
+def import_safety(text):
+    """G9 纯函数：判据脚本必须 import-safe —— 顶层入口调用须落在 __main__ 守卫之后。
+
+    r26 加，起因是本轮自己踩的第五次同族坑：给 `benchmark_metrics.py` 的分档判据做负控制时
+    `import` 它 = 直接跑一遍 16 仓联网采集然后 `exit 0`，**反例压根没执行却看起来像通过**。
+    判据脚本会被互相 import（`--only` 自查、CI 复用、聚合 runner 对账），无守卫就等于
+    "一 import 就跑全套/跑网络"，而退出码还是 0。
+    """
+    lines = text.splitlines()
+    guard = next((i for i, l in enumerate(lines) if l.startswith("if __name__")), None)
+    bad = []
+    for i, l in enumerate(lines):
+        if ENTRY_RE.match(l) and (guard is None or i < guard):
+            bad.append(f"第 {i + 1} 行顶层入口调用且无 __main__ 守卫（import 即执行）：{l[:44]}")
+    return bad
+
+
 def selftest():
     bad = []
     cfg = load_yaml(".github/dependabot.yml")
@@ -233,7 +257,19 @@ def selftest():
     back = seg0.replace("- 测试专用文件清单（r23", "- 测试专用文件清单：（如 eval/x.json / blindset / frozen）\n  - 备注（r23")
     if not eval_scope(back, files0, eval_counts(back)):
         bad.append("篡改⑩（表退回 init 模板原句）未被抓到 ⇒ 占位符判据恒真")
-    print("SELFTEST-PASS: 十类合成篡改全部被抓到、原样零问题" if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
+    # 篡改⑪：G9 两侧都要验（只验"该红"会漏掉"把一切判红"的恒假判据）
+    nognb = "import sys\ndef main():\n    return 0\nsys.exit(main())\n"
+    if not import_safety(nognb):
+        bad.append("篡改⑪a（无 __main__ 守卫的脚本）未被抓到 ⇒ G9 恒真")
+    if import_safety("import sys\ndef main():\n    return 0\nif __name__ == '__main__':\n    sys.exit(main())\n"):
+        bad.append("篡改⑪b（有守卫的脚本）被判失败 ⇒ G9 恒假，判据只会刷红")
+    if import_safety("import sys\ndef main():\n    if len(sys.argv) > 9:\n        sys.exit(2)\n    return 0\nif __name__ == '__main__':\n    sys.exit(main())\n"):
+        bad.append("篡改⑪c（函数体内缩进的 sys.exit 被判违规）⇒ G9 没分清顶层与函数内")
+    real = sorted((ROOT / "_test").glob("*.py"))
+    viol = [p.name for p in real if import_safety(p.read_text("utf-8", errors="replace"))]
+    if viol:
+        bad.append(f"篡改⑪d（真实判据脚本 {len(real)} 个里有 {len(viol)} 个 import 即执行：{viol}）")
+    print("SELFTEST-PASS: 十一类合成篡改全部被抓到、原样零问题" if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
     return 1 if bad else 0
 
 
@@ -297,6 +333,12 @@ def main():
     ebad = eval_scope(seg, dfiles, eval_counts(seg))
     check("G8 评测集来源已登记且声称条数==实际条数（R196 红线机器化）", not ebad, " ; ".join(ebad)
           + f" | 裁决用数据 {dfiles} | 登记表抽到条数 {eval_counts(seg)}")
+
+    scripts = sorted((ROOT / "_test").glob("*.py"))
+    iviol = [f"{p.name} → {import_safety(p.read_text('utf-8', errors='replace'))[0]}"
+             for p in scripts if import_safety(p.read_text("utf-8", errors="replace"))]
+    check("G9 判据脚本全部 import-safe（禁 import 即执行）", not iviol,
+          f"{len(scripts)} 个脚本已扫" + ("；违规：" + " ; ".join(iviol) if iviol else "，零违规"))
 
     fails = [r for r in results if not r[1]]
     print(f"\n合计 {len(results)} 项，失败 {len(fails)} 项")

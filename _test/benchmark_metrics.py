@@ -215,6 +215,19 @@ def diff_snap(prev_repos, cur_repos,
     return drift
 
 
+def classify_drift(drift):
+    """把漂移分成「实质」与「抖动」两档 ⇒ (substantive, noise)。
+
+    r26 加：本轮 6 处漂移里 4 处是 ★ 数 ±1（含 lobehub 82,808→82,807 的**倒退**，
+    平台清虚假账号所致），单点 star 差值不构成趋势证据；若与"对手发布 v2.5.0→v2.13.1"
+    混在一张表里报，台账就失去了指方向的能力。故 stars 一律入抖动档，
+    其余字段（pushed_at / latest_release / ci_workflows / caps / docs / 新仓）全部算实质。
+    """
+    sub = [d for d in drift if d[1] != "stars"]
+    noise = [d for d in drift if d[1] == "stars"]
+    return sub, noise
+
+
 def selftest():
     """合成两份快照：动 stars / pushed_at / **caps / docs**（r21 新增两键），断言 diff 恰好抓到。"""
     base = [{"repo": "lobehub/lobehub", "stars": 100, "pushed_at": "2026-09-01",
@@ -236,7 +249,21 @@ def selftest():
     if {(g[0], g[1]) for g in got} != want:
         print(f"SELFTEST-FAIL: 期望抓到 {sorted(want)}，实际 {[(g[0], g[1]) for g in got]}")
         return 1
-    print(f"SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（{len(got)} 条）")
+    # 分档判据（r26）：两侧都要验，否则"分类器"只是把漂移换个名字再报一遍
+    sub, noise = classify_drift(got)
+    if [(s[0], s[1]) for s in noise] != [("lobehub/lobehub", "stars")]:
+        print(f"SELFTEST-FAIL: 抖动档应只有 stars，实际 {[(n[0], n[1]) for n in noise]}")
+        return 1
+    if len(sub) != 3 or any(s[1] == "stars" for s in sub):
+        print(f"SELFTEST-FAIL: 实质档应含 pushed_at/caps/docs 三条且不含 stars，实际 {[(s[0], s[1]) for s in sub]}")
+        return 1
+    only_stars = [d for d in got if d[1] == "stars"]
+    s2, n2 = classify_drift(only_stars)
+    if s2 or len(n2) != 1:
+        print(f"SELFTEST-FAIL: 纯 ★ 抖动被误判为实质（分类器恒真）：sub={s2}")
+        return 1
+    print(f"SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（{len(got)} 条）"
+          f"；分档正确（实质 {len(sub)} / 抖动 {len(noise)}）且纯抖动场景零实质")
     return 0
 
 
@@ -300,9 +327,13 @@ def main():
     print(f"  能力覆盖率({len(cur)} 参照仓): " + " ".join(f"{k}={v}" for k, v in hit.items()))
     if prev_repos:
         if drift:
-            print(f"漂移: {len(drift)} 处（与上一次快照逐字段比对，禁止沿用旧数字）")
-            for repo, k, o, n in drift:
-                print(f"  - {repo} {k}: {o} -> {n}")
+            sub, noise = classify_drift(drift)
+            print(f"漂移: {len(drift)} 处 = 实质 {len(sub)} 处（可行动）+ 抖动 {len(noise)} 处"
+                  f"（★ 单点差值含倒退，不作趋势证据）｜与上一次快照逐字段比对，禁止沿用旧数字")
+            for repo, k, o, n in sub:
+                print(f"  ▶ 实质 {repo} {k}: {o} -> {n}")
+            for repo, k, o, n in noise:
+                print(f"    抖动 {repo} {k}: {o} -> {n}")
         else:
             print("漂移: 0 处（与上一次快照完全一致）")
     else:
@@ -316,4 +347,7 @@ def main():
     return 0
 
 
-sys.exit(main())
+if __name__ == "__main__":
+    # 守卫不可省：r26 实测裸 sys.exit(main()) 使「import 本模块做负控制」变成「先跑一遍联网采集再 exit 0」，
+    # 于是反例根本没执行却看着像通过 —— 同族坑第五次复发，且这次骗的是验证动作本身。
+    sys.exit(main())
