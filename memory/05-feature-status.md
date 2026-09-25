@@ -48,23 +48,12 @@
       设置面板；每一刀都须沿用同一套动作（外提 → index.html 顺序 → deploy 同步 → size_budget 登记 → 电池全绿 → 重部署）
 ## ✅ 已实现（对标轮 r25，2026-09-25 第六轮：切分第二刀 + 判据抓到我自己两次"静默没生效"）
 
-- [x] **`src/js/chart.js` 外提**（情绪曲线 Canvas 2D + resize 防抖）：`app.js` **403 → 351 行**，行为零改动；
-      两条原约束随迁（HiDPI `setTransform` 逻辑绘制 / resize 200ms 防抖且无数据跳过），并补一处健壮性：
-      缺 `#mood-chart` 时静默返回不抛错。判据=`browser_check` 曲线计数两态（「本机已记录 1 条情绪」/清除后「还没有记录」）实测通过
-- [x] 交付链全跑：`index.html` 顺序 voice→chart→app（实测 6813/6845/6885）→ `DEPLOY-SYNC-PASS`
-      → `size_budget` 登记（17 文件，关键路径 822,936 / 858,752）→ 公网重部署 `0c90a2d9` → 三判据 rc=0
-      → 电池 `--slice 0 14` 14/14、`--slice 14 28` 14/14 ⇒ **28/28 rc=0**
-- [x] 外部漂移 3 处（lobehub 82,808 / ST 33,745 / OLV 13,903，能力矩阵无变化）⇒ 七维无翻牌，本轮不编造差距
 - [ ] 剩余切分两块：对话窗口化 → 设置面板（同法，每刀一轮，07 已登记为必须推进项）
-- ⚠️ **本轮两处自伤**：① 打 `size_budget` 补丁时锚点写成 `4_355`（实为 `4355`），`replace` 未命中却照常打印"已登记"
-      ⇒ 被 coverage 判据当场报「未登记文件」；已改成替换前后各加 assert。② 抽曲线的脚本锚点条件过窄（依赖 `measureText` 前一行）
-      ⇒ `StopIteration` 死在半路；改用 `#btn-clear`/resize 注释这类语义锚点 + 边界行 assert。
-      两条同族：**工具"没报错"不等于"生效了"**（与 r23 的 `done >= 8`、r24 的 `2>/dev/null` 同族，已连续三轮复发）。
-
 ## 分卷目录
 - **卷1** `05-feature-status.part1.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷2** `05-feature-status.part2.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷3** `05-feature-status.part3.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷4** `05-feature-status.part4.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷5** `05-feature-status.part5.md` — 05-feature-status 分卷（R199 自动拆卷）
+- **卷6** `05-feature-status.part6.md` — 05-feature-status 分卷（R199 自动拆卷）
 
