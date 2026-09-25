@@ -215,37 +215,10 @@
   }
   replayStars(); // 进页面先按本机记忆把星图重建出来
 
-  // 7) 设置面板
-  const dlg = $("#dlg-settings");
-  $("#btn-settings").addEventListener("click", () => {
-    const c = window.ChatAgent.getCfg();
-    $("#set-base").value = c.base; $("#set-model").value = c.model; $("#set-key").value = "";
-    $("#set-stream").checked = c.stream !== false;
-    $("#set-provider").value = "";
-    dlg.showModal();
-  });
-  // 快捷预设：选一家就把 base+model 填进输入框（Key 仍需用户自己填，前端永不代存他人密钥）
-  $("#set-provider").addEventListener("change", (e) => {
-    const v = e.target.value;
-    if (!v) return;
-    const [base, model] = v.split("|");
-    $("#set-base").value = base;
-    $("#set-model").value = model;
-  });
-  dlg.addEventListener("close", () => {
-    if (dlg.returnValue !== "save") return;
-    // Key 留空 = 不改：输入框恒不回显旧 Key，空输入若直接覆盖会把已存 Key 洗掉；
-    // proxy 由运行环境持有，对话框不展示，合并写入予以保留
-    const patch = {
-      base: $("#set-base").value.trim(),
-      model: $("#set-model").value.trim(),
-      stream: $("#set-stream").checked
-    };
-    const keyInput = $("#set-key").value.trim();
-    if (keyInput) patch.key = keyInput;
-    window.ChatAgent.setCfg(patch);
-    refreshBadge();
-  });
+  // 7) 设置面板（provider 预设 / 密钥录入 / 流式开关）
+  //    r27 外提到 `src/js/settings.js`：行为零改动，判据 = `_test/settings_panel_check.py` S1–S8（含五类注入反例）。
+  //    徽章刷新留在编排层，用 onSaved 回调注入，模块不反向依赖 app.js。
+  window.Settings.init({ onSaved: refreshBadge });
 
   // 9) 深浅主题切换（r15）：默认深色；选择持久化到 peiliao.theme.v1
   (function () {
