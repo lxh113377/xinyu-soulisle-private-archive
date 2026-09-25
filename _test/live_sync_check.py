@@ -33,8 +33,14 @@ def main():
     if len(body) == 0:
         print("LIVE-SYNC-FAIL: GET / 空 body（若打的是 /index.html 属已知坑，改抓 /）")
         return 1
+    # r28：`.gitattributes` 是 `* text=auto` ⇒ 同一份内容在 Windows 工作区是 CRLF、Linux runner 检出是 LF。
+    # 拿原始字节比会让「部署有没有跟进」这条判据在 CI 上恒红（本机永远看不见，因为两边都是 CRLF）。
+    # 判据要问的是**内容是否同一份**：先比字节；不等再比"归一行尾"，并把「仅行尾差异」如实标出来。
     index_ok = body == local
-    print(f"index.html bytes: live={len(body)} local={len(local)} equal={index_ok}")
+    eol_only = (not index_ok) and body.replace(b"\r\n", b"\n") == local.replace(b"\r\n", b"\n")
+    print(f"index.html bytes: live={len(body)} local={len(local)} equal={index_ok}"
+          + ("｜仅行尾差异（CI 检出 LF vs 本机 CRLF），内容等价 ⇒ 判 PASS" if eol_only else ""))
+    index_ok = index_ok or eol_only
 
     srcs = []
     try:
