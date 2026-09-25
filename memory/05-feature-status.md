@@ -44,22 +44,12 @@
 > 本轮外部数据**有漂移**（4 处：lobehub ★82,805→82,807 且 pushed 09-24→09-25、SillyTavern 33,743→33,744、OLV 13,901→13,902），
 > 但主要产出是**结构性还债**：`app.js` 切分第一刀。
 
-- [x] **`src/js/voice.js` 外提**（`app.js` 471 → 403 行，语音 99 行独立模块）：
-      `window.Voice = { init(), speak(), isSpeaking() }`；保留原三条约束注释（不支持即隐藏 / 异常一律吞掉不带崩主链路 /
-      开关走独立键 `peiliao.speak.v1` 不进 `cfg`）。选它当第一刀的理由是**与编排零耦合 + 判据最密**
-      （`ux_guards` U1 实测 utterance 构造计数与开关、`voice_check` A1-A6 盯 ASR 与按钮）
-- [x] 接线与交付链完整：`index.html` 在 `app.js` 前引入（实测 6813 < 6849）→ `deploy/xinyu` 同步（`DEPLOY-SYNC-PASS`）
-      → `size_budget` 登记新文件（4,148B / 预算 4,355B，关键路径 821,901 / 858,752）→ 公网重部署 `41dea397`
-      → `live_sync` / `public_check` / `online_check` 三判据 rc=0
-- [x] 回归：`--slice 0 14` 14/14 + `--slice 14 28` 14/14 ⇒ **28/28 rc=0 ALL-GREEN**；`node --check` 双文件通过
 - [ ] **切分未完成**：`app.js` 仍 403 行，剩余可摘模块 = 情绪曲线 `drawChart()`、对话窗口化（`RENDER_MAX`/`trimmedBuf`/配额）、
       设置面板；每一刀都须沿用同一套动作（外提 → index.html 顺序 → deploy 同步 → size_budget 登记 → 电池全绿 → 重部署）
-- ⚠️ **本轮自伤（留痕）**：同步时把 `src/index.html` 误 `cp` 进 `deploy/xinyu/js/` 且用 `2>/dev/null` 吞掉报错
-      ⇒ `deploy_sync` 报 EXTRA 一项；核实该副本未被跟踪且与源字节相同后删除。**我自己上一轮才把这条记进 lessons，本轮又踩**。
-
 ## 分卷目录
 - **卷1** `05-feature-status.part1.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷2** `05-feature-status.part2.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷3** `05-feature-status.part3.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷4** `05-feature-status.part4.md` — 05-feature-status 分卷（R199 自动拆卷）
+- **卷5** `05-feature-status.part5.md` — 05-feature-status 分卷（R199 自动拆卷）
 
