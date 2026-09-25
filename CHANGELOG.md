@@ -15,6 +15,12 @@
   自证含两条反向断言：去掉账单措辞必须翻判 CODE；不 SKIP 就 selftest 红。实测三态均正确。
 - 离线壳能力的台账自证：`benchmark_metrics.py` 的 self 行现已报 `caps=...,pwa_offline`
   ⇒ "16 个同类都没做的能力我们有"这句话由台账复算，而不是写在报告里自说（r28 的 claim 至此闭环）。
+- **`benchmark_metrics.py` 的「盲区点名」（r30）**：能力匹配器只看文件路径，对我们有两类是**假阴性**
+  （SSE 写在 `chat.js`/`ChatController.java` 里、文件名不含 sse；浏览器端到端在 `_test/*.py` 里用
+  playwright、路径不含 e2e）。新增 `blind_spot_caps()` **读内容取证据**，在 self 行打印
+  `盲区点名：e2e_browser,streaming`，但**不计入 `caps`** —— 横向对比仍用同一把尺，给参照仓"读内容"就是双标。
+  自证三侧（有证据→点名 / 无证据→空 / 已看见→不重复计数）；三个变异体（恒空 / 恒报 / 不去重）实测都被抓住。
+  复算：`python _test/benchmark_metrics.py --selftest` + `python _test/benchmark_metrics.py`
 
 ### Fixed
 - **聚合器自己是 3.12-only 语法**：r28 给失败明细写的 `print(f"{" " * 25}· {d}")` 依赖 PEP 701，

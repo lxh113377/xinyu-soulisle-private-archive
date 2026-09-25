@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -70,6 +71,40 @@ CAP_RULES = {
         "openapi.yaml", "openapi.yml", "openapi.json", "swagger.yaml", "swagger.yml",
         "swagger.json", "api.openapi.yaml"),
 }
+
+# r30 加：**本项目专属**的"匹配器盲区"点名。CAP_RULES 只看路径字符串，
+# 两类能力对我们是假阴性：SSE 写在 chat.js/ChatController.java 里（文件名不含 sse），
+# 浏览器端到端在 `_test/*.py` 里用 playwright（路径不含 e2e/playwright）。
+# ⚠️ 不拿它去改 peers 的计数（peer 只能按文件树静态判，给它"读内容"就是双标），
+#    也**不计入 caps**（横向对比仍用同一把尺）；只在 self 行点名，防止读者把少算读成"没做"。
+BLIND_PROBES = {
+    "streaming": ((".js", ".java", ".ts"), ("text/event-stream", "ReadableStream")),
+    "e2e_browser": ((".py", ".js", ".ts"), ("sync_playwright", "from playwright", "chromium.launch")),
+}
+
+
+def blind_spot_caps(root, tracked, caps_found):
+    """返回"内容里有证据、但 CAP_RULES 按文件名没看见"的能力名列表（只对本项目算）。"""
+    blind = []
+    for cap, (exts, needles) in BLIND_PROBES.items():
+        if cap in caps_found:
+            continue
+        hit = False
+        for rel in tracked:
+            if not rel.endswith(exts) or len(rel) >= 300:
+                continue
+            f = root / rel
+            try:
+                if f.stat().st_size > 400_000:
+                    continue
+                if any(n in f.read_text("utf-8", errors="replace") for n in needles):
+                    hit = True
+                    break
+            except OSError:
+                continue
+        if hit:
+            blind.append(cap)
+    return sorted(blind)
 
 
 def gh(*args, timeout=40):
@@ -190,6 +225,7 @@ def self_metrics():
             "ci_workflows": jobs or None, "language": "JavaScript/Java",
             "license": None, "default_branch": "main",
             "docs": docs, "caps": sorted(caps), "file_count": files,
+            "caps_blind": blind_spot_caps(ROOT, tracked, caps),
             "src_loc_excl_vendor": loc, "regression_suites": battery,
             "regression_script_files": suites_files,
             "battery_parse_error": battery_err or None}
@@ -296,9 +332,31 @@ def selftest():
     if any(x.startswith("a/a") for x in blind):
         print("SELFTEST-FAIL: 健康仓被误踢出分母 ⇒ 判据过敏")
         return 1
+    # 盲区点名（r30）：正向必须抓到"内容里有 SSE/playwright 证据但文件名看不见"，
+    # 反向必须为空（否则这个点名就只是永远说"我们有"的广告牌）
+    with tempfile.TemporaryDirectory() as td:
+        troot = Path(td)
+        (troot / "src").mkdir()
+        (troot / "src" / "chat.js").write_text(
+            'const r = res.body.getReader(); headers["Content-Type"] = "text/event-stream"',
+            encoding="utf-8")
+        got_b = blind_spot_caps(troot, ["src/chat.js"], set())
+        if got_b != ["streaming"]:
+            print(f"SELFTEST-FAIL: 盲区点名漏报（应抓到 streaming，实际 {got_b}）")
+            return 1
+        clean = Path(td) / "clean"
+        clean.mkdir()
+        (clean / "plain.js").write_text("console.log('no sse here')", encoding="utf-8")
+        if blind_spot_caps(clean, ["plain.js"], set()):
+            print("SELFTEST-FAIL: 无证据仓被点名有盲区 ⇒ 判据恒真")
+            return 1
+        if blind_spot_caps(troot, ["src/chat.js"], {"streaming"}):
+            print("SELFTEST-FAIL: 文件名匹配器已看见的能力仍进盲区名单（重复计数）")
+            return 1
     print("SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（"
           f"{len(got)} 条）；分档正确（实质 {len(sub)} / 抖动 {len(noise)}）且纯抖动场景零实质；"
-          "分母证明正确（1 有效 / 2 盲区点名，健康仓不误踢）")
+          "分母证明正确（1 有效 / 2 盲区点名，健康仓不误踢）；"
+          "r30 盲区点名三侧正确（有证据→点名、无证据→空、已看见→不重复）")
     return 0
 
 
@@ -357,7 +415,9 @@ def main():
               f"caps={','.join(r['caps']) or '-'}")
     print(f"  [self] 心屿 src(除vendor)={own['src_loc_excl_vendor']} 行/{own['file_count']} 文件 "
           f"电池套件={own['regression_suites']}(判据脚本文件={own['regression_script_files']}，两口径不同源即登记) CI job={own['ci_workflows']} "
-          f"docs={len(own['docs'])}/9 caps={','.join(own['caps']) or '-'}")
+          f"docs={len(own['docs'])}/9 caps={','.join(own['caps']) or '-'}"
+          f"（盲区点名：{','.join(own.get('caps_blind') or []) or '无'} = 内容里有证据但文件名匹配器看不见，"
+          f"不计入 caps 以免与参照仓双标）")
     hit, usable, blind = coverage_hits(cur)
     if len(usable) + len(blind) != len(cur):
         print(f"BENCHMARK-FAIL: 分母对不上（有效 {len(usable)} + 盲区 {len(blind)} != 总数 {len(cur)}）")
