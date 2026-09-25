@@ -163,5 +163,13 @@
 <script src="js/chat-window.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/app.js"></script>
+<script>
+/* 只读离线壳注册（r28）：仅在 http(s) 下注册（file:// 无 SW），失败静默 —— 离线壳是增益，不能成为主链路的新故障点 */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(() => {});
+  });
+}
+</script>
 </body>
 </html>

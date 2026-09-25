@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 #    漏登记了 src/data/emotion-strategy.js（4,720B），新增 emotion-remote.js 也不会被自动纳入
 #    —— 「逐文件预算」若靠手工维护，加文件这条最常见的退化路径恰好绕过门禁。
 BUDGETS = {
-    "src/index.html": 9_191,
+    "src/index.html": 9_936,   # r28 上调：加了离线壳注册块（9,463 实测 +5%），理由记在 CHANGELOG
     "src/css/style.css": 13_368,
     "src/js/app.js": 13_780,
     "src/js/chat-agent.js": 11_729,
@@ -30,6 +30,7 @@ BUDGETS = {
     "src/js/chart.js": 3969,
     "src/js/chat-window.js": 5845,
     "src/js/settings.js": 3000,
+    "src/sw.js": 4814,
     "src/js/scroll-story.js": 3_757,
     "src/js/three-scene.js": 15_793,
     "src/js/memory-store.js": 4_844,
@@ -44,6 +45,7 @@ TOTAL_KEY_PATH = 858_752  # 首屏关键路径总预算（含 vendor），2026-0
 
 # 参与覆盖校验的目录（src/functions 是 Pages Function 服务端源码，不在首屏路径）
 COVER_DIRS = ("src/js", "src/css", "src/data", "src/vendor")
+COVER_ROOT = ("src",)   # r28：src 根目录也有首屏件（sw.js），不纳入就等于给"新增文件绕过预算"留口子
 
 
 def coverage():
@@ -56,6 +58,9 @@ def coverage():
     html = "src/index.html"
     if (ROOT / html).exists():
         on_disk.add(html)
+    for d in COVER_ROOT:
+        for p in (ROOT / d).glob("*.js"):
+            on_disk.add(p.relative_to(ROOT).as_posix())
     # demo-config.js：src 版含本机 Key 且被 .gitignore，两端形态本就不同 ⇒ 两侧都排除，
     # 只做「存在则测预算」，不参与「必须登记」的覆盖对账
     on_disk.discard("src/js/demo-config.js")

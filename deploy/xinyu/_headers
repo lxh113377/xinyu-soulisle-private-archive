@@ -1,0 +1,18 @@
+# Cloudflare Pages 响应头（对标轮 r28，只钉真正有缺口的一条）
+#
+# 实测依据（判据 r28 现场测出来的，不是照抄最佳实践）：
+#   GET /                       → Cache-Control: public, max-age=0, must-revalidate   ✅ 已会回源校验
+#   GET /sw.js                  → Cache-Control: public, max-age=0, must-revalidate   ✅
+#   GET /vendor/three.min.js    → Cache-Control: public, max-age=0, must-revalidate   ✅
+#   GET /index.html             → **无 Cache-Control 头**                              ❌ 浏览器可启发式缓存
+# 本地 jar 侧则由 `spring.web.resources.cache.period=0` 统一给 `no-store`（比 no-cache 更严）。
+#
+# 所以这里只补两条：入口 HTML 与 SW 脚本自身。
+# 为什么不顺手把 vendor 改成长缓存 + immutable：那是性能主张，不是离线壳的前提（离线收益来自
+# SW 自己的 Cache Storage，与 HTTP 缓存无关），而且会让两端策略分叉、判据要开始"容忍差异"。
+# 等赛后做性能项时再单独评估，别混进这轮。
+
+/index.html
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache

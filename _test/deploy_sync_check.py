@@ -20,7 +20,7 @@ EXCLUDE_DIRS = {"functions"}
 # 刻意不复制的文件：公网零密钥 stub（src 版含真实 Key，绝不能覆盖过去）。
 # 它**不参与内容比对**（两端本就该不同），只走下方「红线复核」。
 EXCLUDE_FILES = {"js/demo-config.js"}
-WHITELIST_EXTRA = {"js/demo-config.js"}
+WHITELIST_EXTRA = {"js/demo-config.js", "_headers"}   # _headers 是 Pages 专属（jar 不读），只存在于部署副本
 KEY_RE = "sk-[A-Za-z0-9]{20,}"
 
 

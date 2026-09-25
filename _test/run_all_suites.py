@@ -21,6 +21,8 @@ SUITES = [
     ("patch_apply_selftest", [sys.executable, "_test/patch_apply.py", "--selftest"]),
     ("settings_panel", [sys.executable, "_test/settings_panel_check.py"]),
     ("settings_panel_selftest", [sys.executable, "_test/settings_panel_check.py", "--selftest"]),
+    ("offline_shell", [sys.executable, "_test/offline_shell_check.py"]),
+    ("offline_shell_selftest", [sys.executable, "_test/offline_shell_check.py", "--selftest"]),
     ("repo_config", [sys.executable, "_test/repo_config_check.py"]),
     ("repo_config_selftest", [sys.executable, "_test/repo_config_check.py", "--selftest"]),
     ("engine_consistency", [sys.executable, "_test/engine_consistency_check.py"]),
