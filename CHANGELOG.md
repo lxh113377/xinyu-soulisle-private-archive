@@ -5,6 +5,30 @@
 
 ## [Unreleased]
 
+> 对标 r26（2026-09-25 第七轮）：切分第三刀 —— 对话窗口化外提；外部 6 处漂移经分档后**实质仅 2 处**
+> （均在 sapphire：pushed 09-25 + release v2.5.0→v2.13.1），其余 4 处是 ★±1 抖动（lobehub 甚至倒退）。
+> 能力矩阵/CI/docs 无变化 ⇒ 七维无翻牌。本轮另一条主线是**把"验证动作本身"纳入判据**。
+
+### Changed
+- **`src/js/chat-window.js` 外提**（`app.js` 351 → 268 行，行为零改动）：对外只留 `init/push/update/setTag/toBottom`，
+  `quota` 临时抬高、`trimmedBuf` 缓存、`.log-fold` 提示条等原实现约束留在模块内。与前两刀不同，
+  这块**被对话主流程调用**（提交 / 流式覆写 / 历史恢复），所以接口目标是"关住 DOM 细节"而非"搬出状态"。
+  判据 = `ux_guards_check.py` U2a–U2f（浏览器实跑）21 项全绿。
+- 预算**收紧**而非放宽：`app.js` 23,979 → 14,777（实测 +5%），新件登记 5,845；`size_budget` 17 → 18 文件。
+- 漂移台账分档：`benchmark_metrics.py` 新增 `classify_drift`，★ 数入"抖动档"（单点差值含倒退不作趋势证据），
+  `pushed_at`/`latest_release`/`caps`/`docs`/CI 全算"实质档"（可行动）。selftest 两侧都验。
+
+### Fixed
+- **同族坑第五次复发，这次骗的是验证动作本身**：给上面那条分档判据做负控制时 `import benchmark_metrics`
+  = 先跑一遍 16 仓联网采集再 `exit 0` ⇒ **反例根本没执行却看起来像通过**。根因是裸 `sys.exit(main())`
+  缺 `if __name__ == "__main__":` 守卫；全仓扫出 3 个（`benchmark_metrics` / `live_sync_check` /
+  `run_all_suites`，后者 import 一次等于 29 套件全量重跑），三个全补守卫。
+- 新增常驻判据 **G9**（`repo_config_check.py`）：`_test/*.py` 必须 import-safe；`--selftest` 扩到**十一类**，
+  含两条反向样本（"有守卫不得报红"、"函数体内缩进的 sys.exit 不算违规"）防判据恒假。
+- 公网重部署 `61ec115b`：`chat-window.js` 线上 200 且与磁盘等字节，`LIVE-SYNC-PASS` / `PUBLIC-ONLINE-ALL-PASS`。
+- 首次 `wrangler pages deploy` 报 `fetch failed`（未静默跳过，重试第二次成功）；线上主域名响应曾达 15.7s，
+  已记为环境抖动而非代码结论。
+
 > 对标 r25（2026-09-25 第六轮）：切分第二刀 —— 情绪曲线外提；外部漂移 3 处（★ lobehub 82,808 / ST 33,745 / OLV 13,903），
 > 能力矩阵与 release/pushed 无变化 ⇒ 七维无翻牌，本轮差距继续来自自身结构。
 

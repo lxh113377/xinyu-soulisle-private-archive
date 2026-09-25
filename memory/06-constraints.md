@@ -67,6 +67,19 @@
 - 机器责任：`python _test/repo_config_check.py` 的 **G8** 断言 ①本章节非占位符 ②清单里的文件真实存在
   ③`声称条数 == 文件实际 items 数`（改条数不改这里即红）。`--selftest` 用三类反例自证（抹登记行 / 改小条数 / 删章节）
 
+## 红线补充（r26 新增，机器可判）
+
+- **判据脚本必须 import-safe**：`_test/*.py` 的顶层入口调用（`sys.exit(main())` / `main()` / `raise SystemExit`）
+  必须落在 `if __name__ == "__main__":` 守卫之后。原因不是风格：判据脚本会被互相 import（`--only` 自查、
+  聚合 runner 对账、CI 复用），**无守卫 = 一 import 就跑全套或跑网络，而且退出码还是 0**。
+  r26 实测：`run_all_suites.py` 若无守卫，import 一次等于把 29 条套件全量重跑。
+  复算：`python _test/repo_config_check.py`（G9，逐脚本扫）+ `python _test/repo_config_check.py --selftest`（十一类）。
+- **对标漂移必须分档**：★ 数单点差值（含倒退，如 lobehub 82,808→82,807 系平台清虚假账号）属**抖动**，
+  不得与 `pushed_at` / `latest_release` / `caps` / `docs` 这类**实质**变化混在一张表里报，
+  否则台账失去指方向能力（r26 实测：6 处漂移里只有 2 处可行动）。
+  复算：`python _test/benchmark_metrics.py`（输出首行即"实质 N / 抖动 M"）。
+- **06 正文禁手抄数字**（r25 立规、r26 沿用）：只写"判据可复算的事实 + 复算命令"，数字由 `_test/` 脚本现读。
+
 ## 分卷目录
 - **卷1** `06-constraints.part1.md` — 已完成条目归档（R224 主壳自愈）
   - **r25 第二刀已完成**：情绪曲线（Canvas 2D）+ resize 防抖外提为 `src/js/chart.js`，`app.js` 403 → **351 行**；剩余待切 = 对话窗口化（`RENDER_MAX`/`trimmedBuf`/配额）与设置面板两块。**但本条目实测行数已连续三次与实值不同**（06 曾写 469，r24 实测 471，r25 实测 403→351）⇒ 结论：**06 正文里的数字断言不该再手写**，改为「只写判据可复算的事实 + 附复算命令」，数字由 `_test/` 脚本产出（是否把 G 系列扩到全仓文档数字，仍待老大拍板）。

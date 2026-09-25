@@ -44,11 +44,9 @@
 > 本轮外部数据**有漂移**（4 处：lobehub ★82,805→82,807 且 pushed 09-24→09-25、SillyTavern 33,743→33,744、OLV 13,901→13,902），
 > 但主要产出是**结构性还债**：`app.js` 切分第一刀。
 
-- [ ] **切分未完成**：`app.js` 仍 403 行，剩余可摘模块 = 情绪曲线 `drawChart()`、对话窗口化（`RENDER_MAX`/`trimmedBuf`/配额）、
-      设置面板；每一刀都须沿用同一套动作（外提 → index.html 顺序 → deploy 同步 → size_budget 登记 → 电池全绿 → 重部署）
-## ✅ 已实现（对标轮 r25，2026-09-25 第六轮：切分第二刀 + 判据抓到我自己两次"静默没生效"）
+## ✅ 已实现（对标轮 r26，2026-09-25 第七轮：切分第三刀 + 把"验证动作本身"纳入判据）
 
-- [ ] 剩余切分两块：对话窗口化 → 设置面板（同法，每刀一轮，07 已登记为必须推进项）
+- [ ] 剩余切分一块：设置面板 → `src/js/settings.js`（同法，每刀一轮，07 已登记为必须推进项）
 ## 分卷目录
 - **卷1** `05-feature-status.part1.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷2** `05-feature-status.part2.md` — 05-feature-status 分卷（R199 自动拆卷）
@@ -56,4 +54,5 @@
 - **卷4** `05-feature-status.part4.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷5** `05-feature-status.part5.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷6** `05-feature-status.part6.md` — 05-feature-status 分卷（R199 自动拆卷）
+- **卷7** `05-feature-status.part7.md` — 05-feature-status 分卷（R199 自动拆卷）
 
