@@ -31,4 +31,11 @@ J1 骨架 ✅（2026-09-21）/ J2 API 契约对齐 ✅（2026-09-22）/ J3 情�
       静态全 200 + 评测 73-98.6%-6-6 + **镜像内密钥 CLEAN** + `docker restart` 后数据仍在）。
   → **唯一阻塞 = 老大提供目标机器**（IP / 登录方式 / 安全组放行端口）。
   **2026-09-24 老大裁决：先不办，降级至 10 月复赛节点。**
+  **三件套（V3.55.0 第 16 条首次自用；老大给机器前须齐三项，缺一项即判「不可安全照抄」）**：
+  ① 执行目录 = 目标机上仓库根的**绝对路径**（`static-locations=file:${XINYU_WEB_ROOT:./src/}` 按 JVM
+     工作目录解析，cwd 错则首页 404 而接口照样 200）；用 `deploy/jar/start.ps1` 时须先 `cd` 进部署包目录。
+  ② 日志必见证据 = 启动日志出现 `Started SoulIsleApplication`，且 `GET /api/health` 同时回
+     `"status":"UP"` + `indexFound=true` + `vendorFound=true`（缺一判未生效，禁以"端口通/页面能开"代替）。
+  ③ 回滚锚 = 动手前先记旧 jar 的 sha256 与 H2 库文件 `server/data/xinyu.mv.db` 的 sha256；
+     回滚 = 换回旧 jar **并**还原该库文件（只回滚代码不回滚数据会串号）。
   完整部署史见 `part11.md`（人工拆卷自 part6）。
