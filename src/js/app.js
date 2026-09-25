@@ -19,11 +19,19 @@
   // 3) 引擎徽章
   function refreshBadge() {
     const b = $("#mode-badge");
-    if (window.ChatAgent.isOnline()) { b.textContent = "● 在线 AI"; b.classList.remove("offline"); }
+    // navigator.onLine 只用来把"配置说在线"降级为"网络不可用"，绝不反向用它宣称在线
+    //（个别环境恒 true 不代表真能出网；方向性保守，避免把幸运观察当普适规律）
+    const cfgOnline = window.ChatAgent.isOnline();
+    const netDown = cfgOnline && navigator.onLine === false;
+    if (netDown) { b.textContent = "● 网络不可用（配置为在线）"; b.classList.add("offline"); }
+    else if (cfgOnline) { b.textContent = "● 在线 AI"; b.classList.remove("offline"); }
     else { b.textContent = "● 离线共情模板"; b.classList.add("offline"); }
-    $("#chat-engine").textContent = "引擎：" + (window.ChatAgent.isOnline() ? "在线大模型（OpenAI 兼容）" : "离线共情模板引擎");
+    $("#chat-engine").textContent = "引擎：" + (netDown ? "在线大模型（当前网络不可用）"
+      : cfgOnline ? "在线大模型（OpenAI 兼容）" : "离线共情模板引擎");
   }
   refreshBadge();
+  addEventListener("online", refreshBadge);
+  addEventListener("offline", refreshBadge);
 
   // 3.5) 评委体验模式提示条
   if (window.__PEILIAO_DEMO__) {

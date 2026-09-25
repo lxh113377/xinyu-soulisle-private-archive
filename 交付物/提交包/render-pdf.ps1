@@ -45,4 +45,10 @@ Write-Host "PDF 已生成: $out"
 Write-Host ("  页数 = {0}   图片 = {1}   大小 = {2:N0} KB" -f $pages, $imgs, ((Get-Item $out).Length / 1KB))
 if ($pages -gt 20) { Write-Warning "⚠️ 页数 $pages 已超过官方硬约束 20 页，必须精简内容" }
 else { Write-Host "  ✅ 满足 ≤20 页硬约束" }
-if ($imgs -lt 8) { Write-Warning "⚠️ 只嵌入 $imgs 张图（预期 8 张），检查 img/ 下截图是否缺失" }
+
+# 期望图数从 HTML 现读（此前手抄"8 张"，加图后就成了假告警）；数不出来就判不可信，不静默通过
+$htmlFigures = ([regex]::Matches((Get-Content -Raw -Encoding UTF8 $html), '<figure')).Count
+if ($htmlFigures -lt 1) { Write-Error "HTML 里数不到 <figure>（判据输入为空 ⇒ 结论不可信）"; exit 1 }
+Write-Host "  图数期望（HTML 现读 <figure>）= $htmlFigures"
+if ($imgs -lt $htmlFigures) { Write-Warning "⚠️ 只嵌入 $imgs 张图，HTML 声明 $htmlFigures 张 —— 检查 img/ 截图是否缺失" }
+else { Write-Host "  ✅ 图片全部嵌入（$imgs/$htmlFigures）" }

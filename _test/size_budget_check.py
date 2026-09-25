@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BUDGETS = {
     "src/index.html": 9_936,   # r28 上调：加了离线壳注册块（9,463 实测 +5%），理由记在 CHANGELOG
     "src/css/style.css": 13_368,
-    "src/js/app.js": 13_780,
+    "src/js/app.js": 14_390,   # r32 上调：徽章加"网络不可用"降级分支（13,123→13,698 实测 +5%），理由记在 CHANGELOG
     "src/js/chat-agent.js": 11_729,
     "src/js/emotion-engine.js": 5_598,
     "src/js/emotion-remote.js": 4_679,

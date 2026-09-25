@@ -28,6 +28,7 @@ SW 的 network-first 白跑一趟本地缓存。因此本判据同时管两层�
   R5 二次进入 vendor 命中缓存（离线收益非空壳）
   R6 HTTP 头实测：两端对 /、/index.html、/sw.js、/vendor/* 都必须给'再验证'语义（no-cache / no-store / must-revalidate 三选一）
   R7 全程零 JS 异常
+  R10 断网重载后徽章不得伪装在线（含联网态反向断言；红线「界面明示模式」的机器化）
 
 用法：python _test/offline_shell_check.py [--selftest]
 前置：R2/R4/R5 与 R6 的本地部分需要 Java 服务端在 8123；R6 的公网部分需可达（不可达则点名跳过，不判绿）
@@ -298,6 +299,15 @@ def run_runtime():
             hv, ms = wait_precache(p2, w2)
             check("R3a 断网前先确认壳已装完（否则 R3 红的是判据不是产品）", not ms, f"缺={ms}")
             p2.goto(url)
+            badge_on = p2.evaluate("() => (document.querySelector('#mode-badge')||{}).textContent || ''")
+            check("R10a 联网态徽章仍明示「在线 AI」（反向断言：防把分支写反致恒绿）",
+                  "在线 AI" in badge_on, badge_on.strip()[:36])
+            greet = p2.evaluate("""() => {
+              const t = document.querySelector('#chat-log .msg .tag, #chat-log .tag');
+              return t ? t.textContent : '';
+            }""")
+            check("R10c 开场白标签不得伪装来自大模型（本机生成＝红线「禁伪装在线」的同类出口）",
+                  ("在线" not in greet) and ("本机" in greet) and ("未经大模型" in greet), greet.strip()[:36])
             c2.set_offline(True)
             try:
                 p2.reload(wait_until="domcontentloaded", timeout=20000)
@@ -313,6 +323,9 @@ def run_runtime():
               cached: !!navigator.serviceWorker.controller
             })""")
             check("R3 断网后可离线打开（壳真生效）", bool(ok3), f"结构在={ok3} {err3} 诊断={json.dumps(diag, ensure_ascii=False)[:230]}")
+            badge_off = p2.evaluate("() => (document.querySelector('#mode-badge')||{}).textContent || ''")
+            check("R10b 断网重载后徽章不得伪装在线（红线：界面明示模式，禁伪装在线）",
+                  ("在线 AI" not in badge_off) and ("网络不可用" in badge_off), badge_off.strip()[:36])
             c2.close()
         finally:
             srv.shutdown()

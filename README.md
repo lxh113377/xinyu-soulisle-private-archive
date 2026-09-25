@@ -169,7 +169,7 @@ CloudBase 注意事项（实测得来）：
 ## ✅ 验证
 
 ```powershell
-python _test/run_all_suites.py           # ★ 全量电池（35 套件逐条直取 rc，聚合不掩盖单项失败）
+python _test/run_all_suites.py           # ★ 全量电池（37 套件逐条直取 rc，聚合不掩盖单项失败）
 python _test/browser_check.py            # 离线降级 / 双色 / 滚动淡入淡出，输出 ALL-ASSERT-PASS
 python _test/deploy_sync_check.py        # src → deploy/xinyu 三类比对（MISSING/DIFF/EXTRA 归零）
 python _test/engine_consistency_check.py # JS 引擎 ↔ Java 引擎逐项对账（词表结构级）
@@ -193,7 +193,7 @@ python _test/repo_config_check.py --online # 仓库配置自洽：dependabot sch
 GitHub Actions 四条门禁（`.github/workflows/ci.yml`）：同步守卫+评测+策略表+体积+**vendor 供给链**+密钥扫描、Java 构建+**词表一致性红线**（此前只写在 `memory/AGENTS.md` 靠人记，现已机器化）、浏览器回归（runner 无 GPU，强制 SwiftShader）、公网新鲜度。
 四条 job **均在 GitHub 真跑验证**；浏览器 job 首轮就抓到本机看不到的真实缺陷：`src/js/demo-config.js` 被 gitignore，全新 clone 下 `<script>` 静态引它 → 首屏 3 个 404 打破「console 0 报错」。修法＝CI 自动用公网零密钥 stub 补占位（本地按 `CONTRIBUTING.md` 第一步手工补一次）。
 
-最近实测（2026-09-25 对标轮 r20–r27）：全量电池 **35 套件 rc 全 0**（含受理面体检 ci_status，在 CI 内部自动 SKIP）；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`emotion_wiring_check` 9/9（后端路径实测生效 + 不可达即熔断不伪装 + 危机未经后端）；gsap 3.15.0 升级后 `browser_check`/`lightshow`/`pixel_dual` 全绿；首屏关键路径 819,767 B（预算 858,752 B 内）；公网已重新部署并 `LIVE-SYNC-PASS`。
+最近实测（2026-09-25 对标轮 r20–r32）：全量电池 **37 套件 rc 全 0**（含受理面体检 ci_status，在 CI 内部自动 SKIP）；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`emotion_wiring_check` 9/9（后端路径实测生效 + 不可达即熔断不伪装 + 危机未经后端）；gsap 3.15.0 升级后 `browser_check`/`lightshow`/`pixel_dual` 全绿；首屏关键路径 832,373 B（预算 858,752 B 内）；公网已重新部署并 `LIVE-SYNC-PASS`。
 
 
 ---
