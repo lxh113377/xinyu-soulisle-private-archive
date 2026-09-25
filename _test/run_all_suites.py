@@ -102,7 +102,7 @@ def main():
         results.append((name, p.returncode, (tail[-1][:110] if tail else (p.stderr or "").strip()[:110])))
         print(f"{name:22s} rc={p.returncode} | {results[-1][2]}")
         for d in detail:
-            print(f"{" " * 25}· {d}")
+            print(" " * 25 + "· " + d)
 
     bad = [r for r in results if r[1] != 0]
     print("=" * 60)

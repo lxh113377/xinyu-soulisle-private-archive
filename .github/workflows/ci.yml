@@ -19,6 +19,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      # 语法层先过一遍：r28 的教训是聚合器自己写了条只有 Python 3.12 (PEP 701) 能解析的
+      # f-string 嵌套同引号，本机 3.12 全绿、CI pin 3.11 直接炸在 import 之前 —— 版本兼容差
+      # 必须在最早的步骤、以最小的失败面暴露，而不是等 30 条判据跑完才红。
+      - name: 判据脚本语法自检（compileall，锁 CI 的 Python 版本）
+        run: python -m compileall -q _test
       - name: src → deploy/xinyu SHA256 三类归零
         run: python _test/deploy_sync_check.py
       - name: 静态资源体积预算守卫（首屏优势不回涨，含 --selftest 防恒真）
