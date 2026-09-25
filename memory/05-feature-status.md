@@ -49,13 +49,12 @@
 ## ✅ 已实现（对标轮 r27，2026-09-25 第八轮：判据先行 + 切分第四刀 + 全零补分母）
 
 - [ ] 下一件（07 P0）：公网版只读离线壳 `sw.js`（对标反读：16 个同类全零 = 差异化机会），**必须先立时效判据再上线**
+## ✅ 已实现（对标轮 r28，2026-09-25 第九轮：只读离线壳上线，判据先行兑现）
+
+- [ ] 下一件（07 P0）：用 `_test/demo_video_pipeline.py` 重录成片（现成片早于"情绪后端化 + 离线壳"两个差异点）
+
 ## 分卷目录
-- **卷1** `05-feature-status.part1.md` — 05-feature-status 分卷（R199 自动拆卷）
-- **卷2** `05-feature-status.part2.md` — 05-feature-status 分卷（R199 自动拆卷）
-- **卷3** `05-feature-status.part3.md` — 05-feature-status 分卷（R199 自动拆卷）
-- **卷4** `05-feature-status.part4.md` — 05-feature-status 分卷（R199 自动拆卷）
-- **卷5** `05-feature-status.part5.md` — 05-feature-status 分卷（R199 自动拆卷）
-- **卷6** `05-feature-status.part6.md` — 05-feature-status 分卷（R199 自动拆卷）
-- **卷7** `05-feature-status.part7.md` — 05-feature-status 分卷（R199 自动拆卷）
-- **卷8** `05-feature-status.part8.md` — 05-feature-status 分卷（R199 自动拆卷）
+
+- **卷1–4** `part1..part4.md` — R199 自动拆卷（05 历史已完成条目）
+- **卷5–8** `part5..part8.md` — 历轮已完成条目（part8 含 r26–r28 三刀的收尾详情与交付链）
 

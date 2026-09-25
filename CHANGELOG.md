@@ -5,6 +5,36 @@
 
 ## [Unreleased]
 
+> 对标 r28（2026-09-25 第九轮）：**把对标的"全零"读成机会** —— 只读离线壳 `sw.js` 上线（判据先行），
+> 并把判据挂上 CI 真发布路径。外部漂移 3 处全为 ★ 抖动（实质 0）。
+
+### Added
+- **只读离线壳 `src/sw.js`**：HTML/JS/CSS network-first、`vendor/`+`assets/` cache-first（缓存名由 vendor 内容指纹钉）、
+  `/api/**` 与非 GET 完全不碰缓存、`js/demo-config.js`（本地含密钥）既不预缓存也不写缓存。
+- **`_test/offline_shell_check.py`**：A1–A10 静态审计（13 类注入反例）+ R1–R9 运行时，共 14 项；
+  其中 **R9 在公网上真断网重载**（"现场 WiFi 挂了还能演五幕"是唯一验收口径）。入电池 ⇒ 31 → **33 套件**。
+- **`deploy/xinyu/_headers`**：只钉实测真正缺头的两条（`/index.html` 原本无 Cache-Control 且 308 到 `/`；`/sw.js` 显式 no-cache）。
+- **常驻判据 G10**（`repo_config_check.py`）：CI 必须整跑电池且声明豁免，豁免项必须是真实套件（幽灵豁免判红）。
+
+### Changed
+- **CI browser-regression job**：由"只跑 `browser_check.py` 一条"改为 `python _test/run_all_suites.py --exclude-llm`
+  （runner 无上游密钥 ⇒ 显式豁免 `j2_chat_contract` / `stream_contract` 并点名，恒等式 `实跑+豁免==总数` 自证）。
+- `size_budget` 覆盖域扩到 `src` 根目录（`sw.js` 入册 4,814）；`index.html` 预算因注册块上调 9,191→9,936（理由写在该文件行内注释）。
+
+### Fixed
+- **删掉一处自己刚写的死代码**：原打算用 Java `CacheHeaderFilter` 统一头策略，实测发现
+  `spring.web.resources.cache.period=0` 已对所有静态件给 `no-store`（filter 被资源处理器覆盖）⇒ 过滤器删除，
+  也没顺手把 vendor 改长缓存（那是性能主张，不是离线壳前提，做了只会让两端策略分叉）。
+- 判据自证三处：① `transferSize` 对被 SW 拦截的请求恒为 0 ⇒ 无判别力，改由 SW 自报 `x-xinyu-src`；
+  ② `c.add().catch(()=>{})` 吞掉预缓存失败 ⇒ 留痕 + 新增"清单必须真入缓存 / 页面引用必须在壳里"两条分母断言；
+  ③ 间歇红根因是**判据自己的脚手架**（单线程 TCPServer 扛不住 SW 安装期并发）：换 ThreadingHTTPServer 后 3/3 绿，
+  再把变量翻回单线程复现 2/3 红，A/B 钉死因果后才敢收工。
+- `repo_config --selftest` 的反例条数从手抄（"十一类/十五类"两版都错）改为从代码里数。
+
+### Deployment
+- 公网 `54fb9778`（wrangler 回执含 `Uploading _headers`）：`sw.js` 线上 200 / 4,773B / `no-cache`；
+  本地 `--exclude-llm` 31/31 rc=0，全量含密钥 **33/33 rc=0**。
+
 > 对标 r27（2026-09-25 第八轮）：判据先行 —— 先给设置面板立行为判据，再切第四刀；外部漂移 2 处全为 ★ 抖动（实质 0）。
 
 ### Added
