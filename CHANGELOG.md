@@ -23,6 +23,14 @@
   复算：`python _test/benchmark_metrics.py --selftest` + `python _test/benchmark_metrics.py`
 
 ### Fixed
+- **演示成片重录（交付物变更，r30）**：旧片画面仍是**情绪后端化之前**的，而"后端引擎 + 同源代理在线"才是最有
+  说服力的两点差异 ⇒ 按 07 P0 登记的那件自驱项重录。8 幕 `RECORD-PASS`、`ffprobe` **217.56s**、
+  成片 `sha256=fc810f65…`（替换旧 `50e060d1…`）；S3 画面标签实测
+  `在线大模型生成 · 逐字流式 · 情绪双路：词典+LLM 一致 → LLM · 情绪:后端 · 1378ms`。
+  含一次**真实失败**：第一次把代理写成绝对 URL `http://127.0.0.1:8123/api/chat`，页面在 `localhost:8123`
+  ⇒ 跨源且 `/api/chat` 无 CORS 头（curl 带 `Origin` 实测），S3 落进「离线共情模板」被断言拦下 rc=1；
+  改**同源相对** `/api/chat` 后通过。教训："同源代理"的同源是 **URL 形状**的属性，不是端口的属性。
+  录制环境的切换/还原按 sha256 机器核验（`2521954c…` 前后一致），录后 `public_check`/`live_sync`/`deploy_sync` 全 PASS。
 - **聚合器自己是 3.12-only 语法**：r28 给失败明细写的 `print(f"{" " * 25}· {d}")` 依赖 PEP 701，
   本机 3.12 全绿、CI pin 3.11 直接 SyntaxError（30 条判据一条没跑）。改字符串拼接；
   另全仓扫两类 3.11 雷（嵌套同引号 f-string 1 处已修、f-string 花括号内反斜杠 0 处），

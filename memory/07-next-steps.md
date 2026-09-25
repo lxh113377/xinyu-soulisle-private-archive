@@ -18,14 +18,13 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
 - [ ] **J3/J4 变现**（= 让已建成能力真跑起来）：① 两端一致性守卫 ✅ ② 本地演示 `remote:true` ✅
       ③ fat jar 部署包 + Docker 镜像**两条路均已实测就绪** ⇒ **唯一阻塞 = 老大提供目标机器**（IP/登录/安全组）。
       2026-09-24 老大裁决：先不办，降级至 10 月复赛节点。完整段见 `part17`。
-- [ ] **agent 可自驱、不依赖外部信号的下一件（禁止第三次登记而不做）**：重录演示成片。
-      理由：现有成片（217s）仍是**情绪后端化之前**的画面，而"后端引擎 + 离线壳"恰是对评委最有说服力的两点差异。
-      成本一条命令：`python _test/demo_video_pipeline.py`（产物路径与规格已固化，可重录）。
-      ⚠️ 属**交付物**变更 ⇒ 录完必须复跑 `public_check` + `live_sync`，并把成片指纹写进 `提交清单与验收状态.md`。
-      同族（CI 覆盖面）已顺手做完，背景见 `part20`。
-      ⚠️ 前置（r30 实测）：demo-config 须走同源代理才让录（当前直连），细节与还原步骤见 `part20`。
-      ⛔ **另一条只有老大能解**：GitHub Actions 账户账单/配额（连续 3 次 run 判 `ENV_BLOCKED`，runner 从未启动）
-      ⇒ r28 的 CI 覆盖面修复至今无法在受理面验证，我不声称已验。复算：`python _test/ci_status_check.py`
+- [x] ✅ **重录演示成片（r30 已交付）**：8 幕 217.6s，S3 标签含「在线大模型生成 · 逐字流式 · 情绪:后端」，
+      成片 sha256=`fc810f65…`（旧 `50e060d1…`），录后 `public_check`/`live_sync`/`deploy_sync` 三项 PASS。
+      可复算的下一步：`python _test/demo_video_pipeline.py`（前置守卫要求**同源相对** `proxy="/api/chat"`，
+      绝对 URL 会被 CORS 拦成离线模板；切换与还原按 sha256）。全过程记录见 `part20` 第三节 + `提交清单与验收状态.md` 红线。
+- [ ] ⛔ **只有老大能解（agent 侧无入口）**：GitHub Actions 账户账单/配额 —— HEAD 最近 run 判 `ENV_BLOCKED`
+      （runner 从未启动）⇒ r28 的 CI 覆盖面修复**至今无法在受理面验证，我不声称已验**。
+      复算：`python _test/ci_status_check.py`（解除后此条应转 `PASS`，电池那条红随之消失）
 - [ ] **同族坑收口**：前五次台账见 `part18`，r30 增补（索引壳超限）见 `part20`；判据 G9 常驻 `repo_config_check.py`。
 - [ ] ⏸ **待老大（r25 footer 两条未闭环，属全局技能治理链，agent 不擅改归属方资产）**：
       ① A-get-memory 反思清单增「同族坑第三次复发即禁写'下次注意'、须当轮工具化」；

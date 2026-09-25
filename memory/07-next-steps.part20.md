@@ -25,17 +25,27 @@
 **仍开的口子**：G 系列只守 README 的数字，05/06/07 正文数字无守卫 ⇒ 已改为「正文只写复算命令」，
 扩到全仓文档数字需老大拍板。
 
-## 三、成片重录的前置条件（r30 实测，pipeline 自带守卫）
+## 三、成片重录：前置守卫、一次失败的归因、以及已交付结果（r30）
 
-`_test/demo_video_pipeline.py` 开录前有 assert：**要求同源代理链路**，本机 `src/js/demo-config.js` 必须
-`proxy` 有值且 `base` 为空；当前是浏览器直连（键为 `base`/`key`/`model`/`remote`/`emotionRemote`），
-守卫直接 `AssertionError` 拦下 —— **这是正确行为，不绕**。
+`_test/demo_video_pipeline.py` 开录前有 assert：**要求同源代理链路**，本机 `src/js/demo-config.js` 播种的
+cfg 必须 `proxy` 有值且 `base` 为空。登记该 P0 时本机是浏览器直连（键为 `base`/`key`/`model`/`remote`/
+`emotionRemote`），守卫直接 `AssertionError` 拦下 —— **这是正确行为，不绕**（浏览器直连链路已证不稳定，
+不能拿它录答辩素材）。
 
-三步（下一轮首件做）：
+交付步骤（r30 已按此跑通）：
 
 1. 先取该文件 sha256 存档：`python -c "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('src/js/demo-config.js').read_bytes()).hexdigest())"`
-2. 临时改 `proxy: "http://127.0.0.1:8123/api/chat"`、`base` 置空 → `python _test/demo_video_pipeline.py`
-3. 录完按哈希**还原**并复核一致，再复跑 `public_check` + `live_sync`，把成片指纹写进 `提交清单与验收状态.md`
+2. 临时把 `base`+`key` 两行换成 **同源相对路径** `proxy: "/api/chat"` → `python _test/demo_video_pipeline.py`
+   - ⚠️ **不能写绝对 URL**：第一次实测写 `http://127.0.0.1:8123/api/chat`，页面本身由同一 jar 托管在
+     `localhost:8123` ⇒ 属**跨源**请求，而 `/api/chat` 响应**没有** `Access-Control-Allow-Origin`
+     （curl 带 `Origin` 头实测），S3 落进「离线共情模板」被断言拦下，pipeline rc=1。
+     教训：**"同源代理"的"同源"是 URL 形状的属性，不是端口的属性** —— 写成绝对地址就自己造了个跨源。
+3. 录完按哈希**还原**并复核一致（实测还原前后同为 `2521954c4f2087…`），再复跑 `public_check` + `live_sync`
+   + `deploy_sync`（三项均 PASS），把成片指纹写进 `提交清单与验收状态.md`
+
+结果：8 幕 `RECORD-PASS`，`ffprobe` 217.56s，成片 `sha256=fc810f65f8acfef1d07a4b87b2f553e7a233948c5f969fa5d21f34b6ce9267b2`
+（22,506,430B；旧片 `50e060d1…` 已被替换），S3 画面标签实测为
+`在线大模型生成 · 逐字流式 · 情绪双路：词典+LLM 一致 → LLM · 情绪:后端 · 1378ms`。
 
 > 该文件 gitignored，属"环境模拟改权威源"族：备份/还原必须机器核验（同 r28 `ci_equiv_rehearsal.py` 的做法），
 > 不能只写"记得改回来"。
