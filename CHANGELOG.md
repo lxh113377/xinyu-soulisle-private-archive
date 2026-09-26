@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-09-26 — 对标轮 r37：交付可得性（本仓首个 GitHub Release）+ 依赖队列清空
+
 ### Fixed（r36 · 对标轮 2026-09-26：行尾确定性 —— 让"逐字节/SHA256/字节预算"类主张在别人机器上也成立）
 - **工作树字节与机器无关**：`core.autocrlf=true` + `* text=auto` 下，工作树是 CRLF 而仓库 blob 是 LF ⇒
   本机"逐字节相等"的判断在他人 clone 上会**整体反向**。现钉 `.gitattributes`（`* text=auto eol=lf` +

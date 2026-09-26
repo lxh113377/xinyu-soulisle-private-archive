@@ -36,6 +36,10 @@ SUITES = [
     # 现在两侧共用这一条判据（正则只实现一处），本地也进电池。
     ("tracked_secret", [sys.executable, "_test/tracked_secret_scan.py"]),
     ("tracked_secret_selftest", [sys.executable, "_test/tracked_secret_scan.py", "--selftest"]),
+    # r37：本机 `git ls-files` 干净 ≠ **远端树**干净（.gitignore 不撤销已推送的东西，
+    # 而评委看到的是远端）⇒ 另起一条扫 origin 默认分支的文件树
+    ("remote_tree", [sys.executable, "_test/remote_tree_audit.py"]),
+    ("remote_tree_selftest", [sys.executable, "_test/remote_tree_audit.py", "--selftest"]),
     ("ci_status", [sys.executable, "_test/ci_status_check.py"]),
     ("ci_status_selftest", [sys.executable, "_test/ci_status_check.py", "--selftest"]),
     ("repo_config", [sys.executable, "_test/repo_config_check.py"]),
