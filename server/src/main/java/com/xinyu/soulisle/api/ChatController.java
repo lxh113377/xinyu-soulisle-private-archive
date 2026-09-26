@@ -39,18 +39,21 @@ public class ChatController {
      */
     @PostMapping("/api/chat")
     public ResponseEntity<StreamingResponseBody> chat(@RequestBody(required = false) String raw) {
+        // r38：护栏判定**先于**密钥与解析分支，并把结论写进响应头 —— 这样 CI（无上游密钥）
+        // 也能实测"注入被点名、正常句不被误伤"，不必为了跑通判据而给 runner 配密钥。
+        String safety = SafetyGuard.headerValue(SafetyGuard.scan(lastUserQuietly(raw)));
         if (!proxy.hasKey()) {
-            return bytes(500, MediaType.APPLICATION_JSON, "{\"error\":\"no-key\"}");
+            return bytes(500, MediaType.APPLICATION_JSON, "{\"error\":\"no-key\"}", safety);
         }
 
         JsonNode node;
         try {
             node = mapper.readTree(raw == null ? "" : raw);
         } catch (Exception e) {
-            return bytes(400, MediaType.APPLICATION_JSON, "{\"error\":\"bad-json\"}");
+            return bytes(400, MediaType.APPLICATION_JSON, "{\"error\":\"bad-json\"}", safety);
         }
         if (node == null || !node.isObject()) {
-            return bytes(400, MediaType.APPLICATION_JSON, "{\"error\":\"bad-json\"}");
+            return bytes(400, MediaType.APPLICATION_JSON, "{\"error\":\"bad-json\"}", safety);
         }
 
         JsonNode messages = node.get("messages");
@@ -64,7 +67,6 @@ public class ChatController {
         // 干净输入下 harden() 原样返回同一对象 ⇒ 常规对话零行为差异；判定结果只落到响应头。
         SafetyGuard.Verdict verdict = SafetyGuard.scan(SafetyGuard.lastUserText(messages));
         JsonNode upMessages = SafetyGuard.harden(messages);
-        String safety = SafetyGuard.headerValue(verdict);
 
         if (!wantStream) {
             LlmProxy.Result r = proxy.call(upMessages, temperature, maxTokens);
@@ -91,6 +93,16 @@ public class ChatController {
                 .header("X-Accel-Buffering", "no")
                 .header("X-Xinyu-Safety", safety)
                 .body(body);
+    }
+
+    /** 请求体可能非法（坏 JSON / 空体）；护栏只取能解析出来的部分，解析失败按"无用户文本"处理 */
+    private String lastUserQuietly(String raw) {
+        try {
+            JsonNode n = mapper.readTree(raw == null ? "" : raw);
+            return SafetyGuard.lastUserText(n.path("messages"));
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     /** 以 UTF-8 字节直写，绕开 StringHttpMessageConverter 的默认字符集坑（中文回复必须原样回传） */

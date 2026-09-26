@@ -59,18 +59,35 @@ def post(text, stream=False):
                                  data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
                                  headers={"Content-Type": "application/json",
                                           "User-Agent": "xinyu-safety-check"})
-    with urllib.request.urlopen(req, timeout=90) as r:
-        return r.status, dict(r.headers), r.read().decode("utf-8", "replace")
+    # 4xx/5xx 也要拿到响应头：护栏判定现在先于密钥与解析分支写出，
+    # CI runner 没有上游密钥（500 no-key）时**仍然必须能验注入识别**，不能整条套件算未验。
+    try:
+        with urllib.request.urlopen(req, timeout=90) as r:
+            return r.status, dict(r.headers), r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers or {}), e.read().decode("utf-8", "replace")
 
 
 def run_http():
-    bad = []
+    bad, skipped = [], 0
+    # 先探一次"上游有没有密钥"：没有的话 /api/chat 必然 500 no-key（这是契约内的响应，不是缺陷），
+    # 于是**状态码期望值要换**，而护栏断言（响应头）与状态码无关，照常全量实测。
+    # 这一档是本地按 CI 条件复现出来的：无密钥实例 :8124 上首跑就是被"要求 200"误判 6 条红。
+    try:
+        probe_st, _, probe_body = post("在吗")
+        key_free = (probe_st == 500 and "no-key" in probe_body)
+    except Exception as e:
+        print("SAFETY-CHECK-ENV: 服务不可达 %s（%s）⇒ 记为未验证，不判绿" % (BASE, type(e).__name__))
+        return 2
+    want_status = 500 if key_free else 200
+    if key_free:
+        print("ℹ️ 上游无密钥（CI runner 条件）⇒ 响应体契约子项记 skipped，护栏判定仍全量实测")
     try:
         for want, text in INJECTION_CASES:
             st, hdr, _ = post(text)
             v = parse_header(hdr.get("X-Xinyu-Safety") or hdr.get("x-xinyu-safety"))
-            if st != 200:
-                bad.append("注入样本 %s 返回 http=%s" % (want, st))
+            if st != want_status:
+                bad.append("注入样本 %s 返回 http=%s（期望 %s）" % (want, st, want_status))
             if v.get("suspect") != "1":
                 bad.append("漏报：注入样本 [%s] 未被判 suspect（header=%r）" % (want, v))
             elif want not in v.get("signals", ""):
@@ -80,14 +97,18 @@ def run_http():
             v = parse_header(hdr.get("X-Xinyu-Safety") or hdr.get("x-xinyu-safety"))
             if v.get("suspect") != "0":
                 bad.append("误报：正常句子被判 suspect=%r（%r）" % (v.get("suspect"), text[:18]))
-            # 契约：响应体逐字透传 ⇒ 正常调用必须仍是带 choices 的 OpenAI 形态
-            try:
-                j = json.loads(body)
-                if "choices" not in j:
-                    bad.append("契约破坏：正常调用响应体无 choices（键=%s）" % sorted(j)[:5])
-            except Exception as e:
-                bad.append("契约破坏：正常调用响应体不是合法 JSON（%s）" % e)
-        st, hdr, _ = post(CRISIS_CASE)
+            # 契约：响应体逐字透传 ⇒ 正常调用必须仍是带 choices 的 OpenAI 形态。
+            # runner 没有上游密钥时这一项**客观上验不了**（响应就是 500 no-key）⇒ 记 skipped，
+            # 不记 PASS；护栏判定本身（响应头）照样实测，所以整条套件不因缺密钥而降级成未验。
+            if key_free:
+                skipped += 1
+            else:
+                try:
+                    j = json.loads(body)
+                    if "choices" not in j:
+                        bad.append("契约破坏：正常调用响应体无 choices（键=%s）" % sorted(j)[:5])
+                except Exception as e:
+                    bad.append("契约破坏：正常调用响应体不是合法 JSON（%s）" % e)
         v = parse_header(hdr.get("X-Xinyu-Safety") or hdr.get("x-xinyu-safety"))
         if v.get("suspect") != "0":
             bad.append("情绪倾诉句被误判为注入 ⇒ 护栏会把最需要陪伴的话拦在外面")
@@ -99,28 +120,22 @@ def run_http():
         v = parse_header(hdr.get("X-Xinyu-Safety") or hdr.get("x-xinyu-safety"))
         if v.get("capped") != "1":
             bad.append("漏报：>%d 字的超长输入未判 capped（header=%r）" % (4000, v))
+        st, hdr, _ = post(CRISIS_CASE)
+        if st != want_status:
+            bad.append("危机句返回 http=%s（期望 %s）" % (st, want_status))
         st, hdr, _ = post(BENIGN_CASES[0], stream=True)
         if (parse_header(hdr.get("X-Xinyu-Safety") or hdr.get("x-xinyu-safety")) or {}).get("suspect") is None:
             bad.append("流式分支未带 X-Xinyu-Safety 头 ⇒ 两条出口判定不一致")
-    except urllib.error.HTTPError as e:
-        detail = ""
-        try:
-            detail = e.read().decode("utf-8", "replace")[:80]
-        except Exception:
-            pass
-        if e.code == 500 and "no-key" in detail:
-            print("SAFETY-CHECK-ENV: 服务端未配上游密钥（no-key）⇒ 记为未验证")
-            return 2
-        bad.append("HTTP %s %s" % (e.code, detail))
     except Exception as e:
         print("SAFETY-CHECK-ENV: 服务不可达 %s（%s）⇒ 记为未验证，不判绿" % (BASE, type(e).__name__))
         return 2
     for b in bad:
         print("  FAIL", b)
-    print("SAFETY-GUARD-%s（注入 %d 例双向 + 正常 %d 例不误伤 + 危机句不误伤 + 超长/高危/流式各 1 例）"
+    tail = "" if not skipped else "｜跳过 %d 项：runner 无上游密钥，响应体契约子项客观验不了（不是 PASS）" % skipped
+    print("SAFETY-GUARD-%s（注入 %d 例双向 + 正常 %d 例不误伤 + 危机句不误伤 + 超长/高危/流式各 1 例）%s"
           % ("FAIL: %d 项" % len(bad) if bad else
-             ("PASS: %d 例断言全过" % (len(INJECTION_CASES) + 2 * len(BENIGN_CASES) + 3)),
-             len(INJECTION_CASES), len(BENIGN_CASES)))
+             ("PASS: %d 例断言全过" % (len(INJECTION_CASES) + 2 * len(BENIGN_CASES) + 3 - skipped)),
+             len(INJECTION_CASES), len(BENIGN_CASES), tail))
     return 1 if bad else 0
 
 
