@@ -13,6 +13,8 @@
   G2 CI 拓扑：`.github/workflows/ci.yml` 可解析，且 job 数 == README 声称的"N 条门禁"（数字对不上即红）
   G3 契约可发现：`docs/openapi.yaml` 存在、可解析，且被 `docs/README.md` 引用（孤文件即红）
   G4 判据清单自洽：`run_all_suites.py` 的 SUITES 条目数 == README 声称的"（N 套件）"
+  G14 对标仓数自洽：README 的现行状态句「对标源数据台账（N 仓指标」== 台账 `peers_expected`
+     （只锚现行句：历史轮次里的"14 仓"当时就是 14，宽口径会误伤）
   G5（--online）远端受理面：默认分支上 `.github/dependabot.yml` 确实存在（GitHub 只看默认分支）
   G6 第三方授权：`src/vendor/*.js` 每一个文件都必须在 `docs/THIRD-PARTY-NOTICES.md` 里被点名
   G7 README 必须含指向该授权清单的口径行（否则读者只会看到"MIT"，而 GSAP 其实不是 MIT）
@@ -369,6 +371,35 @@ def version_doc_audit(docs_text, pom):
     return bad
 
 
+def peer_count_audit(readme_text, truth):
+    """G14 文档侧：README 里"对标源数据台账（N 仓指标"这一**现行状态**断言必须等于台账记的 N。
+
+    只锚这一句是有意的：README/ROADMAP 里还有"第二轮 14 仓""参照池由 14 扩到 16"这类
+    **历史轮次**陈述，它们当时就是 14，用宽正则一律钉成红 = 误伤（r36 实测先写过宽口径，
+    立刻把 `14 仓实测指标横向对账` 那条历史行判红）。
+    """
+    bad = []
+    found = set(re.findall(r"对标源数据台账（(\d+) 仓指标", readme_text))
+    if not found:
+        bad.append("G14 零命中：README 没有可核对的对标仓数断言 ⇒ 该声明没有机器责任方（不得据此判绿）")
+    if len(found) > 1:
+        bad.append(f"G14 README 内仓数断言自相矛盾：{sorted(found)}")
+    for c in sorted(found):
+        if truth is None:
+            bad.append("G14 取不到台账 peers_expected ⇒ 无权威值可比（先疑台账缺失/损坏）")
+        elif int(c) != int(truth):
+            bad.append(f"README 声称 {c} 仓，台账权威值 {truth}（差 {int(c)-int(truth):+d}）")
+    return bad
+
+
+def ledger_peer_count():
+    p = ROOT / "交付物" / "对标数据" / "benchmark-metrics.json"
+    try:
+        return int(json.loads(p.read_text("utf-8", errors="replace"))["peers_expected"])
+    except Exception:
+        return None
+
+
 def pom_version():
     p = ROOT / "server" / "pom.xml"
     if not p.exists():
@@ -576,6 +607,16 @@ def selftest():
         bad.append("篡改⑯c（空输入/无 tag）没返回空串 ⇒ 会拿垃圾当版本")
     if pick_latest_tag("v1.10.0\nv1.9.0\n") != "v1.10.0":
         bad.append("篡改⑯d（两位数minor）按字典序排 ⇒ 1.9 被判大于 1.10")
+    # ⑰ G14 对标仓数：正向（一致）必须零问题，三种负向必须各自报红
+    ok_line = "python _test/benchmark_metrics.py  # 对标源数据台账（16 仓指标 + …）"
+    if peer_count_audit(ok_line, 16):
+        bad.append("篡改⑰a（README 与台账一致）被误判红 ⇒ 判据过严，第一次接真文就误伤")
+    if not peer_count_audit(ok_line.replace("16 仓", "9 仓"), 16):
+        bad.append("篡改⑰b（文档 9 仓 vs 台账 16 仓）未被抓到 ⇒ 恒绿")
+    if not peer_count_audit("台账说明（删掉了仓数断言）", 16):
+        bad.append("篡改⑰c（现行状态句失踪）未被抓到 ⇒ 声明失去机器责任方却判绿（R247 同族）")
+    if not peer_count_audit(ok_line, None):
+        bad.append("篡改⑰d（台账取不到权威值）被判绿 ⇒ 无权威值可比时必须红")
     real = sorted((ROOT / "_test").glob("*.py"))
     viol = [p.name for p in real if import_safety(p.read_text("utf-8", errors="replace"))]
     if viol:
@@ -626,6 +667,9 @@ def main():
     g12bad = version_truth(tag, pom) + version_doc_audit(docs_text, pom)
     check("G12 版本断言三源对账（git tag == pom == 文档「当前版本」）", not g12bad,
           f"tag={tag or '取不到'} pom={pom or '取不到'} 文档={sorted(docs_text)} | " + " ; ".join(g12bad))
+    g14bad = peer_count_audit(docs_text.get("README.md", ""), ledger_peer_count())
+    check("G14 对标仓数断言 == 台账权威值（README 现行状态句）", not g14bad,
+          f"台账 peers_expected={ledger_peer_count()} | " + (" ; ".join(g14bad) or "README 断言与台账一致"))
     g13bad = guard_inventory(HEADER_DOC, Path(__file__).read_text("utf-8", errors="replace"))
     check("G13 判据账本自洽（头部登记 == main() 实际执行，漏登/幽灵登都红）", not g13bad,
           " ; ".join(g13bad))

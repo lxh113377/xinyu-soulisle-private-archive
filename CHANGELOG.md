@@ -5,6 +5,48 @@
 
 ## [Unreleased]
 
+### Fixed（r36 · 对标轮 2026-09-26：行尾确定性 —— 让"逐字节/SHA256/字节预算"类主张在别人机器上也成立）
+- **工作树字节与机器无关**：`core.autocrlf=true` + `* text=auto` 下，工作树是 CRLF 而仓库 blob 是 LF ⇒
+  本机"逐字节相等"的判断在他人 clone 上会**整体反向**。现钉 `.gitattributes`（`* text=auto eol=lf` +
+  `*.sh`/`*.ps1` 强制 LF + 20 类扩展名显式 `binary`），108 个文本文件 `git add --renormalize` 归一。
+  **归一零内容改动**的证明：`git diff --name-only` 与 `git diff --ignore-cr-at-eol --name-only`
+  文件集相同（只差本轮两个有意改的文件）。跨检出复验：两份 clone 分别按 `autocrlf=true` / `input`
+  检出后文本侧字节一致。
+- **归一过程自己造成过一次二进制损伤（已还原并固化为判据）**：首轮 renormalize 把 20 个二进制里出现的
+  `0D0A` 字节当行尾剥掉（PNG/MP4 各少 1–2 字节），而"两侧都归一再比"的守卫**看不见这种损失**
+  （两侧被同样地破坏了）。全部从 `git show HEAD:` 还原（复核余 0 条不等），并把该形状写成规则 **E3**：
+  含 `0D0A` 却未声明 `binary` 的文件 ⇒ 判红；同时撤销我一开始过严的另一半（"声明 binary 就必须含 0D0A"），
+  两侧各配夹具用例钉住。
+- **新增常驻判据 `_test/eol_parity_check.py`**（`eol_parity` + `eol_parity_selftest` 两条套件）：
+  E1 属性表须有 `eol=lf` 与 `binary`；E2 文本侧工作树无 CRLF 且 `工作树 == 仓库侧 blob`（在途改动放行，
+  但在途且带 CRLF 仍点名）；E3 上述 binary 形状；E4 分母闭合 `text+binary==total`，git 读空/失败 ⇒ rc=2 不判绿。
+  8 类样本自证。当前实测 `text=205 binary=20 total=225`。
+- **三处落仓库文本的写盘口改 `write_bytes`**：`Path.write_text` 在 Windows 文本模式把 `\n` 翻成 `\r\n`
+  （实测 `b'a\n'` → 落盘 `b'a\r\n'`），**一次写入就把刚归一好的 LF 打回 CRLF**。判据接上就当轮抓到
+  `交付物/对标数据/benchmark-metrics.json`。按"修一类不修一例"枚举全部同类出口：台账（`benchmark_metrics.py`）、
+  **补丁器**（`patch_apply.py` — 影响面最大，且它的"写后读回复验"用 `read_text`，universal newlines 会把 CR
+  读成 `\n`，**复验步骤自身正好掩盖该缺陷**，故写与读同时改按字节）、演示流水线（`demo_video_pipeline.py`
+  的 `timeline.json` / `subtitle.ass`，两文件均已入库）。`patch_apply --selftest` 六类 → **八类**
+  （⑦LF 输入打完仍 LF / ⑧CRLF 输入被归一），README 同步。
+- **电池入口由 fail-open 改 fail-closed**（`run_all_suites.py`）：`--help` 无实现 ⇒ 被当未知参数**静默忽略并
+  把 43 条全跑一遍**（本轮撞上）；同理 `--onl selftest` 这类打错字会跑成全量还打印 `ALL-GREEN`，
+  即"子集全绿"被说成"全量全绿"。现：未知开关 / 缺操作数 / `--slice 99 120` 越界（Python 切片会静默截成空集）
+  一律 rc=2，并补 `-h/--help`。摘要行另修一处：由"最后一行"改取"最后一条判定行"，
+  因 `strategy_selftest` 在 PASS 之后还打印注入反例，rc=0 却显示 `· 热线清单需 ≥3 条，实际 []`（看着像报错）。
+
+### Changed（r36 · 公网与受理面）
+- **公网按 LF 重部署，"线上 == 权威源"从此不依赖兜底分支**：`cd deploy && npx wrangler pages deploy xinyu
+  --project-name=xinyu-soulisle --commit-dirty=true`（日志含 `Uploading Functions bundle`）。
+  `live_sync_check` 由 `live=9463 / local=9288｜仅行尾差异 ⇒ PASS`（走 `eol_only` 容差）转为
+  **`live=9288 == local=9288 equal=True`**；`public_check` / `online_check` / `offline_shell_check`（17 项 0 失败）
+  / `deploy_sync_check` 同步复绿。回滚锚点 = 上一版生产部署 `b5f46ecf-d1dd-46ee-b700-10a3d2914e56`。
+- **对标语义补测（本轮新参照数据）**：16 个参照仓根目录 `.gitattributes` 逐个 `gh api` 探测
+  （按 HTTP 状态分 ABSENT/PRESENT，base64 交 Python 解）⇒ **存在 6/16，真钉行尾/二进制 4/16**
+  （lobehub / leemo / opensoul / MoodChat，其中 MoodChat 钉的是 `eol=crlf`）。
+  即"钉行尾"在同类项目里是少数派，但工程化最强的那个在做 ⇒ 本轮做法与头部同形，非自创规矩。
+- **本机 43 套件全量复跑**：`--slice 0 22` ⇒ 22/22、`--slice 22 43` ⇒ 21/21 ⇒ **43/43 rc=0 ALL-GREEN**；
+  台账重采 `BENCHMARK-METRICS-PASS`（`电池套件=43`，漂移 3 处 = 实质 0 + 抖动 3）。
+
 ### 受理面（r35 收口，实测）
 - **四条 CI job 首次在 HEAD 上全绿**：run `36220200506`（sha `7aac7d2`）`conclusion=success`，
   四 job 逐项 success；`ci_status_check.py` 由 `CODE_FAIL` 转 `CI-STATUS-PASS`（rc=0）。

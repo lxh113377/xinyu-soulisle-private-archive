@@ -39,6 +39,12 @@
 - **静态页托管红线**：服务端直读 `src/`（`static-locations=file:${XINYU_WEB_ROOT:./src/}`），禁把前端复制进 `resources/static/`（第三处副本）
 - **评测集红线**：`/api/emotion/eval` 直读 `_test/emotion-eval-dataset.json`，禁复制进 jar
 - **词表一致性红线**：改 JS/Java 任一端词表须两端同步 + 跑 `_test/engine_consistency_check.py`
+- **行尾红线（r36）**：文本一律 `eol=lf`（`.gitattributes` 钉死），落仓库的文本**禁用 `Path.write_text` 文本模式**
+  （Windows 实测把 `\n` 翻成 `\r\n`，一次写入即毁掉归一）⇒ 改 `write_bytes`；复验也要按字节读
+  （`read_text` 的 universal newlines 会把 CR 读成 `\n`，正好掩盖该缺陷）。判据 `_test/eol_parity_check.py`
+- **二进制红线（r36）**：png/jpg/mp4/pdf/jar/db 等按 `.gitattributes` 显式 `binary` 声明，
+  新增二进制扩展名须先登记 —— r36 首轮归一曾剥掉 20 个二进制里的 `0D0A`（PNG/MP4 少 1–2 字节），
+  由 `git show HEAD:` 全量还原；该形状现由判据 E3 盯住
 
 ## 性能/兼容性约束
 <!-- 性能要求、浏览器兼容性、系统兼容性等 -->

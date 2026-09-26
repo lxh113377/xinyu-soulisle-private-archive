@@ -26,16 +26,12 @@
       复算 `grep -rn "本机开场白" src/js/ deploy/xinyu/js/` 命中 >0。
 - [x] **只读离线壳**（r28）：`src/sw.js` + `_test/offline_shell_check.py`（A1–A10 / R1–R9，14 项 + 13 类反例），
       公网真断网仍可演；`/api/**` 与含密钥件永不落缓存。
-- [x] **演示视频（成片）代际 r34**：`RECORD-PASS scenes: 8` / `ffprobe 218.48s` ≤300s，
-      画面已含上述两类标签；指纹与三代际见 `交付物/提交包/提交清单与验收状态.md` 第 2 行（不在此重复抄）。
-- [x] **`app.js` 四刀切分收口**（r24–r27）：voice / chart / chat-window / settings 四个模块外提，
-      每刀带行为判据（U1–U3、A1–A7、S1–S8），预算逐刀反向棘轮。
-- [x] **受理面三条 CI 真红归因并修复**（r35）：settings 落盘完成态等待 / voice 无音频设备降级 /
-      跟踪文件密钥自伤（详见 `交付物/对标分析报告-2026-09-26.md` §2）。
-- [x] **新增常驻判据**（r35）：`_test/tracked_secret_scan.py`（CI 与本地同一把尺）、
-      `repo_config` **G12**（版本三源对账）、**G13**（判据账本自洽：登记==执行）、
-      `voice_check --selftest`（环境降级的五个边界）、电池收口行区分"判红"与"环境未验"。
-
+- [x] **行尾与工作树字节确定性（r36）**：`.gitattributes` 钉 `* text=auto eol=lf` + 显式 binary 名单，
+      108 文本文件 renormalize（内容零改动，由 `git diff --name-only` == `--ignore-cr-at-eol --name-only` 证明）；
+      常驻判据 `_test/eol_parity_check.py`（E1–E4 + 8 类自证）。公网已按 LF 版重部署，
+      `live_sync_check` 现走**逐字节相等**分支（`live=9288 == local=9288`），不再依赖"仅行尾差异"兜底。
+- [x] **构建状态历史条目（r24–r35）**：`app.js` 四刀切分 / 演示视频代际 r34 /
+      r35 受理面三条真红与新增常驻判据 ⇒ 逐字迁 `05-feature-status.part11.md`
 - [ ] **仍存差距（对标 16 仓台账）**：three.js r128 vs 上游 r186（头号技术债，截止后独立成阶段）·
       语义/persona 记忆（9/16 家有向量同族能力）· `docs/` 站与 i18n 框架化（低优先）·
       真机 iOS/Android 帧率 **❌未实测**
@@ -46,6 +42,7 @@
 - **卷5–8** `part5..part8.md` — 历轮已完成条目（part8 含 r26–r28 三刀的收尾详情与交付链）
 - **卷9** `part9.md` — r29–r32 已完成条目
 - **卷10** `part10.md` — r35 人工拆卷：对标轮 r20–r28 各轮段落（含被 r28 反读推翻的「SW 撤销」原文），逐字迁入未改写
+- **卷11** `part11.md` — r36 人工拆卷：「当前构建状态」中 r24–r35 已完成条目（四刀 / 视频 / r35 真红与判据）
 
 > 卷数以磁盘现读为准，本行不抄清单：`ls memory/05-feature-status.part*.md | wc -l`
 > （上一版这里写「卷1–8」时磁盘已有 9 卷 —— 与"文档手抄数字脱节"同族，改为给复算命令。）
