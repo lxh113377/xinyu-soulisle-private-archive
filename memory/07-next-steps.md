@@ -30,6 +30,7 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
       新常驻判据 `java_test_guard`（T4 盯「CI 构建步不得带 `-DskipTests`」）、新观测面 `peer_test_asset_probe`
       （实测 `in-build=9/16 家有、self=0`）、聚合器折叠补 `-` 续行与 stderr、`online_check` 固定 sleep 改完成态轮询、
       整跑加并发锁；电池 54→**58**，独占整跑 **58/58 ALL-GREEN**。台账与 P1 序见 `part33`。
+- [ ] ⚠️ **savepoint 被跨项目噪声门拒（r41）**：15 项 VIOL 全在焚诀根且是他人在途，禁代处置；本仓 violation=0，修法见 `part33` 末节。
 ## 分卷目录
 
 - **卷1–7** `part1..part7.md` — J1–J5 逐阶段验收证据与命令（卷1–4）/ P1·P2 与对话摘要（卷5）/

@@ -29,3 +29,17 @@
 
 ## 受理面回执（本轮收口）
 `a75211a` 首推 → CI `RED: disclaimer_forensics`（自家新判据抓到报告 §9.4 一句裸边界结论）→ 改文案不改判据 → `6c363a0` 重推 → run `36268651657` `conclusion=success`，`ci_status_check` 回 `HEAD = PASS`。`java-build` 的 `mvn package` 在 Linux runner 上实测 `Tests run: 30, Failures: 0`（run 36268051559 原文）⇒ in-build 门禁的跨环境等价性已成实测。
+
+## 阻塞登记（r41 收口时）：savepoint 被跨项目噪声门拒
+`handoff.py savepoint <陪聊>` 走到第 i) 步 `noise` 被拒，`violation=15` **全部在 `焚诀/` 根**
+（`cfg.md`/`self.md`/`pc.txt`/`bot-comparison.md`/`ci.html` 等），实测 `git ls-files` 全为 **untracked**
+且 mtime = 2026-09-27 04:07–04:14 ⇒ 是**另一个在跑的会话的在制品**，不是本仓散落。
+`handoff.py help noise` 自述默认扫三个全局根 + 已登记项目根 ⇒ 本仓 savepoint 被别仓状态挡死。
+
+**处置边界（写给下一轮，别重蹈）**：① 禁止把这些文件迁 `_trash`（等于删别人在途工作，不可逆）；
+② 本轮 `陪聊/docs` 那一处是**登记滞后**（受 git 跟踪的治理件），已按 R284 补登记并两侧实测；
+③ 本条这 15 项是**归属方在途**，正解只有等其收尾或由老大裁定，不得由我代处置。
+
+**待办（P2，属主=A-project-handoff）**：`savepoint` 内的 noise 步骤应按**目标项目根**定标
+（跨根只报不拦），否则任何项目在别的项目写东西时都无法收尾。登记时附实测：
+陪聊根自身 `violation=0 [GATE:noise-pass]`（补 docs 后），拒因 100% 来自外部根。
