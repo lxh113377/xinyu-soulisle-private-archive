@@ -16,6 +16,11 @@ SUITES = [
     # 只防塌方级退化（直读变落库 / 线程池打满 / 危机路径开始打 LLM），不防抖动 ⇒ 才有资格进阻断链。
     ("perf_baseline", [sys.executable, "_test/perf_baseline_check.py", BASE]),
     ("perf_baseline_selftest", [sys.executable, "_test/perf_baseline_check.py", "--selftest"]),
+    # r40c：报告里的「不可比 / 受限于 / 仅保证」类边界结论必须自带取证口径（M5⑫ 的执行器）。
+    # 首跑就在自己的报告里点名一处 r35 遗留（无可比口径 无取证），修文案后才转绿 ⇒ 判据非装饰。
+    ("disclaimer_forensics", [sys.executable, "_test/disclaimer_forensics_lint.py", "--file",
+                              "交付物/对标分析报告-2026-09-26.md"]),
+    ("disclaimer_forensics_selftest", [sys.executable, "_test/disclaimer_forensics_lint.py", "--selftest"]),
     ("deploy_sync", [sys.executable, "_test/deploy_sync_check.py"]),
     # r36：行尾确定性 —— 让「逐字节 / SHA256 / 字节预算」类主张在他人 clone 上也成立
     ("eol_parity", [sys.executable, "_test/eol_parity_check.py"]),
