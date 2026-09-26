@@ -53,6 +53,8 @@ SUITES = [
     ("testasset_selftest", [sys.executable, "_test/peer_test_asset_probe.py", "--selftest"]),
     # r42：无障碍面（对标探针不入链——16 仓 × 4 次 API，承 r37 探针不入电池口径；只入其判定桩）
     ("a11y_probe_selftest", [sys.executable, "_test/peer_a11y_probe.py", "--selftest"]),
+    # r43：可复现面（16 仓 × ~4 次 API 的探针不入链，承 r37 口径；只入判定桩）
+    ("repro_probe_selftest", [sys.executable, "_test/peer_repro_probe.py", "--selftest"]),
     ("api_contract", [sys.executable, "_test/api_contract_check.py"]),
     ("api_contract_selftest", [sys.executable, "_test/api_contract_check.py", "--selftest"]),
     ("patch_apply_selftest", [sys.executable, "_test/patch_apply.py", "--selftest"]),
@@ -86,6 +88,10 @@ SUITES = [
     # 规则集必须含 experimental（默认集看不见 label-content-name-mismatch，首跑即被这一点骗过）。
     ("a11y", [sys.executable, "_test/a11y_check.py"]),
     ("a11y_selftest", [sys.executable, "_test/a11y_check.py", "--selftest"]),
+    # r43：干净克隆可跑性——从 **HEAD** 克隆到临时目录再跑，证明"交出去的那份"能跑，
+    # 而不是"我这台机器上恰好有一份 .gitignore 掉的文件"那一版能跑。
+    ("clean_clone", [sys.executable, "_test/clean_clone_check.py"]),
+    ("clean_clone_selftest", [sys.executable, "_test/clean_clone_check.py", "--selftest"]),
     ("j2_chat_contract", [sys.executable, "_test/j2_chat_contract.py"]),
     ("j4_memory", [sys.executable, "_test/j4_memory_check.py"]),
     ("j4_remote_down", [sys.executable, "_test/j4_remote_down_check.py"]),

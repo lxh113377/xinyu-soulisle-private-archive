@@ -40,6 +40,22 @@
       "sha256": "b0b14d67b55b0c43c756ac0b106cfcb09d0879945f6ead64451065b0672916a2",
       "size": 44575,
       "upstream_seen": "3.15.0 (tag, 2026-09-25 实测)"
+    },
+    {
+      "file": "_test/vendor/axe-core-4.10.2.min.js",
+      "name": "axe-core",
+      "version": "4.10.2",
+      "upstream_repo": "dequelabs/axe-core",
+      "upstream_kind": "release",
+      "detect": "axe v([0-9.]+)",
+      "status": "pinned",
+      "note": "r42 引入的运行时无障碍审计引擎。不进 src/vendor：它是判据依赖而非首屏载荷，进公网 bundle 等于给评委多下 553KB。落 _test/vendor 由 _test/a11y_check.py 读磁盘后add_script_tag 注入。⚠️ 本条是 r43 补登记：r42 当时 vendor 判据的枚举面只有 src/vendor，这件第三方资产在治理面外躺了一整轮（sha 钉默认关闭 = 被替换看不见）。",
+      "sha256": "b511cd9dec01c76f4b2ad1723b66b6db37d4c2eb4ed199076e1829d9ee7b75e3",
+      "size": 553290
     }
+  ],
+  "vendor_dirs": [
+    "src/vendor",
+    "_test/vendor"
   ]
 }

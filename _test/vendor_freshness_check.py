@@ -67,8 +67,36 @@ def audit(manifest, disk):
 
 
 def audit_coverage(manifest, vendor_files):
-    declared = {Path(l["file"]).name for l in manifest.get("libs", [])}
+    """按**相对路径整条**比，不按 basename。
+
+    两个 vendor 目录里放同名文件时，basename 口径会互相顶包（src/vendor/a.js 已登记
+    就能替 _test/vendor/a.js 蒙过 V3）；所以磁盘侧一律带目录前缀（见 vendor_files_on_disk）。
+    """
+    declared = {l["file"] for l in manifest.get("libs", [])}
     return sorted(set(vendor_files) - declared)
+
+
+def vendor_dirs(manifest):
+    """枚举面从名册自己读（缺省回落到历史面 src/vendor）。
+
+    ⚠️ 这里曾经**写死** `src/vendor` 一个目录 ⇒ r42 把 axe-core（553,290B）落进 `_test/vendor/`
+    时，本判据整轮全绿却对它一无所知：**登记册的分母来自被审对象自己**，新面天然不进审计
+    （与 r41 把 disclaimer_forensics 的分母从"手抄单个报告"改成"从目录现读"是同一族）。
+    """
+    dirs = manifest.get("vendor_dirs") or ["src/vendor"]
+    return [str(d) for d in dirs]
+
+
+def vendor_files_on_disk(manifest):
+    """所有声明的 vendor 目录下的 js（带相对目录前缀，避免两个同名文件互相顶包）。"""
+    out = []
+    for d in vendor_dirs(manifest):
+        base = ROOT / d
+        if not base.exists():
+            continue
+        for p in base.glob("*.js"):
+            out.append(f"{d}/{p.name}")
+    return sorted(out)
 
 
 def upstream_latest(lib):
@@ -112,17 +140,29 @@ def selftest():
     bumped["libs"][1]["version"] = "9.9.9"
     if not audit(bumped, disk):
         bad.append("篡改样本②（版本声明与内容脱节）未被抓到 —— V2 恒真")
-    real_on_disk = sorted(p.name for p in (ROOT / "src" / "vendor").glob("*.js"))
+    real_on_disk = vendor_files_on_disk(manifest)
     ghost = json.loads(json.dumps(manifest))
-    ghost["libs"].pop()                      # 模拟"新 vendor 库落盘但没登记台账"
-    dropped = Path(manifest["libs"][-1]["file"]).name
-    if dropped not in real_on_disk:
-        bad.append(f"篡改样本③构造无效：{dropped} 不在磁盘清单里")
-    elif dropped not in audit_coverage(ghost, real_on_disk):
-        bad.append("篡改样本③（删掉一个库的登记）未被 V3 抓到 —— 覆盖判据恒真")
-    if not audit_coverage(manifest, real_on_disk + ["sneaky.min.js"]):
-        bad.append("篡改样本④（凭空塞未登记文件）未被抓到 —— V3 恒真")
-    print("SELFTEST-PASS: 4 类篡改全部被抓到、原样零问题" if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
+    # 篡改样本③：删掉 axe 那条登记（= r42 的真实处境：文件在盘上、台账里没有、且它在第二个 vendor 目录）
+    axe_rel = next((l["file"] for l in manifest["libs"] if "axe-core" in l["file"]), None)
+    ghost["libs"] = [l for l in ghost["libs"] if "axe-core" not in l["file"]]
+    if not axe_rel:
+        bad.append("篡改样本③构造无效：名册里没有 axe-core 条目")
+    elif axe_rel not in real_on_disk:
+        bad.append(f"篡改样本③构造无效：{axe_rel} 不在磁盘枚举面里（vendor_dirs 配错？）")
+    elif axe_rel not in audit_coverage(ghost, real_on_disk):
+        bad.append("篡改样本③（删掉 axe 的登记）未被 V3 抓到 —— 覆盖判据恒真")
+    if not audit_coverage(manifest, real_on_disk + ["_test/vendor/sneaky.min.js"]):
+        bad.append("篡改样本④（第二个 vendor 目录凭空塞未登记文件）未被抓到 —— V3 恒真")
+    # 篡改样本⑤：basename 顶包 —— 只登记 src/vendor/twin.js，磁盘另有 _test/vendor/twin.js
+    collide = json.loads(json.dumps(manifest))
+    collide["libs"].append({"file": "src/vendor/twin.js", "name": "twin", "version": "1",
+                            "sha256": "0" * 64, "size": 1})
+    if "_test/vendor/twin.js" not in audit_coverage(collide, ["src/vendor/twin.js",
+                                                              "_test/vendor/twin.js"]):
+        bad.append("篡改样本⑤（同名文件靠 basename 顶包）未被抓到 —— 覆盖判据口径太松")
+    n_case = 5
+    print(f"SELFTEST-PASS: {n_case} 类篡改全部被抓到、原样零问题" if not bad
+          else "SELFTEST-FAIL: " + "; ".join(bad))
     return 1 if bad else 0
 
 
@@ -164,9 +204,9 @@ def main():
     print(f"  {'PASS' if check_ok else 'FAIL'}  V1+V2 完整性与版本对账"
           + ("" if check_ok else "  -> " + "; ".join(bad)))
 
-    on_disk = sorted(p.name for p in (ROOT / "src" / "vendor").glob("*.js"))
+    on_disk = vendor_files_on_disk(manifest)
     unreg = audit_coverage(manifest, on_disk)
-    print(f"  {'PASS' if not unreg else 'FAIL'}  V3 vendor 全覆盖登记"
+    print(f"  {'PASS' if not unreg else 'FAIL'}  V3 vendor 全覆盖登记（枚举面={','.join(vendor_dirs(manifest))}，磁盘 {len(on_disk)} 件）"
           + ("" if not unreg else f"  -> 未登记 {unreg}"))
 
     stale = 0

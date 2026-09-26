@@ -36,8 +36,30 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ROOT = Path(__file__).resolve().parent.parent
 AXE_PATH = ROOT / "_test" / "vendor" / "axe-core-4.10.2.min.js"
-AXE_SHA256 = os.environ.get("XINYU_AXE_SHA", "")
-AXE_LEN = int(os.environ.get("XINYU_AXE_LEN", "553290"))
+MANIFEST_PATH = ROOT / "_test" / "vendor-manifest.json"
+
+
+def axe_pin():
+    """第三方件的版本/sha/长度**只有一个出处** = vendor-manifest.json。
+
+    首版这里写的是 `XINYU_AXE_SHA`（默认空 ⇒ 只比长度）与一个抄在代码里的 `553290`，
+    于是"钉了 sha"其实是**没钉**：等长替换看不见，而名册里明明白白有真值。
+    同一判断两处实现必然漂移（consulting M5⑥），故改回读名册；名册缺这条 ⇒ 不审未登记件。
+    """
+    try:
+        libs = json.loads(MANIFEST_PATH.read_bytes().decode("utf-8")).get("libs", [])
+    except Exception as e:
+        return None, "名册读不到：%s" % e
+    rel = "_test/vendor/" + AXE_PATH.name
+    for lib in libs:
+        if lib.get("file") == rel:
+            return lib, ""
+    return None, "名册里没有 %s ⇒ 判据不审未登记的第三方件" % rel
+
+
+AXE_LIB, AXE_PIN_ERR = axe_pin()
+AXE_SHA256 = (AXE_LIB or {}).get("sha256", "")
+AXE_LEN = int((AXE_LIB or {}).get("size") or 0)
 BASE = os.environ.get("XINYU_A11Y_BASE", "http://127.0.0.1:8123/index.html")
 OFFLINE = "http://127.0.0.1:18123/v1"
 TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice", "experimental"]
@@ -195,16 +217,20 @@ def main():
     if "--selftest" in sys.argv[1:]:
         return run_selftest()
     # ---- 环境门：取不到证据就不给绿，也不给红 ----
+    if AXE_LIB is None:
+        print("A11Y-ENV-UNVERIFIED %s" % AXE_PIN_ERR)
+        return 2
     if not AXE_PATH.exists():
         print("A11Y-ENV-UNVERIFIED axe 件缺失 %s（禁在线回落：判据不接受顺手下一个）" % AXE_PATH)
         return 2
     raw = AXE_PATH.read_bytes()
     if len(raw) != AXE_LEN:
-        print("A11Y-ENV-UNVERIFIED axe 件长度 %d != 预期 %d（被截断或被替换）" % (len(raw), AXE_LEN))
+        print("A11Y-ENV-UNVERIFIED axe 件长度 %d != 名册钉定 %d（被截断或被替换）" % (len(raw), AXE_LEN))
         return 2
     sha = hashlib.sha256(raw).hexdigest()
-    if AXE_SHA256 and sha != AXE_SHA256:
-        print("A11Y-ENV-UNVERIFIED axe sha256 %s != 钉定 %s" % (sha[:16], AXE_SHA256[:16]))
+    if sha != AXE_SHA256:
+        print("A11Y-ENV-UNVERIFIED axe sha256 %s != 名册钉定 %s（等长替换也会在这里露出来）"
+              % (sha[:16], AXE_SHA256[:16]))
         return 2
     try:
         from playwright.sync_api import sync_playwright
