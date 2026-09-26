@@ -22,6 +22,10 @@ window.ThreeScene = (function () {
   /* 未点亮必须是「中性灰」：带蓝调的灰会落在低落蓝的色相区间里，
      被像素判据误读成「低落已经出现」（实测对照图里凭空多出 1% 的低落色像素）。 */
   const DIM = [0.105, 0.105, 0.115];
+  // r42：系统「减弱动效」偏好下冻结自走时钟。星雾不再自转/自闪，但镜头仍随滚动推进——
+  // 那是用户自己发起的位移（WCAG 2.3.3 的豁免面），不是本开关要砍的对象。
+  const REDUCE = (typeof matchMedia === "function") &&
+    matchMedia("(prefers-reduced-motion: reduce)").matches;
   // LIT_SIZE 需跟着分布尺度走：星云改成立体厚盘后（半径更大、更靠外），
   // 0.22 在只点亮几十颗时屏幕有效像素只剩 ~113（肉眼看不清），故补到 0.26。
   const DIM_SIZE = 0.05, LIT_SIZE = 0.26;
@@ -242,7 +246,7 @@ window.ThreeScene = (function () {
   function tick() {
     requestAnimationFrame(tick);
     if (!renderer) return;
-    const time = performance.now() * 0.00016;
+    const time = REDUCE ? 0 : performance.now() * 0.00016;
 
     // 滚动 → 镜头：第一幕正面 → 第二幕穿入 → 第三幕环绕 → 第四幕俯瞰 → 第五幕拉远
     const camY = Math.sin(scrollT * Math.PI * 2) * 1.6;

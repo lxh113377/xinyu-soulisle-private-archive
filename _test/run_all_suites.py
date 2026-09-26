@@ -51,6 +51,8 @@ SUITES = [
     # r41：对标测试资产面量出 in-build 单测 0/16 vs peers 9/16；探针本体不入电池（16 仓 API 不划算，
     # 承 r37 口径），但它的**匹配器自证**纯本地零网络，进阻断链盯住"把依赖目录当用例"这类灌水。
     ("testasset_selftest", [sys.executable, "_test/peer_test_asset_probe.py", "--selftest"]),
+    # r42：无障碍面（对标探针不入链——16 仓 × 4 次 API，承 r37 探针不入电池口径；只入其判定桩）
+    ("a11y_probe_selftest", [sys.executable, "_test/peer_a11y_probe.py", "--selftest"]),
     ("api_contract", [sys.executable, "_test/api_contract_check.py"]),
     ("api_contract_selftest", [sys.executable, "_test/api_contract_check.py", "--selftest"]),
     ("patch_apply_selftest", [sys.executable, "_test/patch_apply.py", "--selftest"]),
@@ -80,6 +82,10 @@ SUITES = [
     ("strategy", [sys.executable, "_test/strategy_check.py"]),
     ("strategy_selftest", [sys.executable, "_test/strategy_check.py", "--selftest"]),
     ("ux_guards", [sys.executable, "_test/ux_guards_check.py"]),
+    # r42：无障碍从「没人量过」变成常驻阻断面。12 个审计单元=6 状态 x 2 主题，
+    # 规则集必须含 experimental（默认集看不见 label-content-name-mismatch，首跑即被这一点骗过）。
+    ("a11y", [sys.executable, "_test/a11y_check.py"]),
+    ("a11y_selftest", [sys.executable, "_test/a11y_check.py", "--selftest"]),
     ("j2_chat_contract", [sys.executable, "_test/j2_chat_contract.py"]),
     ("j4_memory", [sys.executable, "_test/j4_memory_check.py"]),
     ("j4_remote_down", [sys.executable, "_test/j4_remote_down_check.py"]),

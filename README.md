@@ -65,6 +65,15 @@
 误报侧同样有约束：**正常倾诉句绝不能被当成攻击**。判据里固定 6 条正常句 + 2 条"近似误伤"句
 （含"复述／输出／提示"字样但与系统提示词无关），一旦被误判 `suspect=1` 即判红。
 
+## ♿ 无障碍（r42 起为常驻阻断面，非声明）
+
+承诺：**看不见、看不清、不能用鼠标、用语音操作的人也应该能用**。
+实测口径（WCAG 2.5.3 无障碍名含可见文字 / `prefers-reduced-motion` 下星雾帧间像素差 0.0516→**0.0000** /
+对话日志 `aria-live` 播报 / 规则集含 `experimental` / 23 格对比度弃权已逐格点名）与逐项证据见
+[docs/quality-gates.md](docs/quality-gates.md)「无障碍」节。复算：`python _test/a11y_check.py`（A1–A8）
+
+---
+
 ## 🧩 技术栈
 
 | 层 | 选型 | 备注 |
@@ -188,7 +197,7 @@ CloudBase 注意事项（实测得来）：
 ## ✅ 验证
 
 > **现状（与机器逐条对账，别手抄）**：GitHub Actions 四条门禁（`.github/workflows/ci.yml` 的 job 数）｜
-> ★ 全量电池（58 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
+> ★ 全量电池（61 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
 > 这三处数字由 `repo_config_check.py` 的 **G2 / G4 / G14** 当场等值对账，写错即红。
 >
 > **判据清单与逐条口径全文见 [docs/quality-gates.md](docs/quality-gates.md)**（r39 起从 README 迁出）。这里只留四个『现在到底是多少』的复算入口：

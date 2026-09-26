@@ -234,8 +234,15 @@
     const btn = $("#btn-theme");
     if (!btn) return;   // 头部无切换按钮（旧页面缓存等）时静默跳过，不炸主链路
     function apply(t) {
-      if (t === "light") { document.documentElement.dataset.theme = "light"; btn.textContent = "☀ 浅色"; }
-      else { delete document.documentElement.dataset.theme; btn.textContent = "☾ 深色"; }
+      // r42 无障碍：图标是装饰（aria-hidden），文字与无障碍名各自独立，
+      // 且可见文字必须是无障碍名的子串（WCAG 2.5.3 Label in Name，语音控制用户按可见文字下指令）。
+      const light = t === "light";
+      if (light) { document.documentElement.dataset.theme = "light"; }
+      else { delete document.documentElement.dataset.theme; }
+      const ico = $("#theme-ico"), word = $("#theme-word");
+      if (ico) ico.textContent = light ? "☀" : "☾";
+      if (word) word.textContent = light ? "浅色" : "深色";
+      btn.setAttribute("aria-label", (light ? "浅色" : "深色") + "主题，点击切换");
     }
     let saved = "dark";
     try { saved = localStorage.getItem(KEY) || "dark"; } catch (e) {}

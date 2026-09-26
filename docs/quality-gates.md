@@ -5,7 +5,9 @@
 
 
 ```powershell
-python _test/run_all_suites.py           # ★ 全量电池（58 套件逐条直取 rc，聚合不掩盖单项失败）
+python _test/run_all_suites.py           # ★ 全量电池（61 套件逐条直取 rc，聚合不掩盖单项失败）
+python _test/a11y_check.py               # r42 运行时无障碍：6 状态 x 2 主题 x 含 experimental 规则集 + 动效降档像素实测 + 反例自证
+python _test/a11y_check.py --selftest    # r42 判据自身桩：合成图像走同一条像素通道 + A5/A7 双向 12 例
 python _test/browser_check.py            # 离线降级 / 双色 / 滚动淡入淡出，输出 ALL-ASSERT-PASS
 python _test/deploy_sync_check.py        # src → deploy/xinyu 三类比对（MISSING/DIFF/EXTRA 归零）
 python _test/engine_consistency_check.py # JS 引擎 ↔ Java 引擎逐项对账（词表结构级）
@@ -35,7 +37,36 @@ GitHub Actions 四条门禁（`.github/workflows/ci.yml`）：同步守卫+评�
 
 **受理面状态以远端为准，不在本文件写死**：`python _test/ci_status_check.py`（HEAD 最近一次 run 三态分类：PASS / CODE_FAIL / ENV_BLOCKED）。r35（2026-09-26）实测到一次"本机 37 条全绿、CI 两条 job 真红"的分叉，三条根因与修法见 `交付物/对标分析报告-2026-09-26.md` §2；同类分叉已封成常驻判据（密钥扫描两侧同源 + `voice_selftest` + settings 落盘完成态等待）。
 
-最近实测（2026-09-26 对标轮 r35）：全量电池 **47 条套件实跑全绿**（r36 增 `eol_parity`±自证：工作树字节 == 仓库 blob 字节，于是本仓「逐字节 / SHA256 / 字节预算」类主张在任何机器 clone 上可复算），且远端 HEAD run `36220200506` 四条 job 逐项 `success`（r35 收口，2026-09-26 实测）。前置探针 `preflight` 打头：被测服务没起时收口行写 `ENV-UNVERIFIED` 而不是判红）（含受理面体检 ci_status，在 CI 内部自动 SKIP）；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`emotion_wiring_check` 9/9（后端路径实测生效 + 不可达即熔断不伪装 + 危机未经后端）；gsap 3.15.0 升级后 `browser_check`/`lightshow`/`pixel_dual` 全绿；首屏关键路径 831,152 B（预算 858,752 B 内；r36 行尾归一后从 832,382 降为现值，复算 `python _test/size_budget_check.py`）；公网已重新部署并 `LIVE-SYNC-PASS`。
+最近实测（2026-09-26 对标轮 r35）：全量电池 **47 条套件实跑全绿**（该计数已被 r41 的 58 与 r42 的 61 取代，现行值由 `repo_config_check` 的 G10 恒等式当场复算，本行只保留 r35 当时的取证事实）（r36 增 `eol_parity`±自证：工作树字节 == 仓库 blob 字节，于是本仓「逐字节 / SHA256 / 字节预算」类主张在任何机器 clone 上可复算），且远端 HEAD run `36220200506` 四条 job 逐项 `success`（r35 收口，2026-09-26 实测）。前置探针 `preflight` 打头：被测服务没起时收口行写 `ENV-UNVERIFIED` 而不是判红）（含受理面体检 ci_status，在 CI 内部自动 SKIP）；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`emotion_wiring_check` 9/9（后端路径实测生效 + 不可达即熔断不伪装 + 危机未经后端）；gsap 3.15.0 升级后 `browser_check`/`lightshow`/`pixel_dual` 全绿；首屏关键路径 831,152 B（预算 858,752 B 内；r36 行尾归一后从 832,382 降为现值，复算 `python _test/size_budget_check.py`）；公网已重新部署并 `LIVE-SYNC-PASS`。
 
 
 ---
+
+
+## 无障碍（r42 新增，README 的指针落在这里）
+
+判据：`python _test/a11y_check.py`（运行时 axe-core 4.10.2 本地 vendored + 像素级动效实测）。
+收口行必须自带实测值（电池对每套件只留含判据词的那一行）。
+
+| 判据 | 盯什么 | 为什么单独列 |
+|---|---|---|
+| A1 | 每个审计单元 `passes > 0` | 证明审计真落在填充后的 DOM 上，而不是"页面没渲染完也报 0 违规" |
+| A2 | 6 状态 x 2 主题 = 12 单元，违规节点必须为 0 | 首屏只覆盖 5 幕里的第 1 幕；亮色主题（r15）不测就从不被执行 |
+| A3 | 注入 4 类已知缺陷，axe 必须抓到 | 反例自证：一把量不出东西的尺，它的 0 没有信息量 |
+| A4 | 对比度 `incomplete` 计数 <= 30 且逐格点名 | 暗底 + 半透明卡片 + WebGL 背景 ⇒ 有效背景静态算不出，工具只能弃权（实测 23 格，样本 `.brand`、`.brand-sub`） |
+| A5a | 正常态帧间像素差 > 0.002 | 若星雾本来就不动，"减弱动效已实现"就是空判；这一条是防"删光动画来通过判据" |
+| A5b | reduce 态像素差 <= 15% 正常态 | 实测 0.0516 -> 0.0000（比值 0.000）；CSS 那两行 media query 管不到 WebGL 自走时钟 |
+| A6 | 首个 Tab 落点有可见焦点环 | **下限断言**：全序 Tab 遍历未做，登记在 `memory/07-next-steps` |
+| A7 | 可见文字须为无障碍名子串（WCAG 2.5.3） | 语音用户说"点击 模型设置"却点不到，因无障碍名叫"设置"；纯图标按钮先剥装饰符再判"不适用" |
+| A8 | 对话日志与探针读数须在可访问性树里 `aria-live` | 读屏用户能不能听到回复，取决于这一个属性 |
+
+规则集口径：`wcag2a / wcag2aa / wcag21a / wcag21aa / best-practice / experimental`。
+**`experimental` 不可省**——`label-content-name-mismatch` 只挂这个标签，默认集与"严格 wcag"集都跑不到它；
+r42 首跑不传 `runOnly` 得到 `violations=0`，加该标签即命中 `serious:2`（同页对照，实测 05:2x）。
+
+自证桩：`python _test/a11y_check.py --selftest` = `A11Y-SELFTEST: 12/12`
+（像素通道 3 例含"尺寸不一致必须给 -1 而非 0"、动效判定 4 例含"正常态不动即空判"、标签判定 5 例含两个纯图标按钮）。
+像素数学单一实现 `mean_abs_delta()`，main 与桩共用，禁两处写。
+
+环境三态：服务不可达 / axe 件缺失或长度不符 / PIL 不可用 ⇒ `rc=2 ENV-UNVERIFIED`，不给绿也不给红；
+vendored 件**禁在线回落**（判据不接受"顺手下一个"，那会让一次坏下载伪装成一次通过）。
