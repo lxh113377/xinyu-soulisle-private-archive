@@ -3,6 +3,7 @@ package com.xinyu.soulisle.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xinyu.soulisle.llm.LlmProxy;
+import com.xinyu.soulisle.safety.SafetyGuard;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,14 +60,20 @@ public class ChatController {
         Integer maxTokens = (maxNode != null && maxNode.isNumber()) ? maxNode.asInt() : null;
         boolean wantStream = node.path("stream").isBoolean() && node.get("stream").asBoolean();
 
+        // r38 输入侧护栏：**只改上行 messages，响应体仍逐字透传**（AC-OBS-08 契约不破）。
+        // 干净输入下 harden() 原样返回同一对象 ⇒ 常规对话零行为差异；判定结果只落到响应头。
+        SafetyGuard.Verdict verdict = SafetyGuard.scan(SafetyGuard.lastUserText(messages));
+        JsonNode upMessages = SafetyGuard.harden(messages);
+        String safety = SafetyGuard.headerValue(verdict);
+
         if (!wantStream) {
-            LlmProxy.Result r = proxy.call(messages, temperature, maxTokens);
-            return bytes(r.status(), MediaType.APPLICATION_JSON, r.body());
+            LlmProxy.Result r = proxy.call(upMessages, temperature, maxTokens);
+            return bytes(r.status(), MediaType.APPLICATION_JSON, r.body(), safety);
         }
 
-        LlmProxy.StreamResult s = proxy.openStream(messages, temperature, maxTokens);
+        LlmProxy.StreamResult s = proxy.openStream(upMessages, temperature, maxTokens);
         if (!s.isEventStream()) {
-            return bytes(s.status(), MediaType.APPLICATION_JSON, s.body());
+            return bytes(s.status(), MediaType.APPLICATION_JSON, s.body(), safety);
         }
         StreamingResponseBody body = out -> {
             try (java.io.InputStream in = s.bodyStream()) {
@@ -82,14 +89,21 @@ public class ChatController {
                 .header("Content-Type", "text/event-stream;charset=UTF-8")
                 .header("Cache-Control", "no-cache, no-transform")
                 .header("X-Accel-Buffering", "no")
+                .header("X-Xinyu-Safety", safety)
                 .body(body);
     }
 
     /** 以 UTF-8 字节直写，绕开 StringHttpMessageConverter 的默认字符集坑（中文回复必须原样回传） */
     private ResponseEntity<StreamingResponseBody> bytes(int status, MediaType type, String body) {
+        return bytes(status, type, body, null);
+    }
+
+    private ResponseEntity<StreamingResponseBody> bytes(int status, MediaType type, String body, String safety) {
         byte[] data = body.getBytes(StandardCharsets.UTF_8);
-        return ResponseEntity.status(status)
-                .contentType(type)
-                .body(out -> out.write(data));
+        ResponseEntity.BodyBuilder b = ResponseEntity.status(status).contentType(type);
+        if (safety != null) {
+            b = b.header("X-Xinyu-Safety", safety);   // 头里带判定，body 一字不改
+        }
+        return b.body(out -> out.write(data));
     }
 }

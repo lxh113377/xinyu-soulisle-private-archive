@@ -13,7 +13,7 @@
 
   <groupId>com.xinyu</groupId>
   <artifactId>soulisle-server</artifactId>
-  <version>1.4.1</version>
+  <version>1.4.2</version>
   <name>soulisle-server</name>
   <description>心屿 SoulIsle — Java 全栈服务端（J1 骨架：静态页托管 + /api/health）</description>
 

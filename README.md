@@ -46,6 +46,25 @@
 
 ---
 
+## 🛡 安全策略（三层，r38 起补齐）
+
+> 本轮对标把"内容安全"当成一条能力位来量：16 个参照仓里 **5 家有安全件文件**（lobehub 的
+> `securityBlacklist`、opensoul 的 `exec-safety`、ryza 的 `nsfw` 回归集…），而我方**文件树与 README
+> 两条通道都是 0** —— 只有危机词转介，没有输入侧防护。现已补第二层，并让它在两个通道都可见。
+
+| 层 | 做什么 | 在哪 | 怎么验 |
+|---|---|---|---|
+| ① 危机优先转介 | 危机信号命中即最高优先级，**不调用 LLM**，直接给求助热线 | `src/js/emotion-engine.js` + Java `EmotionLexicon` | `emotion_wiring_check`（危机短路）+ 评测集危机 6/6 |
+| ② 输入侧护栏（新增） | 指令覆盖／系统提示词套取（含中文"把…输出"倒装）／角色伪造／编码载荷 → 判 `suspect` 并**追加系统重申**；单轮 >4000 字截断 | `server/.../safety/SafetyGuard.java` | `python _test/safety_guard_check.py http://127.0.0.1:8123` |
+| ③ 输出侧高危**只分类不改写** | 致死方式／剂量类文本判 `risk=high`，落响应头 `X-Xinyu-Safety` 供前端与判据观测 | 同上 | 同上（`risk=high` 断言） |
+
+**为什么输出侧不做改写**：SSE 是逐块下发的，要改写就得整段缓冲 —— 那会废掉流式并破坏
+「上游响应逐字透传」的契约（AC-OBS-08 / `j2_chat_contract` / `stream_contract` 三条都会红）。
+所以护栏只改**上行** messages，响应体一字不动，判定结果走响应头；最高危的自伤场景由第①层兜底。
+
+误报侧同样有约束：**正常倾诉句绝不能被当成攻击**。判据里固定 6 条正常句 + 2 条"近似误伤"句
+（含"复述／输出／提示"字样但与系统提示词无关），一旦被误判 `suspect=1` 即判红。
+
 ## 🧩 技术栈
 
 | 层 | 选型 | 备注 |
@@ -169,7 +188,7 @@ CloudBase 注意事项（实测得来）：
 ## ✅ 验证
 
 ```powershell
-python _test/run_all_suites.py           # ★ 全量电池（45 套件逐条直取 rc，聚合不掩盖单项失败）
+python _test/run_all_suites.py           # ★ 全量电池（47 套件逐条直取 rc，聚合不掩盖单项失败）
 python _test/browser_check.py            # 离线降级 / 双色 / 滚动淡入淡出，输出 ALL-ASSERT-PASS
 python _test/deploy_sync_check.py        # src → deploy/xinyu 三类比对（MISSING/DIFF/EXTRA 归零）
 python _test/engine_consistency_check.py # JS 引擎 ↔ Java 引擎逐项对账（词表结构级）
@@ -182,6 +201,7 @@ python _test/size_budget_check.py        # 首屏体积预算 + 「新文件必�
 python _test/vendor_freshness_check.py   # vendor 完整性哈希 + 版本对账；--check-upstream 报上游漂移
 python _test/benchmark_metrics.py        # 对标源数据台账（16 仓指标 + 与上次快照逐字段漂移）；联网采集，人工轮次跑
 python _test/live_sync_check.py          # 线上 `/` 与 deploy/xinyu 逐字节比对（部署未跟进即红）
+python _test/safety_guard_check.py        # 输入侧护栏行为验证：注入 6 例必须点名 + 正常 6 例不得误伤（含 --selftest）
 python _test/eol_parity_check.py         # 行尾确定性：工作树字节 == 仓库 blob 字节 + binary 形状（E1–E4，8 类 --selftest）
 python _test/patch_apply.py --selftest       # 补丁器自证：锚点失配/歧义/同义/插入/正常/缺失 + 行尾两侧 八类行为（防"没报错=生效了"）
 python _test/api_contract_check.py       # 接口契约三方对账（控制器↔docs/openapi.yaml↔前端）+ 11 条运行态真实打 + C6 零漏探测
@@ -196,7 +216,7 @@ GitHub Actions 四条门禁（`.github/workflows/ci.yml`）：同步守卫+评�
 
 **受理面状态以远端为准，不在本文件写死**：`python _test/ci_status_check.py`（HEAD 最近一次 run 三态分类：PASS / CODE_FAIL / ENV_BLOCKED）。r35（2026-09-26）实测到一次"本机 37 条全绿、CI 两条 job 真红"的分叉，三条根因与修法见 `交付物/对标分析报告-2026-09-26.md` §2；同类分叉已封成常驻判据（密钥扫描两侧同源 + `voice_selftest` + settings 落盘完成态等待）。
 
-最近实测（2026-09-26 对标轮 r35）：全量电池 **45 条套件实跑全绿**（r36 增 `eol_parity`±自证：工作树字节 == 仓库 blob 字节，于是本仓「逐字节 / SHA256 / 字节预算」类主张在任何机器 clone 上可复算），且远端 HEAD run `36220200506` 四条 job 逐项 `success`（r35 收口，2026-09-26 实测）。前置探针 `preflight` 打头：被测服务没起时收口行写 `ENV-UNVERIFIED` 而不是判红）（含受理面体检 ci_status，在 CI 内部自动 SKIP）；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`emotion_wiring_check` 9/9（后端路径实测生效 + 不可达即熔断不伪装 + 危机未经后端）；gsap 3.15.0 升级后 `browser_check`/`lightshow`/`pixel_dual` 全绿；首屏关键路径 831,152 B（预算 858,752 B 内；r36 行尾归一后从 832,382 降为现值，复算 `python _test/size_budget_check.py`）；公网已重新部署并 `LIVE-SYNC-PASS`。
+最近实测（2026-09-26 对标轮 r35）：全量电池 **47 条套件实跑全绿**（r36 增 `eol_parity`±自证：工作树字节 == 仓库 blob 字节，于是本仓「逐字节 / SHA256 / 字节预算」类主张在任何机器 clone 上可复算），且远端 HEAD run `36220200506` 四条 job 逐项 `success`（r35 收口，2026-09-26 实测）。前置探针 `preflight` 打头：被测服务没起时收口行写 `ENV-UNVERIFIED` 而不是判红）（含受理面体检 ci_status，在 CI 内部自动 SKIP）；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`emotion_wiring_check` 9/9（后端路径实测生效 + 不可达即熔断不伪装 + 危机未经后端）；gsap 3.15.0 升级后 `browser_check`/`lightshow`/`pixel_dual` 全绿；首屏关键路径 831,152 B（预算 858,752 B 内；r36 行尾归一后从 832,382 降为现值，复算 `python _test/size_budget_check.py`）；公网已重新部署并 `LIVE-SYNC-PASS`。
 
 
 ---

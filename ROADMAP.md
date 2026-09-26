@@ -160,7 +160,7 @@ r20 的"vendor 供给链守卫"一行里我写了「心屿零构建 ⇒ 无 lock
 
 ## 版本节奏
 
-- 语义化版本 + `CHANGELOG.md`（Keep a Changelog）。当前版本：**v1.4.1**。
+- 语义化版本 + `CHANGELOG.md`（Keep a Changelog）。当前版本：**v1.4.2**。
   这条断言有机器责任方：`_test/repo_config_check.py` **G12** 拿三个源对账（`git tag --sort=-v:refname` 最大值
   == `server/pom.xml` `<version>` == 本行与 README 里写死的版本号），任一不符即红
   （r35 实测本行停在 `v1.3.0` 而实际已发 `v1.4.0` —— 与"文档数字脱节"同族，此处首次封成常驻判据）。

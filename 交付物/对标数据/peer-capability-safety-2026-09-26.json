@@ -1,0 +1,217 @@
+{
+ "repos": {
+  "lobehub/lobehub": {
+   "tier": "A",
+   "tree": {
+    "evalset": [
+     ".agents/skills/ux-audit/references/example/eval.md",
+     "apps/cli/e2e/fixtures/agent-signal/nightly-review.golden.json",
+     "locales/ar/eval.json",
+     "…共 39 条"
+    ],
+    "guardrail": [
+     "apps/server/src/services/skillMaintainer/pathSafety.test.ts",
+     "apps/server/src/services/skillMaintainer/pathSafety.ts",
+     "packages/agent-runtime/src/audit/__tests__/createSecurityBlacklistAudit.test.ts",
+     "…共 9 条"
+    ]
+   },
+   "readme": {
+    "badge": "33 处｜样本 'img.shields.io'",
+    "live": "67 处｜样本 'https://www.producthunt.com/products/lobehub?embed=true&amp;'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "SillyTavern/SillyTavern": {
+   "tier": "A",
+   "tree": {
+    "evalset": [
+     "default/content/presets/novel/Erato-Golden Arrow.json"
+    ]
+   },
+   "readme": {
+    "badge": "5 处｜样本 'img.shields.io'",
+    "live": "12 处｜样本 'https://docs.sillytavern.app/'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "tier": "B",
+   "tree": {
+    "crisis": [
+     ".github/ISSUE_TEMPLATE/bug---question---get-help---bug---提问---求助.md"
+    ]
+   },
+   "readme": {
+    "badge": "10 处｜样本 'img.shields.io'",
+    "live": "24 处｜样本 'https://hub.docker.com/r/Open-LLM-VTuber/open-llm-vtuber'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "morettt/my-neuro": {
+   "tier": "B",
+   "tree": {},
+   "readme": {
+    "badge": "3 处｜样本 'img.shields.io'",
+    "live": "11 处｜样本 'https://deepwiki.com/morettt/my-neuro'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "letta-ai/letta": {
+   "tier": "D",
+   "tree": {},
+   "readme": {
+    "live": "5 处｜样本 'https://docs.letta.com/letta-code/desktop-app'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "hello-diana/MASCOT": {
+   "tier": "C",
+   "tree": {},
+   "readme": {
+    "evalset": "32 处｜样本 'evaluation'",
+    "live": "10 处｜样本 'http://localhost:8008/v1'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "ddxfish/sapphire": {
+   "tier": "C",
+   "tree": {
+    "guardrail": [
+     "interfaces/web/static/shared/url-safety.js"
+    ]
+   },
+   "readme": {
+    "badge": "8 处｜样本 'img.shields.io'",
+    "live": "15 处｜样本 'https://discord.gg/pCdTAnExma'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "v2rockets/Loyal-Elephie": {
+   "tier": "C",
+   "tree": {},
+   "readme": {
+    "live": "2 处｜样本 'http://localhost:8080'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "tier": "C",
+   "tree": {},
+   "readme": {
+    "crisis": "2 处｜样本 'crisis'",
+    "live": "1 处｜样本 'http://127.0.0.1:5000`.'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "Lum1104/MER-Factory": {
+   "tier": "D",
+   "tree": {},
+   "readme": {
+    "evalset": "41 处｜样本 'dataset'",
+    "badge": "3 处｜样本 'img.shields.io'",
+    "live": "9 处｜样本 'https://lum1104.github.io/MER-Factory/'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "CheaperjamRen/leemo": {
+   "tier": "C",
+   "tree": {
+    "evalset": [
+     "bundled-skills/optional/mcp-builder/reference/evaluation.md",
+     "bundled-skills/optional/theme-factory/themes/golden-hour.md"
+    ],
+    "guardrail": [
+     "tests/main/cdp-audit-safety.test.ts"
+    ]
+   },
+   "readme": {
+    "badge": "4 处｜样本 'img.shields.io'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "NJX-njx/opensoul": {
+   "tier": "C",
+   "tree": {
+    "guardrail": [
+     "src/agents/tools/discord-actions-moderation.ts",
+     "src/infra/exec-safety.ts"
+    ]
+   },
+   "readme": {
+    "badge": "5 处｜样本 '/badge.svg'",
+    "live": "1 处｜样本 'http://127.0.0.1:19001/`'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "s-nagaev/chibi": {
+   "tier": "C",
+   "tree": {},
+   "readme": {
+    "guardrail": "1 处｜样本 'moderation'",
+    "badge": "5 处｜样本 '/badge.svg'",
+    "live": "47 处｜样本 'https://www.codefactor.io/repository/github/s-nagaev/chibi'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "29-Cu/succhia": {
+   "tier": "C",
+   "tree": {},
+   "readme": {
+    "live": "6 处｜样本 'https://你的聊天页`），蓝牙握在外层永不进后台；控制'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "zeroa234/ryza-ai-revive": {
+   "tier": "C",
+   "tree": {
+    "guardrail": [
+     "scripts/nsfw_intent_regression.js",
+     "web/js/nsfw.js"
+    ]
+   },
+   "readme": {
+    "live": "1 处｜样本 'http://127.0.0.1:8765/`'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "Bwcx-songyu/MoodChat": {
+   "tier": "C",
+   "tree": {},
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "__self__": {
+   "tree": {
+    "evalset": [
+     "_test/emotion-eval-dataset.json",
+     "交付物/对标数据/benchmark-metrics.json"
+    ]
+   },
+   "readme": {
+    "crisis": "2 处｜样本 '求助热线'",
+    "evalset": "9 处｜样本 '评测'",
+    "badge": "5 处｜样本 'img.shields.io'",
+    "live": "4 处｜样本 'https://xinyu-soulisle.pages.dev'"
+   }
+  }
+ },
+ "na": [],
+ "denominator": 16
+}

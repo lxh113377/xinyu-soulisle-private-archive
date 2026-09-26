@@ -52,6 +52,9 @@ SUITES = [
     ("j4_memory", [sys.executable, "_test/j4_memory_check.py"]),
     ("j4_remote_down", [sys.executable, "_test/j4_remote_down_check.py"]),
     ("stream_contract", [sys.executable, "_test/stream_contract.py"]),
+    # r38：输入侧护栏必须"真的在拦"（注入 6 例点名 + 正常 6 例不误伤，含 2 例近似误伤）
+    ("safety_guard", [sys.executable, "_test/safety_guard_check.py", BASE]),
+    ("safety_guard_selftest", [sys.executable, "_test/safety_guard_check.py", "--selftest"]),
     ("voice", [sys.executable, "_test/voice_check.py", BASE]),
     # r35：voice 的"CI 无麦克风 ⇒ SKIP"降级必须是纯函数且带边界反例，否则降级会吞掉真缺陷
     ("voice_selftest", [sys.executable, "_test/voice_check.py", "--selftest"]),
