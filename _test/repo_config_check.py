@@ -785,7 +785,15 @@ def main():
     print(f"\n合计 {len(results)} 项，失败 {len(fails)} 项")
     for nm, _, d in fails:
         print("  🔴", nm, d)
-    print("REPO-CONFIG-PASS" if not fails else "REPO-CONFIG-FAIL")
+    # 判据清单必须出现在结论行里：电池只保留每条套件"最后一条含判据词的行"，
+    # 逐条 PASS 行在 CI 里全被折掉 ⇒ 只写 REPO-CONFIG-PASS 等于把"到底跑了哪几条"藏起来
+    #（与 r40b 给 perf_baseline 补实测值是同一族，修法同类而不是各修各的）。
+    ran = sorted({g for n, _o, _d in results for g in re.findall(r"G\d+", n)},
+                 key=lambda s: int(s[1:]))
+    print("REPO-CONFIG-PASS（实跑 %d 条判据：%s）" % (len(results), " ".join(ran))
+          if not fails else
+          "REPO-CONFIG-FAIL（实跑 %d 条，红 %d 条：%s）"
+          % (len(results), len(fails), " ".join(f.split()[0] for f in fails)))
     return 1 if fails else 0
 
 
