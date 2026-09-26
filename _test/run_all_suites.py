@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """全量回归电池：逐套件直取 rc，聚合零掩盖（audit-runner-safe-agents 范式：每项独立记录，不看 any）"""
-import subprocess, sys, io
+import subprocess, sys, io, re
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = "http://127.0.0.1:8123"
+# 判定行形状：各套件统一以 <NAME>-PASS / -FAIL / -CLEAN / UNVERIFIED 收尾
+VERDICT_RE = re.compile(r"(?:PASS|FAIL|CLEAN|UNVERIFIED|OK)\b")
 
 SUITES = [
     # 前置探针放第一条：r35 实测 jar 中途掉线一次报 5 条红，逐条归因花了三轮命令。
@@ -71,9 +73,30 @@ LLM_SUITES = {"j2_chat_contract", "stream_contract", "online_check"}
 # ⚠️ 本版第一稿是**死代码**（先滤掉 "--" 开头的参数再判 args[0] == "--slice"，永不命中），
 #    跑 "--slice 0 14" 却把 28 条全跑了个遍 —— "配了开关但开关没生效"正是本轮 repo_config 判据要防的那类事，
 #    结果自己又踩了一次。故此处直接按 sys.argv 原样解析，并由 --list 提供可复核的"过滤后到底剩几条"。
+USAGE = """run_all_suites.py — 全量回归电池（SUITES 是条数唯一真相源）
+  --list             只打印套件总数（供别的判据对账）
+  --exclude-llm      跳过需要真实上游密钥的套件（CI 用；豁免条数由恒等式自证）
+  --only <子串>      只跑名字含该子串的套件
+  --slice <起> <止>  按下标分段取数（长电池分段跑，避免撞调用方超时）
+  -h, --help         本说明
+未知开关一律拒（rc=2）：开关打错字若被静默忽略，会把"子集全绿"印成"全量全绿"。"""
+
+KNOWN_FLAGS = {"--list", "--exclude-llm", "--only", "--slice", "--help", "-h"}
+
+
 def main():
     global SUITES
     argv = sys.argv[1:]
+    if "--help" in argv or "-h" in argv:
+        print(USAGE)
+        return 0
+    # 未知开关 fail-closed：r36 实测 `--help` 被静默忽略 ⇒ 直接把 43 条全跑了一遍，
+    # 而 `--onl selftest` 这类打错字的过滤同样会跑成全量并打印 ALL-GREEN。
+    unknown = [a for a in argv if a.startswith("-") and a not in KNOWN_FLAGS]
+    if unknown:
+        print("BATTERY-FAIL: 未知开关 %s（可用：--list/--exclude-llm/--only/--slice/--help）"
+              % " ".join(unknown))
+        return 2
     if "--list" in argv:
         print("SUITES:", len(SUITES))
         return 0
@@ -88,12 +111,25 @@ def main():
             print("BATTERY-FAIL: --exclude-llm 却零豁免 ⇒ 豁免名单与实际套件漂移，判据失效")
             return 1
     if "--only" in argv:
-        key = argv[argv.index("--only") + 1]
+        i = argv.index("--only")
+        if i + 1 >= len(argv):
+            print("BATTERY-FAIL: --only 缺子串操作数")
+            return 2
+        key = argv[i + 1]
         SUITES = [s for s in SUITES if key in s[0]]
         print(f"(--only {key!r} → {len(SUITES)} 条)")
     if "--slice" in argv:
         i = argv.index("--slice")
+        if i + 2 >= len(argv):
+            print("BATTERY-FAIL: --slice 需要两个下标（起 止）")
+            return 2
+        total = len(SUITES)
         lo, hi = int(argv[i + 1]), int(argv[i + 2])
+        # 越界下标在 Python 里是静默截断（`--slice 99 120` → 空集），必须点名：
+        # 分段跑时"这一条都没跑"不能被印成"这段全绿"
+        if not (0 <= lo < hi <= total):
+            print(f"BATTERY-FAIL: --slice {lo}:{hi} 越界（套件总数 {total}）")
+            return 2
         SUITES = SUITES[lo:hi]
         print(f"(--slice {lo}:{hi} → {len(SUITES)} 条)")
     if not SUITES:
@@ -106,15 +142,17 @@ def main():
                            encoding="utf-8", errors="replace", timeout=600)
         tail = (p.stdout or "").strip().splitlines()
         # 聚合器只留最后一行 ⇒ 判据说 FAIL 却答不出"哪一条 FAIL"，等于没判（r28 CI 实测踩到）。
-        # 现在：rc≠0 时把该套件里所有 FAIL/🔴/异常行原样吐出来（成功路径仍只有一行，不制造噪声）。
-        # 聚合器只留最后一行 ⇒ 判据说 FAIL 却答不出"哪一条 FAIL"，等于没判（r28 CI 实测踩到）。
         # 现在：rc≠0 时把该套件的 FAIL/🔴/异常行原样带出来；成功仍是一行，不制造噪声。
+        # 摘要行改取"最后一条判定行"而非"最后一行"：r36 实测 strategy_selftest 在 PASS 后
+        # 还打印注入反例清单，摘要于是显示 `· 热线清单需 ≥3 条，实际 []` —— rc=0 却像报错。
         detail = []
         if p.returncode != 0 and tail:
             keys = ("FAIL", "🔴", "Error", "error:", "Traceback", "SKIP")
             hit = [x.strip()[:170] for x in tail if any(k in x for k in keys)]
             detail = hit or tail[-6:]
-        results.append((name, p.returncode, (tail[-1][:110] if tail else (p.stderr or "").strip()[:110])))
+        line = next((x for x in reversed(tail) if VERDICT_RE.search(x)),
+                    tail[-1] if tail else "")
+        results.append((name, p.returncode, (line[:110] if tail else (p.stderr or "").strip()[:110])))
         print(f"{name:22s} rc={p.returncode} | {results[-1][2]}")
         for d in detail:
             print(" " * 25 + "· " + d)
