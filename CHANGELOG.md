@@ -5,6 +5,11 @@
 
 ## [Unreleased]
 
+### 受理面（r35 收口，实测）
+- **四条 CI job 首次在 HEAD 上全绿**：run `36220200506`（sha `7aac7d2`）`conclusion=success`，
+  四 job 逐项 success；`ci_status_check.py` 由 `CODE_FAIL` 转 `CI-STATUS-PASS`（rc=0）。
+  上一轮登记的"只有老大能解（账单/配额）"至此闭环——真因不是配额，是三条代码级缺陷。
+
 ### Fixed（r35 · 对标轮 2026-09-26：受理面三条 CI 真红逐条归因）
 - **CI 密钥门禁被自家判据夹具命中**：`_test/pdf_leak_scan.py:91` 的反例样本写成连续的 `sk-`+24 位字面量，
   而同步守卫 job 的密钥扫描扫的是 `git ls-files` ⇒ **跟踪文件里最像密钥的东西是"检测密钥的判据"本身**，

@@ -27,11 +27,11 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
       现场取证（`diag`）与两类反例长期保留，防复发。
 - [ ] 🟡 同件第二刀：Playwright 启 `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`，
       把 `voice` 的 "CI 无麦克风 ⇒ SKIP" 换成真断言（降级读永远比造环境弱）。
-- [ ] ⚠️ **r35 更正（原「只有老大能解：ENV_BLOCKED」按纪律保留 + 加更正注）**：Actions 账单/配额**已恢复**
-      —— HEAD 最近 run 现判 **CODE_FAIL**（2 条 job 有真日志的失败，最近 5 次 push 全红），
-      "只有老大能解"已失效，受理面改由 r35 修复链（CHANGELOG「Fixed（r35）」四条）跟踪。
-      这条红**换了原因却没换打印形态**（`RED: ci_status`）⇒ 电池收口行已拆两类。
-      复算：`python _test/ci_status_check.py`（应转 `CI-STATUS-PASS`，rc=0）
+- [x] ✅ **r35 受理面闭环**（原「只有老大能解：ENV_BLOCKED」的更正与了结）：账单/配额确已恢复，
+      真因是三条代码级缺陷（见 CHANGELOG「Fixed（r35）」）。修复后 run `36220200506`（sha `7aac7d2`）
+      **四条 job 逐项 success**，`python _test/ci_status_check.py` ⇒ `CI-STATUS-PASS` rc=0。
+      留痕的教训：这条红**换过原因却没换打印形态** ⇒ 电池收口行现拆 `RED(判红)` / `ENV-UNVERIFIED` /
+      `CRASH` 三类（第三类是本轮被自己的 0xC0000409 崩溃逼出来的）。
 - [ ] **同族坑收口**：台账见 `part18`/`part20`（r30 增补=索引壳超限）；G9 常驻 `repo_config_check.py`。
 ## 分卷目录
 
