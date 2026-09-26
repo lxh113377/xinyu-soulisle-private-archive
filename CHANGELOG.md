@@ -5,6 +5,32 @@
 
 ## [Unreleased]
 
+### Changed（r39 · A-project-better 遗留盘点轮：文档追上构建 + 体量收口）
+- **05 三条「仍存差距」实为已完成**（`/api/emotion` 前端接线 / PWA 离线壳 / `app.js` 模块化拆分）：
+  逐条命令取证后按删除线保留原文 + 标注实测状态，明细迁 `05…part12.md`（R241 留痕不改写）。
+  这是 R240 的反向形态（磁盘有、文档没回扫），由 Step 0 盘点当场抓出。
+- **README 回到每轮注入预算内**：`## ✅ 验证` 一节（4,745B）整卷逐字迁 `docs/quality-gates.md`
+  并在 `docs/README.md` 建索引（不留孤文件）；README 19,531B → **15,454B**（预算 16,384B）。
+  07 索引壳经 `handoff.py trim-shell` 3,845B → 2,633B。**AGENTS.md 27,411B 未强推**：
+  `handoff.py handoff` 主动识别它为人工索引壳并拒绝覆盖，该边界优先于"把数字做绿"。
+- **回收 81,005,106B 可再生中间件**：`demo_video_raw.webm`（25,800,267B）与
+  `demo_video_out/video_raw/` 7 个逐轮帧件（55,203,953B），全部实测 gitignored 且未被跟踪，
+  按回收区约定迁 `_trash/`，**移动前后拼接 sha256 相同、原位清空**；成片 mp4 未动。
+  整仓 227,817,951B → 146,815,984B（`handoff.py volume` 现测）。
+
+### Added（r39）
+- **Docker 面从"文件名存在"升级为"CI 每轮实测"**（接续 part26 的 P2「一键起的实测面」）：
+  `java-build` job 末尾新增两步 —— `docker build -f server/Dockerfile`（context=仓库根）与
+  **容器起服三项自证**（`"status":"UP"` / `"indexFound":true` / `"vendorFound":true` + 首页 200）。
+  只 build 不算数：COPY 路径、jar 是否 repackage 成功、镜像内前端是否真命中，都要跑出来才有回执。
+
+### 盘点过程中撤回的一条误判
+- 由 `handoff.py help trim-shell` 报 `Unknown command` 我一度判定"体量判据的处置建议指向不存在的命令"，
+  准备按高优先缺陷落进 skill。**核实分发表后撤回**：`trim-shell`、`volume` 都在册，
+  我第一次只看了 `--help` 的前 25 行。真缺陷小一号但仍存在：**`help <在册命令>` 回 Unknown**
+  （`help trim-shell` / `help recycle` 同形），会让"先跑 help 现读"这条护栏给假阴性 —— 已登记待办，
+  属主侧修，本轮不代改他人脚本。
+
 ## [1.4.3] - 2026-09-26 — 对标轮 r38 续：护栏判定前移，CI 无密钥也能实测
 
 ### Fixed（r38 续）

@@ -20,3 +20,4 @@
 
 1. 先改 `openapi.yaml`（含 `x-live-check` 标注）→ 2. 跑 `python _test/api_contract_check.py`（应因"代码缺实现"报红）
    → 3. 改控制器/前端 → 4. `--selftest` 确认判据仍能抓红 → 5. 跑全量电池 `python _test/run_all_suites.py`。
+- [quality-gates.md](quality-gates.md) — 判据体系明细（47 条套件逐条口径 + 复算命令），r39 从 README 迁出

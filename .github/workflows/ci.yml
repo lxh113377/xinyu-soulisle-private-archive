@@ -118,6 +118,29 @@ jobs:
           python _test/api_contract_check.py
           python _test/api_contract_check.py --selftest
 
+      # r39：把「Dockerfile 从未真构建过」这条长期挂账变成每轮实测。
+      # 只 build 不算数（可能 COPY 路径坏、jar 不在、前端缺）⇒ 必须起容器并自证 /api/health 的
+      # webRoot/indexFound 三项，否则"能构建"是一句没有回执的配置声明。
+      - name: 构建服务端镜像（build context = 仓库根）
+        run: docker build -f server/Dockerfile -t xinyu-soulisle:ci .
+      - name: 容器起服自证（/api/health 三项 + 前端真命中，无密钥也不许伪装在线）
+        run: |
+          set -e
+          docker run -d --rm --name xinyu-ci -p 18080:8080 xinyu-soulisle:ci
+          trap 'docker stop xinyu-ci || true' EXIT
+          ok=""
+          for i in $(seq 1 30); do
+            body=$(curl -sf http://127.0.0.1:18080/api/health || true)
+            if echo "$body" | grep -q '"status":"UP"'; then ok=1; break; fi
+            sleep 2
+          done
+          [ -n "$ok" ] || { echo "容器内 /api/health 未 UP（30 次轮询失败）"; exit 1; }
+          echo "$body"
+          echo "$body" | grep -q '"indexFound":true'   || { echo "镜像内前端未命中（COPY deploy/xinyu 失效）"; exit 1; }
+          echo "$body" | grep -q '"vendorFound":true'  || { echo "镜像内 vendor 未命中"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/)
+          [ "$code" = "200" ] || { echo "容器首页 http=$code"; exit 1; }
+          echo "DOCKER-RUNTIME-PROOF-PASS"
   browser-regression:
     name: 浏览器回归（降级链路 + 星雾点亮 + 危机拦截）
     runs-on: ubuntu-latest

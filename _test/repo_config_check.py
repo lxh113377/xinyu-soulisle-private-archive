@@ -371,6 +371,12 @@ def version_doc_audit(docs_text, pom):
     return bad
 
 
+def _read(rel):
+    """读受仓管文档；不存在按空串（调用方靠"零命中即红"兜，不会静默放行）。"""
+    p = ROOT / rel
+    return p.read_text("utf-8", errors="replace") if p.exists() else ""
+
+
 def peer_count_audit(readme_text, truth):
     """G14 文档侧：README 里"对标源数据台账（N 仓指标"这一**现行状态**断言必须等于台账记的 N。
 
@@ -667,7 +673,11 @@ def main():
     g12bad = version_truth(tag, pom) + version_doc_audit(docs_text, pom)
     check("G12 版本断言三源对账（git tag == pom == 文档「当前版本」）", not g12bad,
           f"tag={tag or '取不到'} pom={pom or '取不到'} 文档={sorted(docs_text)} | " + " ; ".join(g12bad))
-    g14bad = peer_count_audit(docs_text.get("README.md", ""), ledger_peer_count())
+    # r39：可核对面跟着声明走。README 的「## ✅ 验证」一节整体迁往 docs/quality-gates.md 后，
+    # 只扫 README 会让 G14 报"零命中"（r39 实测就这么红过一次）⇒ 审计面取 README ∪ 迁移目的地，
+    # **只扩文件集合、不放宽正则**（历史轮次的「14 仓」陈述仍故意不匹配）。
+    claim_text = docs_text.get("README.md", "") + "\n" + _read("docs/quality-gates.md")
+    g14bad = peer_count_audit(claim_text, ledger_peer_count())
     check("G14 对标仓数断言 == 台账权威值（README 现行状态句）", not g14bad,
           f"台账 peers_expected={ledger_peer_count()} | " + (" ; ".join(g14bad) or "README 断言与台账一致"))
     g13bad = guard_inventory(HEADER_DOC, Path(__file__).read_text("utf-8", errors="replace"))

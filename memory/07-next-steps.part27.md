@@ -27,3 +27,20 @@
       当前明确不做，理由已写进代码注释与 README「安全策略」。
 - [ ] **P3｜runner 条件预演自动化**：本轮靠手工起 :8124 剔除密钥复现。可固化为
       `--no-upstream` 模式或 CI 第二个 job，避免下一个人又靠记忆。
+
+- [x] ✅ **r35 05 追平**：05 权威段已建，残段迁 `05…part10`，全文见 `part24`。
+
+- [x] ✅ **r35 `settings_panel` 四条 CI 红：修法有效已被受理面证实**（run `36219657886` 转绿）。
+      机制解释仍不完整（本机测不到"点完就读"的差异，CI 侧等完成态即绿）⇒ 只记"有效"不记"已解释"；
+      现场取证（`diag`）与两类反例长期保留，防复发。
+
+- [x] ✅ **r35 受理面闭环**：四条 CI job 在 sha `7aac7d2` 上逐项 success（run `36220200506`），
+      `ci_status_check.py` ⇒ `CI-STATUS-PASS`；电池收口行拆 `RED` / `ENV-UNVERIFIED` / `CRASH` 三类。
+      原文（含"换过原因却没换打印形态"的教训与 41 条复验）迁 `part24`。
+
+- [x] ✅ **r36 行尾确定性 + 公网同源 + 电池 fail-closed**：钉 `eol=lf`、108 文件归一、判据 `eol_parity`、
+      公网重部署后逐字节相等、三处 `write_text`→`write_bytes`、未知开关 rc=2（本机 43/43）。见 `part24/25`。
+
+- [x] ✅ **r37 交付可得性**：首个 Release + 队列 3/4 + `remote_tree_audit`（45）。见 `part26`。
+
+- [x] ✅ **r38 安全层**：`SafetyGuard` + 行为判据（47）+ `build_jar`；Release `v1.4.3` → `part27`
