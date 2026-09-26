@@ -42,7 +42,7 @@
 - **行尾红线（r36）**：文本一律 `eol=lf`（`.gitattributes` 钉死），落仓库的文本**禁用 `Path.write_text` 文本模式**
   （Windows 实测把 `\n` 翻成 `\r\n`，一次写入即毁掉归一）⇒ 改 `write_bytes`；复验也要按字节读
   （`read_text` 的 universal newlines 会把 CR 读成 `\n`，正好掩盖该缺陷）。判据 `_test/eol_parity_check.py`
-- **性能口径红线（r40）**：性能数字只允许来自 `python _test/perf_baseline_check.py`（本地无外网、危机短路路径、阈值含 ~16–25 倍余量）。**禁止**「比某参照仓快 N%」式横向对比——16 仓实测无一家公开可比延迟/吞吐数值（报告 §14.1）；headless 或真机 FPS 未实测即写 ❌，不得充当性能结论。
+- **性能口径红线（r40）**：性能数字只允许来自 `python _test/perf_baseline_check.py`（本地无外网、危机短路路径、阈值含 ~16–25 倍余量）。**禁止**「比某参照仓快 N%」式横向对比——16 仓实测无一家公开可比延迟/吞吐数值（报告 §14.1）；headless 或真机 FPS 未实测即写 ❌，不得充当性能结论。 **禁跨环境引用绝对值（r40b 实测）**：本机与 CI 两指标不同向（p95 本机 26.2ms / CI 3.3ms；吞吐本机 2026.9 / CI 1178.6 rps），任何「换环境仍是多少」的写法都不成立；判据行必须自带被检环境的数字。
 - **远端可见面红线（r37）**：评委与公网看到的是**远端 main 文件树 + Release 资产 + 线上站点**；
   本机 `.gitignore` 只挡「以后再 add」，**不会把已推上去的东西从远端拿掉** ⇒ 本机工件
   （含 Key 的 `src/js/demo-config.js`、`_test/cors_probe.py`、`server/data/*.mv.db`、`*.jar`）
