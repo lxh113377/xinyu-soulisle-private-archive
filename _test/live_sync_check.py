@@ -2,8 +2,10 @@
 """线上↔权威源逐字节新鲜度守卫：公网 Pages 内容与 deploy/xinyu 不一致即红。
 判据设计：
   1) 生产别名 `/` 页面字节 == deploy/xinyu/index.html 字节（Pages 原样托管，实测相等）
-  2) 线上缺失任何一个被跟踪的 js/css 资源（404 即漂移）
-  3) ⚠️ 坑位固化：Pages 对 /index.html 返回 200 但空 body，必须抓 `/`
+  2) 页面**引用到的每个** js/css/vendor/data/manifest 资源：既要 200，也要**字节相等**
+     （r36 前只查 200 ⇒ "公网与权威源逐字节同源"这句其实只由 index.html 一张图支撑）
+  3) 分母从页面现读，不手抄清单；解析不到任何引用 ⇒ rc=2（空集不算通过）
+  4) ⚠️ 坑位固化：Pages 对 /index.html 返回 200 但空 body，必须抓 `/`
 退出码：0=LIVE-SYNC-PASS 1=漂移 2=网络/环境异常（不许把环境故障伪装成通过）
 """
 import sys
@@ -48,17 +50,47 @@ def main():
     except Exception:
         htm = ""
     import re
-    for m in re.finditer(r'(?:src|href)="((?:js|css|manifest)[^"]+)"', htm):
+    # 分母**从页面现读**，不手抄清单：页面引用了什么，就要求公网与权威源在什么上一致。
+    # 前缀后必须跟 `/`（或整体匹配 manifest.webmanifest）：否则 `href="data:image/svg+xml,<svg…"`
+    # 这类内联 data URI 会被当路径去取（变异测试实测抓到：四条断言全被这条假 URL 打断）
+    for m in re.finditer(r'(?:src|href)="((?:js|css|vendor|data)/[^"?#]+|manifest\.webmanifest)', htm):
         srcs.append(m.group(1))
-    missing = []
+    if not srcs:
+        # 抓不到任何引用 = 页面结构变了或正则失效，此时"零漂移"毫无意义（禁把空集当通过）
+        print("LIVE-SYNC-ENV-ERROR: 页面未解析出任何 js/css/vendor/data/manifest 引用 ⇒ 判据失效")
+        return 2
+    missing, drift, eol_files, equal = [], [], [], 0
     for s in sorted(set(srcs)):
         try:
-            st, _ = fetch(BASE.rstrip("/") + "/" + s)
-            ok = st == 200
+            st, ab = fetch(BASE.rstrip("/") + "/" + s)
         except Exception:
-            ok = False
-        if not ok:
-            missing.append(s)
+            missing.append(f"{s}(取数失败)")
+            continue
+        if st != 200:
+            missing.append(f"{s}(http={st})")
+            continue
+        loc = XINYU / s
+        if not loc.exists():
+            drift.append(f"{s}(公网有、权威源无)")
+            continue
+        lb = loc.read_bytes()
+        if ab == lb:
+            equal += 1
+        elif ab.replace(b"\r\n", b"\n") == lb.replace(b"\r\n", b"\n"):
+            eol_files.append(s)   # 内容等价但字节不等 ⇒ 单独点名，不并入"相等"
+        else:
+            drift.append(f"{s}(live={len(ab)}B local={len(lb)}B)")
+    n = len(set(srcs))
+    print(f"资源字节对账：引用 {n} 项 | 逐字节相等 {equal} | 仅行尾差异 {len(eol_files)} | "
+          f"缺失 {len(missing)} | 内容漂移 {len(drift)}")
+    if eol_files:
+        print(f"  ⚠️ 仅行尾差异（部署或检出侧行尾未对齐，r36 已钉 eol=lf，再出现须查部署链）：{eol_files}")
+    if missing:
+        print(f"LIVE-SYNC-FAIL: 线上缺资源/取数失败 {missing}")
+        return 1
+    if drift:
+        print(f"LIVE-SYNC-FAIL: 线上内容与权威源不一致 {drift}")
+        return 1
     if not index_ok:
         print("LIVE-SYNC-FAIL: 线上 index.html 与 deploy/xinyu/index.html 字节不一致（部署未跟进）")
         return 1
