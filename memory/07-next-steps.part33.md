@@ -26,3 +26,6 @@
 **账面指标看不见的维度要定期换面量**：`in-build 用例数` 这一维，★/停更/workflow 数/文档件全都不是零，
 唯一 ★1 的 Java 同栈对手反而**有**脚手架 ⇒ "能力矩阵"式对标对本维完全失明。
 与 r37「dependabot 在册但 PR 没人处理」同族：**配置在册 ≠ 行为发生**，能力位 ≠ 使用。
+
+## 受理面回执（本轮收口）
+`a75211a` 首推 → CI `RED: disclaimer_forensics`（自家新判据抓到报告 §9.4 一句裸边界结论）→ 改文案不改判据 → `6c363a0` 重推 → run `36268651657` `conclusion=success`，`ci_status_check` 回 `HEAD = PASS`。`java-build` 的 `mvn package` 在 Linux runner 上实测 `Tests run: 30, Failures: 0`（run 36268051559 原文）⇒ in-build 门禁的跨环境等价性已成实测。
