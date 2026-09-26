@@ -1,6 +1,35 @@
-# 关键：shell 脚本必须以 LF 入库/检出。
-# 否则 Windows 检出时 CRLF 会让 Linux 执行报 `/bin/bash^M: bad interpreter`。
-*.sh text eol=lf
+# 行尾策略（r36 立，2026-09-26）
+#
+# 为什么要钉死：`* text=auto` 单独存在时，Windows 检出会把 LF 转成 CRLF（本机 core.autocrlf=true），
+# 于是「工作树字节 ≠ 仓库 blob 字节」。而本仓有一族**按字节**成立的判据：
+#   `_test/deploy_sync_check.py`（src↔deploy 逐文件 SHA256）、`_test/size_budget_check.py`（字节预算）、
+#   `_test/live_sync_check.py`（公网 vs 权威源，r28 起带 eol_only 兜底）、成片 sha256 台账。
+# 实测（r36）：108 个被跟踪文件工作树含 CRLF 而 blob 是 LF；公网 js/app.js 13,698B 含 249 个 CR，
+# 而 clone 后检出只有 13,449B ⇒ 「逐字节一致」是**机器相关**的主张，外人复算不出来。
+# 正解：文本一律 LF 入库也 LF 检出 ⇒ 同一 commit 在任何机器上字节相同，上面那族判据才真正可复算。
+* text=auto eol=lf
 
-# 其余按平台默认处理（Windows 检出为 CRLF，Linux 为 LF）
-* text=auto
+# 脚本类显式钉 LF：
+#   *.sh  —— CRLF 会让 Linux 侧报 `/bin/bash^M: bad interpreter`（本仓 server/Dockerfile 与 CI 用到）
+#   *.ps1 —— Windows PowerShell 与 pwsh 都读 LF，钉住可防 autocrlf 回摆
+*.sh  text eol=lf
+*.ps1 text eol=lf
+
+# 二进制：禁止任何行尾/内容改写（这些进 SHA256 台账、预缓存清单与交付物）
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.svg  text eol=lf
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.mp3  binary
+*.mp4  binary
+*.webm binary
+*.pdf  binary
+*.jar  binary
+*.db   binary
+*.zip  binary

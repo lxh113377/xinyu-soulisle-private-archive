@@ -11,6 +11,9 @@ SUITES = [
     # 前置探针放第一条：r35 实测 jar 中途掉线一次报 5 条红，逐条归因花了三轮命令。
     ("preflight", [sys.executable, "_test/server_preflight.py"]),
     ("deploy_sync", [sys.executable, "_test/deploy_sync_check.py"]),
+    # r36：行尾确定性 —— 让「逐字节 / SHA256 / 字节预算」类主张在他人 clone 上也成立
+    ("eol_parity", [sys.executable, "_test/eol_parity_check.py"]),
+    ("eol_parity_selftest", [sys.executable, "_test/eol_parity_check.py", "--selftest"]),
     ("size_budget", [sys.executable, "_test/size_budget_check.py"]),
     ("size_budget_selftest", [sys.executable, "_test/size_budget_check.py", "--selftest"]),
     ("emotion_wiring", [sys.executable, "_test/emotion_wiring_check.py"]),
