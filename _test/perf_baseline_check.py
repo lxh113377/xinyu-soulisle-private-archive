@@ -187,8 +187,13 @@ def main():
             print("  FAIL", x)
         print("PERF-BASELINE-FAIL: %d 项超预算/口径失效" % len(bad))
         return 1
-    print("PERF-BASELINE-PASS（%d 个目标在预算内；口径=本地无外网 + 危机路径不调 LLM；"
-          "这是自身棘轮不是跨项目对比）" % len(BUDGETS))
+    # 实测值必须挤进这一行：电池只保留最后一条含判据词的 stdout，逐项明细行在 CI 里会被丢掉
+    # ⇒ 判据是棘轮，看不见被检环境的数字就无从判断"该不该重定基线"（07 在册 P2）。
+    peak = max(d["p95_ms"] for k, d in m.items() if k in BUDGETS)
+    tightest = min(BUDGETS[k]["p95_ms"] - d["p95_ms"] for k, d in m.items() if k in BUDGETS)
+    print("PERF-BASELINE-PASS（%d 个目标在预算内｜实测峰值 p95=%.1fms，最紧余量 %.0fms｜吞吐 %s rps｜"
+          "口径=本地无外网 + 危机路径不调 LLM；这是自身棘轮不是跨项目对比）"
+          % (len(BUDGETS), peak, tightest, m.get("throughput_health", {}).get("rps", "取不到")))
     return 0
 
 
