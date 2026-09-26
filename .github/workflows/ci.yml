@@ -53,21 +53,15 @@ jobs:
         run: |
           python _test/strategy_check.py
           python _test/strategy_check.py --selftest
-      - name: 密钥零入库扫描（含"判据必须能抓到东西"的对照组）
+      - name: 密钥零入库扫描（判据与本地电池同源，正则不再内联）
         run: |
           set -e
-          # 对照组：先证明这条正则在**本环境**确实抓得到东西，否则"0 命中"没有意义（R247）。
-          # 密钥串必须**拼接生成** —— 直接写死 30 位字面量会让本文件自己命中这条扫描（本机实测踩过）。
-          printf 'demo sk-%s\n' "$(printf 'a%.0s' $(seq 1 30))" > /tmp/keycanary
-          if ! grep -lE "sk-[A-Za-z0-9]{20,}" /tmp/keycanary >/dev/null; then
-            echo "对照组失败：正则抓不到已知密钥 ⇒ 本步判据恒真，拒绝放行"; exit 1
-          fi
-          rm -f /tmp/keycanary
-          # 真实扫描：只扫 git 跟踪的文件（工作区可能含未跟踪的本机演示配置，如 src/js/demo-config.js）
-          if git ls-files -z | xargs -0 -r grep -lIE "sk-[A-Za-z0-9]{20,}" 2>/dev/null; then
-            echo "🔴 检出疑似真实密钥，禁止入库"; exit 1
-          fi
-          echo "✅ KEY-SCAN-PASS（跟踪文件 0 命中，对照组已证非恒真）"
+          # r35：原先这条正则在 yml 里内联一份、本地电池只有 public_check 扫交付副本
+          # ⇒ "被跟踪文件里写了密钥形态字面量"只有 CI 红（实测 _test/pdf_leak_scan.py 连红多轮，本机全绿）。
+          # 现在判定收进 _test/tracked_secret_scan.py 这一处：CI 与电池调同一个脚本，
+          # 对照组（该抓的必须抓到 / 该放的不得误伤）由 --selftest 承担，不再靠 bash 现场拼。
+          python _test/tracked_secret_scan.py --selftest
+          python _test/tracked_secret_scan.py
 
   java-build:
     name: Java 服务端构建 + 词表一致性红线
@@ -174,7 +168,7 @@ jobs:
       # ⇒ 与同行踩过的「CodeQL 只挂 PR、main 零分析」同族：装了不等于在用。现改为整跑电池。
       # runner 没有上游密钥（密钥不落仓）⇒ 用 --exclude-llm 显式豁免三条在线链路套件，
       # 且豁免数与总数由脚本自证恒等式；CI 覆盖面本身另有 repo_config 的 G10 常驻判据盯着。
-      - name: 全量回归电池（30 条实跑 + 3 条无密钥豁免，豁免必须点名）
+      - name: 全量回归电池（实跑/豁免条数由脚本自证恒等式，步骤名不抄数字）
         run: python _test/run_all_suites.py --exclude-llm
 
   live-sync:

@@ -6,11 +6,12 @@
 #       再观察按钮 DOM 的监听态（class=recording）与恢复态。
 #       判据只看**真实发生过的事实**：API 存在吗？start 真被调用了吗？监听态出现过吗？能恢复吗？
 import asyncio
+import os
 import sys
 
 from playwright.async_api import async_playwright
 
-URL = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8125/"
+URL = next((a for a in sys.argv[1:] if not a.startswith("--")), "http://127.0.0.1:8125/")
 
 INIT_SCRIPT = """
 window.__voice = { constructed: false, started: 0, stopped: 0, ev: [] };
@@ -41,6 +42,57 @@ window.__voice = { constructed: false, started: 0, stopped: 0, ev: [] };
   window.webkitSpeechRecognition = Wrapped;
 })();
 """
+
+
+def no_input_device(ev):
+    """纯函数：本环境的"识别失败"是否属于**环境不具备音频输入设备**（而非产品坏了）。
+
+    成立条件（两条同时满足，缺一即判红）：
+      1) 确在 CI（`CI` 环境变量由 Actions 自动置）；
+      2) 出现的错误**全部**是 `audio-capture`（容器里没有采集设备）。
+    ⚠️ `not-allowed` / `service-not-allowed` **不再**算环境借口（r35 收紧）：那是麦克风权限被拒，
+    正是演示当天会真发生的阻断，把它一并降级等于把缺陷藏进"CI 允许"里。
+    """
+    errs = [e for e in ev if e.startswith("error:")]
+    return bool(os.environ.get("CI")) and bool(errs) and all("audio-capture" in e for e in errs)
+
+
+def selftest() -> int:
+    """判据非恒真自证：`no_input_device` 的五个边界（含两个反向方向）。"""
+    cases = [
+        # (ev, CI 环境, 期望, 说明)
+        (["start", "error:audio-capture", "end"], "1", True, "CI + 仅无设备 ⇒ 降级"),
+        (["start", "error:audio-capture", "end"], None, False, "本机同错误 ⇒ 仍判红（不许拿 CI 当挡箭牌）"),
+        (["start", "error:not-allowed", "end"], "1", False, "CI + 权限被拒 ⇒ 真阻断，不降级"),
+        (["start", "error:audio-capture", "error:not-allowed"], "1", False, "混合 ⇒ 含权限问题就不降级"),
+        (["start", "end"], "1", False, "无任何错误 ⇒ 不该拿环境当理由"),
+    ]
+    bad = []
+    saved = os.environ.get("CI")
+    try:
+        for ev, ci, want, why in cases:
+            if ci is None:
+                os.environ.pop("CI", None)
+            else:
+                os.environ["CI"] = ci
+            got = no_input_device(ev)
+            print("  %s  %s" % ("OK  " if got == want else "BAD ", why))
+            if got != want:
+                bad.append(f"{why}（期望 {want} 实得 {got}）")
+        # 反向：若把判定改成恒真/恒假，上述用例必须整批改判 ⇒ 用例真的有判别力
+        os.environ["CI"] = "1"
+        if no_input_device([]) or no_input_device(["error:not-allowed"]):
+            bad.append("恒真退化未被抓到")
+    finally:
+        if saved is None:
+            os.environ.pop("CI", None)
+        else:
+            os.environ["CI"] = saved
+    if bad:
+        print("VOICE-SELFTEST-FAIL: " + " ; ".join(bad))
+        return 1
+    print("VOICE-SELFTEST-PASS: %d 个边界用例全过（含本机不降级与权限类不降级两个反向方向）" % len(cases))
+    return 0
 
 
 async def main() -> int:
@@ -105,6 +157,8 @@ async def main() -> int:
             await page.wait_for_timeout(100)
         if saw_recording:
             print("A4 PASS  进入监听态（class=recording）")
+        elif no_input_device((await page.evaluate("() => window.__voice")).get("ev", [])):
+            print("A4  SKIP  CI 无音频输入设备（audio-capture）⇒ 监听态不可能出现（本机跑同一条仍判红）")
         else:
             fails.append("A4 未观察到监听态（class=recording 从未出现）")
 
@@ -138,11 +192,9 @@ async def main() -> int:
             print("A7 PASS  识别已 start")
         blocking = [e for e in ev if e.startswith("error:") and
                     any(k in e for k in ("not-allowed", "service-not-allowed", "audio-capture"))]
-        # CI 容器里没有音频输入设备，recognize() 只会回 audio-capture / not-allowed ⇒
-        # 那是**环境不具备**、不是产品坏了（本机跑同一条会真断言）。
-        # 只在「阻断项全部属于无设备这类」且「确在 CI 环境」时降为 SKIP，其余情形照旧判红。
-        no_dev = ("audio-capture", "not-allowed", "service-not-allowed")
-        if blocking and __import__("os").environ.get("CI") and all(any(k in e for k in no_dev) for e in blocking):
+        # CI 容器里没有音频输入设备，recognize() 只会回 audio-capture ⇒
+        # 那是**环境不具备**、不是产品坏了（本机跑同一条会真断言；权限类错误不适用此降级，见 no_input_device）。
+        if blocking and no_input_device(ev):
             print("A7  SKIP  本环境无麦克风输入（CI），阻断项仅这类：", blocking)
         elif blocking:
             fails.append("A7 阻断性错误（演示当天会直接不可用）: %s" % blocking)
@@ -171,4 +223,6 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        raise SystemExit(selftest())
     raise SystemExit(asyncio.run(main()))

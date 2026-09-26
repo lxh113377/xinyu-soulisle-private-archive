@@ -25,9 +25,14 @@
      `if __name__ == "__main__":` 守卫之后 —— 判据脚本会被互相 import（--only 自查 / 聚合 runner 对账 /
      CI 复用），无守卫 = "一 import 就跑全套或跑网络，且退出码 0"（r26 实测第五次同族坑）
   G10 判据必须挂在**真会走的路径**上：CI 步骤里要整跑电池（run_all_suites.py）且声明 --exclude-llm 豁免，
-     豁免项必须是真实存在的套件（幽灵豁免=恒真风险）。根因两条：① 本项目 CI 长期只跑 browser_check 一条，
+  豁免项必须是真实存在的套件（幽灵豁免=恒真风险）。根因两条：① 本项目 CI 长期只跑 browser_check 一条，
      r26-r28 新加的 patch_apply / settings_panel / offline_shell 全在发布路径之外（本地绿≠有人管）；
      ② 同行实证 CodeQL 30 次全 success 但 refs/heads/main 分析数为 0——有运行记录不等于覆盖主路径。
+
+  G11 依赖清单对账：判据脚本 import 的第三方包 == `_test/requirements.txt`，且每个跑判据的 CI job 都装了它
+  G12 版本断言三源对账：`git tag` 最大值 == `server/pom.xml` <version> == 文档「当前版本：**vX.Y.Z**」
+  G13 判据账本自洽：本文件头部登记的 G 清单与 `main()` 里实际执行的 check("G..") 一一对应
+     —— 漏登记与幽灵登记都判红（这条由 G13 自己盯着自己，根因见 guard_inventory 的 docstring）
 
 退出码：0=REPO-CONFIG-PASS 1=任一判据失败 2=环境异常（缺 PyYAML / --online 但 gh 不可用）
 """
@@ -40,6 +45,9 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[1]
+# 模块级抓头部说明：函数内的 `__doc__` 是**该函数自己的** docstring，拿它当清单会读到空
+# ⇒ G13 会把"自己没登记"误判成别人漏登记（写这条时当场自抓到的一次误归因）。
+HEADER_DOC = __doc__ or ""
 SUPPORTED_ECO = {"npm", "pip", "maven", "gradle", "github-actions", "docker", "cargo",
                  "composer", "mix", "nuget", "terraform", "gofmod", "gomod", "bundler", "pub"}
 INTERVALS = {"daily", "weekly", "monthly", "quarterly", "yearly"}
@@ -326,6 +334,91 @@ def ci_battery_audit(ci_text, suites_text):
     return bad, len(names), exempt
 
 
+def version_truth(tag, pom):
+    """G12 纯函数：把"当前版本"这条断言绑到三个权威源上，任一侧脱节即红。
+
+    立此条的实证（r35）：`ROADMAP.md` 版本节奏段写着 **v1.3.0**，而 `git tag` 已有 `v1.4.0`、
+    `server/pom.xml` 也是 `1.4.0` —— 与本项目反复登记的"文档数字与实值脱节"同族，
+    而 G2/G4 只覆盖 README 的门禁数/套件数，版本断言**当时没有机器责任方**。
+    本函数只在两侧同构时才算绿：tag==pom==文档，且文档断言真的存在（漏声明=失去责任方，判红）。
+    """
+    bad = []
+    if not tag:
+        bad.append("G12 取不到 git tag ⇒ 版本判据在读空气（先疑仓库无标签）")
+    if not pom:
+        bad.append("G12 取不到 server/pom.xml 的 <version> ⇒ 同上")
+    if tag and pom and tag.lstrip("v") != pom:
+        bad.append(f"权威源互不一致：tag={tag} 而 pom={pom}（发版链断在中间）")
+    return bad
+
+
+def version_doc_audit(docs_text, pom):
+    """G12 文档侧：每个 `当前版本：**vX.Y.Z**` 断言必须等于权威版本；ROADMAP 必须有这一行。"""
+    bad = []
+    seen = 0
+    for name, text in docs_text.items():
+        found = set(re.findall(r"当前版本[：:]\s*\*\*v?(\d+\.\d+\.\d+)", text))
+        if not found and name == "ROADMAP.md":
+            bad.append("ROADMAP 的「当前版本：**vX.Y.Z**」断言行失踪 ⇒ 版本声明没有机器责任方")
+        for v in sorted(found):
+            seen += 1
+            if pom and v != pom:
+                bad.append(f"{name} 声称 v{v}，权威源 pom 为 {pom}")
+    if not seen:
+        bad.append("G12 零命中：全仓没有任何版本断言可核对（不得据此判绿）")
+    return bad
+
+
+def pom_version():
+    p = ROOT / "server" / "pom.xml"
+    if not p.exists():
+        return ""
+    m = re.search(r"<artifactId>soulisle-server</artifactId>\s*<version>([^<]+)</version>",
+                  p.read_text("utf-8", errors="replace"))
+    return m.group(1).strip() if m else ""
+
+
+def latest_tag():
+    try:
+        out = subprocess.run(["git", "tag", "--sort=-v:refname"], capture_output=True,
+                             text=True, encoding="utf-8", timeout=30).stdout
+    except OSError:
+        return ""
+    for line in out.splitlines():
+        line = line.strip()
+        if re.fullmatch(r"v?\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?", line):
+            return line
+    return ""
+
+
+def guard_inventory(header_text, source_text):
+    """G13 纯函数：`main()` 里真正执行的每条 G 判据，必须在本文件头部的判据清单里有一行说明。
+
+    立此条的实证（r35，两次同族）：G11（依赖清单对账）落地时**只**写在函数 docstring 里，
+    头部清单从 G10 直接跳到"退出码"一行 —— 读文件的人以为只有 10 条判据；同族形态是
+    CI 步骤名手抄"30 条实跑"与实际 34 条脱节、ROADMAP 版本号停在上一版。
+    根因同一：**同一个清单有两处实现（代码 / 说明），改一处不会让另一处跟上**（M5⑥）。
+    零命中不得判绿（R247）：解析不到任何 G 编号 = 正则失效，不是"没有判据"。
+    """
+    # 一条 check() 可以同时承担多条判据（实际有 `check("G6+G7 ...")` 这种合并项）
+    # ⇒ 必须把整条名字里的 G 编号全取出来。首版只取第一个数字，当场把 G7 误判成"登记了没执行"
+    #   （判据自己太窄导致的假红 —— 先修判据，不动登记，R263）。
+    executed = set()
+    for m in re.finditer(r'check\(\s*"([^"]*)"', source_text):
+        executed.update(re.findall(r"G(\d+)", m.group(1)))
+    documented = set(re.findall(r"^\s*G(\d+)", header_text, re.M))
+    if not executed:
+        return ["G13 解析不到任何 check(\"G..\") ⇒ 判据清单为空，不得据此判绿"]
+    missing = sorted(set(executed) - set(documented), key=int)
+    ghost = sorted(set(documented) - set(executed), key=int)
+    bad = []
+    if missing:
+        bad.append(f"已执行但未在头部登记的判据：G{'、G'.join(missing)}")
+    if ghost:
+        bad.append(f"头部登记但 main() 里查无实行的判据：G{'、G'.join(ghost)}")
+    return bad
+
+
 def selftest():
     bad = []
     cfg = load_yaml(".github/dependabot.yml")
@@ -410,6 +503,30 @@ def selftest():
         bad.append("篡改⑬c（清单里的幽灵依赖，没人 import）未被 G11 抓到")
     if not r_run:
         bad.append("篡改⑬ 反例组失效：CI 里根本没解析到跑判据的 job（G11 在读空气）")
+    # 篡改⑭：版本断言三源对账（r35 一手实证 —— ROADMAP 停在 v1.3.0 而 tag/pom 已是 1.4.0）
+    if version_truth("v1.4.0", "1.4.0"):
+        bad.append("篡改⑭a（tag 与 pom 相等）被判失败 ⇒ G12 恒假，只会刷红")
+    if not version_truth("v1.4.0", "1.3.0"):
+        bad.append("篡改⑭b（两个权威源互斥）未被 G12 抓到 ⇒ 恒真")
+    if not version_truth("", "1.4.0"):
+        bad.append("篡改⑭c（取不到 tag = 判据在读空气）未被 G12 抓到")
+    if version_doc_audit({"ROADMAP.md": "当前版本：**v1.4.0**"}, "1.4.0"):
+        bad.append("篡改⑭d（文档等于权威源）被判失败 ⇒ 文档侧恒假")
+    if not version_doc_audit({"ROADMAP.md": "当前版本：**v1.3.0**"}, "1.4.0"):
+        bad.append("篡改⑭e（文档落后一版，正是本次真实缺陷形态）未被 G12 抓到")
+    if not version_doc_audit({"ROADMAP.md": "这一节没写版本", "README.md": "也没有"}, "1.4.0"):
+        bad.append("篡改⑭f（全仓零版本断言 / ROADMAP 断言行失踪）未被 G12 抓到 ⇒ 零命中被判绿（R247）")
+    # 篡改⑮：判据清单与头部说明对账（G13 自己也得被登记，否则它就是个暗判据）
+    src_self = Path(__file__).read_text("utf-8", errors="replace")
+    if guard_inventory(HEADER_DOC, src_self):
+        bad.append(f"篡改⑮a（本文件自身）被判失败：{guard_inventory(HEADER_DOC, src_self)}")
+    fake_hdr = "\n".join(f"  G{i} 占位" for i in range(1, 12)) + "\n"
+    if not guard_inventory(fake_hdr, 'check("G1 ok")\ncheck("G12 版本")\n'):
+        bad.append("篡改⑮b（执行了 G12 而头部只到 G11）未被 G13 抓到 ⇒ 恒真")
+    if not guard_inventory("  G9 只有这一条\n", 'check("G1 x")\ncheck("G2 y")\n'):
+        bad.append("篡改⑮c（头部登记与实际执行两套账）未被 G13 抓到")
+    if not guard_inventory("  G1 占位\n", 'print("没有判据")\n'):
+        bad.append("篡改⑮d（零命中：解析不到任何 G）未被 G13 抓到 ⇒ 读空气被判绿")
     real = sorted((ROOT / "_test").glob("*.py"))
     viol = [p.name for p in real if import_safety(p.read_text("utf-8", errors="replace"))]
     if viol:
@@ -454,6 +571,15 @@ def main():
     n = battery_count()
     check("G4 电池条目数 == README 声称的套件数", s_claim is not None and s_claim == n,
           f"run_all_suites.py 实测 {n} | README 声称 {s_claim}")
+    pom, tag = pom_version(), latest_tag()
+    docs_text = {name: (ROOT / name).read_text("utf-8", errors="replace")
+                 for name in ("ROADMAP.md", "README.md") if (ROOT / name).exists()}
+    g12bad = version_truth(tag, pom) + version_doc_audit(docs_text, pom)
+    check("G12 版本断言三源对账（git tag == pom == 文档「当前版本」）", not g12bad,
+          f"tag={tag or '取不到'} pom={pom or '取不到'} 文档={sorted(docs_text)} | " + " ; ".join(g12bad))
+    g13bad = guard_inventory(HEADER_DOC, Path(__file__).read_text("utf-8", errors="replace"))
+    check("G13 判据账本自洽（头部登记 == main() 实际执行，漏登/幽灵登都红）", not g13bad,
+          " ; ".join(g13bad))
     if a.online:
         repo = None
         try:

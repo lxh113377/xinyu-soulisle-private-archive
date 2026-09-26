@@ -5,6 +5,47 @@
 
 ## [Unreleased]
 
+### Fixed（r35 · 对标轮 2026-09-26：受理面三条 CI 真红逐条归因）
+- **CI 密钥门禁被自家判据夹具命中**：`_test/pdf_leak_scan.py:91` 的反例样本写成连续的 `sk-`+24 位字面量，
+  而同步守卫 job 的密钥扫描扫的是 `git ls-files` ⇒ **跟踪文件里最像密钥的东西是"检测密钥的判据"本身**，
+  两条 job 因此连红 5 次 push（本机 37 条套件全绿看不见）。修法三层：样本改拼接 +
+  新建 `_test/tracked_secret_scan.py`（分母非空断言 / 逐条 `路径:行号` / 四类边界自证）+
+  `ci.yml` 改为调用该脚本 ⇒ **CI 与本地从此同一把尺**（原先同一判断两处实现，只有一处会红）。
+- **`voice` 判据的 CI 降级没盖住 A4**：A7 有"无麦克风 ⇒ SKIP"，A4 没有 ⇒ CI 上 `error:audio-capture`
+  让 `recording` 类根本不可能出现却判红。抽出纯函数 `no_input_device(ev)` 供两条共用，并**顺手收紧**：
+  `not-allowed` / `service-not-allowed` 不再算环境借口（那是权限被拒，演示当天真会挂）。
+  新增常驻套件 `voice_selftest`（5 例，含"本机同错误仍判红""权限类不降级"两个反向方向）。
+- **`settings_panel` 四条 CI 红：登记为未归因，不声称已修**。已排除 `demo-config` 变量（换 CI 版 stub
+  本机复跑 9/9 绿，按 sha256 还原）；给判据装上"完成态等待 + 报红时自动附现场
+  `{open, returnValue, saveDone, domBase, cfg, ua}`"，并补两类反例（⑥ 竞态实测、⑦ 保存不关窗必超时）。
+  下一次 run 无论绿红都给出可定位的现场行。
+- **电池收口行把"判红"与"环境未验"分开**：`ci_status` 长期挂红期间原因换过（账单阻塞 → 代码级失败），
+  而收口行两次的样子一样（`RED: ci_status`）⇒ 换原因的常红被自己的措辞吞掉。现分三类打印
+  `ALL-GREEN` / `RED(判红，必须修)` / `ENV-UNVERIFIED(不是判红，但不得声称已验)`；
+  **本条自己也被实测证伪过一次**：第一版写"非 1 即环境"，随即两条套件硬崩（`rc=0xC0000409`、stdout 全空）
+  被判成"环境未验" ⇒ 补第三类 `CRASH(判据自身崩溃，必须查)`，并用合成四态套件双向验。
+- **新增前置探针 `_test/server_preflight.py`**：跑判据中途本机 fat jar 掉线，一次报出 5 条红
+  （`api_contract` / `settings_panel` / `settings_panel_selftest` / `offline_shell` / `ci_status`），
+  失败面各不相同（Playwright `ERR_CONNECTION_REFUSED`、urllib `WinError 10061`），归因花三轮命令。
+  现由电池第一条说清："服务不可达 ⇒ 依赖它的套件本轮全部算**未验**"，并按 rc=2 归入 `ENV-UNVERIFIED`。
+
+### Changed（r35 · 文档与判据账本）
+- **G12 版本断言三源对账**（`git tag` == `server/pom.xml` == 文档「当前版本」）：实测 `ROADMAP.md` 停在
+  **v1.3.0** 而 tag/pom 均已 **1.4.0**，改文档后转绿；`--selftest` 篡改⑭ 六例含"全仓零断言不得判绿"。
+- **G13 判据账本自洽**（头部登记 == `main()` 实际执行的 `check("G..")`）：上线当轮即抓到两处自身缺陷 ——
+  G7 因 `check("G6+G7 …")` 合并项被首版正则漏取（判据过敏，按 R263 先修判据不动登记），
+  以及 G11 落地时从未写进头部清单（漏登记）。
+- **ROADMAP 补「更正注」**：`⚠️ 撤下两项` 段里「PWA / service worker 撤销不做」已被 r28 的只读离线壳推翻，
+  却与同文件第 94 行（离线壳已交付）并存且无更正注 —— 违反该文件自己第 156 行的纪律；现按
+  "保留原文 + 更正注 + 写明真实路径（同一条 `pwa_offline=0/16` 被反读成差异化机会）"补齐。
+- `ci.yml` 电池步骤名去掉手抄数字（写死"30 条实跑 + 3 条豁免"，实际 34+3；条数由脚本自证恒等式）。
+- README 三条状态性表述按 R242 回扫：删除"四条 job 均在 GitHub 真跑验证"这类会随受理面变色而失效的写法，
+  改为"以 `ci_status_check.py` 读回的远端判定为准"；套件数 37→40 由 G4 机器对账。
+- `memory/05-feature-status.md` 追平 r29–r35 构建（07 登记的 P0 自驱项）：主壳新增「当前构建状态」权威段，
+  r20–r28 各轮残段逐字迁 `part10.md`；主壳 3,798B ≤ R161 的 4,096B，逐行复核**原始行丢失 0**。
+- 电池 37 → **40** 条（新增 `tracked_secret` / `tracked_secret_selftest` / `voice_selftest`）。
+
+
 ### Changed（r34）
 - **演示成片再录**：r30 成片录于诚实性修复之前，画面仍挂旧标签；r34 重录后画面含「本机开场白 · 未经大模型」
   与「● 在线 AI」，`RECORD-PASS scenes: 8` / `ffprobe 218.48s` ≤300s，提交清单第 2 行指纹与三代际已更新。

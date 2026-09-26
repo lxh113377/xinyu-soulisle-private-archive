@@ -8,6 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE = "http://127.0.0.1:8123"
 
 SUITES = [
+    # 前置探针放第一条：r35 实测 jar 中途掉线一次报 5 条红，逐条归因花了三轮命令。
+    ("preflight", [sys.executable, "_test/server_preflight.py"]),
     ("deploy_sync", [sys.executable, "_test/deploy_sync_check.py"]),
     ("size_budget", [sys.executable, "_test/size_budget_check.py"]),
     ("size_budget_selftest", [sys.executable, "_test/size_budget_check.py", "--selftest"]),
@@ -25,6 +27,10 @@ SUITES = [
     ("offline_shell_selftest", [sys.executable, "_test/offline_shell_check.py", "--selftest"]),
     ("pdf_leak_scan", [sys.executable, "_test/pdf_leak_scan.py"]),
     ("pdf_leak_selftest", [sys.executable, "_test/pdf_leak_scan.py", "--selftest"]),
+    # r35：CI 的密钥门禁原先内联在 ci.yml，本地扫不到 ⇒ "被跟踪文件含密钥形态"只有 CI 红。
+    # 现在两侧共用这一条判据（正则只实现一处），本地也进电池。
+    ("tracked_secret", [sys.executable, "_test/tracked_secret_scan.py"]),
+    ("tracked_secret_selftest", [sys.executable, "_test/tracked_secret_scan.py", "--selftest"]),
     ("ci_status", [sys.executable, "_test/ci_status_check.py"]),
     ("ci_status_selftest", [sys.executable, "_test/ci_status_check.py", "--selftest"]),
     ("repo_config", [sys.executable, "_test/repo_config_check.py"]),
@@ -38,6 +44,8 @@ SUITES = [
     ("j4_remote_down", [sys.executable, "_test/j4_remote_down_check.py"]),
     ("stream_contract", [sys.executable, "_test/stream_contract.py"]),
     ("voice", [sys.executable, "_test/voice_check.py", BASE]),
+    # r35：voice 的"CI 无麦克风 ⇒ SKIP"降级必须是纯函数且带边界反例，否则降级会吞掉真缺陷
+    ("voice_selftest", [sys.executable, "_test/voice_check.py", "--selftest"]),
     ("browser_check", [sys.executable, "_test/browser_check.py"]),
     ("pixel_dual", [sys.executable, "_test/pixel_dual_check.py"]),
     ("lightshow", [sys.executable, "_test/lightshow_check.py"]),
@@ -109,8 +117,25 @@ def main():
             print(" " * 25 + "· " + d)
 
     bad = [r for r in results if r[1] != 0]
+    # 收口行必须把"判红"与"环境未验（rc=2）"分开印：r35 实证 ci_status 长期挂红，
+    # 起因是账单阻塞（rc=2），计费恢复后变成代码级失败（rc=1）——**原因换了，行没换**，
+    # 于是连续 5 次 push 带着真红出门，而电池摘要看上去和上周一样。
+    # ⚠️ 三类而不是两类：本轮第一版把"非 1 即环境"写死，随即被自己的输出证伪 ——
+    #    voice 两条套件硬崩（rc=0xC0000409、stdout 全空）被判成"环境未验"，等于给崩溃发了通行证。
+    hard = [b[0] for b in bad if b[1] == 1]
+    soft = [b[0] for b in bad if b[1] == 2]
+    crash = [(b[0], b[1]) for b in bad if b[1] not in (1, 2)]
+    parts = []
+    if hard:
+        parts.append("RED(判红，必须修): " + ",".join(hard))
+    if soft:
+        parts.append("ENV-UNVERIFIED(不是判红，但不得声称已验): " + ",".join(soft))
+    if crash:
+        parts.append("CRASH(判据自身崩溃，既不是判红也不是环境，必须查): "
+                     + ",".join("%s=0x%08x" % (n, c & 0xFFFFFFFF) for n, c in crash))
+    tail_msg = "ALL-GREEN" if not parts else "  |  ".join(parts)
     print("=" * 60)
-    print(f"BATTERY: {len(results) - len(bad)}/{len(results)} rc=0", "ALL-GREEN" if not bad else "RED: " + ",".join(b[0] for b in bad))
+    print(f"BATTERY: {len(results) - len(bad)}/{len(results)} rc=0", tail_msg)
     return 1 if bad else 0
 
 

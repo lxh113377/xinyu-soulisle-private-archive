@@ -88,7 +88,10 @@ def selftest():
 
     clean = mkpdf(["Xinyu SoulIsle application plan", "emotion engine dual path", "crisis hotline 12356",
                    "%@P %V@8 +@-- +@L c-@g.Bk"])   # 字体二进制里的噪声串：必须不误报（r32 实测误报源）
-    dirty = mkpdf(["plan text", "file:///C:/Users/someone/x.html", "sk-abcdefghij1234567890QRST",
+    # 样本密钥串**必须拼接**：本文件是 git 跟踪件，写成连续字面量会被 CI 的
+    # 「跟踪文件密钥扫描」（同一条 sk-[A-Za-z0-9]{20,} 正则）自伤命中 ⇒ r35 实测 CI 因此连红。
+    key_sample = "sk-" + "abcdefghij" + "1234567890" + "QRST"
+    dirty = mkpdf(["plan text", "file:///C:/Users/someone/x.html", key_sample,
                    "someone@corp.cn", "13800001234"])
     bad = []
     cs = scan(pdf_visible_text(clean))

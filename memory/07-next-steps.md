@@ -19,25 +19,26 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
 - [ ] **J3/J4 变现**（= 让已建成能力真跑起来）：① 两端一致性守卫 ✅ ② 本地演示 `remote:true` ✅
       ③ fat jar 部署包 + Docker 镜像**两条路均已实测就绪** ⇒ **唯一阻塞 = 老大提供目标机器**（IP/登录/安全组）。
       2026-09-24 老大裁决：先不办，降级至 10 月复赛节点。完整段见 `part17`。
-- [x] ✅ **r33 公网已重部署并复核**（deployment `b5f46ecf`）：`LIVE-SYNC-PASS`（逐字节等）+
-      `PUBLIC-ONLINE-ALL-PASS`（标签实测「在线大模型生成 · 逐字流式」/ 危机 True / console 0）+
-      `/api/chat` 200 + 公网 `app.js` 含降级徽章、`chat-window.js` 含诚实标签。
-      ⚠️ 部署命令必须 `cd deploy` 再跑（Functions 目录按 cwd 解析，日志须见 "Uploading Functions bundle"）。
-- [x] ✅ **r34 成片再录完成**：`RECORD-PASS scenes: 8` + `VIDEO-PIPELINE-PASS dur=218.5s`，抽帧目检画面已含
-      「本机开场白 · 未经大模型」+「● 在线 AI」；配置按 sha256 逐字节还原、公网 stub 未触碰、
-      `public_check` → `KEY_LEAK: False`。指纹与代际**不抄在这里**：见提交清单第 2 行。
-- [ ] 🔴 **下一件（r34 登记，agent 可自驱）**：`memory/05-feature-status.md` 是功能状态权威清单，
-      r32（徽章三态 + 诚实标签）与 r34（成片代际）之后大概率落后 ⇒ 按"材料须追上构建"复扫并补条目；
-      复算：`grep -n "在线 AI\|本机开场白\|演示视频" memory/05-feature-status.md*` 命中数须 >0 且逐条对得上实测。
-- [ ] ⛔ **只有老大能解（agent 侧无入口）**：GitHub Actions 账户账单/配额 —— HEAD 最近 run 判 `ENV_BLOCKED`
-      （runner 从未启动）⇒ r28 的 CI 覆盖面修复**至今无法在受理面验证，我不声称已验**。
-      复算：`python _test/ci_status_check.py`（解除后应转 `PASS`，电池那条红随之消失）
+- [x] ✅ **r35 05 追平完成**（原 r34 登记的自驱项）：`memory/05-feature-status.md` 新增「当前构建状态（r20–r35）」
+      权威段（三态徽章 / 本机开场白标签 / 离线壳 / 演示视频代际），r20–r28 各轮残段逐字迁 `05…part10.md`。
+      复算：`grep -c "在线 AI\|本机开场白\|演示视频" memory/05-feature-status.md` = 4，体积由 savepoint 量。
+- [ ] 🔴 **下一件（r35 登记，agent 可自驱）**：`settings_panel` 的 S3/S4/S5/S7b **CI 红本机绿**仍未定案归因
+      （已排除 demo-config 变量）。判据本轮已装好自归因面（完成态等待 + 报红附现场
+      `{open, returnValue, saveDone, domBase, cfg, ua}`）⇒ 下次 push 后
+      `gh run view <id> --log-failed | grep -A3 settings_panel` 读现场行定案，**禁止**照猜修法。
+- [ ] 🟡 同件第二刀：Playwright 启 `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`，
+      把 `voice` 的 "CI 无麦克风 ⇒ SKIP" 换成真断言（降级读永远比造环境弱）。
+- [ ] ⚠️ **r35 更正（原「只有老大能解：ENV_BLOCKED」按纪律保留 + 加更正注）**：Actions 账单/配额**已恢复**
+      —— HEAD 最近 run 现判 **CODE_FAIL**（2 条 job 有真日志的失败，最近 5 次 push 全红），
+      "只有老大能解"已失效，受理面改由 r35 修复链（CHANGELOG「Fixed（r35）」四条）跟踪。
+      这条红**换了原因却没换打印形态**（`RED: ci_status`）⇒ 电池收口行已拆两类。
+      复算：`python _test/ci_status_check.py`（应转 `CI-STATUS-PASS`，rc=0）
 - [ ] **同族坑收口**：台账见 `part18`/`part20`（r30 增补=索引壳超限）；G9 常驻 `repo_config_check.py`。
 ## 分卷目录
 
 - **卷1–7** `part1..part7.md` — J1–J5 逐阶段验收证据与命令（卷1–4）/ P1·P2 与对话摘要（卷5）/
   **P0 未完成项完整描述**（卷6）/ P0 已完成项 + 改造不变量 + J4·J5 详情（卷7）
 - **卷8–16** `partN.md` — R199 自动拆卷（历次已完成条目）；含**卷11** = fat jar / 容器部署完整史（人工自卷6拆出）
-- **卷17–22** `partN.md` — 17 主线背景+J3/J4 段｜18 切分做法+八步序列+同族坑前五讲｜19 离线壳做法｜
-  20 CI 三判据+成片重录全程｜**21 技能治理链四条闭环全记录**｜22 R199 自动拆卷（07 已完成条目续卷）
+- **卷17–23** `partN.md` — 17 主线背景+J3/J4｜18 切分做法+八步序列+同族坑前五讲｜19 离线壳｜
+  20 CI 三判据+成片重录｜**21 技能治理链四条闭环**｜22 自动拆卷续卷｜**23 r35 已完成项**（r33 重部署 / r34 成片）
 
