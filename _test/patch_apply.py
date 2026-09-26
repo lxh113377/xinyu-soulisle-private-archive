@@ -51,9 +51,13 @@ def apply_patch(path, find, repl, expect_count=1, count=-1, dry=False, quiet=Fal
     bak = Path(tempfile.gettempdir()) / f"patch_apply_{p.name}.{datetime.now():%Y%m%d%H%M%S}.bak"
     shutil.copy2(p, bak)
     try:
-        p.write_text(new, "utf-8")
-        back = p.read_text("utf-8")          # 读回复验：写成功 ≠ 内容对
-        if back != new:
+        # newline 必须显式：write_text 在 Windows 文本模式把 \n 翻成 \r\n，
+        # 于是"打一个补丁"就把 r36 归一好的 LF 文件重新变成 CRLF（eol_parity 判红）。
+        p.write_bytes(new.encode("utf-8"))
+        # 读回也必须按字节：read_text 走 universal newlines，会把 \r\n 读成 \n，
+        # 于是"写坏了行尾"这种缺陷正好被复验步骤自己掩盖掉。
+        back = p.read_bytes()
+        if back != new.encode("utf-8"):
             shutil.copy2(bak, p)
             return 1, f"写后读回不一致 ⇒ 已回滚（备份 {bak.name}）"
     except Exception as e:
@@ -90,7 +94,19 @@ def selftest():
     rc, _ = apply_patch(d / "nope.txt", "x", "y", quiet=True)
     if rc != 2:
         bad.append(f"⑤文件不存在应 rc=2（实际 {rc}）")
-    print("SELFTEST-PASS: 锚点失配/歧义/同义/插入/正常/缺失 六类行为均正确" if not bad
+    # ⑦⑧ 行尾两侧：r36 实测 write_text 在 Windows 会把 \n 翻成 \r\n，
+    # 打一次补丁就把归一好的 LF 文件变回 CRLF（eol_parity 判红）⇒ 出口必须钉成 LF。
+    lf = d / "lf.txt"
+    lf.write_bytes(b"alpha 4355 beta\n")
+    apply_patch(lf, "4355", "3969", quiet=True)
+    if b"\r" in lf.read_bytes():
+        bad.append("⑦LF 样本打完补丁出现 CR ⇒ 写盘端又把行尾翻成 CRLF（回归）")
+    crlf = d / "crlf.txt"
+    crlf.write_bytes(b"alpha 4355 beta\r\n")
+    apply_patch(crlf, "4355", "3969", quiet=True)
+    if b"\r" in crlf.read_bytes():
+        bad.append("⑧CRLF 样本打完补丁仍带 CR ⇒ 出口未统一（规则不能看输入决定）")
+    print("SELFTEST-PASS: 锚点失配/歧义/同义/插入/正常/缺失 + 行尾两侧 八类行为均正确" if not bad
           else "SELFTEST-FAIL: " + "; ".join(bad))
     return 1 if bad else 0
 

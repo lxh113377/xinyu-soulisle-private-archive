@@ -173,7 +173,8 @@ def run_recording():
 
     real_errors = [e for e in errors if "net::" not in e and "ERR_" not in e]
     assert len(real_errors) == 0, f"非预期 console 报错: {real_errors[:5]}"
-    (OUTDIR / "timeline.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
+    (OUTDIR / "timeline.json").write_bytes(
+        json.dumps(rec, ensure_ascii=False, indent=1).encode("utf-8"))  # 落仓库的产物一律 LF（见 eol_parity）
     log("RECORD-PASS scenes:", len(rec), "end_t_ms:", last_t[0])
 
 def build_ass(dur_s):
@@ -184,7 +185,8 @@ def build_ass(dur_s):
             "Style: Default,Microsoft YaHei,36,&H00FFFFFF,&H0000E7FF,&H00202020,&H96000000,0,0,0,0,1,2,0,2,60,60,50,1\n\n[Events]\n"
             "Format: Layer, Start, End, Style, Text\n")
     ev = [f"Dialogue: 0,{f(ts[i])},{f(ts[i+1]-0.3)},Default,{SCENES[i][1]}" for i in range(len(SCENES))]
-    (OUTDIR / "subtitle.ass").write_text(head + "\n".join(ev), encoding="utf-8")
+    (OUTDIR / "subtitle.ass").write_bytes(
+        (head + "\n".join(ev)).encode("utf-8"))
     return ts
 
 def synth_tts(ts, final):

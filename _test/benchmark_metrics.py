@@ -522,7 +522,9 @@ def main():
     payload = {"generated_by": "_test/benchmark_metrics.py",
                "peers_expected": len(PEERS), "runs": hist}
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), "utf-8")
+    # write_bytes 而非 write_text：文本模式在 Windows 会把 \n 翻成 \r\n，
+    # 台账一旦带 CRLF，"逐字节对账/SHA256"类主张在别人 clone 上就复算不出来（eol_parity 实测抓到过一次）
+    tmp.write_bytes(json.dumps(payload, ensure_ascii=False, indent=1).encode("utf-8"))
     os.replace(tmp, path)
 
     print(f"采集: {len(cur)}/{len(PEERS)} 仓 | 快照 {path.relative_to(ROOT).as_posix()} | 历史 {len(hist)} 次")
