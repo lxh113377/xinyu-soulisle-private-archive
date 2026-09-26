@@ -81,7 +81,7 @@ def no_run_expired(now, first_seen, grace):
     return (now - first_seen) > grace
 
 
-def judge(sha, timeout, grace=90):
+def judge(sha, timeout, grace=180):
     t0 = time.time()
     deadline = t0 + timeout
     last = ""
@@ -97,8 +97,9 @@ def judge(sha, timeout, grace=90):
             return 0
         if state == "NO_RUN":
             if no_run_expired(time.time(), t0, grace):
-                print("CI-WATCH-UNVERIFIED | %s | 宽限 %ds 后仍无 run 记录（%s）⇒ 不得当通过"
-                      % (sha[:8], grace, why))
+                print("CI-WATCH-UNVERIFIED | %s | 宽限 %ds 后仍无 run 记录（%s）⇒ 不得当通过；"
+                  "若本机登记更慢，加大 --no-run-grace 或稍后重跑"
+                  % (sha[:8], grace, why))
                 return 2
             time.sleep(15)
             continue
@@ -152,6 +153,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sha", default="")
     ap.add_argument("--timeout", type=int, default=300)
+    ap.add_argument("--no-run-grace", type=int, default=180,
+                    help="无 run 记录的容忍秒数（实测 90s 在本网络会误报：run 登记可晚于 90s）")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -163,7 +166,7 @@ def main():
             print("CI-WATCH-UNVERIFIED | 取不到 HEAD ⇒ 不判绿")
             return 2
         sha = out.strip()
-    return judge(sha, a.timeout)
+    return judge(sha, a.timeout, a.no_run_grace)
 
 
 if __name__ == "__main__":
