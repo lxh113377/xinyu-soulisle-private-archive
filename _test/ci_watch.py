@@ -71,8 +71,19 @@ def red_detail(run_id):
     return jobs, (tail or "(--log-failed 无输出)")
 
 
-def judge(sha, timeout):
-    deadline = time.time() + timeout
+def no_run_expired(now, first_seen, grace):
+    """纯函数：`无 run 记录` 只有在宽限期之后才算结论。
+
+    为什么必须有这道闸（首跑自抓）：刚 push 完的头几十秒里 GitHub **本来就还没登记 run**，
+    把 NO_RUN 直接当终态 ⇒ 本工具第一次上岗就把一次正常推送报成 `UNVERIFIED`（实测 `2a20186`），
+    属于"把没看到写成结论"的反面变体：看到空 ≠ 判完。宽限期后仍空才允许报未验证。
+    """
+    return (now - first_seen) > grace
+
+
+def judge(sha, timeout, grace=90):
+    t0 = time.time()
+    deadline = t0 + timeout
     last = ""
     while time.time() < deadline:
         rows, why = runs_for(sha)
@@ -85,8 +96,12 @@ def judge(sha, timeout):
             print("CI-WATCH-GREEN | %s | %s" % (sha[:8], note))
             return 0
         if state == "NO_RUN":
-            print("CI-WATCH-UNVERIFIED | %s | %s ⇒ 不得当通过" % (sha[:8], why))
-            return 2
+            if no_run_expired(time.time(), t0, grace):
+                print("CI-WATCH-UNVERIFIED | %s | 宽限 %ds 后仍无 run 记录（%s）⇒ 不得当通过"
+                      % (sha[:8], grace, why))
+                return 2
+            time.sleep(15)
+            continue
         print("CI-WATCH-RED | %s | %s" % (sha[:8], note))
         for r in rows:
             if r.get("conclusion") in ("success", "skipped"):
@@ -122,7 +137,13 @@ def selftest():
             bad.append("%s：期望 %s 实得 %s" % (name, want, got))
     if classify([{"status": "completed", "conclusion": "success"}])[0] == "RED":
         bad.append("恒红")
-    print("CI-WATCH-SELFTEST-%s（%d 态判定 + 恒红守卫）"
+    # NO_RUN 宽限期双向自证：窗口内不得结案（首跑就在这条上把一次正常推送报成未验证），
+    # 窗口外必须结案（否则 run 永不出现时会一直等到超时）
+    if no_run_expired(100.0, 60.0, 90):
+        bad.append("宽限期内就结案 ⇒ 刚 push 的正常空窗被当成终态")
+    if not no_run_expired(200.0, 60.0, 90):
+        bad.append("宽限期外仍不结案 ⇒ NO_RUN 永不报警（run 一直不出现时静默）")
+    print("CI-WATCH-SELFTEST-%s（%d 态判定 + NO_RUN 宽限双向 + 恒红守卫）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(cases)))
     return 1 if bad else 0
 
