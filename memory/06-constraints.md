@@ -42,6 +42,12 @@
 - **行尾红线（r36）**：文本一律 `eol=lf`（`.gitattributes` 钉死），落仓库的文本**禁用 `Path.write_text` 文本模式**
   （Windows 实测把 `\n` 翻成 `\r\n`，一次写入即毁掉归一）⇒ 改 `write_bytes`；复验也要按字节读
   （`read_text` 的 universal newlines 会把 CR 读成 `\n`，正好掩盖该缺陷）。判据 `_test/eol_parity_check.py`
+- **远端可见面红线（r37）**：评委与公网看到的是**远端 main 文件树 + Release 资产 + 线上站点**；
+  本机 `.gitignore` 只挡「以后再 add」，**不会把已推上去的东西从远端拿掉** ⇒ 本机工件
+  （含 Key 的 `src/js/demo-config.js`、`_test/cors_probe.py`、`server/data/*.mv.db`、`*.jar`）
+  出现在远端树即事故。判据 `_test/remote_tree_audit.py`（扫 origin 默认分支，实测 230 blob 零命中；
+  空树或 `truncated=true` 判未验不判绿）。⚠️ 本仓名带 `private-archive` 而 visibility 实测为
+  **PUBLIC** ⇒ 禁止按「私有」假设放松上传。
 - **二进制红线（r36）**：png/jpg/mp4/pdf/jar/db 等按 `.gitattributes` 显式 `binary` 声明，
   新增二进制扩展名须先登记 —— r36 首轮归一曾剥掉 20 个二进制里的 `0D0A`（PNG/MP4 少 1–2 字节），
   由 `git show HEAD:` 全量还原；该形状现由判据 E3 盯住

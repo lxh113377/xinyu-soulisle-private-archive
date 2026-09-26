@@ -2,7 +2,7 @@
  "repos": {
   "lobehub/lobehub": {
    "stars": 82834,
-   "open_issues": 950,
+   "open_issues": 947,
    "pushed_days": 0,
    "rel_90d": 92,
    "rel_last_days": 0,
@@ -10,6 +10,9 @@
    "issue_closed_days": 0,
    "contributors": ">=100",
    "one_click": "Dockerfile",
+   "one_click_paths": [
+    "./Dockerfile"
+   ],
    "gov": "security,license,docs-dir,changelog"
   },
   "SillyTavern/SillyTavern": {
@@ -21,7 +24,11 @@
    "rel_assets": 0,
    "issue_closed_days": 9,
    "contributors": ">=100",
-   "one_click": "Dockerfile",
+   "one_click": "Dockerfile,compose",
+   "one_click_paths": [
+    "./Dockerfile",
+    "docker/docker-compose.yml"
+   ],
    "gov": "security,license"
   },
   "Open-LLM-VTuber/Open-LLM-VTuber": {
@@ -34,6 +41,7 @@
    "issue_closed_days": 115,
    "contributors": 27,
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "license"
   },
   "morettt/my-neuro": {
@@ -46,6 +54,7 @@
    "issue_closed_days": "NA(无真issue)",
    "contributors": 25,
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "license,docs-dir"
   },
   "letta-ai/letta": {
@@ -58,6 +67,7 @@
    "issue_closed_days": 0,
    "contributors": ">=100",
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "security,license"
   },
   "hello-diana/MASCOT": {
@@ -70,6 +80,7 @@
    "issue_closed_days": 31,
    "contributors": 1,
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "license"
   },
   "ddxfish/sapphire": {
@@ -82,6 +93,10 @@
    "issue_closed_days": 33,
    "contributors": 4,
    "one_click": "compose,Dockerfile",
+   "one_click_paths": [
+    "./docker-compose.yml",
+    "./Dockerfile"
+   ],
    "gov": "license,docs-dir"
   },
   "v2rockets/Loyal-Elephie": {
@@ -94,6 +109,7 @@
    "issue_closed_days": 675,
    "contributors": 2,
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "license"
   },
   "Rogendo/Mental-health-Chatbot": {
@@ -106,6 +122,7 @@
    "issue_closed_days": 20,
    "contributors": 3,
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "none"
   },
   "Lum1104/MER-Factory": {
@@ -118,6 +135,7 @@
    "issue_closed_days": 167,
    "contributors": 3,
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "license,docs-dir"
   },
   "CheaperjamRen/leemo": {
@@ -130,6 +148,7 @@
    "issue_closed_days": "NA(无真issue)",
    "contributors": 1,
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "security,license,docs-dir"
   },
   "NJX-njx/opensoul": {
@@ -142,6 +161,10 @@
    "issue_closed_days": 201,
    "contributors": 7,
    "one_click": "compose,Dockerfile",
+   "one_click_paths": [
+    "./docker-compose.yml",
+    "./Dockerfile"
+   ],
    "gov": "dependabot,security,license,docs-dir,changelog"
   },
   "s-nagaev/chibi": {
@@ -154,6 +177,9 @@
    "issue_closed_days": "NA(无真issue)",
    "contributors": 3,
    "one_click": "Dockerfile",
+   "one_click_paths": [
+    "./Dockerfile"
+   ],
    "gov": "license,docs-dir"
   },
   "29-Cu/succhia": {
@@ -166,6 +192,7 @@
    "issue_closed_days": "NA(无真issue)",
    "contributors": 1,
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "license"
   },
   "zeroa234/ryza-ai-revive": {
@@ -178,6 +205,7 @@
    "issue_closed_days": 4,
    "contributors": 3,
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "security,license,docs-dir"
   },
   "Bwcx-songyu/MoodChat": {
@@ -190,6 +218,7 @@
    "issue_closed_days": "NA(无真issue)",
    "contributors": 1,
    "one_click": "none",
+   "one_click_paths": [],
    "gov": "none"
   }
  },

@@ -26,6 +26,8 @@
       复算 `grep -rn "本机开场白" src/js/ deploy/xinyu/js/` 命中 >0。
 - [x] **只读离线壳**（r28）：`src/sw.js` + `_test/offline_shell_check.py`（A1–A10 / R1–R9，14 项 + 13 类反例），
       公网真断网仍可演；`/api/**` 与含密钥件永不落缓存。
+- [x] **可下载交付物（r37）**：首个 GitHub Release `v1.4.1` = fat jar 28,438,588B（内嵌 1.4.1、
+      0 前端文件、0 密钥形态）+ 零密钥前端包 249,409B/23 文件；远端实测非草稿、2 资产。
 - [x] **行尾与工作树字节确定性（r36）**：`.gitattributes` 钉 `* text=auto eol=lf` + 显式 binary 名单，
       108 文本文件 renormalize（内容零改动，由 `git diff --name-only` == `--ignore-cr-at-eol --name-only` 证明）；
       常驻判据 `_test/eol_parity_check.py`（E1–E4 + 8 类自证）。公网已按 LF 版重部署，

@@ -7,6 +7,36 @@
 
 ## [1.4.1] - 2026-09-26 — 对标轮 r37：交付可得性（本仓首个 GitHub Release）+ 依赖队列清空
 
+### Added（r37）
+- **首个可下载交付物**：GitHub Release `v1.4.1`（远端实测 `isDraft=false`，2 个资产）
+  - `soulisle-server-1.4.1.jar` 28,438,588 B —— 内嵌 `version=1.4.1`、含 **0** 个前端文件
+    （静态页按 `file:` 直读，不入 jar）、**0** 处密钥形态、`mybatis-plus-core-3.5.17.jar` 在册
+  - `xinyu-web-1.4.1.zip` 249,409 B / 23 文件 —— 零密钥前端包，逐文件扫 `sk-` 形态 0 命中
+  - ⚠️ 过程坑（已入 05 排障口径）：jar 被 8123 运行中的进程锁住 ⇒ `mvn package` 的 `repackage`
+    无法改名 `.jar.original` 而失败，且**旧 jar 已被截成 48,907 B** —— 差点把半成品当 28MB 产物上传。
+    教训：**发版类判据必须先验"产物完整"（尺寸/内嵌版本/内容清单），不能只看命令 exit 0**。
+- **常驻判据 `_test/remote_tree_audit.py`**（两条套件，电池 43 → **45**）：扫 **origin 默认分支的文件树**
+  而非本机 `git ls-files`。动因是本轮实测到两件事叠加：仓库名叫 `private-archive` 而 visibility 实为
+  **PUBLIC**，而 `.gitignore` 只挡"以后再 add"、**不会把已推上去的东西从远端拿掉** ⇒
+  "本机 ignore 到位"与"评委看到的树干净"是两个命题。deny-list 7 条 / 放行 2 条
+  （`.env.example` 与零密钥 `deploy/xinyu/js/demo-config.js` 不得误伤）、空树或 `truncated=true` ⇒ rc=2
+  不判绿。实测远端 **230 个 blob 零命中**。自证被自己的**假反例**打回一次（样本 `public/x.png`
+  本不在禁用面）⇒ 换成 `_test/_shots/lit_single.png` 才是真命中。
+- **对标新观测面探针 `_test/peer_hygiene_probe.py`**（人工轮次工具，不入电池：16 仓 × ~20 次 API 太贵）：
+  发布可得性 / 维护响应 / 工程治理，分母 `import` 自台账 `PEERS`（不另立清单），每字段独立取数、
+  失败记 `NA(原因)` 并计入 unverified。第一版只查根目录 ⇒ 把 self 判成"一键起=none"而
+  `server/Dockerfile` 实际存在 ⇒ 改为对所有仓统一探 `"" / server/ / docker/ / deploy/` 并打印命中路径。
+
+### Fixed（r37）
+- **依赖队列清空 3/4**：#4 mybatis-plus `3.5.7→3.5.17`、#1 `actions/checkout 4→7`、
+  #3 `actions/setup-python 5→7` 合并（三次 push 的 CI 逐项 success）。#3 与 #1 同改 `ci.yml` 冲突 ⇒
+  用 `@dependabot rebase` 让工具自己 rebase 后再合，不在他人分支上手解冲突。
+  **#2 Spring Boot `3.2.5→4.1.1` 判为截止前不合并**（主版本语义变更 + v2 后端非演示主路径 ⇒ 收益≈0 风险实），
+  登记为赛后项并写明重评触发条件。
+- **版本三源对账当场拦住中间态**：pom 改 1.4.1 而 tag 尚未打时 G12 如实判红
+  「发版链断在中间」⇒ 提交 + `git tag v1.4.1` + `git push origin main refs/tags/v1.4.1`（单事务推两 ref
+  避免"CI 先跑、tag 后到"的竞态）后转绿。**这是判据按设计工作，不是故障**。
+
 ### Fixed（r36 · 对标轮 2026-09-26：行尾确定性 —— 让"逐字节/SHA256/字节预算"类主张在别人机器上也成立）
 - **工作树字节与机器无关**：`core.autocrlf=true` + `* text=auto` 下，工作树是 CRLF 而仓库 blob 是 LF ⇒
   本机"逐字节相等"的判断在他人 clone 上会**整体反向**。现钉 `.gitattributes`（`* text=auto eol=lf` +
