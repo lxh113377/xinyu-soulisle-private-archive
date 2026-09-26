@@ -38,10 +38,3 @@
 JS 侧 a11y lint 工具链（原生 ES Module 无构建链，为一条规则引整条工具链不成立）；
 axe 违规分档放行（12 单元只有 0/非 0 有意义）；覆盖率百分比（16 家公开数值 0 家，无分母）；
 i18n 框架化 / 插件市场 / 换 React / Spring Security / 多用户（维持 r41 判定）。
-
-## r42 收口阻塞（同 r41 复现，禁代处置）
-
-`handoff.py savepoint` 被噪声散射门禁拒：`handoff.py noise` 汇总实测
-`global_skills violation=0 / global_memory violation=0 / 焚诀 violation=15`
-⇒ 15 项全在**焚诀根**且是他人在途（`.trae/`、`bot-comparison.md`、`ci.html` 等根部意外项），
-本仓 0 违规。**不搬他人文件、不改 allowlist 求绿**，等该根自行收口后复跑。
