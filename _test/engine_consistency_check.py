@@ -18,6 +18,10 @@
   B 逐条预测：36 条评测集的 `{text, expect, pred}` 三元组**逐条**相等
     （只比汇总指标会漏掉「两条错误互相抵消」这类分叉）
   C 汇总指标：total / accuracy / crisis_recall / per_class / misses 相等
+  D **服务端危机短路契约**（r40b 补）：冻结集里 6 条危机样本逐条打 `/api/emotion`，
+    必须 `path == 词典·危机拦截` 且 `llm is null` 且 `final == crisis`。
+    为什么单列一层：AC-OBS-18 的"危机不经过后端"断言的是**前端**，本层断言的是**Java 侧**，
+    两个命题此前各自无守卫 ⇒ "危机短路"这件事在验收面上只写了一半（07 卷31 P2）。
 
 用法：
   ① 先起 Java 服务端在 8123（工作目录 = 项目根）
@@ -56,6 +60,52 @@ def java_side():
     lex = get_json(f"{BASE}/api/emotion/lexicon")
     ev = get_json(f"{BASE}/api/emotion/eval?detail=1")
     return lex, ev
+
+
+# ── D 层：服务端危机短路契约 ────────────────────────────────────────────────
+CRISIS_PATH_LABEL = "词典·危机拦截"   # 契约字面量，取证自 EmotionClassifier.java:55；
+# **故意不从 Java 源码里读**：读源码自比 = 该断言永真，改名不会被抓到（假判据）。
+# 代码侧改标签 ⇒ 本层判红，由人显式改这里并同时改 08 的 AC 文案。
+
+
+def post_emotion(text):
+    req = urllib.request.Request(
+        f"{BASE}/api/emotion",
+        data=json.dumps({"text": text}, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def crisis_samples():
+    """样本只取**已登记冻结集**（r40 实踩：自造句子可能是否定式、命中不了危机词表，
+    于是打到 LLM，量到的"性能"其实是网络）。取不到样本 = 分母为空，判红不判绿。"""
+    ds = json.loads((ROOT / "_test" / "emotion-eval-dataset.json").read_text("utf-8"))
+    return [x["text"] for x in ds.get("items", []) if x.get("expect") == "crisis"]
+
+
+def crisis_contract(probe=post_emotion):
+    texts = crisis_samples()
+    if not texts:
+        return ["D 层分母为空（冻结集里取不到 crisis 样本）⇒ 未验，不判绿"], 0
+    bad = []
+    for t in texts:
+        tag = f"text={t[:10]}…"
+        try:
+            j = probe(t)
+        except Exception as e:
+            bad.append(f"D 层取数失败 {tag}（{type(e).__name__}）⇒ 未验，不判绿")
+            continue
+        if not isinstance(j, dict) or not j:
+            bad.append(f"D 层响应为空 {tag} ⇒ 未验，不判绿")
+            continue
+        if j.get("path") != CRISIS_PATH_LABEL:
+            bad.append(f"D 层路径漂移 {tag}：path={j.get('path')!r} ≠ {CRISIS_PATH_LABEL!r}")
+        if j.get("llm") is not None:
+            bad.append(f"D 层危机样本打了 LLM {tag}：llm 非 null ⇒ 服务端短路失效")
+        if (j.get("final") or {}).get("emotion") != "crisis":
+            bad.append(f"D 层结论漂移 {tag}：final={j.get('final')!r}")
+    return bad, len(texts)
 
 
 def diff_words(a, b):
@@ -147,7 +197,22 @@ def main():
     summarize(js, lex_java, ev_java)
     ok, problems = compare(js, lex_java, ev_java)
 
+    # ── D 层（服务端危机短路）─────────────────────────────────
+    d_bad, d_n = crisis_contract()
+    problems.extend(d_bad)
+    print(f"=== D 层：服务端危机短路 ===\n  冻结危机样本 {d_n} 条 → path={CRISIS_PATH_LABEL} 且 llm=null："
+          + ("全部命中" if not d_bad else f"🔴 {len(d_bad)} 处异常"))
+
     if selftest:
+        fake = lambda t: {"path": "词典+LLM 融合", "llm": {"emotion": "sadness"},
+                          "final": {"emotion": "sadness"}}
+        fb, fn = crisis_contract(probe=fake)
+        print(f"【D 层自检】伪造「危机走了 LLM」×{fn} 条 → 抓到 {len(fb)} 条"
+              f"（每条须同时抓到 path/llm/final 漂移 = {fn * 3} 条）")
+        if len(fb) < fn * 3:
+            print("🔴 SELFTEST-FAIL：D 层漏报 ⇒ 这一层恒绿，真短路失效会被静默放过")
+            return 1
+
         if ok:
             print("🔴 SELFTEST-FAIL：注入分叉后判据仍报通过 ⇒ 判据无效（形同虚设）")
             return 1
@@ -156,8 +221,8 @@ def main():
             print("   ·", p)
         return 0
 
-    if ok:
-        print("✅ ENGINE-CONSISTENCY-PASS：JS 与 Java 两侧词表 + 逐条预测 + 汇总指标全等")
+    if not problems:
+        print("✅ ENGINE-CONSISTENCY-PASS：JS 与 Java 两侧词表 + 逐条预测 + 汇总指标全等 + D 层危机短路契约")
         return 0
 
     print(f"🔴 ENGINE-CONSISTENCY-FAIL：发现 {len(problems)} 处分叉")

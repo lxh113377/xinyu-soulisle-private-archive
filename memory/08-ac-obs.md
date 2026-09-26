@@ -38,6 +38,7 @@
 - [x] AC-OBS-20: 接口契约与实现不脱节（r21）→ `api_contract_check.py`：C1 控制器 11 条路由全部已文档化、C2 spec 无幽灵路径、C3 前端未偷调未文档化端点、C4 真实打 8 个端点状态码与必需键一致（含 `/api/chat`、`/api/emotion` 在线调用；探测会话 `contract-probe` 由 DELETE 自清）、C5 `--selftest` 四类合成篡改全抓到 | 测试输出 + API响应
 - [x] AC-OBS-21: 接口探测覆盖率不掺水（r22）→ C6 要求 `真实探测 + 显式豁免 == spec 操作总数`，C6b 要求当前**零豁免**；实测 11/11 真实打（含 3 条上一轮静默漏掉的 memory 读接口）；`--selftest` 第 5 类样本（抹掉一条标注）必须被 C6 抓到 | 测试输出 + API响应
 - [x] AC-OBS-22: 仓库配置与文档数字自洽（r22）→ `repo_config_check.py` G1–G5：dependabot ecosystem/目录可达、CI job 数==README 声称、契约被索引引用、电池条目数==README 声称、`--online` 默认分支可见；**判别力实证**：加 2 条套件未改 README 时 G4 当场报红（实测 28、声称 26），改后转绿 | 测试输出
+- [x] **AC-OBS-23（2026-09-26 r40b）**：危机短路在**两侧都**有显式契约（合围）→ 前端半边由 AC-OBS-18（W3/W3b：`attempted=0`）管，Java 半边新增 `engine_consistency_check.py` **D 层**：冻结集 6 条危机样本逐条打 `/api/emotion`，断言 `path=词典·危机拦截` + `llm=null` + `final=crisis`；实测 6/6 全中。**双向变异已证**：期望标签改成 `__mutated__` → 6/6 抓到；改回 → 0 命中；`--selftest` 另伪造「危机走了 LLM」的响应 ×6 ⇒ 抓到 18 条 | 测试输出 + API响应
 - [x] AC-OBS-17: 情绪识别可切后端且降级不伪装（r20）→ `emotion_wiring_check.py` 9 项：W4 实测 `stats.ok≥1` 且气泡标「情绪:后端」；W5 拦掉 `/api/emotion` 即 `isDown()=True`、回复照常、**不出现**后端标注；W6 同句双端词典结论相同 | 测试输出
 - [x] AC-OBS-18: 危机拦截不因后端化而延迟（r20）→ W3 源码级判据（`lex.crisis` 分支先于 `fetchEmotion(text)`）+ W3b 实测 `crisisShortCircuit≥1 且 attempted=0`（后端一次都没被调） | 测试输出 + API响应
 - [x] AC-OBS-19: 首屏第三方库可溯源（r20）→ `vendor-manifest.json` 声明版本/sha256，`vendor_freshness_check.py` V1 完整性 V2 从文件内容解析版本对账（正则零命中即红）V3 新库漏登记即红；`--selftest` 4 类篡改全抓到 | 测试输出
