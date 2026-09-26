@@ -12,6 +12,10 @@ VERDICT_RE = re.compile(r"(?:PASS|FAIL|CLEAN|UNVERIFIED|OK)\b")
 SUITES = [
     # 前置探针放第一条：r35 实测 jar 中途掉线一次报 5 条红，逐条归因花了三轮命令。
     ("preflight", [sys.executable, "_test/server_preflight.py"]),
+    # r40：性能面从"未实测"变成有数有棘轮。阈值按本机三轮实测 p95 放宽 ~16-25 倍，
+    # 只防塌方级退化（直读变落库 / 线程池打满 / 危机路径开始打 LLM），不防抖动 ⇒ 才有资格进阻断链。
+    ("perf_baseline", [sys.executable, "_test/perf_baseline_check.py", BASE]),
+    ("perf_baseline_selftest", [sys.executable, "_test/perf_baseline_check.py", "--selftest"]),
     ("deploy_sync", [sys.executable, "_test/deploy_sync_check.py"]),
     # r36：行尾确定性 —— 让「逐字节 / SHA256 / 字节预算」类主张在他人 clone 上也成立
     ("eol_parity", [sys.executable, "_test/eol_parity_check.py"]),
