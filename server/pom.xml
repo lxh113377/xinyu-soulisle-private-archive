@@ -46,6 +46,15 @@
       <artifactId>mysql-connector-j</artifactId>
       <scope>runtime</scope>
     </dependency>
+
+    <!-- r41 补齐决策 #1 第②条（"强类型 + 可单测"）：此前 server/src 下 JUnit 用例数实测为 0，
+         那句话从 2026-09-20 挂到 2026-09-27 没有产物支撑。用 starter 而非手挑 junit/assertj，
+         与既有"优先用现成件"口径一致；test scope 不进 fat jar（repackage 排除 test 域）。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -54,6 +63,16 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!-- 词表 SSOT 默认按 ./src/ 解析，而 surefire 的 user.dir 默认是 server/
+               ⇒ 不改这一条，构建期内所有加载词表的用例都会因路径不成立而红。
+               指到仓库根等于把"启动工作目录必须是项目根"这条运行期铁律也在构建期钉住。 -->
+          <workingDirectory>${project.basedir}/..</workingDirectory>
+        </configuration>
       </plugin>
     </plugins>
   </build>

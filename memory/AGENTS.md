@@ -26,7 +26,7 @@
 - **Java 构建环境（2026-09-21 实测，禁凭记忆猜路径）**：JDK 17 = `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot`；Maven = `%USERPROFILE%\.local\maven\apache-maven-3.9.9\bin\mvn`（不在 PATH）。⚠️ **默认 `JAVA_HOME` 是 JDK 8，每次构建/启动前必须显式切换**，否则 Spring Boot 3 编译失败
 - **静态页托管红线**：服务端直读 `src/`（`static-locations=file:${XINYU_WEB_ROOT:./src/}`），**禁止**把前端复制进 `src/main/resources/static/`（会造出第三处副本同步点）
 - **评测集红线（J3）**：`GET /api/emotion/eval` 从 `_test/emotion-eval-dataset.json` **直读权威源**（`XINYU_EVAL_DATASET` 可覆盖），**禁止**把评测集复制进 jar/资源目录
-- **🔴 词表一致性红线（J3，2026-09-22 立）**：情绪引擎在 JS / Java **各有一份**（本地那份是**离线降级**用的，不可删）。**改任一端的词表，必须两端同步改，并跑 `python _test/engine_consistency_check.py`**（三层判据：词表结构含重复项与顺序 / **逐条预测 73 条**（2026-09-23 由 36 扩至 73）/ 汇总指标）—— **不一致即失败**，禁止只看 `emotion_eval.js` 单侧通过就提交
+- **🔴 词表一致性红线（J3，2026-09-22 立 / 2026-09-27 r41 更正）**：~~情绪引擎在 JS / Java **各有一份**（本地那份是**离线降级**用的，不可删）。**改任一端的词表，必须两端同步改**~~ ⇒ **更正：词表自 J6（2026-09-23）起已是单一真相源** `src/data/emotion-lexicon.js`，JS 与 Java **各自加载同一文件**（`EmotionLexicon.java` 内零硬编码词表、加载失败 fail-fast 不回落）⇒ 「两端各抄一份词表」这条已不成立，改词表**只改一处**。仍然成立的部分：两份**算法实现**在（离线降级要的那份不可删），所以 `python _test/engine_consistency_check.py` 照跑（三层判据：词表结构含重复项与顺序 / **逐条预测 73 条**（2026-09-23 由 36 扩至 73）/ 汇总指标）—— 它现在验的是「两端加载器对同一数据解析一致」，**不一致即失败**，禁止只看 `emotion_eval.js` 单侧通过就提交
 - **J4 开关（2026-09-23 校正：此前只写「默认关闭」，与磁盘实况不符）**：分三层，**不得混为一谈**
   1. **代码层**（`src/js/memory-store.js`）—— 判定仍是 `cfg.remote === true` 才发远端请求，**默认关闭**；服务端不可达即熔断（404/网络失败 → `remoteDown`，本会话不再重试），本地 `localStorage` 照常写入
   2. **本地演示预置层**（`src/js/demo-config.js`）—— 已置 **`remote: true`** ⇒ **本地 / fat jar 演示默认开启**服务端持久化（"跨设备、清缓存都不丢"成立）
@@ -67,4 +67,4 @@
 | `upgrade_footer_gate.py` 回 `[GATE:evolution-fail]`：`改法超 40 字` / `块内存在非法行` / `未找到 footer 锚点块` | footer 文法是**精确正则**：块须 `<!-- footer:begin session=… ts=… -->` … `<!-- footer:end -->`；`[升级建议]` 五段顺序固定、**括号内不得含 `)`**、`改法 ≤40 字`；`[记忆预检]` 只允许 `lessons=\| 工具=\| 说明=` 三字段且**单行、说明 ≤40 字** | 照 `A-memory-start/references/reply_footer.md §1` 填；填完必用 `--file <本次卷>` 复跑一次，**断言回执里的 source 是自己那块**（否则那个 pass 可能是别人的块给的） |
 | push 完就收工、CI 结果靠下一轮想起来再查 | 49/51/52 条判据里有一批只在 CI 才判得动（Linux runner、浅克隆无 tag 走 ls-remote 分支），本地全绿不等于受理面全绿 | **推送一律走 `bash _test/push_and_watch.sh`**：push → 轮询该 sha 的 run → 逐 job 点名 → `--log-failed` 末 40 行 + 四条下一步指令；退出码 0 绿 / 1 红 / 2 未验证（无 run、超时、gh 不可用都不算过） |
 | `python - <<'PY'` 打完补丁后目标文件 `SyntaxError: unterminated string literal` | 内联脚本的 replacement 含 `\\n` 时被多层解释把**转义落成真实换行**插进字符串字面量（本仓第 10 次遇到"内联/heredoc 吞反斜杠"族） | 含转义序列的文本改动**一律走 Edit 工具**；必须内联时把待插入内容写成单行字面量或 `chr(10).join([...])` |
-
+| Java 源文件里字符串字面量**内部**再放一对引号就出事（r41 实测两种形态：`"第 " + i + " 个分量不等"` 落盘后少掉一个 `"`；`@DisplayName("…「顺手去重」…")` 写成全角引号后被归一成 ASCII `"`）⇒ javac 报「未结束的字符串文字」并连带下一行「需要 ;」 | 写文件路径会对**字面量内部**的引号做规范化或吞字符，与 heredoc 吞反斜杠同族但换了个咬合点 | 字面量内**不放**第二对引号（要引用短语用「」且只在注释里用）；新建含中文的源文件后先跑「逐行 ASCII 引号数奇偶」扫描再 javac（本仓当场抓出 2 处，两处都在真正式跑之前） |

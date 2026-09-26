@@ -80,10 +80,32 @@ def selftest():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--file", default="")
+    ap.add_argument("--all", action="store_true",
+                    help="扫 交付物/对标分析报告-*.md 全集（分母从目录现读，不手抄清单）")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
+    if a.all:
+        # 为什么要有这条：判据原先钉死单个文件名，出新报告后**它扫的还是上一份**
+        # ⇒ "报告都有取证"这句话对新产物不成立（r41 发现自己踩的正是这一族）。
+        base = Path(__file__).resolve().parents[1] / "交付物"
+        files = sorted(base.glob("对标分析报告-*.md"))
+        if not files:
+            print("DISCLAIMER-UNVERIFIED: 目录里没有对标报告 ⇒ 空分母不判绿")
+            return 2
+        bad, rows = [], []
+        for f in files:
+            hits = scan_file(f)
+            rows.append((f.name, len(hits)))
+            for no, word, text in hits:
+                bad.append("%s:%d [%s] %s" % (f.name, no, word, text))
+        for line in bad:
+            print("  " + line)
+        detail = "、".join("%s=%d" % r for r in rows)
+        print("DISCLAIMER-%s: 报告 %d 份（分母从目录现读），缺取证 %d 处｜%s"
+              % ("CLEAN" if not bad else "FAIL", len(files), len(bad), detail))
+        return 0 if not bad else 1
     p = Path(a.file) if a.file else None
     if p is None or not p.is_file():
         print("DISCLAIMER-UNVERIFIED: 未指定可读文件（不得把「没读到」印成通过）")

@@ -5,10 +5,12 @@
 
 
 ```powershell
-python _test/run_all_suites.py           # ★ 全量电池（47 套件逐条直取 rc，聚合不掩盖单项失败）
+python _test/run_all_suites.py           # ★ 全量电池（58 套件逐条直取 rc，聚合不掩盖单项失败）
 python _test/browser_check.py            # 离线降级 / 双色 / 滚动淡入淡出，输出 ALL-ASSERT-PASS
 python _test/deploy_sync_check.py        # src → deploy/xinyu 三类比对（MISSING/DIFF/EXTRA 归零）
 python _test/engine_consistency_check.py # JS 引擎 ↔ Java 引擎逐项对账（词表结构级）
+python _test/java_test_guard.py          # r41 in-build 单测资产守卫：用例数下限 + pom 依赖在位 + CI 构建步未跳测（T4）
+python _test/peer_test_asset_probe.py --selftest   # 对标测试资产面的匹配器自证（16 仓反例：依赖目录/包标记不算用例）
 python _test/emotion_wiring_check.py     # 情绪后端化接线：接线顺序/公网零开关/危机短路/熔断回落/双端一致（9 项 + --selftest）
 python _test/strategy_check.py           # 共情策略表 ↔ 词表成对性（--selftest 注入分叉证判据非恒真）
 node _test/emotion_eval.js               # 前端情绪评测集复跑

@@ -232,8 +232,13 @@
 
 - **结论**：**按原定方向继续用 Java**，不返工。
   - 支持 Java 的三条真实理由：① 产物干净（fat jar，无需 venv 管理）② 强类型 + 可单测（36 条评测可做成 JUnit，比跑 node 脚本正规）③ 部署不受平台风控挟制（⚠️ 此条与语言无关，Python 容器化同样能做到）
+    ⚠️ **第②条曾长期是空头主张（r41 实测更正，2026-09-27）**：从 09-20 立此理由到 09-26，`server/src` 下 JUnit 用例数 = **0**、
+    `pom.xml` 连 junit 依赖都没有 ⇒ 「可单测」是**能力声称**而非**产物**。现已补齐：4 个测试类 / 30 个用例
+    （`EmotionLexiconTest`·`EmotionEngineTest`·`EmotionClassifierTest`·`SafetyGuardTest`），并由常驻判据
+    `_test/java_test_guard.py` 盯住三件事：用例数下限、`pom` 里 starter-test 在位、**CI 的 java-build 构建步不得带 `-DskipTests`**
+    （否则这个门禁会在受理面上静默消失，而本地看到的仍是「CI 全绿」）。复算：`mvn -B -f server/pom.xml test`。
   - **诚实复核（2026-09-22 老大追问后新增）**：本项目真正需要的只有「1 个 LLM 代理 + 2 张表 + 1 个词典引擎」。**若从零重做，本作品会选 Python**（开发量小一个量级，且 AI 生态是主场）。选 Java 属于「方向先定、已投入且验收通过」的路径依赖，**返工成本 > 收益**。
-- **已知代价**：① 两套后端并行维护（v1 Serverless 保留为降级路径）② 情绪引擎出现**两份真相**（JS + Java）③ 代码量约为 Python 方案的数倍。
+- **已知代价**：① 两套后端并行维护（v1 Serverless 保留为降级路径）② ~~情绪引擎出现**两份真相**（JS + Java）~~ **已于 J6 消除（更正注 2026-09-27 补）**：词表自 2026-09-23 起是**单一真相源** `src/data/emotion-lexicon.js`，JS 与 Java 各自**加载同一文件**（`EmotionLexicon` 里零硬编码词表，加载失败 fail-fast 不回落）⇒ 分叉在结构上不可能；两份**实现**（算法）仍在，那是离线降级要求的，不是真相副本 ③ 代码量约为 Python 方案的数倍。
 - **重评触发条件**（命中即重新评估，届时按「Python 侧服务 + Java HTTP 调用」演进，**不要用 Java 硬啃 AI 生态**）：
   - 需要本地情绪模型 / Embedding / 向量检索 / RAG 记忆 / 模型微调
   - 需要引入 Python 专属 NLP 生态（jieba、snownlp、transformers）
