@@ -33,6 +33,7 @@
 
   G11 依赖清单对账：判据脚本 import 的第三方包 == `_test/requirements.txt`，且每个跑判据的 CI job 都装了它
   G12 版本断言三源对账：`git tag` 最大值 == `server/pom.xml` <version> == 文档「当前版本：**vX.Y.Z**」
+  G15 AC 追溯键唯一性棘轮：08 一个 id 只挂一条命题（存量 7 按基线放行，新增重复即红）
   G13 判据账本自洽：本文件头部登记的 G 清单与 `main()` 里实际执行的 check("G..") 一一对应
      —— 漏登记与幽灵登记都判红（这条由 G13 自己盯着自己，根因见 guard_inventory 的 docstring）
 
@@ -466,6 +467,37 @@ def latest_tag():
     return remote
 
 
+AC_DUP_BASELINE = 7   # r40b 实测存量：08 里 13/14/15/16/17/18/19 各挂了 2 条命题
+_AC_DEF = re.compile(r"- \[.\] (?:\*\*)?AC-OBS-(\d+)")
+
+
+def ac_id_audit(ac_text):
+    """G15 纯函数：`08-ac-obs.md` 的 AC id 是验收面追溯键，一个 id 只能挂一条命题。
+
+    立此条的实证（r40b 加 AC-OBS-23 时顺手数了一遍 id）：30 条定义只用掉 23 个 id，
+    `AC-OBS-13/14/15/16/17/18/19` **每个都挂了两条互不相干的命题**——
+    例如 AC-OBS-19 既写"首屏第三方库可溯源"（r20）又写"容器镜像真构建真运行"（2026-09-23）。
+    `flow --verify-ac` 的实跑回显里同一个 id 出现两次，且它把整套报成"24 条 AC"
+    ⇒ 重复的后果不是难看，是**一条判红不知道该勾哪一行 + AC 计数失真**。
+
+    分级：存量 7 个 id 已脏，重编号会牵动 README/07/CHANGELOG 的交叉引用（另事，已登记 07 待办）。
+    本判据**只钉增量**（棘轮只降不升）：新出现的重复当场红，存量按基线放行并写明来源。
+    """
+    ids = [m.group(1) for ln in ac_text.splitlines() if ln.startswith("- [")
+           for m in [_AC_DEF.match(ln)] if m]
+    if not ids:
+        return ["G15 零命中：08 解析不到任何 AC 定义 ⇒ 读空气，不得判绿"]
+    counts = {}
+    for i in ids:
+        counts[i] = counts.get(i, 0) + 1
+    dup = {i: c for i, c in counts.items() if c > 1}
+    extra = sum(c - 1 for c in dup.values())
+    if extra > AC_DUP_BASELINE:
+        return [f"G15 AC id 重复增量：额外 {extra} 条 > 基线 {AC_DUP_BASELINE}"
+                f"（重复 id={sorted(dup, key=int)}）⇒ 同一追溯键挂了多条命题"]
+    return []
+
+
 def guard_inventory(header_text, source_text):
     """G13 纯函数：`main()` 里真正执行的每条 G 判据，必须在本文件头部的判据清单里有一行说明。
 
@@ -613,6 +645,14 @@ def selftest():
         bad.append("篡改⑯c（空输入/无 tag）没返回空串 ⇒ 会拿垃圾当版本")
     if pick_latest_tag("v1.10.0\nv1.9.0\n") != "v1.10.0":
         bad.append("篡改⑯d（两位数minor）按字典序排 ⇒ 1.9 被判大于 1.10")
+    # ⑱ G15 AC 追溯键：真文件须放行 / 多造一条重复须红 / 零定义须红
+    real_ac = _read("memory/08-ac-obs.md")
+    if ac_id_audit(real_ac):
+        bad.append(f"篡改⑱a（真实 08 应按基线放行）被判红：{ac_id_audit(real_ac)}")
+    if not ac_id_audit(real_ac + "\n- [x] AC-OBS-23: 又一条命题挂着同一个 id\n"):
+        bad.append("篡改⑱b（新增一条 id 重复）未被 G15 抓到 ⇒ 棘轮失效")
+    if not ac_id_audit("# 标题\n没有定义行\n"):
+        bad.append("篡改⑱c（零定义）被判绿 ⇒ 读空气")
     # ⑰ G14 对标仓数：正向（一致）必须零问题，三种负向必须各自报红
     ok_line = "python _test/benchmark_metrics.py  # 对标源数据台账（16 仓指标 + …）"
     if peer_count_audit(ok_line, 16):
@@ -680,6 +720,11 @@ def main():
     g14bad = peer_count_audit(claim_text, ledger_peer_count())
     check("G14 对标仓数断言 == 台账权威值（README 现行状态句）", not g14bad,
           f"台账 peers_expected={ledger_peer_count()} | " + (" ; ".join(g14bad) or "README 断言与台账一致"))
+    ac_text = _read("memory/08-ac-obs.md")
+    acbad = ac_id_audit(ac_text)
+    check("G15 AC 追溯键唯一性棘轮（08 一个 id 一条命题，存量基线 %d）" % AC_DUP_BASELINE,
+          not acbad, acbad and " ; ".join(acbad)
+          or "无新增重复（存量 7 条按基线放行，重编号另登 07 待办）")
     g13bad = guard_inventory(HEADER_DOC, Path(__file__).read_text("utf-8", errors="replace"))
     check("G13 判据账本自洽（头部登记 == main() 实际执行，漏登/幽灵登都红）", not g13bad,
           " ; ".join(g13bad))
