@@ -21,6 +21,8 @@ SUITES = [
     ("disclaimer_forensics", [sys.executable, "_test/disclaimer_forensics_lint.py", "--file",
                               "交付物/对标分析报告-2026-09-26.md"]),
     ("disclaimer_forensics_selftest", [sys.executable, "_test/disclaimer_forensics_lint.py", "--selftest"]),
+    # r40c：push 后的 CI 看守。只把**纯判定桩**接进阻断链（真跑要联网查 gh，不属回归面）。
+    ("ci_watch_selftest", [sys.executable, "_test/ci_watch.py", "--selftest"]),
     ("deploy_sync", [sys.executable, "_test/deploy_sync_check.py"]),
     # r36：行尾确定性 —— 让「逐字节 / SHA256 / 字节预算」类主张在他人 clone 上也成立
     ("eol_parity", [sys.executable, "_test/eol_parity_check.py"]),

@@ -5,6 +5,22 @@
 
 ## [Unreleased]
 
+### Added（r40c · 用户回传四条未闭环建议 → 全部落条 + push 后 CI 看守）
+- **`_test/disclaimer_forensics_lint.py`（套件 +2）**：报告里 `不可比 / 无可比口径 / 受限于 / 仅保证 / 无法做到`
+  类边界结论必须同句带实证标记（实测 · 逐文件 · 命令 · run 号 · 计数+单位 · sha/CRC），拿不出就改写成
+  `未实测 + 取证路径`；`未实测`/`❌` 属诚实缺口，**不在拦截面**。8 类桩 + 恒绿守卫；
+  **首跑就在自己报告里点名一处 r35 遗留**（§3.3 性能句），补上取证指向 §14.1 后才转绿；
+  还自抓判据自身缺陷：`口径` 同时在被拦词表与白名单 ⇒ 句子会自己洗白，已移除。规则侧落 consulting-analysis V1.16.0（M5⑫）。
+- **`_test/ci_watch.py` + `_test/push_and_watch.sh`（套件 +1：纯判定桩 6 态）**：把"push 后查 CI"从人脑挪到脚本——
+  等结论 → 逐 job 点名 → `--log-failed` 抓失败面末 40 行 → 印四条下一步指令。
+  退出码沿用电池约定：0 绿 / 1 红 / **2 未验证（无 run、超时、gh 不可用一律不当通过）**。
+  实测 `CI-WATCH-GREEN | a6c4dc1d`；Trae 侧 IDE hook 需本机配置（无既定 schema，不猜格式），
+  现以 `bash _test/push_and_watch.sh` 为强制收尾步（已写进 `memory/AGENTS.md` 推送纪律）。
+- 其余三处规则落条：A-skill-manager **1.8.0**（铁律10 补"回落只读通道也要留实测证据"，
+  反例＝只读门禁的 pass 其实是别人的合规）、cross-platform-agent-sync **1.5.0**
+  （共写文件暂存面归属核对：numstat 只防多行裹挟，**同行覆盖时读数与自己一致、完全看不出**，夹具实测）、
+  GM `scripts/secret_scan.py`（两类假阳性根除，selftest 5→9，`--all` 699 文件 0 命中）。
+
 ### Added（r40b · 判据可观测性 + 危机短路两侧合围）
 - **G15 进 `repo_config_check.py`：AC 追溯键唯一性棘轮**（新增待办见 `07` 卷32）。
   起因是给自己加的 AC-OBS-23 顺手数了遍 id，实测 08 有 **30 条定义只用 23 个 id**——
