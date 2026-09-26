@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: 装判据第三方依赖（单一清单；漏装会让 job 以 rc=2 报"环境异常"，本地装了看不出来）
@@ -73,7 +73,7 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: 装判据第三方依赖（单一清单；漏装会让 job 以 rc=2 报"环境异常"，本地装了看不出来）
@@ -132,7 +132,7 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: 装判据第三方依赖（单一清单；漏装会让 job 以 rc=2 报"环境异常"，本地装了看不出来）
@@ -178,7 +178,7 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: 装判据第三方依赖（单一清单；漏装会让 job 以 rc=2 报"环境异常"，本地装了看不出来）
