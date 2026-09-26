@@ -378,17 +378,55 @@ def pom_version():
     return m.group(1).strip() if m else ""
 
 
-def latest_tag():
-    try:
-        out = subprocess.run(["git", "tag", "--sort=-v:refname"], capture_output=True,
-                             text=True, encoding="utf-8", timeout=30).stdout
-    except OSError:
+TAG_RE = re.compile(r"(?:refs/tags/)?(v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)(\^\{\})?$")
+
+
+def pick_latest_tag(output):
+    """纯函数：从 `git tag` 或 `git ls-remote --tags` 的输出里挑最大的版本 tag。
+
+    必须处理两种形态：① 一行一个 tag 名；② `<sha>\\trefs/tags/vX.Y.Z`（可带 `^{}` 剥离行）。
+    `^{}` 行不能当独立候选 —— 否则同一个 tag 会被数两次，且排序键不同。
+    """
+    cands = []
+    for line in output.splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        ref = parts[-1]                    # `git tag` 只有一列；ls-remote 是 `<sha>\trefs/tags/X`
+        if ref.endswith("^{}"):
+            continue
+        m = TAG_RE.match(ref)
+        if m:
+            cands.append(m.group(1))
+    if not cands:
         return ""
-    for line in out.splitlines():
-        line = line.strip()
-        if re.fullmatch(r"v?\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?", line):
-            return line
-    return ""
+    def key(t):
+        core = t.lstrip("v").split("-")[0]
+        return tuple(int(x) for x in core.split(".")[:3])
+    return sorted(cands, key=key)[-1]
+
+
+def latest_tag():
+    """tag 权威面：本地优先，本地取不到再读远端。
+
+    立此处的实测根因（r35）：CI 的 `actions/checkout@v4` 默认不拉旧 commit 上的 tag ⇒
+    本函数首版只跑 `git tag` 时在 CI 返回空，G12 判"读空气"红 ——
+    **判据自带"本机恒真 / CI 恒红"的环境假设**，正是我在报告 §2 里批评的那一族，自己又踩了一次。
+    """
+    def run(args):
+        try:
+            r = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", timeout=30)
+        except OSError:
+            return ""
+        return r.stdout if r.returncode == 0 else ""
+
+    local = pick_latest_tag(run(["git", "-C", str(ROOT), "tag", "--sort=-v:refname"]))
+    if local:
+        return local
+    remote = pick_latest_tag(run(["git", "-C", str(ROOT), "ls-remote", "--tags", "origin"]))
+    if remote:
+        print("  NOTE  G12 本地无 tag（浅克隆/CI 常态），已改读 `git ls-remote --tags origin`")
+    return remote
 
 
 def guard_inventory(header_text, source_text):
@@ -527,6 +565,17 @@ def selftest():
         bad.append("篡改⑮c（头部登记与实际执行两套账）未被 G13 抓到")
     if not guard_inventory("  G1 占位\n", 'print("没有判据")\n'):
         bad.append("篡改⑮d（零命中：解析不到任何 G）未被 G13 抓到 ⇒ 读空气被判绿")
+    # 篡改⑯：tag 解析必须对两种形态都成立（r35 实测 CI 浅克隆无本地 tag ⇒ G12 假红）
+    if pick_latest_tag("v1.3.0\nv1.4.0\n") != "v1.4.0":
+        bad.append("篡改⑯a（本地 `git tag` 两行形态）挑错版本")
+    lsremote = ("aaa refs/tags/v1.3.0\nbbb refs/tags/v1.3.0^{}\n"
+                "ccc refs/tags/v1.4.0\nddd refs/tags/v1.4.0^{}\n")
+    if pick_latest_tag(lsremote) != "v1.4.0":
+        bad.append("篡改⑯b（`ls-remote --tags` 含 ^{} 剥离行）挑错 ⇒ 未覆盖 CI 形态")
+    if pick_latest_tag("") != "" or pick_latest_tag("no tags\n") != "":
+        bad.append("篡改⑯c（空输入/无 tag）没返回空串 ⇒ 会拿垃圾当版本")
+    if pick_latest_tag("v1.10.0\nv1.9.0\n") != "v1.10.0":
+        bad.append("篡改⑯d（两位数minor）按字典序排 ⇒ 1.9 被判大于 1.10")
     real = sorted((ROOT / "_test").glob("*.py"))
     viol = [p.name for p in real if import_safety(p.read_text("utf-8", errors="replace"))]
     if viol:

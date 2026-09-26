@@ -22,10 +22,9 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
 - [x] ✅ **r35 05 追平完成**（原 r34 登记的自驱项）：`memory/05-feature-status.md` 新增「当前构建状态（r20–r35）」
       权威段（三态徽章 / 本机开场白标签 / 离线壳 / 演示视频代际），r20–r28 各轮残段逐字迁 `05…part10.md`。
       复算：`grep -c "在线 AI\|本机开场白\|演示视频" memory/05-feature-status.md` = 4，体积由 savepoint 量。
-- [ ] 🔴 **下一件（r35 登记，agent 可自驱）**：`settings_panel` 的 S3/S4/S5/S7b **CI 红本机绿**仍未定案归因
-      （已排除 demo-config 变量）。判据本轮已装好自归因面（完成态等待 + 报红附现场
-      `{open, returnValue, saveDone, domBase, cfg, ua}`）⇒ 下次 push 后
-      `gh run view <id> --log-failed | grep -A3 settings_panel` 读现场行定案，**禁止**照猜修法。
+- [x] ✅ **r35 `settings_panel` 四条 CI 红：修法有效已被受理面证实**（run `36219657886` 转绿）。
+      机制解释仍不完整（本机测不到"点完就读"的差异，CI 侧等完成态即绿）⇒ 只记"有效"不记"已解释"；
+      现场取证（`diag`）与两类反例长期保留，防复发。
 - [ ] 🟡 同件第二刀：Playwright 启 `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`，
       把 `voice` 的 "CI 无麦克风 ⇒ SKIP" 换成真断言（降级读永远比造环境弱）。
 - [ ] ⚠️ **r35 更正（原「只有老大能解：ENV_BLOCKED」按纪律保留 + 加更正注）**：Actions 账单/配额**已恢复**
