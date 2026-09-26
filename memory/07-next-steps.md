@@ -32,6 +32,7 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
       **四条 job 逐项 success**，`python _test/ci_status_check.py` ⇒ `CI-STATUS-PASS` rc=0。
       留痕的教训：这条红**换过原因却没换打印形态** ⇒ 电池收口行现拆 `RED(判红)` / `ENV-UNVERIFIED` /
       `CRASH` 三类（第三类是本轮被自己的 0xC0000409 崩溃逼出来的）。
+      本机侧同日复验：`--slice 0 21` ⇒ 21/21、`--slice 21 41` ⇒ 20/20 ⇒ **41 条全绿**。
 - [ ] **同族坑收口**：台账见 `part18`/`part20`（r30 增补=索引壳超限）；G9 常驻 `repo_config_check.py`。
 ## 分卷目录
 
