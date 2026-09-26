@@ -4,6 +4,19 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Added（r40d · 交付面九项覆盖机器化 + AGENTS.md 陈旧 P0 更正）
+- **`_test/plan_pdf_coverage_check.py`（两条套件，电池 52→54）**：把清单第 1 行「官方 9 项逐项齐全」
+  从人眼对照升级为常驻判据。九项**从 `应用方案大纲.md` 现读**（分母不手抄），页数由 pypdf 实数（20 ≤ 20），
+  匹配按「章节序号 + 词块重叠」—— 首版按整串相等把已在的两项报成缺失（大纲与 PDF 同义不同字，M5⑧ 同族）。
+  九向自证：误伤 1 / 漏报 4（删章、换无关标题、超页、缺项）/ 读空气 2（空文本层、空分母、取不到页数）
+  / **取数形状 2**：`extract_text` 首版用 `""` 连页，把每页首行的章节标题粘到上一行 ⇒ 九章全部"查无"，
+  判据差点把完好的 PDF 报成缺九章；改为 `
+` 连接并加"非锚定扫描"守卫（形状可疑只能 UNVERIFIED，不判缺也不判绿）。
+  依赖 pypdf 已登记 `_test/requirements.txt`（G11 会盯）。
+- **`AGENTS.md` 07 段三行陈旧 P0 就地更正**：它写「缺件风险=PDF」「PDF 起草冻结待解冻」「前端未切 /api/emotion」，
+  而 `memory/07-next-steps.md` 早已更正 —— 根因是 `handoff.py sync` 对本项目结构检测部分失效（08 已登记），
+  07 段是 **09-22 快照**。已在文中显式写明"读 P0 以 memory/07 为准"，避免下一个 agent 又照快照行动。
+
 
 ### Added（r40c · 用户回传四条未闭环建议 → 全部落条 + push 后 CI 看守）
 - **`_test/disclaimer_forensics_lint.py`（套件 +2）**：报告里 `不可比 / 无可比口径 / 受限于 / 仅保证 / 无法做到`

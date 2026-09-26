@@ -5,6 +5,7 @@
 # 与这份清单对账：新判据引入新依赖而未登记，CI 覆盖判据立刻报红。
 playwright
 PyYAML
+pypdf           # 由 plan_pdf_coverage_check 引入（读交付 PDF 的页码与文本层）
 Pillow          # 由 pixel_dual / lightshow 两条像素级判据引入（CI 整跑电池后必装）
 # 注：清单只覆盖「CI 真会执行的判据」的 import。如 demo_video_pipeline 需要 edge-tts，
 # 但它是本地重录工具、不在电池也不在 CI ⇒ 不进清单（否则 CI 白装依赖，G11 也会判幽灵依赖）。

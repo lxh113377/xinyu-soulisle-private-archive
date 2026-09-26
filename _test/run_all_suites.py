@@ -23,6 +23,9 @@ SUITES = [
     ("disclaimer_forensics_selftest", [sys.executable, "_test/disclaimer_forensics_lint.py", "--selftest"]),
     # r40c：push 后的 CI 看守。只把**纯判定桩**接进阻断链（真跑要联网查 gh，不属回归面）。
     ("ci_watch_selftest", [sys.executable, "_test/ci_watch.py", "--selftest"]),
+    # r40d：交付物 PDF 的「官方九项齐全」从人眼对照升级为机器断言（分母取自大纲，不手抄）。
+    ("plan_pdf_coverage", [sys.executable, "_test/plan_pdf_coverage_check.py"]),
+    ("plan_pdf_coverage_selftest", [sys.executable, "_test/plan_pdf_coverage_check.py", "--selftest"]),
     ("deploy_sync", [sys.executable, "_test/deploy_sync_check.py"]),
     # r36：行尾确定性 —— 让「逐字节 / SHA256 / 字节预算」类主张在他人 clone 上也成立
     ("eol_parity", [sys.executable, "_test/eol_parity_check.py"]),
