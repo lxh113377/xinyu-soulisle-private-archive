@@ -28,6 +28,8 @@
       公网真断网仍可演；`/api/**` 与含密钥件永不落缓存。
 - [x] **可下载交付物（r37）**：首个 GitHub Release `v1.4.1` = fat jar 28,438,588B（内嵌 1.4.1、
       0 前端文件、0 密钥形态）+ 零密钥前端包 249,409B/23 文件；远端实测非草稿、2 资产。
+- [x] **安全策略第二层（r38）**：`SafetyGuard` 输入侧护栏（8 类注入模式 + 4000 字截断），判定落响应头
+      `X-Xinyu-Safety`、响应体仍逐字透传；判据 `safety_guard_check` 双向实测（CI 无密钥下仍验 15 项）。
 - [x] **行尾与工作树字节确定性（r36）**：`.gitattributes` 钉 `* text=auto eol=lf` + 显式 binary 名单，
       108 文本文件 renormalize（内容零改动，由 `git diff --name-only` == `--ignore-cr-at-eol --name-only` 证明）；
       常驻判据 `_test/eol_parity_check.py`（E1–E4 + 8 类自证）。公网已按 LF 版重部署，

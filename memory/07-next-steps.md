@@ -13,7 +13,7 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
 
 - [ ] 🔴 [推荐:R35-03] **iCAN 提交硬截止 2026-09-30（剩 4 天；截止即锁团队信息）**：官网报名 + 提交。
       缺件只剩一项：**报名名单 PII（五人学号/手机号/邮箱 + 指导教师 ≤2 非成员 + 官网填报登录态）只有老大能给**。
-      PDF ✅（页数不抄数，复算：`powershell -File 交付物/提交包/render-pdf.ps1` 末行 `PAGES=` 须 ≤20）；
+      PDF ✅（复算：`powershell -File 交付物/提交包/render-pdf.ps1` 末行 `PAGES=` ≤20）；
       视频 ✅ **218.5s，r34 已再录含诚实标签画面**（非"待录"）。
       完整复核记录见 `part6`。
 - [ ] **J3/J4 变现** [推荐:R35-02]（= 让已建成能力真跑起来）：① 两端一致性守卫 ✅ ② 本地演示 `remote:true` ✅
@@ -28,12 +28,10 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
 - [x] ✅ **r35 受理面闭环**：四条 CI job 在 sha `7aac7d2` 上逐项 success（run `36220200506`），
       `ci_status_check.py` ⇒ `CI-STATUS-PASS`；电池收口行拆 `RED` / `ENV-UNVERIFIED` / `CRASH` 三类。
       原文（含"换过原因却没换打印形态"的教训与 41 条复验）迁 `part24`。
-- [x] ✅ **r36 行尾确定性 + 公网字节同源 + 电池入口 fail-closed**：`.gitattributes` 钉 `eol=lf` 与 binary 名单、
-      108 文本文件归一、常驻判据 `eol_parity`（实测 text=205/binary=20/total=225）、公网重部署后
-      `live=9288 == local=9288`（不再靠"仅行尾差异"兜底放行）、三处 `write_text` 改 `write_bytes`、
-      `--help`/未知开关由"静默跑全量"改 rc=2。本机 **43/43 全绿**（22/22 + 21/21 两段）。详见 `part24`。
-- [x] ✅ **r37 交付可得性**：首个 Release `v1.4.1`（jar + 零密钥前端包）+ dependabot 队列 3/4 已合
-      + 新判据 `remote_tree_audit`（电池 43→45）。详见 `part26`。
+- [x] ✅ **r36 行尾确定性 + 公网同源 + 电池 fail-closed**：钉 `eol=lf`、108 文件归一、判据 `eol_parity`、
+      公网重部署后逐字节相等、三处 `write_text`→`write_bytes`、未知开关 rc=2（本机 43/43）。见 `part24/25`。
+- [x] ✅ **r37 交付可得性**：首个 Release + 队列 3/4 + `remote_tree_audit`（45）。见 `part26`。
+- [x] ✅ **r38 安全层**：`SafetyGuard` + 行为判据（47）+ `build_jar`；Release `v1.4.3` → `part27`
 - [ ] **同族坑收口**：台账见 `part18`/`part20`（r30 增补=索引壳超限）；G9 常驻 `repo_config_check.py`。
 ## 分卷目录
 
@@ -42,5 +40,5 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
 - **卷8–16** `partN.md` — R199 自动拆卷（历次已完成条目）；含**卷11** = fat jar / 容器部署完整史（人工自卷6拆出）
 - **卷17–26** `partN.md` — 17 主线背景+J3/J4｜18 切分+八步+同族坑｜19 离线壳｜20 CI 三判据+成片｜
   21 技能治理链｜22 拆卷续卷｜23 r35 完成项｜24 r35 迁入全文+r36 归一与判据｜25 r36 续卷｜
-  **26 r37 交付可得性（首个 Release / 依赖队列 / 远端树判据）**
+  **26 r37 交付可得性**｜**27 r38 安全层与 CI 前置**
 

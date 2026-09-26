@@ -51,3 +51,7 @@ desktop.ini
 %SystemDrive%/
 # 回收站台账（治理基础设施，不入库）
 _trash/
+
+# 工具运行态（handoff savepoint 的心跳/快照与重复执行守卫），不入库：
+# 与 R269 同源纪律——活跃工具运行态文件走 .gitignore 豁免，不迁 _trash 也不提交
+memory/sessions/
