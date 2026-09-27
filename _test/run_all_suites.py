@@ -101,6 +101,28 @@ SUITES = [
     # 实测教训：org 级 dependabot 配置对仓内 tree 不可见（lobehub 开 30 PR 却无 dependabot.yml），
     # 而 search 端点受 secondary rate limit 影响会把 NA 塌缩成"0 家真跑过"的假结论（17/17 里含该反例）。
     ("community_probe_selftest", [sys.executable, "_test/peer_community_probe.py", "--selftest"]),
+    # r51：故障注入。把上游打挂（500/非JSON/断连/黑洞挂起）看界面说不说真话。
+    # 修前实测：徽章在四类故障下仍写「● 在线 AI」（气泡却写"大模型暂不可用"）；挂起型 60.6s 才兜底。
+    ("fault_injection", [sys.executable, "_test/fault_injection_check.py"]),
+    ("fault_injection_selftest", [sys.executable, "_test/fault_injection_check.py", "--selftest"]),
+    # r51：故障可见性对标的探针自证。边界写死在判据里——故障注入无法对他人站点实施，
+    # 所以这一面只取「结构 + 声明」两类证据（监控集成/错误页/排障文档），恒等式含 NA 与 out_of_scope。
+    ("fault_peer_selftest", [sys.executable, "_test/peer_fault_probe.py", "--selftest"]),
+    # r52：长期记忆召回。十三份对标把「记忆系统」记成存在性 ✅（有表、写得进去），
+    # 从没量过"落库的记忆有没有回到发给模型的那条 messages"。实测导出面零召回项 ⇒ 只写不读。
+    # 判据取数面 = 拦 /api/chat 读 request.post_data（真流量出口），R4 是反向腿（清库后必须消失），
+    # 缺反向腿的判据可以靠"永远注入一段常量"骗绿——所以 selftest 里专门放了这条反例。
+    ("memory_recall", [sys.executable, "_test/memory_recall_check.py"]),
+    ("memory_recall_selftest", [sys.executable, "_test/memory_recall_check.py", "--selftest"]),
+    # r52：记忆/上下文面对标探针的判据自证。三通道里"引用边"只认正向回执，
+    # none-in-sample / NA 两态都不构成"该仓没做回灌"；歧义形状（storage 含 rag、
+    # React createContext、memory-leak 测试件、GPU memory）各配一条反例。
+    ("memory_peer_selftest", [sys.executable, "_test/peer_memory_probe.py", "--selftest"]),
+    # r52：README「出错了怎么办」段 ⇄ 代码状态标签**双向**对账。补文档不等于补上——
+    # 首跑就以 T2 抓到我自己写了一个代码里不存在的徽章文案（`● 已离线`），以 T1 逼出
+    # 一个真实但没被文档化的第四态（`● 网络不可用（配置为在线）`）。
+    ("readme_troubleshooting", [sys.executable, "_test/readme_troubleshooting_check.py"]),
+    ("readme_troubleshooting_selftest", [sys.executable, "_test/readme_troubleshooting_check.py", "--selftest"]),
     # r45：发布/版本治理对标探针的判据自证（semver 合流 / 发布滞后 / CHANGELOG 三段，含小数天反例）
     ("release_probe_selftest", [sys.executable, "_test/peer_release_probe.py", "--selftest"]),
     # r46：许可与供给链对标探针的判据自证（LICENSE 类件 / 归属类件 / vendored 目录三个分类器，

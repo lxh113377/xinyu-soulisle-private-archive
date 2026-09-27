@@ -5,7 +5,16 @@
 
 
 ```powershell
-python _test/run_all_suites.py           # ★ 全量电池（67 套件逐条直取 rc，聚合不掩盖单项失败）
+python _test/run_all_suites.py           # ★ 全量电池（套件条数以 `--list` 实算为准，本文件不抄数；逐条直取 rc，聚合不掩盖单项失败）
+python _test/fault_injection_check.py    # r51 故障注入：上游 500/非JSON/断连/黑洞挂起/恢复 五类，看界面说不说真话（徽章同帧翻面 + hit_count 全非零证注入真打到通道）
+python _test/fault_injection_check.py --selftest  # r51 判据自身桩：12 例（含「注入 0 命中记 INVALID 不记 PASS」+ r52「归因缺失总预算内也判红」）
+python _test/peer_fault_probe.py --selftest       # r51 故障可见性对标探针桩：6 例（边界=不得写成报错体验对比结论）
+python _test/memory_recall_check.py               # r52 长期记忆召回：拦 /api/chat 读 post_data，证「落库的记忆真进了 messages」；R4 清库后必须消失（反向腿）
+python _test/memory_recall_check.py --selftest    # r52 召回判据桩：9 例（含「恒真注入」「没读到我自己写的那块」「原话进 prompt」三形）
+python _test/peer_memory_probe.py                 # r52 记忆/上下文面对标：16 仓三通道，引用边只认正向回执（none-in-sample/NA 两态不构成结论）
+python _test/peer_memory_probe.py --selftest      # r52 记忆探针桩：9 例（歧义形状四连：storage 含 rag／React context／泄漏件／GPU memory）
+python _test/readme_troubleshooting_check.py      # r52 README 排障段 ⇄ 代码状态标签双向对账（T1 漏写状态／T2 凭空造状态 都判红）
+python _test/readme_troubleshooting_check.py --selftest  # r52 文档对账桩：5 例（含"取数面退化成空集"与"抽到注释"两形）
 python _test/clean_clone_check.py         # r43 干净克隆可跑性：从 HEAD 克隆到临时目录再跑，未知报错即红（已登记缺口须计数命中，0 命中要销账）
 python _test/data_rights_check.py            # r44 数据权利：披露随模式翻转 + 删除回执并复核归零 + 导出与计数对齐
 python _test/peer_data_rights_probe.py --selftest  # r44 对标探针桩：10 例（路径 7｜README 2｜边界 1）

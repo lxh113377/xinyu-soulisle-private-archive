@@ -24,8 +24,15 @@ BUDGETS = {
     "src/css/style.css": 13_888,   # r47 上调：触屏可达性块（13,368→13,502 实测 +134B，含 5% 余量）。
     #    动因不是"装不下就抬上限"：块内容由 _test/mobile_check.py M2/M3 实测驱动（7 控件高 27-35px
     #    < WCAG 2.5.8 的 44；输入框 14-15px 触发 iOS 聚焦缩放），且已先把注释压到 3 行再登记。
-    "src/js/app.js": 14_390,   # r32 上调：徽章加"网络不可用"降级分支（13,123→13,698 实测 +5%），理由记在 CHANGELOG
-    "src/js/chat-agent.js": 11_729,
+    "src/js/app.js": 15_490,   # r32 上调：徽章加"网络不可用"降级分支（13,123→13,698 实测 +5%），理由记在 CHANGELOG
+    #    r51 再上调：徽章加"大模型暂不可用（已降级）"分支 + 每轮 respond 后 refreshBadge()
+    #    （14,294→14,748 实测 +454B，含 5% 余量）。动因是 r51 故障注入实测——上游 500/非 JSON/断连/挂起
+    #    四类故障下气泡写「暂不可用」而徽章仍写「● 在线 AI」，同屏自相矛盾且撞红线"禁伪装在线"。
+    #    先把自己新写的 3 行注释压成 1 行（省 109B）再登记，不是装不下就抬上限。
+    "src/js/chat-agent.js": 13_024,   # r52 上调 11,729→实测 12,404 +5%：SYSTEM 末尾拼长期记忆摘要
+    #    + respond 返回值新增 memory 字段（仅"真发给模型且此前有记忆"才非零）。动因是 r52 实测——
+    #    MemoryStore 导出面**零召回项**，落库记忆只喂星图，模型侧对用户历史一无所知。
+    #    先把自己新写的 4 行注释压成 2 行（12,493→12,404，省 89B）再登记，不是装不下就抬上限。
     "src/js/emotion-engine.js": 5_598,
     "src/js/emotion-remote.js": 4_679,
     "src/js/voice.js": 4355,
@@ -37,7 +44,11 @@ BUDGETS = {
     "src/js/three-scene.js": 15_793,
     # r45 上调 4,844 -> 7214：clear() 改为带回执并读 /stats 复核归零 + 新增 exportAll()
     # （r44 数据权利面实测：旧 fire-and-forget 丢弃服务端 removed 回执）。理由同记 CHANGELOG。
-    "src/js/memory-store.js": 7214,
+    "src/js/memory-store.js": 8_868,
+    # r52 上调 7214→实测 8,446 +5%：新增 recall()（只聚合次数/跨度/高频情绪，不拼用户原话）
+    # 与 count()（供界面标「已带入 N 条记忆」）。判据 _test/memory_recall_check.py R4 是反向腿：
+    # 清空记忆后召回段必须消失，所以这块不是"常量字符串"，是数据驱动的能力。
+    # 同样先压注释（8,675→8,446，省 229B）再登记。
     # r45 新增：数据主体权利 UI 从 app.js 外提（外提后 app.js 14,281 回到限内），基线取实测 +5%
     "src/js/data-rights.js": 3300,
     "src/js/demo-config.js": 1_828,

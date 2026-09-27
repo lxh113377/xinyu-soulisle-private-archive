@@ -361,6 +361,86 @@ def import_safety(text):
 REQ_ALIAS = {"pyyaml": "yaml", "pillow": "PIL"}   # 发行名 → import 名（清单写 PyYAML/Pillow，代码 import yaml/PIL）
 
 
+def py_syntax_hygiene(text):
+    """G9 第二腿：判据脚本必须**解析得动**。
+
+    为什么算进 G9 而不是新开判据号（r51 §5-P1 立的账）：本仓台账里"内联/heredoc 写盘把
+    `\\n` 落成真实换行、把字面量里的引号吞掉"这一族已复发 12 次，而它的**第一现场就是
+    SyntaxError**。可 `third_party_imports()` 对 SyntaxError 是 `except: continue` ——
+    一个被写坏的文件在依赖审计里**直接隐身**，比报错更糟。本腿把它变成点名。
+    """
+    import ast as _ast
+    try:
+        _ast.parse(text)
+    except SyntaxError as e:
+        return [f"SyntaxError 第 {e.lineno} 行：{e.msg}（heredoc/内联写盘吞转义或引号的第一现场）"]
+    except Exception as e:                       # 递归过深等：同样算"解析不动"
+        return [f"parse 异常 {type(e).__name__}"]
+    return []
+
+
+def java_quote_parity(text):
+    """**advisory only（不进闸）**：Java 逐行未转义 ASCII 双引号须成对。
+
+    r52 实测误报率 **6/20 文件**被报红（假阳形态：`{\\"emotion\\"...}` 这类 JSON 字面量里的
+    反斜杠-引号交替、跨行 `+` 拼接），即"文本启发式重造 Java 词法器"不成立。
+    该事实的**权威判据是 javac**（吞掉字面量内部引号的第一现场就是「未结束的字符串文字」），
+    而 java-build 一直在 CI 链上、且 T4 盯住构建步不得加 `-DskipTests`
+    （⇒ 见 `_test/java_test_guard.py`）。同一事实不另立第二把更差的尺。
+    本函数保留给**手工诊断**用（判红时先看它给不给方向），不进 G9 的判定集合。
+    """
+    out = []
+    in_block = False
+    for i, raw in enumerate(text.splitlines()):
+        s = raw.strip()
+        if in_block:
+            if "*/" in s:
+                in_block = False
+            continue
+        if s.startswith("/*") and "*/" not in s[2:]:
+            in_block = True
+            continue
+        if s.startswith("//") or s.startswith("*") or s.startswith("/*"):
+            continue                        # 注释行里的引号不参与配对
+        if '"""' in raw:
+            continue                        # 文本块：边界不是逐行奇偶
+        n, in_s, in_c, k = 0, False, False, 0
+        while k < len(raw):
+            ch = raw[k]
+            if in_s:
+                if ch == "\\":
+                    k += 2
+                    continue
+                if ch == '"':
+                    n += 1                  # ⚠️ 收口引号也要计数：首版只数开引号，
+                in_s = False                #    一个字符串贡献 1 ⇒ "奇数"变成"字符串个数为奇"，
+                k += 1                      #    实测 17/20 文件全报红，是判据错不是代码错
+                continue
+            if in_c:
+                if ch == "\\":
+                    k += 2
+                    continue
+                if ch == "'":
+                    in_c = False
+                k += 1
+                continue
+            if ch == "/" and raw[k + 1:k + 2] == "/":
+                break                       # 行注释：其后不计数
+            if ch == '"':
+                n += 1
+                in_s = True
+            elif ch == "'":
+                in_c = True
+            k += 1
+        if in_s or in_c:
+            out.append(f"第 {i + 1} 行字符串/字符字面量未闭合（{s[:48]}）")
+            continue
+        if n % 2:
+            out.append(f"第 {i + 1} 行未转义 ASCII 双引号为奇数（{n} 个）：{s[:48]}")
+    return out
+
+
+
 def ci_invoked_scripts(ci_text, suites_text):
     """CI 真会执行的判据脚本 = workflow 的 run 里点名的 ∪ 电池 SUITES 里的。
     审计面必须按这个集合来，否则会把"本地工具的重依赖"算进 CI 清单（G11 反过来判它幽灵依赖）。"""
@@ -739,6 +819,16 @@ def selftest():
         bad.append("篡改⑪b（有守卫的脚本）被判失败 ⇒ G9 恒假，判据只会刷红")
     if import_safety("import sys\ndef main():\n    if len(sys.argv) > 9:\n        sys.exit(2)\n    return 0\nif __name__ == '__main__':\n    sys.exit(main())\n"):
         bad.append("篡改⑪c（函数体内缩进的 sys.exit 被判违规）⇒ G9 没分清顶层与函数内")
+    # 篡改⑪d：G9 第二腿（解析得动）两侧都要验。正例是**本仓真实全量**——
+    # 只验合成样本会漏掉"判据对本仓真实文件恒假"这一形（首版 java 腿就是这么被实测打回的）。
+    if not py_syntax_hygiene("def f():\n    return \"未闭合\n"):
+        bad.append("篡改⑪d（SyntaxError 文件）未被抓到 ⇒ G9 解析腿恒真")
+    if py_syntax_hygiene("def f():\n    return \"ok\"\n"):
+        bad.append("篡改⑪e（合法文件被判解析失败）⇒ G9 解析腿恒假")
+    _realbad = [p.name for p in sorted((ROOT / "_test").glob("*.py"))
+                if py_syntax_hygiene(p.read_text("utf-8", errors="replace"))]
+    if _realbad:
+        bad.append(f"篡改⑪f：本仓真实判据脚本有 {_realbad} 解析失败却该由 G9 主体报红")
     # 篡改⑫：CI 覆盖面的正反两侧（缺电池步骤 / 幽灵豁免 必须报红；原样必须零违规）
     st = (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace")
     ci0 = (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace")
@@ -949,8 +1039,16 @@ def main():
     scripts = sorted((ROOT / "_test").glob("*.py"))
     iviol = [f"{p.name} → {import_safety(p.read_text('utf-8', errors='replace'))[0]}"
              for p in scripts if import_safety(p.read_text("utf-8", errors="replace"))]
-    check("G9 判据脚本全部 import-safe（禁 import 即执行）", not iviol,
-          f"{len(scripts)} 个脚本已扫" + ("；违规：" + " ; ".join(iviol) if iviol else "，零违规"))
+    # G9 第二腿（r51 §5-P1 立的账，本轮机器化）：判据脚本必须**解析得动**。
+    # 动因不是"又想加一条"，而是台账里"内联/heredoc 写盘吞转义与引号"已复发 12 次，
+    # 而 `third_party_imports()` 对 SyntaxError 是 `except: continue` ⇒ 被写坏的文件
+    # 在依赖审计里**直接隐身**。⚠️ Java 那一半试过文本启发式，误报 6/20，已撤出判定集合
+    #（该事实的权威判据是 javac + T4 盯 -DskipTests，见 java_quote_parity 的 docstring）。
+    syviol = [f"{p.name} → {py_syntax_hygiene(p.read_text('utf-8', errors='replace'))[0]}"
+              for p in scripts if py_syntax_hygiene(p.read_text("utf-8", errors="replace"))]
+    check("G9 判据脚本全部 import-safe（禁 import 即执行）且解析得动", not iviol and not syviol,
+          f"{len(scripts)} 个脚本已扫"
+          + ("；违规：" + " ; ".join((iviol + syviol)[:6]) if (iviol or syviol) else "，零违规"))
 
     fails = [r for r in results if not r[1]]
     print(f"\n合计 {len(results)} 项，失败 {len(fails)} 项")
@@ -964,7 +1062,7 @@ def main():
     print("REPO-CONFIG-PASS（实跑 %d 条判据：%s）" % (len(results), " ".join(ran))
           if not fails else
           "REPO-CONFIG-FAIL（实跑 %d 条，红 %d 条：%s）"
-          % (len(results), len(fails), " ".join(f.split()[0] for f in fails)))
+          % (len(results), len(fails), " ".join(x[0].split()[0] for x in fails)))
     return 1 if fails else 0
 
 

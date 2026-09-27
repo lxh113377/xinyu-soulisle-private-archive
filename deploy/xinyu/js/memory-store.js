@@ -74,6 +74,35 @@ window.MemoryStore = (function () {
     } catch { /* 忽略 */ }
   }
   function all() { return load().slice(); }
+  /**
+   * 长期记忆摘要（r52）：把已落库的情绪记录**聚合**成一短句，供 ChatAgent 注入 system。
+   * 只聚合（次数/跨度/高频情绪）、不拼用户原话：既守"只留本机/本演示实例服务端"的隐私承诺，
+   * 也不撞 token 与体积预算。无记忆时返回 ""（不追加，免得 system 里出现空标题）。
+   */
+  function recall() {
+    const arr = load();
+    if (!arr.length) return "";
+    const now = Date.now();
+    const cnt = {};
+    for (const e of arr) {
+      const k = e && e.emotion;
+      if (k) cnt[k] = (cnt[k] || 0) + 1;
+    }
+    const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a] || (a < b ? -1 : 1)).slice(0, 3);
+    const label = (k) => (window.EmotionEngine && window.EmotionEngine.labelOf) ? window.EmotionEngine.labelOf(k) : k;
+    const first = Number(arr[0].ts) || now;
+    const last = Number(arr[arr.length - 1].ts) || now;
+    const days = Math.floor((now - last) / 86400000);
+    const sinceLast = days <= 0 ? "就在今天" : days === 1 ? "昨天" : days + " 天前";
+    const span = Math.max(1, Math.round((now - first) / 86400000));
+    const emoPart = top.length
+      ? "；高频情绪：" + top.map(k => label(k) + " " + cnt[k] + " 次").join("、")
+      : "";
+    return "【长期记忆】你们此前已经聊过 " + arr.length + " 次，跨度 " + span + " 天，上次交流" + sinceLast
+      + emoPart + "。可以自然承接这些脉络，但请勿逐条复述清单，也不要臆造没出现过的细节。";
+  }
+  /** 记忆条数（供界面标注「已带入 N 条记忆」，让"AI 引用了你之前说的"这件事可见） */
+  function count() { return load().length; }
   /** 清除本机 + 服务端，并读 /stats 复核归零；返回 Promise<{local,removed,verified,error}>
    *  verified 三态：null=未连/未核验，禁并入成功（r44 实测旧版丢弃服务端 removed 回执） */
   function clear() {
@@ -139,5 +168,5 @@ window.MemoryStore = (function () {
       });
   }
 
-  return { record, all, clear, exportAll, hydrate, pushMessage, isRemote, sessionId };
+  return { record, all, clear, exportAll, hydrate, pushMessage, isRemote, sessionId, recall, count };
 })();

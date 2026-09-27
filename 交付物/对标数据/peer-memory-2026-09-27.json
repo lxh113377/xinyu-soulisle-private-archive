@@ -1,0 +1,492 @@
+{
+ "repos": [
+  {
+   "repo": "__self__",
+   "tier": "-",
+   "tree": {
+    "memory": [
+     "memory/01-goal.md",
+     "memory/02-structure.md",
+     "memory/03-tech-stack.md"
+    ],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "_test/j2_chat_contract.py",
+     "deploy/cloudbase/functions/chat/index.js",
+     "deploy/functions/api/chat.js",
+     "deploy/xinyu/js/chat-agent.js",
+     "deploy/xinyu/js/chat-window.js",
+     "server/src/main/java/com/xinyu/soulisle/api/ChatController.java"
+    ]
+   },
+   "readme": {},
+   "edge": [
+    "none-in-sample",
+    "",
+    6
+   ]
+  },
+  {
+   "repo": "lobehub/lobehub",
+   "tier": "A",
+   "tree": {
+    "memory": [
+     ".agents/skills/cli/references/memory.md",
+     ".agents/skills/ux-audit/references/example/memory.md",
+     "apps/cli/e2e/memory.e2e.test.ts"
+    ],
+    "summary": [
+     "apps/server/src/router-hono/workflows/topic-auto-summary/dispatch.test.ts",
+     "apps/server/src/router-hono/workflows/topic-auto-summary/dispatch.ts",
+     "apps/server/src/router-hono/workflows/topic-auto-summary/execute.ts"
+    ],
+    "ctxwin": [
+     "apps/server/src/modules/AgentRuntime/adapters/ServerContextBuilder.ts",
+     "apps/server/src/modules/AgentRuntime/adapters/serverCallLlmContextBuilder.test.ts",
+     "apps/server/src/modules/AgentRuntime/adapters/serverCallLlmContextBuilder.ts"
+    ],
+    "retrieval": [
+     "apps/server/src/routers/async/__tests__/ragEval.test.ts",
+     "apps/server/src/routers/async/ragEval.ts",
+     "apps/server/src/routers/lambda/ragEval.ts"
+    ],
+    "assembly": [
+     ".agents/acceptance/scripts/agent-browser-klm.mjs",
+     ".agents/acceptance/scripts/agent-gateway/analyze-events.ts",
+     ".agents/acceptance/scripts/agent-gateway/analyze.mjs",
+     ".agents/acceptance/scripts/agent-gateway/local-gateway-probe.mjs",
+     ".agents/acceptance/scripts/agent-gateway/probe-dump.js",
+     ".agents/acceptance/scripts/agent-gateway/probe-dump.ts"
+    ]
+   },
+   "readme": {
+    "conversation_memory": true
+   },
+   "edge": [
+    "none-in-sample",
+    "",
+    6
+   ],
+   "err": ""
+  },
+  {
+   "repo": "SillyTavern/SillyTavern",
+   "tier": "A",
+   "tree": {
+    "memory": [
+     "public/scripts/extensions/memory/index.js",
+     "public/scripts/extensions/memory/manifest.json",
+     "public/scripts/extensions/memory/settings.html"
+    ],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "public/scripts/PromptManager.js",
+     "public/scripts/chat-backups.js",
+     "public/scripts/chat-templates.js",
+     "public/scripts/itemized-prompts.js",
+     "public/scripts/macros/definitions/chat-macros.js",
+     "public/scripts/system-messages.js"
+    ]
+   },
+   "readme": {
+    "worldbook": true
+   },
+   "edge": [
+    "none-in-sample",
+    "",
+    6
+   ],
+   "err": ""
+  },
+  {
+   "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
+   "tier": "B",
+   "tree": {
+    "memory": [
+     "src/open_llm_vtuber/agent/agents/basic_memory_agent.py"
+    ],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "prompts/__init__.py",
+     "prompts/prompt_loader.py",
+     "src/open_llm_vtuber/__init__.py",
+     "src/open_llm_vtuber/agent/__init__.py",
+     "src/open_llm_vtuber/agent/agent_factory.py",
+     "src/open_llm_vtuber/agent/agents/__init__.py"
+    ]
+   },
+   "readme": {
+    "long_term_memory": true
+   },
+   "edge": [
+    "yes",
+    "src/open_llm_vtuber/agent/agent_factory.py → basic_memory_agent",
+    2
+   ],
+   "err": ""
+  },
+  {
+   "repo": "morettt/my-neuro",
+   "tier": "B",
+   "tree": {
+    "memory": [
+     "docs/qt/config/memory.md",
+     "live-2d/plugins/built-in/rag-memory/index.js",
+     "live-2d/plugins/built-in/rag-memory/metadata.json"
+    ],
+    "summary": [],
+    "ctxwin": [
+     "live-2d/js/ai/ContextManager.js"
+    ],
+    "retrieval": [
+     "RAG.bat",
+     "docs/public/images/webui-service-rag.png",
+     "full-hub/rag-hub/占位.txt"
+    ],
+    "assembly": [
+     "live-2d/js/ai/MoodChatModule.js",
+     "live-2d/js/ai/conversation/VoiceChatFacade.js",
+     "live-2d/js/ai/llm-client.js",
+     "live-2d/js/ai/llm-handler.js",
+     "live-2d/js/avatar/avatar-voice-chat-binding.js",
+     "live-2d/js/core/llm-provider-store.js"
+    ]
+   },
+   "readme": {
+    "cn": true
+   },
+   "edge": [
+    "none-in-sample",
+    "",
+    6
+   ],
+   "err": ""
+  },
+  {
+   "repo": "letta-ai/letta",
+   "tier": "D",
+   "tree": {
+    "memory": [],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": []
+   },
+   "readme": {},
+   "edge": [
+    "NA",
+    "",
+    0
+   ],
+   "err": ""
+  },
+  {
+   "repo": "hello-diana/MASCOT",
+   "tier": "C",
+   "tree": {
+    "memory": [],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "src/data_generation/__init__.py",
+     "src/data_generation/annotation.py",
+     "src/data_generation/common.py",
+     "src/data_generation/group_branching.py",
+     "src/data_generation/group_independent.py",
+     "src/data_generation/individual.py"
+    ]
+   },
+   "readme": {},
+   "edge": [
+    "NA",
+    "",
+    6
+   ],
+   "err": ""
+  },
+  {
+   "repo": "ddxfish/sapphire",
+   "tier": "C",
+   "tree": {
+    "memory": [
+     "core/memory_layers.py",
+     "docs/MEMORY.md",
+     "docs/plugin-author/memory-layers.md"
+    ],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "core/chat/__init__.py",
+     "core/chat/chat.py",
+     "core/chat/chat_streaming.py",
+     "core/chat/chat_tool_calling.py",
+     "core/chat/compress.py",
+     "core/chat/display_format.py"
+    ]
+   },
+   "readme": {
+    "long_term_memory": true
+   },
+   "edge": [
+    "yes",
+    "core/chat/chat.py → memory",
+    6
+   ],
+   "err": ""
+  },
+  {
+   "repo": "v2rockets/Loyal-Elephie",
+   "tier": "C",
+   "tree": {
+    "memory": [
+     "backend/memory_server.py"
+    ],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "backend/llm_utils.py",
+     "frontend/components/Chat/Chat.tsx",
+     "frontend/components/Chat/ChatInput.tsx",
+     "frontend/components/Chat/ChatLoader.tsx",
+     "frontend/components/Chat/ChatMessage.tsx",
+     "frontend/pages/api/chat.ts"
+    ]
+   },
+   "readme": {
+    "rag": true
+   },
+   "edge": [
+    "none-in-sample",
+    "",
+    6
+   ],
+   "err": ""
+  },
+  {
+   "repo": "Rogendo/Mental-health-Chatbot",
+   "tier": "C",
+   "tree": {
+    "memory": [],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": []
+   },
+   "readme": {},
+   "edge": [
+    "NA",
+    "",
+    0
+   ],
+   "err": ""
+  },
+  {
+   "repo": "Lum1104/MER-Factory",
+   "tier": "D",
+   "tree": {
+    "memory": [],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "mer_factory/nodes/gate_agent.py",
+     "mer_factory/prompts.py"
+    ]
+   },
+   "readme": {},
+   "edge": [
+    "NA",
+    "",
+    2
+   ],
+   "err": ""
+  },
+  {
+   "repo": "CheaperjamRen/leemo",
+   "tier": "C",
+   "tree": {
+    "memory": [
+     "scripts/verify-memory-restart.mjs",
+     "scripts/verify-memory-workspace.mjs",
+     "src/bridge/memory-mcp.ts"
+    ],
+    "summary": [
+     "src/renderer/stores/usage-summary.ts"
+    ],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "bundled-skills/default-enabled/skill-creator/eval-viewer/generate_review.py",
+     "bundled-skills/default-enabled/skill-creator/scripts/generate_report.py",
+     "bundled-skills/optional/baoyu-post-to-wechat/scripts/wechat-agent-browser.ts",
+     "scripts/verify-agent-capabilities.mjs",
+     "src/host/momo-prompt.ts",
+     "tests/bridge/fixtures/sdk-messages.ts"
+    ]
+   },
+   "readme": {},
+   "edge": [
+    "none-in-sample",
+    "",
+    6
+   ],
+   "err": ""
+  },
+  {
+   "repo": "NJX-njx/opensoul",
+   "tier": "C",
+   "tree": {
+    "memory": [
+     "apps/windows/src/OpenSoul/publish/System.IO.MemoryMappedFiles.dll",
+     "apps/windows/src/OpenSoul/publish/System.IO.UnmanagedMemoryStream.dll",
+     "apps/windows/src/OpenSoul/publish/System.Memory.dll"
+    ],
+    "summary": [
+     "extensions/matrix/src/matrix/actions/summary.ts",
+     "extensions/open-prose/skills/prose/examples/02-research-and-summarize.prose",
+     "skills/summarize/SKILL.md"
+    ],
+    "ctxwin": [
+     "src/agents/context-window-guard.test.ts",
+     "src/agents/context-window-guard.ts"
+    ],
+    "retrieval": [
+     "src/telegram/draft-chunking.test.ts",
+     "src/telegram/draft-chunking.ts"
+    ],
+    "assembly": [
+     ".pi/extensions/prompt-url-widget.ts",
+     "extensions/bluebubbles/src/chat.test.ts",
+     "extensions/bluebubbles/src/chat.ts",
+     "extensions/llm-task/index.ts",
+     "extensions/llm-task/src/llm-task-tool.test.ts",
+     "extensions/llm-task/src/llm-task-tool.ts"
+    ]
+   },
+   "readme": {
+    "long_term_memory": true
+   },
+   "edge": [
+    "none-in-sample",
+    "",
+    6
+   ],
+   "err": ""
+  },
+  {
+   "repo": "s-nagaev/chibi",
+   "tier": "C",
+   "tree": {
+    "memory": [
+     "chibi/memory/__init__.py",
+     "chibi/memory/abstract.py",
+     "chibi/memory/chroma.py"
+    ],
+    "summary": [
+     "tests/services/test_check_history_and_summarize.py"
+    ],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "tests/runners/test_ide_background_messages.py",
+     "tests/services/test_editor_context_prompt.py"
+    ]
+   },
+   "readme": {
+    "summarize_ctx": true,
+    "ctx_window": true
+   },
+   "edge": [
+    "none-in-sample",
+    "",
+    2
+   ],
+   "err": ""
+  },
+  {
+   "repo": "29-Cu/succhia",
+   "tier": "C",
+   "tree": {
+    "memory": [],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": []
+   },
+   "readme": {},
+   "edge": [
+    "NA",
+    "",
+    0
+   ],
+   "err": ""
+  },
+  {
+   "repo": "zeroa234/ryza-ai-revive",
+   "tier": "C",
+   "tree": {
+    "memory": [
+     "scripts/memory_regression.js",
+     "web/assets/icons/paywall_benefit_memory.svg",
+     "web/js/memory.js"
+    ],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "android/app/src/main/java/com/ryza/chat/AlarmReceiver.java",
+     "android/app/src/main/java/com/ryza/chat/AlarmRingActivity.java",
+     "android/app/src/main/java/com/ryza/chat/AlarmScheduler.java",
+     "android/app/src/main/java/com/ryza/chat/AlarmStore.java",
+     "android/app/src/main/java/com/ryza/chat/AssetServer.java",
+     "android/app/src/main/java/com/ryza/chat/BootReceiver.java"
+    ]
+   },
+   "readme": {
+    "conversation_memory": true
+   },
+   "edge": [
+    "none-in-sample",
+    "",
+    6
+   ],
+   "err": ""
+  },
+  {
+   "repo": "Bwcx-songyu/MoodChat",
+   "tier": "C",
+   "tree": {
+    "memory": [],
+    "summary": [],
+    "ctxwin": [],
+    "retrieval": [],
+    "assembly": [
+     "src/main/java/org/example/aispingbt/AiService/PromptManage.java",
+     "src/main/java/org/example/aispingbt/controller/PsychologicalChat.java"
+    ]
+   },
+   "readme": {},
+   "edge": [
+    "NA",
+    "",
+    2
+   ],
+   "err": ""
+  }
+ ],
+ "na": [],
+ "denominator": 17,
+ "blind": 0,
+ "usable": 17,
+ "self_paths_scanned": 367,
+ "ceiling_note": "引用边通道是**正向回执**：none-in-sample / NA 两态都不构成「该仓没做记忆回灌」的结论；且 peers 无行为注入条件，本面只比「有没有制度化」，不比「做得好不好」。"
+}

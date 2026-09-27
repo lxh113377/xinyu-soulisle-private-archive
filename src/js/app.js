@@ -23,7 +23,10 @@
     //（个别环境恒 true 不代表真能出网；方向性保守，避免把幸运观察当普适规律）
     const cfgOnline = window.ChatAgent.isOnline();
     const netDown = cfgOnline && navigator.onLine === false;
+    /* r51 实测：上游故障时气泡写「暂不可用」而徽章仍写「在线 AI」，同屏打脸 ⇒ 撞红线"禁伪装在线" */
+    const llmBad = cfgOnline && !netDown && window.ChatAgent.llmBad();
     if (netDown) { b.textContent = "● 网络不可用（配置为在线）"; b.classList.add("offline"); }
+    else if (llmBad) { b.textContent = "● 大模型暂不可用（已降级本机模板）"; b.classList.add("offline"); }
     else if (cfgOnline) { b.textContent = "● 在线 AI"; b.classList.remove("offline"); }
     else { b.textContent = "● 离线共情模板"; b.classList.add("offline"); }
     $("#chat-engine").textContent = "引擎：" + (netDown ? "在线大模型（当前网络不可用）"
@@ -179,10 +182,13 @@
       const r = await window.ChatAgent.respond(text, onDelta);
       if (bubble) bubble.remove(); else thinking.remove();
       const modeLabel = { model: "在线大模型生成", fallback: "大模型暂不可用 · 离线共情模板", offline: "离线共情模板", guard: "安全转介策略" }[r.mode];
+      refreshBadge();   // r51：降级发生过就必须让徽章同帧翻面（判据 fault_injection_check F3）
       // 情绪识别来源必须如实标注：后端 /api/emotion 与本地词典是两套实现，界面不得含糊
       const emoSrcLabel = r.emoSrc === "backend" ? " · 情绪:后端" : "";
+      // r52：AI 引用了长期记忆就要说出来——隐私承诺是"只留本机"，那"被带进模型"这件事也得可见
+      const memLabel = r.memory ? " · 已带入 " + r.memory + " 条记忆" : "";
       const aiMsg = CW.push("ai", r.reply,
-        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
+        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${memLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
       aiMsg.dataset.emotion = r.emotion;
       window.Voice.speak(r.reply);   // 朗读开关打开时同步播出（失败静默，绝不影响主链路）
       // 记住这条情绪 → 点亮一簇星（一个瞬间 = 1~8 颗，强度越高越多）

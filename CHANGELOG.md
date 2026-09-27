@@ -4,6 +4,78 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Added（r52 · 长期记忆召回与上下文管理面）
+- **`_test/memory_recall_check.py`（+2 套件，`--selftest` 9/9）**：量的是**「落库的记忆有没有回到发给模型的那条 messages」**——
+  取数面 = 拦 `/api/chat` 读 `request.post_data`（真流量出口，不是读源码字符串）。五类用例：
+  空记忆不得注入 ／ 播 3 条必须注入且带条数 ／ 刷新后仍召回 ／ **清库后必须消失（反向腿）** ／ 危机不发请求。
+  另两条：R6 在线召回须在界面标注「已带入 N 条记忆」，R7 召回段内**不得出现任何用户原话**（只做聚合）。
+- **`_test/peer_memory_probe.py`**：peers 16 仓三通道（结构面按**路径段词元**分类、README 锚定词组、
+  以及「装配件 import 记忆件」的**正向引用边**）。引用边三态 `yes / none-in-sample(n) / NA` 分开记，
+  只有 yes 算证据 —— 抽到 6 个装配件没看见 ≠ 该仓没做。快照 `交付物/对标数据/peer-memory-2026-09-27.json`。
+- **`_test/readme_troubleshooting_check.py`（+2 套件，`--selftest` 5/5）**：新排障段 ⇄ 代码状态标签**双向**对账。
+  正向取数面只认两个"决定状态的产地"（`modeLabel` 映射 + `refreshBadge()` 内的 `textContent` 赋值），
+  按文件扫会被注释里的话污染（实测把「禁伪装在线」当成要求文档化的状态）。
+- **实装召回**：`MemoryStore.recall()/count()`（次数/跨度/高频情绪三量，不含原话）→ `SYSTEM(emo)` 末尾拼接 →
+  `respond()` 返回 `memory` 计数（**只在真发给模型时非零**，降级/离线标了就是说谎）→ `app.js` 气泡尾注。
+
+### Fixed（r52 · 三条实测缺陷）
+- **「记忆系统 ✅」是存在性结论而非能力**：十三份对标把 J4 双表记成强项，但 `memory-store.js` 导出面
+  实测**零召回项**、`chat-agent.js` 只喂 `history.slice(-10)` ⇒ "跨设备记住你"当时**只成立在星图展示层**，
+  模型侧对用户历史一无所知。现在召回真的进 prompt，且有常驻判据双向钉住（有=必须注入，清=必须消失）。
+- **挂起型 30.2 s 里那 ~15 s 已归因**（r51 挂了整轮的 P1-2）：黑洞计数单位从「accept 次数」改成
+  **「POST 请求数」**后看见 2 条腿 —— classify 腿与 reply 腿**各吃满一个 15 s 熔断后串行相加**
+  （实测两腿间隔 15.0 s、已归因 30.0 s／30.2 s）。分类腿只回 ~20 token ⇒ 单独给 6 s，
+  整轮 **30.2 s → 21.3 s**；`HANG_BUDGET_S` 随之 35 → **25**（实测上界 + 17% 余量，同一把尺）。
+- **README 排障段首跑即抓到两处漂移**：我自己写了代码里根本不存在的徽章 `● 已离线`（真文案是
+  `● 离线共情模板`），同时逼出一个真实但从未文档化的第四态 `● 网络不可用（配置为在线）`。
+  ⚠️ 这不是"文档写好了"，是**判据把文档按回产品**。
+
+### 度量学（r52 · 三条自己抓自己的）
+- **`highlight` 同族第二例：词元不匹配致 self 假阴**。引用边首版拿"去掉扩展名的段名"（`memory-store`）
+  当 needle，而调用点是 `window.MemoryStore.record`（归一化后 `memorystore`）⇒ 两串永不相等，
+  **本仓被判成"没做回灌"**。改成三形状（连写形／原段名／词元本身）+ 成员访问（`x.y`）与 import 两条边，
+  并补正例②（全局对象形）与反例⓪（注释里提一句 memory 不算边）。
+- **歧义形状四连**：`storage` 含子串 `rag`、React `createContext` 目录、`memory-leak.spec.ts` 是泄漏测试件、
+  README 里 "GPU memory" —— 每一条形成本探针的一条反向断言（`--selftest` 9/9 全打这四形）。
+- **文本启发式重造词法器不成立**：Java 逐行引号奇偶判据实测**误报 6/20**（`{\\"emotion\\"}` 这类
+  反斜杠-引号交替 + 跨行 `+` 拼接），已**撤出判定集合**并写明理由：该事实的权威判据是 javac，
+  java-build 在 CI 链上且 T4 盯住构建步不得加 `-DskipTests`。留作手工诊断用（`java_quote_parity`）。
+- **`--selftest` 里用了不存在的计数器**（`ok += 1` 而该 selftest 只有 `bad` 列表）⇒ `UnboundLocalError`；
+  以及**失败出口自己会崩**：`repo_config_check` 的结论行对 tuple 调 `f.split()`，一旦真有判据红就
+  抛 `AttributeError` 把红因盖掉 —— 两处都是"判据坏了长得像被测对象坏了"，已各自补反例。
+
+### 未做（诚实登记，不写成已建议即完成）
+- **不引入第三方错误监控**（Sentry/Datadog）：与产品隐私承诺直接冲突，属**主动不对标**（沿用 r51 裁决）。
+- **peers 侧无行为注入条件**：`peer_memory_probe` 的引用边只到"结构与声明"，快照头 `ceiling_note` 写死。
+
+### Added（r51 · 故障注入与错误可见性面）
+- **`_test/fault_injection_check.py`（+2 套件，`--selftest` 9/9）**：把上游真打挂再读界面 ——
+  F1 `HTTP 500` ／ F2 200+非 JSON（网关吐 HTML）／ F3 连接被断 ／ F4 黑洞不返回 ／ F5 故障后一次成功。
+  每类都断言三件事：**界面有与故障同类的降级标注**、**输入框恢复可用**、**未捕获异常恒 0**；
+  F5 反向断言徽章必须翻回「● 在线 AI」（否则我只是把开关焊死在另一侧）。
+- **`_test/peer_fault_probe.py`**：peers 侧只取结构与声明证据（error-monitoring 配置、troubleshooting 段）。
+  ⚠️ 天花板如实写进快照头：**故障注入不能对他人站点做** ⇒ 本面对 peers 只出"有没有做"，不出"做得好不好"。
+
+### Fixed（r51 · 两条实测缺陷）
+- **徽章在故障下说谎**：四类故障（500/非JSON/断连/挂起）下气泡如实写「大模型暂不可用 · 离线共情模板」，
+  而全局 `#mode-badge` 仍停在 **「● 在线 AI」** —— 同一屏两句话互相打脸，撞本仓红线"禁伪装在线"。
+  现由 `ChatAgent.llmBad()` 记录最近一次是否"配了在线却降级"，`refreshBadge()` 每轮 respond 后同帧翻面。
+- **挂起型空转 60.6s**：`LLM_TIMEOUT_MS=60000` 实测让演示现场等**一分钟**才见兜底（气泡自己印 60,604ms）。
+  该 timer 只约束"响应头到达"（收到即 clearTimeout），不影响已开始吐字的长回答 ⇒ 降到 **15s**；
+  复测 30.2s（多出的 ~15s 归属未定，见下），仍是一半的改善。
+
+### 度量学（r51 · 夹具把自己骗了两次）
+- **playwright-python 按回调参数个数决定传几个实参**：首版 `def handler(route, m=mode, st=...)`
+  被传入 `(route, request)` ⇒ `m` 被 request 顶掉，五类故障**全部掉进 else 分支被喂了成功响应**，
+  判据于是报"四类故障都没降级、徽章都称在线"。那是**夹具坏了不是产品坏了**。
+  改法：闭包工厂只收 `route`；并加**注入有效性正对照**（recover 必须出现 GOOD_BODY 指纹，否则整轮判
+  INVALID、所有故障读数作废）——这条正对照正是拦住假读数的东西。
+- **黑洞挂起不能用 `route` 回调里 `time.sleep(400)`**：同步 API 的回调跑在分发绿点上，
+  睡 400s 会把分发循环一起占住 ⇒ 我自己的轮询取到 `None` 而不是"慢"。改真黑洞 socket 服务器
+  （accept 后一个字节不回），顺带得到一个诚实的 hit 计数。
+- **未归因的 30.2s 不写成机制**：黑洞只 `accept` 到 1 次连接，我却量到 30.2s（≠ 2×15s 的"重试"故事）。
+  按"先归因再降级"的规矩，F4 预算按**实测上界 + 余量**定（35s），差额登记为 P1 待查，不编解释。
+
 ### Added（r50 · 协作治理与健康度面）
 - **`_test/peer_community_probe.py`（`--selftest` 入电池 74→75，17/17）**：三通道独立取数 ——
   A 声明面（git tree 扫 CONTRIBUTING/SECURITY/CODEOWNERS/CODE_OF_CONDUCT/ISSUE_TEMPLATE/PR模板/dependabot）、

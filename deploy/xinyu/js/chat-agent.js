@@ -33,8 +33,18 @@ window.ChatAgent = (function () {
   function isOnline() { const c = cfg(); return !!c.proxy || !!(c.base && c.key && c.model); }
 
   /* 统一 LLM 请求：proxy 模式走同源 /api/chat（密钥在云端 Function）；否则前端直连（本地演示）。
-   * 60s 超时（与 Java 侧 LlmProxy 请求超时同值）：超时即抛错走离线兜底，避免 thinking 常转。 */
-  const LLM_TIMEOUT_MS = 60000;
+   * ⚠️ r51 故障注入实测：原 60s 在"上游挂起不返回"时让界面**空转 60,604ms 才降级**
+   *（气泡里那行 latency 就是它自己印的），而演示现场一分钟空转等于演示失败。
+   * 该 timer 只在 `await fetch()` 之前生效（响应头一到就 clearTimeout），
+   * 所以它约束的恰好是"对端多久之内理我"，不影响已经开始流式输出的长回答
+   * ⇒ 降到 15s：DeepSeek 正常首包 <5s，15s 已留 3 倍余量，且远小于 Java 侧 LlmProxy 的 60s。 */
+  const LLM_TIMEOUT_MS = 15000;
+  /* r52 分相归因实测：黑洞挂起下兜底 30.2s **不是玄学**，而是 classify 腿与 reply 腿各吃满
+     一个 15s 熔断后**串行相加**（fetch 2 次、两腿间隔 15.0s、已归因 30.0s／30.2s）。
+     分类腿只回 ~20 token 的 JSON，15s 是给它发答案用的预算而不是等首包用的 ⇒ 单独给 6s
+     （DeepSeek 正常分类 <2s，仍留 3 倍余量），挂起场景整轮 30.2s → 约 21s。 */
+  const CLASSIFY_TIMEOUT_MS = 6000;
+  let llmBad = false;                      // r51：最近一次是否"配了在线却降级了"（徽章要跟着翻）
   async function fetchWithTimeout(url, opts, ms) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), ms || LLM_TIMEOUT_MS);
@@ -45,19 +55,19 @@ window.ChatAgent = (function () {
     }
   }
 
-  function endpoint(c, body) {
+  function endpoint(c, body, ms) {
     if (c.proxy) {
       return fetchWithTimeout(c.proxy, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
-      });
+      }, ms);
     }
     return fetchWithTimeout(c.base.replace(/\/$/, "") + "/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + c.key },
       body: JSON.stringify({ model: c.model, ...body })
-    });
+    }, ms);
   }
 
   function contentOf(data) {
@@ -102,24 +112,24 @@ window.ChatAgent = (function () {
    * 代理/上游不支持流式（响应不是 text/event-stream）或流式请求失败 → **自动回落整包 JSON**，
    * 调用方无需感知，也不会因为回落而丢回复。
    */
-  async function llmFetch(messages, temperature, max_tokens, onDelta) {
+  async function llmFetch(messages, temperature, max_tokens, onDelta, ms) {
     const c = cfg();
     const wantStream = !!onDelta && c.stream !== false;
     const body = { messages, temperature, max_tokens };
     if (!wantStream) {
-      const res = await endpoint(c, body);
+      const res = await endpoint(c, body, ms);
       if (!res.ok) throw new Error("HTTP " + res.status);
       return contentOf(await res.json());
     }
     try {
-      const res = await endpoint(c, { ...body, stream: true });
+      const res = await endpoint(c, { ...body, stream: true }, ms);
       if (!res.ok) throw new Error("HTTP " + res.status);
       const ct = res.headers.get("content-type") || "";
       if (ct.includes("text/event-stream") && res.body) return await readSSE(res, onDelta);
       return contentOf(await res.json());        // 代理回落成整包：按非流式解析
     } catch (e) {
       if (e && e.name === "AbortError") throw e;
-      const res = await endpoint(c, body);       // 流式路径任何异常 → 再走一次原整包路径
+      const res = await endpoint(c, body, ms);       // 流式路径任何异常 → 再走一次原整包路径
       if (!res.ok) throw new Error("HTTP " + res.status);
       return contentOf(await res.json());
     }
@@ -131,8 +141,12 @@ window.ChatAgent = (function () {
 
   const SYSTEM = (emo) => {
     const s = strategyOf(emo);
+    // 长期记忆注入（r52）：MemoryStore 此前**只写不读**——落库的记忆只喂星图，模型侧对
+    // "你们聊过几次"一无所知，"跨设备记住你"只成立在展示层。只注入聚合摘要，不注入原话。
+    const mem = (window.MemoryStore && window.MemoryStore.recall) ? window.MemoryStore.recall() : "";
     return STR.persona + "用户刚说的话被识别为主要情绪「" + window.EmotionEngine.labelOf(emo) + "」。" +
-      "当前共情要点：" + s.lead + "。要求：" + STR.rules.map((r, i) => (i + 1) + ")" + r).join("；") + "。";
+      "当前共情要点：" + s.lead + "。要求：" + STR.rules.map((r, i) => (i + 1) + ")" + r).join("；") + "。" +
+      (mem ? mem : "");
   };
 
   function offlineReply(emo) {
@@ -157,7 +171,7 @@ window.ChatAgent = (function () {
     const cs = STR.classify;
     const data = await llmFetch(
       [{ role: "system", content: cs.sys }, { role: "user", content: text.slice(0, cs.maxInputChars || 200) }],
-      cs.temperature ?? 0, cs.maxTokens ?? 40
+      cs.temperature ?? 0, cs.maxTokens ?? 40, null, CLASSIFY_TIMEOUT_MS
     );
     const raw = data || "";
     const m = raw.match(/\{[\s\S]*\}/);
@@ -202,19 +216,24 @@ window.ChatAgent = (function () {
       return { reply: CRISIS_REPLY, emotion: "crisis", mode: "guard", path, latency: 0, lexAll: lex.all, emoSrc };
     }
     let reply, mode, streamed = false;
+    // 记录"本轮发给模型前已存在的记忆条数"：record 在之后才写，所以这里取到的是**此前**的条数
+    const memBefore = (window.MemoryStore && window.MemoryStore.count) ? window.MemoryStore.count() : 0;
     if (isOnline()) {
       try {
         reply = await onlineReply(text, emo, onDelta);
         mode = "model";
+        llmBad = false;
         streamed = !!onDelta;
-      } catch { reply = offlineReply(emo); mode = "fallback"; }
+      } catch { reply = offlineReply(emo); mode = "fallback"; llmBad = true; }
     } else {
       reply = offlineReply(emo); mode = "offline";
     }
     const latency = Math.round(performance.now() - t0);
     remember(text, reply);
     window.MemoryStore.record({ emotion: emo, intensity, secondary, text: text.slice(0, 60) });
-    return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all, streamed, emoSrc };
+    // memory 只在**真的带着摘要发给了模型**时才非零：降级/离线模板没走 LLM，标了就是说谎
+    return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all, streamed,
+             emoSrc, memory: mode === "model" ? memBefore : 0 };
   }
 
   /** 记住一轮问答：本地 history 为主，远端（J4，默认关闭）尽力而为 */
@@ -238,5 +257,6 @@ window.ChatAgent = (function () {
     return { version: STR.version, emotions: EMOTIONS.slice(), rules: STR.rules.slice(), fallback: FALLBACK_EMO };
   }
 
-  return { respond, classifyEmotion, isOnline, setCfg, getCfg, getHistory, strategyInfo };
+  return { respond, classifyEmotion, isOnline, setCfg, getCfg, getHistory, strategyInfo,
+           llmBad: () => llmBad };   // r51：徽章要能反映"配了在线但刚降级过"，否则会说谎
 })();

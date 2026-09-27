@@ -1,0 +1,276 @@
+{
+ "repos": {
+  "lobehub/lobehub": {
+   "tier": "A",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [
+     "apps/cli/src/commands/status.ts",
+     "packages/agent-runtime/src/utils/status.ts",
+     "packages/env/src/debug.ts"
+    ],
+    "mon_deps": [
+     "@sentry/electron",
+     "@sentry/vite-plugin"
+    ],
+    "dsn_in_env_sample": false,
+    "vendors": [
+     "sentry"
+    ]
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "SillyTavern/SillyTavern": {
+   "tier": "A",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [
+     "src/healthcheck.js"
+    ],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": [
+     "highlight"
+    ]
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "tier": "B",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": [
+     "sentry"
+    ]
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "morettt/my-neuro": {
+   "tier": "B",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "letta-ai/letta": {
+   "tier": "D",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "hello-diana/MASCOT": {
+   "tier": "C",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "ddxfish/sapphire": {
+   "tier": "C",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [
+     "plugins/discord/api/debug.py",
+     "plugins/discord/api/health.py",
+     "plugins/status/routes/status.py"
+    ],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "v2rockets/Loyal-Elephie": {
+   "tier": "C",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": [
+     "highlight"
+    ]
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "tier": "C",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "Lum1104/MER-Factory": {
+   "tier": "D",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {
+    "report_channel": "1 处｜样本 'Open an issue'"
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "CheaperjamRen/leemo": {
+   "tier": "C",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": [
+     "highlight"
+    ]
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "NJX-njx/opensoul": {
+   "tier": "C",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [
+     "extensions/twitch/src/status.ts",
+     "src/auto-reply/status.ts",
+     "src/channels/plugins/status.ts"
+    ],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {
+    "troubleshooting": "2 处｜样本 \"('#troubleshooting', 'troubleshooting'\""
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "s-nagaev/chibi": {
+   "tier": "C",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "29-Cu/succhia": {
+   "tier": "C",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "zeroa234/ryza-ai-revive": {
+   "tier": "C",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "Bwcx-songyu/MoodChat": {
+   "tier": "C",
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "__self__": {
+   "tree": {
+    "mon_files": [],
+    "err_pages": [],
+    "diag": [],
+    "mon_deps": [],
+    "dsn_in_env_sample": false,
+    "vendors": []
+   },
+   "readme": {}
+  }
+ },
+ "na": [],
+ "denominator": 16,
+ "blind": 0,
+ "usable": 16,
+ "ceiling_note": "故障注入无法对他人站点实施 ⇒ 本面只出结构与声明证据，不得写成报错体验对比结论",
+ "ts": "2026-09-27T06:36:31Z"
+}
