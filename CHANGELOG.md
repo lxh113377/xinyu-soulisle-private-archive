@@ -9,6 +9,17 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Fixed（r58 · 探针自己的取数通道，两处由实测翻案）
+- **误诊过一次**：16 仓全量跑挂了一小时以上，我先归因到「`download_url` 指向
+  `objects.githubusercontent.com`，那个主机在本机连不上」，并把 workflow 正文改成走
+  `api.github.com/contents`（base64）。改完**同一条 urllib 调用 3.9s 返回 360 个节点** ⇒
+  真实原因是**抖动**而非选错主机。换主机这条仍然成立（少一批跨主机调用），但不能当结论写。
+- 于是补上真正的缺陷：`api()` **没有重试** —— 单次 `RemoteDisconnected` 就把整仓判成 NA，
+  而 NA 在本机的链路特征下（按域名×时刻时通时不通）会攒成一整面**假盲区**。
+  ⇒ 加有界重试（3 次，间隔 0/2/5s，只对传输层失败与 5xx/429；**404 立即返回不重试**），
+  并把单次超时 45s→20s（45s 会把一次抖动放大成几十分钟）。
+- ⚠️ 电池不受影响：`quality_peer_selftest` 是离线桩（不联网），联网采集仍是人工轮次动作。
+
 ### Added（r58 · 质量工程面：JS 侧单元测试从零起账）
 - **实测起点**：`peer_quality_tooling_probe.py --self-only` 量出本仓 **JS 测试文件 0 个**，
   而 Java 侧是 4 个测试类 / 30 个用例且 CI 真跑。README 把 `docs/quality-gates.md` 指认为

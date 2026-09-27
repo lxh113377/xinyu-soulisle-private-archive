@@ -26,11 +26,14 @@
 退出码：0=分母齐且无 NA 1=存在 NA 或 selftest 未过 2=无 GitHub token（环境）
 """
 import argparse
+import base64
 import json
 import os
 import re
 import subprocess
 import sys
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -125,17 +128,38 @@ def self_paths():
     return [x.strip() for x in r.stdout.splitlines() if x.strip()]
 
 
+RETRY_WAITS = (0, 2, 5)          # 第 1/2/3 次尝试前的等待秒数（上限 3 次，总预算仍 < 单机网络抖动）
+CALL_TIMEOUT = 20                # 45s 会把一次抖动放大成几十分钟的整轮（r58 实测：16 仓跑了一小时）
+
+
 def api(path, token):
+    """带**有界重试**的取数：本机到 api.github.com 的链路是"按域名×时刻"时通时不通，
+    单次 RemoteDisconnected/超时不代表该仓不存在 ⇒ 不重试就会把整面打成 NA（假盲区）。
+    重试只针对传输层失败与 5xx/429；404 一就返回（那是真没有，不该重试）。
+    """
     req = urllib.request.Request("https://api.github.com/" + path,
                                  headers={"User-Agent": "xinyu-quality-probe",
                                           "Accept": "application/vnd.github+json"})
     if token:
         req.add_header("Authorization", "Bearer " + token)
-    try:
-        with urllib.request.urlopen(req, timeout=45) as r:
-            return json.loads(r.read().decode("utf-8", "replace")), ""
-    except Exception as e:
-        return None, "http=%s" % getattr(e, "code", type(e).__name__)
+    last = "unknown"
+    for wait in RETRY_WAITS:
+        if wait:
+            time.sleep(wait)
+        try:
+            with urllib.request.urlopen(req, timeout=CALL_TIMEOUT) as r:
+                return json.loads(r.read().decode("utf-8", "replace")), ""
+        except urllib.error.HTTPError as e:
+            last = "http=%s" % e.code
+            if e.code == 404:
+                return None, last
+            if e.code in (403, 429):
+                ra = e.headers.get("Retry-After")
+                if ra and str(ra).isdigit():
+                    time.sleep(min(int(ra), 20))
+        except Exception as e:
+            last = "http=%s" % type(e).__name__
+    return None, last + "(x%d)" % len(RETRY_WAITS)
 
 
 def token_of():
@@ -163,22 +187,26 @@ def readme_of(repo, token):
     for name in ("README.md", "readme.md", "README.rst", "README"):
         j, _ = api("repos/%s/contents/%s" % (repo, name), token)
         if j and j.get("content"):
-            import base64
             return base64.b64decode(j["content"]).decode("utf-8", "replace"), name
     return "", ""
 
 
 def ci_blobs_of(repo, token):
+    """工作流正文一律走 api.github.com 的 contents（base64），**不用 download_url**。
+
+    实测根因（r58）：download_url 指向 objects.githubusercontent.com，本机对那个主机
+    连不上也不报错——`urlopen(timeout=45)` 静默等满 45s 再抛。16 仓 × 若干 workflow
+    ⇒ 全量跑挂了一小时以上，而 `api.github.com/rate_limit` 同期 0.6s 返回 200、配额 used=0。
+    ⇒ 慢的不是对标对象，是我自己选的取数主机。换回同一主机后必须重测总耗时，别信"应该快了"。
+    """
     out = {}
     j, _ = api("repos/%s/contents/.github/workflows" % repo, token)
-    for item in (j or []):
-        if item.get("type") == "file" and item.get("download_url"):
-            try:
-                with urllib.request.urlopen(urllib.request.Request(
-                        item["download_url"], headers={"User-Agent": "xinyu-quality-probe"}), timeout=45) as r:
-                    out[item["name"]] = r.read().decode("utf-8", "replace")
-            except Exception:
-                pass
+    for item in (j if isinstance(j, list) else []):
+        if item.get("type") != "file" or not re.search(r"\.ya?ml$", item.get("name", "")):
+            continue
+        c, _ = api("repos/%s/contents/%s" % (repo, item["path"]), token)
+        if c and c.get("content"):
+            out[item["name"]] = base64.b64decode(c["content"]).decode("utf-8", "replace")
     return out
 
 
