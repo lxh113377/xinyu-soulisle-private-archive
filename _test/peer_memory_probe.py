@@ -361,13 +361,16 @@ def main():
         for x in na:
             print("  NA %s: %s" % (x["repo"], x["why"]))
     if a.json:
-        Path(a.json).write_text(json.dumps(
+        # 必须 write_bytes：Windows 下 write_text 把 "\n" 译成 "\r\n"，而 eol_parity 判据要求
+        # 工作树字节 == git blob 字节 ⇒ 一份"跑一次就把自己写脏"的产物等于给下轮留假红。
+        # （同族：本仓 07 卷 4KB 判据当年也是栽在 write_text 的 CRLF 上。r52 实测被抓。）
+        Path(a.json).write_bytes(json.dumps(
             {"repos": rows, "na": na, "denominator": n, "blind": len(na), "usable": n - len(na),
              "self_paths_scanned": sn,
              "ceiling_note": "引用边通道是**正向回执**：none-in-sample / NA 两态都不构成"
                              "「该仓没做记忆回灌」的结论；且 peers 无行为注入条件，"
                              "本面只比「有没有制度化」，不比「做得好不好」。"},
-            ensure_ascii=False, indent=1), "utf-8")
+            ensure_ascii=False, indent=1).encode("utf-8"))
         print("快照 → " + a.json)
     sys.exit(1 if na else 0)
 
