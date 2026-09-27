@@ -36,6 +36,7 @@
 | VOL-EEB5B | P2 | 体量治理[L3 产物] 交付物/提交包/心屿SoulIsle-应用方案.pdf — 拆分或归档（禁直删） | todo | - | - | 2026-09-27 17:44 | - |
 | VOL-0580C | P2 | 体量治理[L3 产物] 交付物/提交包/心屿MindIsle_参赛方案.pptx — 拆分或归档（禁直删） | todo | - | - | 2026-09-28 01:14 | - |
 | VOL-AGG-20260928 | P1 | 体量治理[L1 记忆卷] 体量余量聚合（6 项） — 另有 6 项待判断，合计 139169 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-09-28 01:14 | - |
+| WF-r73-接入CI契约 | P1 | 陪聊当前未接入 CI 全绿契约（.ci/contract.json 缺失），而 ciwatch 实扫到 1 份 workflow / run 执行面 89 行 ⇒ 未接入 ≠ 没有 CI，这 89 行里没有一条是被契约点名的 blocking 判据。一致接入四步（本引擎 wflow.adapters.sevenstep 对位）：① 生成 .ci/contract.json（把 mvn verify / 关键门禁逐条列 blocking）；② 在 .github/workflows/ci.yml 里为每条加 run step 并 --sweep 复扫到 matched==declared；③ pre-push 接线 greencheck；④ 保留本项目特性（Java/Maven 档位与 8123 回归口不并入引擎）。前提可复算命令：cd 本仓 && python D:/global_skills/A-project-handoff/scripts/handoff.py flow . --status | todo | - | - | 2026-09-28 02:10 | - |
 
 ## 推进记录
 
@@ -43,6 +44,7 @@
 
 - [2026-09-27 17:44] 体量体检登记 7 项（待判断项转任务，id 前缀 VOL-）
 - [2026-09-28 01:14] 体量体检登记 2 项（待判断项转任务，id 前缀 VOL-）
+- [2026-09-28 02:10] WF-r73-接入CI契约 新增（P1，todo）
 
 ## 分卷目录
 
