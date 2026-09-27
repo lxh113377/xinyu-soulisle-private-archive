@@ -62,6 +62,37 @@
   `python _test/deploy_sync_check.py --selftest` → `DEPLOYSYNC-SELFTEST-PASS`；真面 →
   `DEPLOY-SYNC-PASS`，函数面回执 `分母 1 个`。
 
+### Added（r59 · 交付物清单面 + 函数出口面：两处"手工证过一次"换成常驻判据）
+- **起因是一手事故取证**：2026-09-28 00:19 实测 `交付物/提交包/` 下 **7 个被 git 跟踪的交付件从
+  工作树消失**（含唯一的参赛成片 mp4、`render-pdf.ps1`、`提交清单与验收状态.md` 本体），
+  而 `grep -rn "演示视频|demo_video_out|提交清单|render-pdf" _test/run_all_suites.py
+  _test/repo_config_check.py .github/workflows/*.yml` → **0 命中** ⇒ 该面在 91 套件里**没有归属**，
+  丢失是零告警的。距 iCAN 提交硬截止剩 2 天。
+- 恢复：`git checkout HEAD -- <7 条显式 pathspec>`（不走目录级、不碰他人在途件），
+  并按清单登记的指纹**回读验证**成片 `sha256=04a7f7bf…0888ec7e` **逐字节相等** ——
+  "恢复成功"由被恢复对象的指纹证明，不由退出码证明。
+- **新判据 `_test/deliverable_inventory_check.py`**：提交包「清单声明 ⇄ 磁盘实况 ⇄ 口径」三方对账。
+  分母由清单表格行**现读** `交付物/...` token（不手抄清单），官方硬约束同列现读
+  （`≤20页` / `≤5分钟`），成片指纹行内 `sha256=<64hex>` 在册即对账。真面回执：
+  `声明 3 条｜受检 3｜品牌在册比对 1｜未登记交付物 1｜未验 0`，PDF 20/20 页、成片 218.48s、sha256 全等。
+- **时长不再依赖 ffprobe**：本机 `shutil.which("ffprobe")` = **None**（清单验收列写的却是 ffprobe 读数
+  ⇒ 那条主张在当前环境不可复算）。改为零依赖解 MP4 `moov>mvhd`，与登记值 **218.48s 同尺**。
+  首版只扫文件头 1 MB 判不出 —— 实测该成片 `moov` 落在 **22,888,322 / 22,954,501 B**（非 faststart，
+  盒在尾部），改为「头 1 MB → 尾 1 MB」两段 seek。
+- **新判据 `_test/api_egress_headers_check.py`**：node 假 fetch 驱动**真** `chat.js`，
+  把 r57 那次手工 curl 换成可重跑的 6 出口断言（`no-key`/`bad-json`/`sse`/`passthrough`/
+  `upstream-error`/`stream-fallback`），逐出口查 5 类头 + 状态码 + 错误体形状 + 部署副本逐字节等。
+  **首跑就抓到判据自己的空转腿**：SSE 那条没发 `stream: true` ⇒ `wantStream` 为假，
+  实际测的是整包 JSON 分支（表现为"该出口回了 no-store"），补 `stream:true` 后才真打到 SSE 出口。
+
+### 更正（r59 · 一处设计取舍写成判据语义，免得下轮当漏洞修掉）
+- 未登记进清单的交付物形状件**默认只计数不判红**，**当且仅当它已被 git 跟踪**才升为红。
+  依据：未跟踪草稿可能正被别的会话在途编辑，判红＝让别人的半成品锁住整仓；入库那一刻才进入提交面。
+  本轮据此测出真实分叉：`交付物/提交包/心屿MindIsle_参赛方案.pptx`（未跟踪，09-26 17:06）文本层
+  `MindIsle` 12 处，而权威源 `src/index.html` 与在册 PDF 文本层都是 `SoulIsle` ⇒ 判据印出但不拦；
+  自测腿Ⓗ证明「一旦 `git add` 即拦」。⚠️ 该腿首版为假绿：`evaluate()` 声明了 `tracked` 注入缝，
+  调用点却直写 `tracked_by_git(rel)` ⇒ 注入不生效（函数对、接线错，R238 同族）。
+
 ## [1.6.1] - 2026-09-27
 
 > 切版动因（机器判据 R1）：距 `v1.6.0` 已攒 5 个 feat（上限 5、余量 0）。
