@@ -4,6 +4,17 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Added（r57 · 判据清单与电池双向对账 G16）
+- `repo_config_check.py` 新增 **G16**：`run_all_suites.py` 的 SUITES 里真调用的 `_test/*.py|js`
+  （**59 条**，分母从代码现读）必须逐条出现在 `docs/quality-gates.md`；反向同尺 —— 文档写了而
+  `_test/` 查无此件也算红。首跑即抓到 **26 条从未在册**（先 16 条，补完再抓到 10 条：
+  `ci_watch`/`lightshow`/`pixel_dual`/`server_preflight`/`voice` + 五支 `peer_*_probe`）。
+  动因：本文档头部虽写着"不抄数"（所以**数字**没骗人），但它是从 README 迁出的「判据体系明细」，
+  读者会当清单用 ⇒ 同族根因仍是 M5⑥「一个清单两处实现」。
+  四腿自证（`--selftest` ㉑a–㉑d）：正向拿**真文档真电池**跑防误伤 ＋ 抹一条真判据必红 ＋
+  写一条幽灵必红 ＋ 分母取空不得判绿。
+- ⚠️ 此条把 `feats` 推到 **5/5（余量 0）**：下一个 `feat` 提交会被 R1 拦红，正解是**先切版**
+  （v1.6.1）而不是抬上限 —— `release_cut.py` 自 r45 挂账未做，切版仍须手工。
 ### Added（r57 · 函数侧安全响应头）
 - **`/api/chat`（Pages Function）现在自己回安全头**：`Content-Security-Policy: default-src 'none'`
   + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`
@@ -25,6 +36,16 @@
   （线上看到完整 11 条指令的页面 CSP）；只有 **`POST` 交给函数**才没有头。
   ⇒ 缺口比我写的更窄也更准：要补的是函数出口，不是给函数加 `onRequestOptions`
   （加了反而把平台 405 变成 204，动到契约面）。
+
+### Fixed（r57 · 发版通道的红因归因）
+- `push_and_watch.sh` 以前对任何 CI 红都印同一句「按上面输出的『下一步指令』修」—— 而 r56 起
+  电池有 `ENV-QUOTA` 档（上游余额耗尽也退 2、CI 也红，但**本仓无可修项**）。照旧那句话，
+  下一轮就会去代码里找"计费造成的水红"，最坏是抬判据把它洗绿。
+  ⇒ 现在按日志实判：**有 `ENV-QUOTA(` 且无 `RED(判红`** 时改印"零判红 + 处置动作只有老大能做 +
+  记未验禁写全绿"。退出码不变（红仍是红）。
+  取证用两份**真实**日志跑过两条方向：`/tmp/pw57c.txt`（84/85，仅 quota）走 quota 支、
+  `/tmp/pw57.txt`（含 `disclaimer_forensics` 真红）走修判据支。
+  改 `tee` 落盘后退出码必须取 `${PIPESTATUS[0]}` —— 直接 `$?` 会拿到 `tee` 的码而恒 0（在册老坑，这次是自己差点踩进去）。
 
 ### 更正（r57 第二处 · CI 判红 `disclaimer_forensics` 挖出的引用缺陷，非本轮代码）
 - 推送后 CI 唯一真红是 `disclaimer_forensics`：r57 报告性能行写了「无同类可比口径（⚠️r40 结论"不可比"）」

@@ -37,6 +37,9 @@
   G11 依赖清单对账：判据脚本 import 的第三方包 == `_test/requirements.txt`，且每个跑判据的 CI job 都装了它
   G12 版本断言三源对账：`git tag` 最大值 == `server/pom.xml` <version> == 文档「当前版本：**vX.Y.Z**」
   G15 AC 追溯键唯一性棘轮：08 一个 id 只挂一条命题（存量 7 按基线放行，新增重复即红）
+  G16 电池脚本 ⇄ `docs/quality-gates.md` 明细双向对账：电池里跑的 `_test/*.py|js` 必须在该文档出现，
+     文档写了而 `_test/` 查无此件也算红（r57 实证：该文档被当作"判据清单"读，而 44 条套件里 16 条从未在其中，
+     同族根因 M5⑥ 一处清单两处实现；分母从 SUITES 现读，零分母不判绿）
   G13 判据账本自洽：本文件头部登记的 G 清单与 `main()` 里实际执行的 check("G..") 一一对应
      —— 漏登记与幽灵登记都判红（这条由 G13 自己盯着自己，根因见 guard_inventory 的 docstring）
 
@@ -128,6 +131,41 @@ def battery_count():
     txt = (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace")
     seg = txt.split("SUITES = [", 1)[1].split("\n]", 1)[0]
     return len(re.findall(r'^\s*\("', seg, re.M))
+
+
+def battery_scripts():
+    """电池 SUITES 真正调用的 `_test/` 脚本名集合（分母从代码现读，不从文档现读）。
+
+    为什么单独取这一份而不是 `os.listdir('_test')`：目录里有大量**没接线**的一次性脚本
+    （截图/CORS 探针…），把它们一律要求登记会把"文档"变成"目录镜像"，那是另一个维度。
+    本条守的是"会阻断发布的判据 ⇄ 被当作判据清单来读的那份文档"这一对真相。
+    """
+    txt = (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace")
+    seg = txt.split("SUITES = [", 1)[1].split("\n]", 1)[0]
+    return {p.split("/")[-1] for p in re.findall(r'"_test/([^"]+?\.(?:py|js))"', seg)}
+
+
+def gate_doc_audit(scripts, doc_text, on_disk):
+    """G16 纯函数：电池脚本 ⇄ docs/quality-gates.md 双向对账。
+
+    立此条的实证（r57）：`docs/quality-gates.md` 头部写着「本文件不抄数」，所以**数字**没骗人，
+    但它是 README 迁出去的"判据体系明细"，读者（含下一轮的我）会当成清单来读 —— 实测 44 条
+    非 selftest 套件里 **16 条从未出现在其中**（perf_baseline / j2 / j4 / offline_shell / …），
+    且这条盲区存活了 15 轮无人报警。同族根因仍是 M5⑥：**同一个清单有两处实现**。
+    零分母不得判绿（R247）：取不到任何电池脚本 = 解析失效，不是"没有判据"。
+    """
+    bad = []
+    if not scripts:
+        return ["G16 解析不到任何电池脚本（SUITES 形状变了？）⇒ 不得据此判绿"]
+    missing = sorted(s for s in scripts if s not in doc_text)
+    if missing:
+        bad.append("在电池里跑、却没进 quality-gates 的脚本 %d 条：%s"
+                   % (len(missing), "、".join(missing[:6]) + ("…" if len(missing) > 6 else "")))
+    named = {m.split("/")[-1] for m in re.findall(r"_test/([A-Za-z0-9_.\-]+\.(?:py|js))", doc_text)}
+    ghost = sorted(n for n in named if n not in on_disk)
+    if ghost:
+        bad.append("quality-gates 写了而 `_test/` 查无此件：%s" % "、".join(ghost))
+    return bad
 
 
 def remote_has_file(rel, repo):
@@ -916,6 +954,22 @@ def selftest():
         bad.append("篡改⑰c（现行状态句失踪）未被抓到 ⇒ 声明失去机器责任方却判绿（R247 同族）")
     if not peer_count_audit(ok_line, None):
         bad.append("篡改⑰d（台账取不到权威值）被判绿 ⇒ 无权威值可比时必须红")
+    # ㉑ G16 电池脚本 ⇄ quality-gates 双向对账：正向用**真文档真电池**跑（证明不误伤），
+    #    三条负向各自必须红（漏登记 / 幽灵登记 / 零分母）。首跑只测负向会漏掉"判据过严"这一族。
+    real_scripts = battery_scripts()
+    real_doc = _read("docs/quality-gates.md")
+    real_disk = {p.name for p in (ROOT / "_test").iterdir() if p.is_file()}
+    g16now = gate_doc_audit(real_scripts, real_doc, real_disk)
+    if g16now:
+        bad.append("篡改㉑a（当前真实文档与电池）被判红：%s" % g16now)
+    victim = sorted(real_scripts)[0]
+    thinned = "\n".join(l for l in real_doc.splitlines() if victim not in l)
+    if not gate_doc_audit(real_scripts, thinned, real_disk):
+        bad.append("篡改㉑b（从文档抹掉一条真在电池里的脚本 %s）未被抓到 ⇒ 漏登记可隐形" % victim)
+    if not gate_doc_audit(real_scripts, real_doc + "\npython _test/ghost_check_never_written.py  # 幽灵\n", real_disk):
+        bad.append("篡改㉑c（文档引用不存在的判据脚本）未被抓到 ⇒ 反向腿失效")
+    if not gate_doc_audit(set(), real_doc, real_disk):
+        bad.append("篡改㉑d（分母取空）被判绿 ⇒ 违 R247 零命中不得判绿")
     real = sorted((ROOT / "_test").glob("*.py"))
     viol = [p.name for p in real if import_safety(p.read_text("utf-8", errors="replace"))]
     if viol:
@@ -960,6 +1014,11 @@ def main():
     n = battery_count()
     check("G4 电池条目数 == README 声称的套件数", s_claim is not None and s_claim == n,
           f"run_all_suites.py 实测 {n} | README 声称 {s_claim}")
+    scripts = battery_scripts()
+    on_disk = {p.name for p in (ROOT / "_test").iterdir() if p.is_file()}
+    g16bad = gate_doc_audit(scripts, _read("docs/quality-gates.md"), on_disk)
+    check("G16 电池脚本 ⇄ quality-gates 明细双向对账（漏登/幽灵登都红）", not g16bad,
+          f"电池脚本 {len(scripts)} 条（分母从 SUITES 现读）| " + (" ; ".join(g16bad) or "全部在册"))
     pom, tag = pom_version(), latest_tag()
     docs_text = {name: (ROOT / name).read_text("utf-8", errors="replace")
                  for name in ("ROADMAP.md", "README.md") if (ROOT / name).exists()}

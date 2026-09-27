@@ -46,6 +46,38 @@ python _test/eol_parity_check.py         # 行尾确定性：工作树字节 == 
 python _test/patch_apply.py --selftest       # 补丁器自证：锚点失配/歧义/同义/插入/正常/缺失 + 行尾两侧 八类行为（防"没报错=生效了"）
 python _test/api_contract_check.py       # 接口契约三方对账（控制器↔docs/openapi.yaml↔前端）+ 11 条运行态真实打 + C6 零漏探测
 python _test/repo_config_check.py --online # 仓库配置自洽：dependabot schema/目录可达 + 文档数字断言==机器实测 + 默认分支受理面
+
+# ↓ r57 补登记：以下 16 条在电池里，而本节（被当作"判据清单"来读）从来没有它们。
+#   一句话说明逐字取自各脚本自己的 docstring 首行，不凭记忆改写。
+#   同族盲区常驻由 `repo_config_check.py` 的 **G16** 钉住：电池脚本 ⇄ 本节 双向对账
+#   （电池有、本节没有 ⇒ 红；本节写了、`_test/` 里查无此件 ⇒ 也算红）。
+python _test/perf_baseline_check.py      # 性能基线判据（r40）：把"性能表现"这一维从连续几轮的「未实测」变成有数、有预算、有回归棘轮的一格
+python _test/disclaimer_forensics_lint.py --all  # 边界声明取证判据（M5⑫ 执行器）：免责声明不得顶替一整维的测量（r57 由 CI 判红实证它在管）
+python _test/plan_pdf_coverage_check.py  # 应用方案 PDF 的九项覆盖判据（iCAN 硬截止前的交付面自证）
+python _test/settings_panel_check.py     # 设置面板行为守卫（r27，第四刀的前置判据）
+python _test/offline_shell_check.py      # 只读离线壳（sw.js）+ 缓存头策略判据（r28）
+python _test/pdf_leak_scan.py            # PDF 文本层泄露复扫（R242：二进制产物须抽文本后再扫）
+python _test/tracked_secret_scan.py      # 跟踪文件密钥形态扫描（r35）—— 与 CI 密钥门禁同一把尺，且本地也跑
+python _test/remote_tree_audit.py        # 远端树洁净度审计（r37）：评委看得见的是远端 main 的文件树，不是本机工作树
+python _test/mobile_check.py             # 移动端与触屏可达性判据（r47）—— 量真实几何，不量"有没有写 @media"
+python _test/release_governance_check.py # 发布治理判据（r45，双通道同尺）—— 盯「版本在动、内容没切版」这一族
+python _test/j2_chat_contract.py         # J2 契约验收：POST /api/chat 与 v1 1:1，前端零代码改动即可切到 Spring Boot
+python _test/j4_memory_check.py          # J4 持久化验验收：记忆从 localStorage 迁到服务端数据库（并保留本地降级）
+python _test/j4_remote_down_check.py     # J4 熔断对照：服务端没有 /api/memory 时，远端记忆必须"试一次就闭嘴"
+python _test/online_check.py             # 在线模式全链路回归：徽章 + 双路情绪探针 + 在线对话 + 危机拦截 + console 0 报错
+python _test/public_check.py             # 公网版验收：评委打开即在线AI（走服务端代理），密钥零暴露，console 0
+node _test/emotion_eval.js               # 情绪引擎评测：词典层准确率（技术实现维度的可复现数字）
+# ↓ 同批第二刀：G16 首跑又抓到 10 条（r35–r50 落地的判据/探针/通道件，同样从未进本文明细）
+python _test/ci_watch.py                 # push 后的 CI 回执看守（把"看 CI"从人记得住，变成一条命令必跑）
+python _test/lightshow_check.py          # 一键点亮验收：清屏（UI 让位）+ 六色各自可见 + 铺得够满够散 + 播完不自动跳回
+python _test/pixel_dual_check.py         # 星雾「是不是真的变彩色了」——像素级回归（判断据不看内部数组）
+python _test/server_preflight.py         # 被测服务前置探针（r35）—— 把"服务没起"与"代码有缺陷"分开报
+python _test/voice_check.py              # 语音输入（Web Speech API）实测：只认真实发生过的事实（API 在否/start 真被调用/监听态出现过/能恢复）
+python _test/peer_a11y_probe.py          # 对标 r42 探针：无障碍与制度化（a11y）（16 仓 + self，三通道同尺）
+python _test/peer_community_probe.py     # 对标 r50 探针：协作治理与健康度的制度化程度（16 仓 + self，三通道同尺）
+python _test/peer_license_probe.py       # 对标 r46 探针：许可与供给链合规（16 仓 + self，双通道同尺）
+python _test/peer_mobile_probe.py        # 对标 r47 探针：移动端与触屏支持的结构性证据（16 仓 + self，双通道）
+python _test/peer_release_probe.py       # 对标 r45 探针：发布与版本治理（16 仓 + self，同一把尺）
 ```
 
 > 前置：多数判据需 fat jar 起在 8123（`java -jar server/target/soulisle-server.jar --server.port=8123`，
