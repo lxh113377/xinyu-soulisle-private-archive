@@ -82,14 +82,32 @@ CASES = [
 ]
 
 
+def row_line(case, res):
+    """门面行渲染单独成函数：上一版它内联在 run() 里，占位符比实参少一个 ⇒
+    自测 10 腿全过而真面 `TypeError` 崩在打印上（自测覆盖纯函数、没覆盖输出面 = 又一条假绿）。"""
+    return ("  · %-18s dock=%s ui=%s src=%s lit=%s errs=%d msgs=%s cons=%s write=%s 末条=「%s」%s%s"
+            % (case, bool(res.get("dock")), res.get("ui_count"), res.get("src_count"),
+               res.get("lit"), len(res.get("pageerrors") or []), res.get("msgs"),
+               res.get("cons", 0), res.get("write"), res.get("last"),
+               (" 回执=「%s」" % (res.get("receipt") or "")[:44]) if res.get("receipt") else "",
+               (" 〔" + res["degraded"] + "〕") if res.get("degraded") else ""))
+
+
+def diag(res):
+    """稀有间歇红的自证快照：变红时必须当场说清"这句话到底走到哪一步"。"""
+    return ("气泡 %s 条｜console 错 %s 条｜本机写盘 %s｜数据源 %s｜界面 %s｜末条「%s」"
+            % (res.get("msgs"), res.get("cons", 0), res.get("write"),
+               res.get("src_count"), res.get("ui_count"), res.get("last")))
+
+
 def assess(case, res):
     """纯判定：输入一条用例的实测结果，返回违规列表。抽出来是为了让 --selftest 能喂坏读数。"""
     bad = []
     if res.get("arm_error"):
         bad.append("%s 注错脚本自身抛错：%s" % (case, res["arm_error"]))
     if res.get("harness_error"):
-        bad.append("%s 取数失败（harness 侧，不是应用崩）⇒ 该条不作数、必须查: %s"
-                   % (case, res["harness_error"]))
+        bad.append("%s 取数失败（harness 侧，不是应用崩）⇒ 该条不作数、必须查: %s ｜诊断 %s"
+                   % (case, res["harness_error"], diag(res)))
     if res.get("pageerrors"):
         bad.append("%s 有 %d 条未捕获异常（catch 没兜住或被绕过）: %s"
                    % (case, len(res["pageerrors"]), res["pageerrors"][0][:90]))
@@ -104,8 +122,8 @@ def assess(case, res):
     if res.get("lit") is None:
         bad.append("%s 星雾点亮读数取不到 ⇒ 未验" % case)
     elif res["lit"] <= 0:
-        bad.append("%s 说了一句情绪话后星雾没点亮（lit=%s）⇒ 存储故障把体验一起带走了"
-                   % (case, res["lit"]))
+        bad.append("%s 说了一句情绪话后星雾没点亮（lit=%s）⇒ 存储故障把体验一起带走了 ｜诊断 %s"
+                   % (case, res["lit"], diag(res)))
     if case.startswith("F4"):
         rec = res.get("receipt") or ""
         if "失败" not in rec:
@@ -137,6 +155,8 @@ def probe_case(browser, case, fault, click_clear):
     page = ctx.new_page()
     res = {"pageerrors": [], "arm_error": "", "harness_error": ""}
     page.on("pageerror", lambda e: res["pageerrors"].append(str(e)))
+    page.on("console", lambda m: res.setdefault("console_errors", []).append(m.text[:90])
+            if m.type == "error" else None)
     try:
         page.add_init_script(FAULT[fault])
         page.goto(BASE + "/index.html", wait_until="networkidle", timeout=45000)
@@ -154,6 +174,23 @@ def probe_case(browser, case, fault, click_clear):
             " ? MemoryStore.count() : null")
         res["lit"] = page.evaluate(
             "() => (window.ThreeScene && ThreeScene.litInfo) ? ThreeScene.litInfo().lit : null")
+        # 稀有间歇红的正解是"下次变红自带红因"：这四件都是**被等对象自己产出的证据**，
+        # 不引入第二份真相 —— 气泡数（有没有走完对话）、console error 数（被谁吞了）、
+        # 本机写盘能力（setItem 真能不能写）、末条气泡头（在线/离线/降级哪一种）。
+        res["msgs"] = page.evaluate(
+            "() => document.querySelectorAll('#chat-log .msg').length")
+        res["cons"] = len(res.get("console_errors") or [])
+        # 分开报两个动作：只报一个名字会把"removeItem 被注错"读成"写不进去"（首版实测即如此）
+        res["write"] = page.evaluate(
+            "() => { const o = {};"
+            " try { localStorage.setItem('peiliao.write-probe', '1'); o.set = 'ok'; }"
+            " catch (e) { o.set = String(e && e.name || e); }"
+            " try { localStorage.removeItem('peiliao.write-probe'); o.rm = 'ok'; }"
+            " catch (e) { o.rm = String(e && e.name || e); }"
+            " return 'set=' + o.set + ' rm=' + o.rm; }")
+        res["last"] = (page.evaluate(
+            "() => { const m = document.querySelectorAll('#chat-log .msg');"
+            " return m.length ? m[m.length - 1].innerText : ''; }") or "")[:56]
         if click_clear:
             # 这个按钮在第四幕（滚动叙事里默认还没进场）。真点击拿不到就把**触发方式**降级成
             # JS dispatch，但绝不解绑成"没测"：降级必须留痕并印出来 —— 可达性是
@@ -226,11 +263,7 @@ def run() -> int:
         print("STORAGE-RESILIENCE-UNVERIFIED: 零用例实跑，不判绿")
         return 2
     for case, r in rows:
-        print("  · %-18s dock=%s ui=%s src=%s lit=%s errs=%d%s%s"
-              % (case, bool(r.get("dock")), r.get("ui_count"), r.get("src_count"),
-                 r.get("lit"), len(r.get("pageerrors") or []),
-                 (" 回执=「%s」" % (r.get("receipt") or "")[:44]) if r.get("receipt") else "",
-                 (" 〔" + r["degraded"] + "〕") if r.get("degraded") else ""))
+        print(row_line(case, r))
     for x in bad:
         print("  ✗ " + x)
     if bad:
@@ -299,11 +332,22 @@ def selftest() -> int:
         out = assess("F3-quota", res)
         if not any("未捕获异常" in x for x in out):
             bad.append("⑧坏页真崩而判据没红 ⇒ 注错没打到被审对象，这条反例是假的：%s" % out)
+    full = {"dock": True, "ui_count": 1, "src_count": 1, "lit": 5, "msgs": 2, "cons": 0,
+            "write": "ok", "last": "在线", "receipt": "本机清除失败", "pageerrors": []}
+    try:
+        line = row_line("F4-remove-denied", full)
+        if "本机清除失败" not in line or "F4-remove-denied" not in line:
+            bad.append("⑪行渲染内容不对（缺回执或缺用例名）: %s" % line[:90])
+        sparse = row_line("F0-baseline", {})          # 空读数也不许崩：崩了就是假红
+        if "F0-baseline" not in sparse:
+            bad.append("⑪空读数行渲染没点用例名")
+    except Exception as exc:
+        bad.append("⑪行渲染抛错（自测覆盖不到输出面的代价就在这）: %s" % exc)
     zero = assess("F0-baseline", {"dock": True, "ui_count": None, "src_count": None,
                                   "lit": None, "pageerrors": []})
     if len(zero) < 2:
         bad.append("⑨零读数应当成「未验」堆红，实到 %d 条" % len(zero))
-    print("STORAGE-RESILIENCE-SELFTEST-%s（10 腿：合规正例 + 六形必红 + 坏页端到端 + 零读数）"
+    print("STORAGE-RESILIENCE-SELFTEST-%s（11 腿：合规正例 + 六形必红 + 坏页端到端 + 零读数 + 门面行渲染）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad)))
     for x in bad:
         print("  ✗ " + x)

@@ -62,6 +62,14 @@
   `python _test/deploy_sync_check.py --selftest` → `DEPLOYSYNC-SELFTEST-PASS`；真面 →
   `DEPLOY-SYNC-PASS`，函数面回执 `分母 1 个`。
 
+### Fixed（r63 · 判据输出面的第二条假绿 + 间歇红改为自证）
+- **`storage_resilience_check` 连跑 3 次 15/15 全绿** ⇒ 那条红属稀有间歇，停止猜机制，
+  改为让**下次变红自带证据**：门面行与红因加印「气泡数／console 错数／本机写盘 `set=`·`rm=`／末条气泡标签」。
+  写盘探针首版把两个动作混成一个词（F4 报 `SecurityError` 看着像写不进），拆成 `set=ok rm=SecurityError`。
+- **自测 11 腿全绿、真面 `TypeError` 崩在打印上**：占位符比实参少一个，而所有腿只调纯函数
+  ⇒ 门面行渲染是**没人覆盖的输出面**。提成为 `row_line()` + 第 ⑪ 腿（正例断言点名回执与用例名、
+  空读数不得抛）。复算：`python _test/storage_resilience_check.py --selftest` → 11/11，真面 rc=0。
+
 ### Fixed（r61 · 收口我自己造的两处）
 - **公网漂移**：r61 中途缩注释改了 `src/` 却未重部 ⇒ `live_sync` 判红。补部后
   `LIVE-SYNC-PASS` 21/21 逐字节等。收尾清单里"改 `src/` ⇒ 重部 + 跑 live_sync"不可省。
