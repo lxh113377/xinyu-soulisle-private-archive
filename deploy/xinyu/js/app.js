@@ -187,8 +187,10 @@
       const emoSrcLabel = r.emoSrc === "backend" ? " · 情绪:后端" : "";
       // r52：AI 引用了长期记忆就要说出来——隐私承诺是"只留本机"，那"被带进模型"这件事也得可见
       const memLabel = r.memory ? " · 已带入 " + r.memory + " 条记忆" : "";
+      // r53：滑出窗口的历史被概要替代了就要说出来（否则用户以为模型"记得全部"）
+      const dropLabel = r.dropped ? " · 早前 " + r.dropped + " 条已概要" : "";
       const aiMsg = CW.push("ai", r.reply,
-        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${memLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
+        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${memLabel}${dropLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}`);
       aiMsg.dataset.emotion = r.emotion;
       window.Voice.speak(r.reply);   // 朗读开关打开时同步播出（失败静默，绝不影响主链路）
       // 记住这条情绪 → 点亮一簇星（一个瞬间 = 1~8 颗，强度越高越多）

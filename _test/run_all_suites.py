@@ -123,6 +123,11 @@ SUITES = [
     # 一个真实但没被文档化的第四态（`● 网络不可用（配置为在线）`）。
     ("readme_troubleshooting", [sys.executable, "_test/readme_troubleshooting_check.py"]),
     ("readme_troubleshooting_selftest", [sys.executable, "_test/readme_troubleshooting_check.py", "--selftest"]),
+    # r53：上下文窗口预算与截断损失。十四份报告从没量过"本机攒下的对话模型这一轮真看到了多少"，
+    # 实测 14 轮里 16 条消息对模型永久不可见且无任何补偿 ⇒ 概要注意送达 + 条数按判据独立算法对账
+    # （不让产品报给自己的数字自比）。修前该套件以 X2 判红，是真拦住过东西的判据。
+    ("context_budget", [sys.executable, "_test/context_budget_check.py"]),
+    ("context_budget_selftest", [sys.executable, "_test/context_budget_check.py", "--selftest"]),
     # r45：发布/版本治理对标探针的判据自证（semver 合流 / 发布滞后 / CHANGELOG 三段，含小数天反例）
     ("release_probe_selftest", [sys.executable, "_test/peer_release_probe.py", "--selftest"]),
     # r46：许可与供给链对标探针的判据自证（LICENSE 类件 / 归属类件 / vendored 目录三个分类器，

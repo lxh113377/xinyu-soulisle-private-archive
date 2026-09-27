@@ -141,13 +141,39 @@ window.ChatAgent = (function () {
 
   const SYSTEM = (emo) => {
     const s = strategyOf(emo);
-    // 长期记忆注入（r52）：MemoryStore 此前**只写不读**——落库的记忆只喂星图，模型侧对
-    // "你们聊过几次"一无所知，"跨设备记住你"只成立在展示层。只注入聚合摘要，不注入原话。
+    // 长期记忆注入（r52）：MemoryStore 原本**只写不读**，"跨设备记住你"只成立在展示层。
+    // 只注入聚合摘要，不注入原话。
     const mem = (window.MemoryStore && window.MemoryStore.recall) ? window.MemoryStore.recall() : "";
     return STR.persona + "用户刚说的话被识别为主要情绪「" + window.EmotionEngine.labelOf(emo) + "」。" +
       "当前共情要点：" + s.lead + "。要求：" + STR.rules.map((r, i) => (i + 1) + ")" + r).join("；") + "。" +
-      (mem ? mem : "");
+      (mem ? mem : "") + summaryOfDropped();
   };
+
+  /**
+   * 早前对话概要（r53）：把**滑出上下文窗口**的那段历史压成一行结构化摘要。
+   * 动因实测：HISTORY_MAX=10 ⇒ 14 轮对话有 16 条消息对模型永久不可见（context_budget_check 拦
+   * /api/chat 取证），而"陪伴感"恰建立在模型看不见的部分上。只扫情绪标签、不抄原话（X5 盯），
+   * 零截断时返回 ""（X4 反向腿：常量注入会被当场抓红）。
+   */
+  function summaryOfDropped() {
+    const drop = history.slice(0, Math.max(0, history.length - HISTORY_MAX));
+    if (!drop.length) return "";
+    const cnt = {};
+    let crisis = 0;
+    for (const m of drop) {
+      if (m.role !== "user") continue;
+      const e = window.EmotionEngine.scan(String(m.content || ""));
+      if (e.crisis) { crisis += 1; continue; }
+      const k = window.EmotionEngine.labelOf(e.emotion);
+      cnt[k] = (cnt[k] || 0) + 1;
+    }
+    const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a] || (a < b ? -1 : 1)).slice(0, 3);
+    return "早前对话概要：此前 " + drop.length + " 条消息未逐条送入上下文；" +
+      "情绪分布 " + (top.length ? top.map(k => k + "×" + cnt[k]).join("、") : "无词典命中") +
+      "；其间危机信号 " + crisis + " 次。请勿复述本概要，自然承接即可。";
+  }
+  /** 本轮被概要替代的条数（供界面标注，与 SYSTEM 内同一次计算口径一致） */
+  function droppedCount() { return Math.max(0, history.length - HISTORY_MAX); }
 
   function offlineReply(emo) {
     const pool = strategyOf(emo).templates;
@@ -218,6 +244,7 @@ window.ChatAgent = (function () {
     let reply, mode, streamed = false;
     // 记录"本轮发给模型前已存在的记忆条数"：record 在之后才写，所以这里取到的是**此前**的条数
     const memBefore = (window.MemoryStore && window.MemoryStore.count) ? window.MemoryStore.count() : 0;
+    const dropBefore = droppedCount();   // 同理：概要替代掉的条数要在 remember 之前取
     if (isOnline()) {
       try {
         reply = await onlineReply(text, emo, onDelta);
@@ -231,9 +258,10 @@ window.ChatAgent = (function () {
     const latency = Math.round(performance.now() - t0);
     remember(text, reply);
     window.MemoryStore.record({ emotion: emo, intensity, secondary, text: text.slice(0, 60) });
-    // memory 只在**真的带着摘要发给了模型**时才非零：降级/离线模板没走 LLM，标了就是说谎
+    // memory/dropped 只在**真的带着它们发给了模型**时才非零：降级/离线模板没走 LLM，标了就是说谎
     return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all, streamed,
-             emoSrc, memory: mode === "model" ? memBefore : 0 };
+             emoSrc, memory: mode === "model" ? memBefore : 0,
+             dropped: mode === "model" ? dropBefore : 0 };
   }
 
   /** 记住一轮问答：本地 history 为主，远端（J4，默认关闭）尽力而为 */
@@ -257,6 +285,6 @@ window.ChatAgent = (function () {
     return { version: STR.version, emotions: EMOTIONS.slice(), rules: STR.rules.slice(), fallback: FALLBACK_EMO };
   }
 
-  return { respond, classifyEmotion, isOnline, setCfg, getCfg, getHistory, strategyInfo,
+  return { respond, classifyEmotion, isOnline, setCfg, getCfg, getHistory, droppedCount, strategyInfo,
            llmBad: () => llmBad };   // r51：徽章要能反映"配了在线但刚降级过"，否则会说谎
 })();

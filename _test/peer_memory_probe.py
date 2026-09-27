@@ -29,7 +29,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from benchmark_metrics import PEERS, ROOT
 
 NOISE = re.compile(r"(^|/)(node_modules|\.venv|venv|dist|build|target|vendor|\.git|_shots|"
-                   r"web_raw|video_raw|__pycache__|\.next|miniprogram_npm)/", re.I)
+                   r"web_raw|video_raw|__pycache__|\.next|miniprogram_npm"
+                   # 测试/夹具目录**不算产品能力**（r53 实测自打）：本仓新增判据
+                   # `_test/context_budget_check.py` 的词元是 context+budget，正好命中 ctxwin，
+                   # 于是"产品有上下文窗口管理器"被我自己写的一个**测试脚本**充上了。
+                   # 排除对 self 与 peers 同尺生效（peers 的 tests/ 里同样有这类命名）。
+                   r"|_?tests?|__tests__|spec|e2e|cypress|playwright)/", re.I)
 # 装配件：文件名词元里含 prompt/messages/chain/agent/llm/chat/completion 的**代码**文件
 ASSEMBLY = re.compile(r"\.(py|ts|tsx|js|jsx|mjs|java|go|rs)$", re.I)
 IMPORTISH = re.compile(r"(from|import|require|use)\s|@Resource|@Autowired", re.I)
@@ -319,9 +324,24 @@ def selftest():
         ok += 1
     else:
         fail.append("对偶 none-in-sample 形状或样本数缺失：%s ｜ %s" % (e3, v))
+    # 反例⑤（r53 实测自打）：判据/测试目录里的文件**不得**充当产品能力。
+    # 本仓新增 `_test/context_budget_check.py` 的词元正好是 context+budget，第一版把它算成
+    # "该仓有上下文窗口管理器" ⇒ self 从 1/4 虚高到 2/4，且这个"2"里根本没有产品代码。
+    t6 = classify_tree(["_test/context_budget_check.py", "tests/memory_fixture.ts",
+                        "src/store/memory.ts"])
+    if not t6["ctxwin"] and not t6["summary"] and t6["memory"] == ["src/store/memory.ts"]:
+        ok += 1
+    else:
+        fail.append("反例⑤ 测试目录被当成产品能力：%s ｜ %s" % (t6["ctxwin"], t6["memory"]))
+    # 对偶（防"一删了之"）：产品目录里的同名文件必须照常命中，排除面不能顺手把真能力也排除掉
+    t7 = classify_tree(["src/context/context_budget.ts", "src/lib/summary.ts"])
+    if t7["ctxwin"] and t7["summary"]:
+        ok += 1
+    else:
+        fail.append("对偶 产品目录被误排除：%s ｜ %s" % (t7["ctxwin"], t7["summary"]))
     for x in fail:
         print("  SELFTEST-FAIL " + x)
-    expected = 9
+    expected = 11
     print("MEMPEER-SELFTEST: %d/%d%s" % (ok, expected,
           "" if ok + len(fail) == expected else "  ⚠️ 分支数 %d≠%d" % (ok + len(fail), expected)))
     return 0 if ok == expected and ok + len(fail) == expected else 1

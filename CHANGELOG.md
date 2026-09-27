@@ -4,6 +4,42 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Added（r53 · 上下文窗口预算与截断损失面）
+- **`_test/context_budget_check.py`（+2 套件，`--selftest` 10/10）**：量「本机攒下的对话，
+  模型这一轮真看到了多少」。取数面 = 拦 `/api/chat` 读 `request.post_data` 反解 messages；
+  **截断条数由判据自己**用「发该轮之前本机 history 条数 − 窗口」算出，不采信产品报给自己的数
+  （`measure()` 自比是登记在册的假反例形态）。六条：X1 覆盖率棘轮（下限 0.30）／X2 截断必须由
+  概要注意送达**且条数对得上**／X3 system 段 ≤1,600 字符／X4 首轮与零截断不得有任何注入（反向腿）／
+  X5 概要内不得出现用户原话／X6 未捕获异常 0。
+- **`summaryOfDropped()` + `droppedCount()` 实装**：滑出 `HISTORY_MAX=10` 窗口的那段历史压成一行
+  结构化概要（条数 + 情绪分布 top3 + 危机次数），**不抄原话**；界面加标「早前 N 条已概要」。
+- **`peer_memory_probe` 换到逐类读数**：上轮只报"四类里有几类"的合计，本轮逐类拆
+  （`memory 10/16｜summary 4/16｜ctx 窗口管理 3/16｜retrieval 3/16`）——合计会把三件不同的事糊成一个分数。
+
+### Fixed（r53 · 一条实测缺陷 + 一条度量学自打）
+- **14 轮对话里 16 条消息对模型永久不可见且零补偿**：`chat-agent.js:11` `HISTORY_MAX=10`、
+  第 159 行 `history.slice(-HISTORY_MAX)` 是历史进 messages 的唯一入口 ⇒ 聊到第 6 轮前面全丢。
+  演示与答辩现场一次正常对话就是 10–15 轮，而"情感陪伴"的叙事恰建立在模型看不见的部分上。
+  修前该套件以 `X2 截断了 16 条历史，但 system 里没有「早前对话概要」段` **真判红**，修后送达且条数对账通过。
+- **我自己写的一个测试脚本给产品充上了能力**：新增 `_test/context_budget_check.py` 的词元正好是
+  `context`+`budget` ⇒ 结构探针把它算成"本仓有上下文窗口管理器"，self 从 1/4 虚高到 2/4。
+  探针的 `NOISE` 加了测试/夹具目录排除（对 self 与 peers 同尺生效），并配**对偶**用例
+  （产品目录里的同名文件必须照常命中，防止"一删了了"把真能力也排除掉）；桩 9→11。
+  ⚠️ 诚实结论：self 在**结构面仍不在** summary/ctx 两格（摘要是函数级、藏在 chat-agent.js 里，
+  按文件粒度的探针取不到），本轮只主张行为面 X2 已过。
+
+### 度量学（r53 · 两处实跑前就拦下的）
+- 首版 `assess()` 用**发完之后**的 history 条数算截断数 ⇒ 与产品"发之前"的口径差一条，
+  概要与判据各算一套永远对不上；写完先手算 14 轮的两个数才发现，改为每轮记 `before`。
+- 概要注意一度想写"首个话题=答辩"——那是用户原话的关键词，撞 r52 的 R7 隐私口径；
+  改成只扫情绪标签，并给判据补 X2-INVARIANT（概要里出现独有词即红）。
+
+### 环境（r53 登记，不归本会话修）
+- `A-project-handoff/scripts/handoff_lib/volumegov.py:3456` SyntaxError（print 里嵌套 ASCII 引号）
+  ⇒ `handoff.py` 整体跑不动、`savepoint` 链断。该文件 mtime=**16:53（当分钟）**、
+  `D:\global_skills` 内另有 3 个在途改动 ⇒ **并行会话正在写**，按其自身纪律不代修。
+  本轮手工完成 savepoint 的等价校验（07 P0 非空 / P-1 在册 / 07 全卷 ≤4,096 B / 文本 LF）。
+
 ### Fixed（r52 收口 · 切版之后落地的两处）
 - **生产方 `Path.write_text()` 在 Windows 下把 CRLF 写进自家快照**：`peer_memory_probe --json`
   产出的 `对标数据/peer-memory-*.json` 工作树字节 ≠ git blob 字节，同族两处是切版时用

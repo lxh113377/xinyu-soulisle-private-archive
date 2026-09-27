@@ -13,12 +13,12 @@
     "ctxwin": [],
     "retrieval": [],
     "assembly": [
-     "_test/j2_chat_contract.py",
      "deploy/cloudbase/functions/chat/index.js",
      "deploy/functions/api/chat.js",
      "deploy/xinyu/js/chat-agent.js",
      "deploy/xinyu/js/chat-window.js",
-     "server/src/main/java/com/xinyu/soulisle/api/ChatController.java"
+     "server/src/main/java/com/xinyu/soulisle/api/ChatController.java",
+     "server/src/main/java/com/xinyu/soulisle/entity/ChatMessage.java"
     ]
    },
    "readme": {},
@@ -35,7 +35,7 @@
     "memory": [
      ".agents/skills/cli/references/memory.md",
      ".agents/skills/ux-audit/references/example/memory.md",
-     "apps/cli/e2e/memory.e2e.test.ts"
+     "apps/cli/src/commands/memory.test.ts"
     ],
     "summary": [
      "apps/server/src/router-hono/workflows/topic-auto-summary/dispatch.test.ts",
@@ -48,9 +48,9 @@
      "apps/server/src/modules/AgentRuntime/adapters/serverCallLlmContextBuilder.ts"
     ],
     "retrieval": [
-     "apps/server/src/routers/async/__tests__/ragEval.test.ts",
      "apps/server/src/routers/async/ragEval.ts",
-     "apps/server/src/routers/lambda/ragEval.ts"
+     "apps/server/src/routers/lambda/ragEval.ts",
+     "locales/ar/ragEval.json"
     ],
     "assembly": [
      ".agents/acceptance/scripts/agent-browser-klm.mjs",
@@ -125,8 +125,8 @@
     "long_term_memory": true
    },
    "edge": [
-    "yes",
-    "src/open_llm_vtuber/agent/agent_factory.py → basic_memory_agent",
+    "yes(import)",
+    "src/open_llm_vtuber/agent/agent_factory.py → memory",
     2
    ],
    "err": ""
@@ -162,8 +162,8 @@
     "cn": true
    },
    "edge": [
-    "none-in-sample",
-    "",
+    "yes(member)",
+    "live-2d/js/ai/MoodChatModule.js → memory",
     6
    ],
    "err": ""
@@ -236,7 +236,7 @@
     "long_term_memory": true
    },
    "edge": [
-    "yes",
+    "yes(import)",
     "core/chat/chat.py → memory",
     6
    ],
@@ -329,15 +329,14 @@
      "bundled-skills/default-enabled/skill-creator/scripts/generate_report.py",
      "bundled-skills/optional/baoyu-post-to-wechat/scripts/wechat-agent-browser.ts",
      "scripts/verify-agent-capabilities.mjs",
-     "src/host/momo-prompt.ts",
-     "tests/bridge/fixtures/sdk-messages.ts"
+     "src/host/momo-prompt.ts"
     ]
    },
    "readme": {},
    "edge": [
-    "none-in-sample",
-    "",
-    6
+    "yes(import)",
+    "src/host/momo-prompt.ts → memory",
+    5
    ],
    "err": ""
   },
@@ -391,24 +390,19 @@
      "chibi/memory/abstract.py",
      "chibi/memory/chroma.py"
     ],
-    "summary": [
-     "tests/services/test_check_history_and_summarize.py"
-    ],
+    "summary": [],
     "ctxwin": [],
     "retrieval": [],
-    "assembly": [
-     "tests/runners/test_ide_background_messages.py",
-     "tests/services/test_editor_context_prompt.py"
-    ]
+    "assembly": []
    },
    "readme": {
     "summarize_ctx": true,
     "ctx_window": true
    },
    "edge": [
-    "none-in-sample",
+    "NA",
     "",
-    2
+    0
    ],
    "err": ""
   },
@@ -487,6 +481,6 @@
  "denominator": 17,
  "blind": 0,
  "usable": 17,
- "self_paths_scanned": 367,
+ "self_paths_scanned": 296,
  "ceiling_note": "引用边通道是**正向回执**：none-in-sample / NA 两态都不构成「该仓没做记忆回灌」的结论；且 peers 无行为注入条件，本面只比「有没有制度化」，不比「做得好不好」。"
 }

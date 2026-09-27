@@ -15,6 +15,8 @@ python _test/peer_memory_probe.py                 # r52 记忆/上下文面对�
 python _test/peer_memory_probe.py --selftest      # r52 记忆探针桩：9 例（歧义形状四连：storage 含 rag／React context／泄漏件／GPU memory）
 python _test/readme_troubleshooting_check.py      # r52 README 排障段 ⇄ 代码状态标签双向对账（T1 漏写状态／T2 凭空造状态 都判红）
 python _test/readme_troubleshooting_check.py --selftest  # r52 文档对账桩：5 例（含"取数面退化成空集"与"抽到注释"两形）
+python _test/context_budget_check.py             # r53 上下文预算：14 轮实测窗口内送 10／发前 26，截断 16 条须由概要注意送达且条数对账
+python _test/context_budget_check.py --selftest  # r53 判据桩：10 例（含"无概要""假条数""常量注入""窗口缩水""原话进概要"）
 python _test/clean_clone_check.py         # r43 干净克隆可跑性：从 HEAD 克隆到临时目录再跑，未知报错即红（已登记缺口须计数命中，0 命中要销账）
 python _test/data_rights_check.py            # r44 数据权利：披露随模式翻转 + 删除回执并复核归零 + 导出与计数对齐
 python _test/peer_data_rights_probe.py --selftest  # r44 对标探针桩：10 例（路径 7｜README 2｜边界 1）
