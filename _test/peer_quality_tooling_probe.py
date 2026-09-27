@@ -128,7 +128,8 @@ def self_paths():
     return [x.strip() for x in r.stdout.splitlines() if x.strip()]
 
 
-RETRY_WAITS = (0, 2, 5)          # 第 1/2/3 次尝试前的等待秒数（上限 3 次，总预算仍 < 单机网络抖动）
+RETRY_WAITS = (0, 2, 5)          # 第 1/2/3 次尝试前的等待秒数（仅三次；配合下面的全局预算才有上界）
+DEADLINE = [None]                # main() 里按 --budget 写入的绝对截止时刻；None = 不设限
 CALL_TIMEOUT = 20                # 45s 会把一次抖动放大成几十分钟的整轮（r58 实测：16 仓跑了一小时）
 
 
@@ -144,6 +145,9 @@ def api(path, token):
         req.add_header("Authorization", "Bearer " + token)
     last = "unknown"
     for wait in RETRY_WAITS:
+        dl = DEADLINE[0]
+        if dl is not None and time.time() > dl:
+            return None, "budget-exhausted"
         if wait:
             time.sleep(wait)
         try:
@@ -273,9 +277,14 @@ def main():
     ap.add_argument("--json", default="")
     ap.add_argument("--self-only", action="store_true")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--budget", type=int, default=240,
+                help="联网采集的总秒数上界（默认 240）；到点后剩余仓记 NA(budget-exhausted)，"
+                     "不折叠成通过，也不让一次人工轮次挂成无限等")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
+    DEADLINE[0] = time.time() + max(10, a.budget)
+    t_start = time.time()
     token = token_of()
     rows = []
     sp = self_paths()
@@ -317,6 +326,9 @@ def main():
     has_type = sum(1 for r in okp if "typecheck" in r[1])
     print("peers：有 JS 测试文件 %d/%d ｜ CI 有单测执行位 %d/%d ｜ 有 linter 配置 %d/%d ｜ 有 tsconfig %d/%d"
           % (has_js, len(okp), has_ci_unit, len(okp), has_lint, len(okp), has_type, len(okp)))
+    print("预算 %ds ｜ 已用 %.0fs ｜ budget 耗尽后停取 %s"
+          % (a.budget, time.time() - t_start,
+             "是" if any("budget-exhausted" in str(r[5]) for r in rows if r[1] is None) else "否"))
     print("应测 %d 仓 ｜ 计入分母 %d ｜ BLIND(NA) %d ｜ 恒等式：%s"
           % (len(peers), len(okp), len(blind),
              "OK" if len(okp) + len(blind) == len(peers) else "不成立⇒分母可疑"))
