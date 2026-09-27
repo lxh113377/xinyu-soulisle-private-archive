@@ -219,17 +219,21 @@ def probe(base):
             pg.on("pageerror", lambda e: errs.append(str(e)[:120]))
             try:
                 pg.goto(base + "/", wait_until="load", timeout=40000)
-                pg.wait_for_timeout(1200)
+                # 等**被检对象的完成态**而不是固定 sleep：星雾首帧 + 坞内计数挂载才算可测
+                pg.wait_for_function(
+                    "() => !!window.ThreeScene && !!document.querySelector('#btn-dock')"
+                    " && getComputedStyle(document.querySelector('#chat-dock')).display !== 'none'",
+                    timeout=15000)
                 rows.append((w, h, pg.evaluate(JS_PROBE)))
-                # M5：把折叠面打开复检（默认隐藏的缺陷只有打开才看得见）
+                # M5：同一页面里把折叠面点开复检（默认隐藏的缺陷只有打开才看得见）。
+                # ⚠️ 每个视口只 goto 一次 —— 首版每个 opener 都重开一页，单条判据吃到 129s，
+                #    是全电池最慢的一条（对照 a11y 37s）；加闸不记账就会被后人当累赘删掉。
                 for opener in ("#btn-settings", "#btn-dock"):
                     try:
                         if pg.query_selector(opener):
                             pg.click(opener)
-                            pg.wait_for_timeout(450)
-                            d2 = pg.evaluate(JS_PROBE)
-                            rows.append((w, h, {"sw": d2["sw"], "cw": d2["cw"], "iw": d2["iw"],
-                                                "els": d2["els"]}))
+                            pg.wait_for_timeout(250)
+                            rows.append((w, h, pg.evaluate(JS_PROBE)))
                     except Exception:
                         pass
             except Exception as e:
