@@ -5,6 +5,18 @@
 
 ## [Unreleased]
 
+### Added（r45 · 发布治理常驻判据——把"别忘了切版"从记性活变成闸）
+- **`_test/release_governance_check.py`（+2 套件，电池 68→70，`--selftest` 12/12）**：R1 距上次切版的 feat 增量
+  ≤ 5（当前值与余量一起印在 PASS 行里，不做零余量地板）；R2 `[Unreleased]` ⇄ git 增量**双向**对账
+  （有 feat 零 bullet 判红 / 有 bullet 零 commit 判红 / **R2c 逐轮点名**：commit 里的轮次号必须在 changelog 出现）；
+  R3 已发布 tag 必须有对应版本段。**首跑即真判红**：`feats=11（上限 5）` + `r42,r43 漏记`，逼出 v1.5.0 切版。
+- 一条自己的口径错被反向用例抓出：R2c 初版把 `docs/chore` 尾巴也算漏记，于是 v1.4.3 段标题里的 r38
+  被误判（它的功能早已随版发布）。分母收窄到 feat/fix/perf/refactor 后 r38 自然消失、r41–r43 仍咬住，
+  并补「正例③：docs/chore 尾巴免登记」钉住这个边界。
+- **R4 发布滞后按天数「只报不拦」**：墙钟判据会在零提交的情况下自己从绿翻红，那是时间的颜色不是代码的颜色，
+  不进默认阻断链（本机既有铁律）。取不到 tag（浅克隆）回落 `ls-remote`，两通道皆否 ⇒ **rc=2 UNVERIFIED**，
+  不把"读不到"判成"违规"。
+
 ## [1.5.0] - 2026-09-27 — 对标轮 r39–r45 收口（11 个 feat / 44 个 commit 随版发布）
 
 > 切版由本轮新上的 `_test/release_governance_check.py` 逼出：R1 实测「距 v1.4.3 已攒 11 个 feat（上限 5）」，

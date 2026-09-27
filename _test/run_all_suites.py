@@ -94,6 +94,10 @@ SUITES = [
     ("data_rights_probe_selftest", [sys.executable, "_test/peer_data_rights_probe.py", "--selftest"]),
     # r45：发布/版本治理对标探针的判据自证（semver 合流 / 发布滞后 / CHANGELOG 三段，含小数天反例）
     ("release_probe_selftest", [sys.executable, "_test/peer_release_probe.py", "--selftest"]),
+    # r45：发布治理常驻判据。R1 盯「距上次切版的 feat 增量」，R2 把 CHANGELOG ⇄ git 增量做成双向对账
+    # （首跑就以 feats=11/上限 5 判红，并抓出 r41/r42/r43 三轮漏记 —— 旧轮次的 bullet 会掩盖计数型判据）。
+    ("release_governance", [sys.executable, "_test/release_governance_check.py"]),
+    ("release_governance_selftest", [sys.executable, "_test/release_governance_check.py", "--selftest"]),
     # r43：干净克隆可跑性——从 **HEAD** 克隆到临时目录再跑，证明"交出去的那份"能跑，
     # 而不是"我这台机器上恰好有一份 .gitignore 掉的文件"那一版能跑。
     ("clean_clone", [sys.executable, "_test/clean_clone_check.py"]),
