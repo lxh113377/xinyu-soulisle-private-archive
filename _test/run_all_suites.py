@@ -92,6 +92,8 @@ SUITES = [
     ("data_rights", [sys.executable, "_test/data_rights_check.py"]),
     ("data_rights_selftest", [sys.executable, "_test/data_rights_check.py", "--selftest"]),
     ("data_rights_probe_selftest", [sys.executable, "_test/peer_data_rights_probe.py", "--selftest"]),
+    # r45：发布/版本治理对标探针的判据自证（semver 合流 / 发布滞后 / CHANGELOG 三段，含小数天反例）
+    ("release_probe_selftest", [sys.executable, "_test/peer_release_probe.py", "--selftest"]),
     # r43：干净克隆可跑性——从 **HEAD** 克隆到临时目录再跑，证明"交出去的那份"能跑，
     # 而不是"我这台机器上恰好有一份 .gitignore 掉的文件"那一版能跑。
     ("clean_clone", [sys.executable, "_test/clean_clone_check.py"]),

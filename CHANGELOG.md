@@ -4,6 +4,30 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+
+## [1.5.0] - 2026-09-27 — 对标轮 r39–r45 收口（11 个 feat / 44 个 commit 随版发布）
+
+> 切版由本轮新上的 `_test/release_governance_check.py` 逼出：R1 实测「距 v1.4.3 已攒 11 个 feat（上限 5）」，
+> R2c 实测「r41/r42/r43 三轮 feat 级提交压根没进 changelog」（下方已按轮次补齐）。
+> 上一版 v1.4.3 的段标题写着「对标轮 r38 续」，所以 r38 只在 tag 之后留了 docs 尾巴 —— 那条**不算漏记**，
+> 判据的分母因此收窄到 feat/fix/perf/refactor。
+
+### Added（r45 · 发布治理对标探针，先量别人再被自己量）
+- **`_test/peer_release_probe.py`（`--selftest` 入电池，13/13）**：16 仓同尺量「有公开 release / tag 合 semver /
+  有 CHANGELOG 类件 / 发布滞后」四问，实测 **11/16 有 release、11/16 semver 合规、只有 4/16 带 CHANGELOG 类件、
+  11 个有 release 的家里 4 家滞后 >30 天（min 0 / 中位 9 / max 261）**，BLIND 0 且恒等式自证。
+  自犯一处并已修：`lag` 首版按**整数天**截断，把一个 22 小时前的发布读成 `lag=0`（假新鲜）——
+  改小数天并补「30 小时 = 1.25」专用用例。
+
+### Fixed（r45 · 公网离线态直接报错：外提的新模块没进 SW 预缓存）
+- **现象**：`_test/offline_shell_check.py` R9a 报「公网壳 17/18 缺 `/js/data-rights.js`」，R7 同期在公网断网重载阶段
+  抛 `TypeError: Cannot read properties of undefined (reading 'init') at js/app.js:208`。两条**同一根因**：
+  离线时 SW 供不出该模块 ⇒ `window.DataRights` 未定义 ⇒ 编排脚本报错。公网用户断网打开即坏，不是"少缓存一个文件"那么轻。
+- **根因**：r45 为修字节预算把模块外提，只改了 `index.html` 的 `<script>` 与 `src/`，**没同步 `src/sw.js` 的 PRECACHE**；
+  而本仓判据 R8 早就"复算清单自 sw.js 源码"，A10 也盯"页面引用必须被壳覆盖" —— 我本地跳过了全量电池就推，两条闸一起在网上判红。
+- **处置**：`PRECACHE` 补 `/js/data-rights.js` + 同步 `deploy/xinyu/sw.js` + 重部署公网壳（部署→判据复验 17 项全过、
+  R8 入缓存 18/18、R7 零异常），**再**推送。教训回写：改 `src/` 的模块增删，SW 预缓存清单属同一改动面，不是独立运维项。
+
 ### Changed（r45 · 修 r44 造成的受理面红：单文件字节预算被顶穿）
 - **真因**：r44 把「披露翻转 / 清除回执 / 导出下载」全塞进 `app.js` 与 `memory-store.js`，
   两文件分别到 16,815 / 7,550 B，超各自预算（14,390 / 4,844），CI `size_budget` 判红 2 项
@@ -12,6 +36,37 @@
   `app.js` 回到 14,281 B（限内，未动其预算）；`memory-store.js` 因确实新增了两个数据动作
   （复核式删除 + 导出），预算 4,844 → 7214 B（实测 +5%），并同步登记新文件预算。
   **没有放宽任何判据的余量比例，也没有删断言求绿。**
+### Added（r44 · 数据主体权利面）
+- **`_test/data_rights_check.py` + `_test/peer_data_rights_probe.py`（电池 64→67）**：把「你的数据归你」从口号变成
+  三条可判据的行为 —— ① 披露语**随真实模式翻转**（`remote:true` 才说"同步到服务端"，本机态说"不上传"，两态互斥
+  且双向测）；② **清除带回执**：删完读 `/stats` 复核归零，把"我删了"变成"我删了 N 条并验证为 0"；
+  ③ **导出对齐计数**：打包内容与 `/stats` 计数一致，不给人一份缺斤短两的 JSON。
+  首跑踩中两处：回执写 `#probe-result` 被情绪探针覆写（改占自己的槽）、反向腿 `add_init_script` 每次导航重跑致 cfg 被重置（改用第二个 context）。
+
+### Added（r43 · 可复现面）
+- **`_test/clean_clone_check.py` + `_test/peer_repro_probe.py`（电池 61→64）**：证明「交出去的那份能跑」，
+  而不是「我这台机器恰好有一份被 `.gitignore` 掉的文件」那一版能跑。从 **HEAD** 克隆到临时目录、起服、Playwright 真加载。
+  归因口径：Chrome 的 404 console 行**不含 URL**，故按 `requestfailed` 的 URL 分类；已登记缺口取零命中即报警。
+- **闭合 r42 自己造出的治理面外资产**：r42 为了让 a11y 判据能跑，把 axe-core 放进 `_test/vendor/` 却没登记进
+  `vendor-manifest.json` —— 等于自己造了一个无人对账的 vendored 依赖。现已登记（sha256 + size），并把
+  `vendor_freshness_check.py` 的对账单位从 basename 改成**全相对路径**（否则 `a/x.js` 与 `b/x.js` 可跨目录互相洗白）。
+
+### Added（r42 · 无障碍面装上常驻门禁）
+- **`_test/a11y_check.py` + `_test/peer_a11y_probe.py`（电池 58→61）**：12 个审计单元 = 6 状态 × 2 主题，axe-core
+  规则集**必须含 `experimental`** —— 默认集看不见 `label-content-name-mismatch`，首跑就以 `violations=0` 骗过了我。
+  另配注入式正对照（A3）证明判据会咬人。
+- **闭合三条实测缺口**：`prefers-reduced-motion` 下星雾停掉持续动效（像素级验证降档倍数）/ 图标按钮补
+  WCAG 2.5.3 label-in-name / 装饰字符 `⚙` 归 `aria-hidden` 并给 `aria-label`。
+- 一处假反例入册：用截断 PNG 冒充"尺寸不符"是无效反例（M5④⑧ 第 4 次复发），改做真 16×16 图。
+
+### Added（r41 · 测试资产面，兑现决策 #1 的空头主张）
+- **in-build 单测 0 → 4 类 30 用例**（`EmotionLexiconTest` / `EmotionEngineTest` / `EmotionClassifierTest` /
+  `SafetyGuardTest`），`mvn package` 从此自带门禁。此前从 09-20 立「可单测」为选 Java 的三条理由之一，
+  到 09-26 实测 `server/src` 下 JUnit 用例数仍为 **0**、`pom.xml` 连 junit 依赖都没有 —— 是**能力声称**不是**产物**。
+- **`_test/java_test_guard.py` 常驻**（盯用例数下限、`pom` 里 starter-test 在位、**CI 构建步不得带 `-DskipTests`**
+  —— 否则门禁会在受理面上静默消失而本地仍看到"CI 全绿"）+ 新观测面 `peer_test_asset_probe`（实测 peers 有 in-build 单测 9/16、self 0）。
+- 顺带两处：聚合器折叠补 `-` 续行与 stderr；`online_check` 的固定 sleep 改完成态轮询、整跑加并发锁。
+
 ### Added（r40d · 交付面九项覆盖机器化 + AGENTS.md 陈旧 P0 更正）
 - **`_test/plan_pdf_coverage_check.py`（两条套件，电池 52→54）**：把清单第 1 行「官方 9 项逐项齐全」
   从人眼对照升级为常驻判据。九项**从 `应用方案大纲.md` 现读**（分母不手抄），页数由 pypdf 实数（20 ≤ 20），
