@@ -33,7 +33,11 @@ BUDGETS = {
     "src/sw.js": 4814,
     "src/js/scroll-story.js": 3_757,
     "src/js/three-scene.js": 15_793,
-    "src/js/memory-store.js": 4_844,
+    # r45 上调 4,844 -> 7214：clear() 改为带回执并读 /stats 复核归零 + 新增 exportAll()
+    # （r44 数据权利面实测：旧 fire-and-forget 丢弃服务端 removed 回执）。理由同记 CHANGELOG。
+    "src/js/memory-store.js": 7214,
+    # r45 新增：数据主体权利 UI 从 app.js 外提（外提后 app.js 14,281 回到限内），基线取实测 +5%
+    "src/js/data-rights.js": 3300,
     "src/js/demo-config.js": 1_828,
     "src/data/emotion-lexicon.js": 4_042,
     "src/data/emotion-strategy.js": 4_956,

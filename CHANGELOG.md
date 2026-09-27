@@ -4,6 +4,14 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Changed（r45 · 修 r44 造成的受理面红：单文件字节预算被顶穿）
+- **真因**：r44 把「披露翻转 / 清除回执 / 导出下载」全塞进 `app.js` 与 `memory-store.js`，
+  两文件分别到 16,815 / 7,550 B，超各自预算（14,390 / 4,844），CI `size_budget` 判红 2 项
+  （run `36282517198`，`BATTERY: 63/64 RED: size_budget`）。
+- **修法**：按本仓既有外提先例（`voice.js`/`chart.js`）新增 `src/js/data-rights.js` 承载 UI，
+  `app.js` 回到 14,281 B（限内，未动其预算）；`memory-store.js` 因确实新增了两个数据动作
+  （复核式删除 + 导出），预算 4,844 → 7214 B（实测 +5%），并同步登记新文件预算。
+  **没有放宽任何判据的余量比例，也没有删断言求绿。**
 ### Added（r40d · 交付面九项覆盖机器化 + AGENTS.md 陈旧 P0 更正）
 - **`_test/plan_pdf_coverage_check.py`（两条套件，电池 52→54）**：把清单第 1 行「官方 9 项逐项齐全」
   从人眼对照升级为常驻判据。九项**从 `应用方案大纲.md` 现读**（分母不手抄），页数由 pypdf 实数（20 ≤ 20），

@@ -204,58 +204,14 @@
   //    先摘这块是因为它与对话编排零耦合，能让剩余作用域只剩「编排 + 星图 + 曲线 + 窗口化 + 设置」。
   window.Voice.init();
 
-  // r44 数据说明与模式对齐：第四幕原句写死「不上传」，而本地/fat jar 演示开了 `remote:true`
-  // 时对话与情绪**确实会同步到服务端数据库** ⇒ 披露语必须跟着真实模式走，不能只写最乐观那一档。
-  const lead = $("#data-disclosure");
-  function syncDisclosure() {
-    if (!lead) return;
-    lead.textContent = window.MemoryStore.isRemote()
-      ? "你在心屿说过的每一句话，都会成为它星雾里的一颗星星。情绪与对话会同步到**本演示实例的服务端**"
-        + "（为的是跨设备也记得你），可随时一键清除并当场核验归零，也可打包导出带走。"
-      : "你在心屿说过的每一句话，都会成为它星雾里的一颗星星。所有情绪与对话**只留在本机浏览器**"
-        + "（不上传），可随时一键清除。";
-  }
-  syncDisclosure();
+  // 6.5) 数据主体权利 UI（r45 外提到 js/data-rights.js：披露翻转 / 清除回执 / 导出下载）
+  window.DataRights.init({ beforeClear: function () {
+    if (gl) { window.ThreeScene.cancelShow(); window.ThreeScene.douse(); }
+    syncStars(); window.Chart.render();
+    const pr = document.getElementById('probe-result');
+    if (pr) pr.textContent = '星星已熄灭 —— 再和它说一句话，星雾会重新亮起来。';
+  } });
 
-  $("#btn-clear").addEventListener("click", () => {
-    if (gl) { window.ThreeScene.cancelShow(); window.ThreeScene.douse(); }   // 星星同步熄灭
-    syncStars();
-    window.Chart.render();
-    const count = $("#chart-count");
-    if (count) count.textContent = "正在清除…";
-    window.MemoryStore.clear().then(r => {
-      const bits = [];
-      bits.push(r.local ? "本机已清除" : "本机清除失败");
-      if (r.removed === null && !r.error) bits.push("未连服务端（无需服务端清除）");
-      else if (r.verified === true) bits.push("服务端已删 " + r.removed + " 条，复核为 0");
-      else if (r.verified === false) bits.push("服务端复核未归零：" + r.error);
-      else bits.push("服务端清除失败：" + (r.error || "无回执"));
-      $("#probe-result").textContent = "星星已熄灭 —— 再和它说一句话，星雾会重新亮起来。";
-      // 回执必须写在自己的槽里：#probe-result 是情绪探针读数位，会被探针渲染覆写
-      // （r44 实测：写进去的回执当场被"双路情绪 · LLM 精判失败 → 词典兜底"顶掉，
-      //  而那句里恰好也有"失败"二字，判据因此把"没写成功"误读成"写成功但被截"）。
-      if (count) count.textContent = bits.join(" ｜ ");
-      syncDisclosure();
-    });
-  });
-
-  // r44 可携权：把服务端 + 本机两份记录打成一个 JSON 包下载（复用只读端点，不新增后端面）
-  const btnExport = $("#btn-export");
-  if (btnExport) btnExport.addEventListener("click", () => {
-    const count = $("#chart-count");
-    if (count) count.textContent = "正在打包…";
-    window.MemoryStore.exportAll().then(bundle => {
-      const n = (bundle.source.local || []).length
-        + ((bundle.source.server && bundle.source.server.emotions) || []).length;
-      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "xinyu-my-data-" + bundle.sessionId + ".json";
-      document.body.appendChild(a); a.click();
-      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
-      if (count) count.textContent = "已导出 " + n + " 条记录" + (bundle.error ? "（服务端部分失败）" : "");
-    });
-  });
   // 7) 情绪曲线：r25 外提到 `src/js/chart.js`（行为零改动；判据=browser_check 的曲线计数断言）
   window.Chart.init();
 

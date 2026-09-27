@@ -74,17 +74,8 @@ window.MemoryStore = (function () {
     } catch { /* 忽略 */ }
   }
   function all() { return load().slice(); }
-  /**
-   * 清除我的数据 = 本机 + 服务端**都要清，并且要能自证清干净了**。
-   *
-   * 为什么改（对标轮 r44 实测）：旧写法是 fire-and-forget——
-   * `api("/" + sid, {method:"DELETE"}).then(guard).catch(markDown)`，
-   * 服务端明明回了 `{"ok":true,"removed":N}`，**这个 N 被整个丢掉**，
-   * 而 UI 在请求还没回来时就印「星星已熄灭」。于是"我帮你删干净了"是一句
-   * 没有任何回执支撑的承诺（同族：M5⑪「配置在册 ≠ 行为闭环」、交付只写成功面）。
-   * 现在：等 DELETE → 再读 `/stats` 复核归零 → 把三个数交回调用方去显示。
-   * 返回 Promise<{local, removed, verified, error}>；离线/未开远端时 verified 记 null（不谎报已核验）。
-   */
+  /** 清除本机 + 服务端，并读 /stats 复核归零；返回 Promise<{local,removed,verified,error}>
+   *  verified 三态：null=未连/未核验，禁并入成功（r44 实测旧版丢弃服务端 removed 回执） */
   function clear() {
     mem = [];
     let localOk = false;
@@ -111,11 +102,7 @@ window.MemoryStore = (function () {
       })
       .catch(e => { out.error = String((e && e.message) || e); markDown(); return out; });
   }
-  /**
-   * 导出我的数据（可携权）。用**已有**的只读端点拼装，不新增后端面：
-   * 情绪走 `/api/memory/emotions`，对话走 `/api/memory/messages`，本机 localStorage 一并带上，
-   * 保证"服务端不可达时也能拿走本机这一份"。返回一个对象（调用方负责下载与显示）。
-   */
+  /** 导出：复用只读端点拼服务端两份 + 本机一份，条数须与 /stats 对齐 */
   function exportAll() {
     const base = { sessionId: sessionId(), exportedAt: new Date().toISOString(),
                    mode: isRemote() ? "remote" : "local-only", source: {} };
