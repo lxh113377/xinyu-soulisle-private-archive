@@ -178,6 +178,10 @@ SUITES = [
     # 真函数模块 —— 6 条出口（含 stream=true 但上游报错的折返腿）离线可重跑，摘头即翻红。
     ("api_egress_headers", [sys.executable, "_test/api_egress_headers_check.py"]),
     ("api_egress_headers_selftest", [sys.executable, "_test/api_egress_headers_check.py", "--selftest"]),
+    # r60 持久层异常面：memory-store 8 处 try/catch 从没被走过一遍（47 条判据零覆盖）。
+    # 五种存储故障 × 四条断言，F4 那条当场抓出"清除后界面计数不刷新"的真缺陷。
+    ("storage_resilience", [sys.executable, "_test/storage_resilience_check.py"]),
+    ("storage_resilience_selftest", [sys.executable, "_test/storage_resilience_check.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），

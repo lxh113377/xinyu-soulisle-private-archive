@@ -86,6 +86,8 @@ python _test/deliverable_inventory_check.py               # r59 交付物清单�
 python _test/deliverable_inventory_check.py --selftest    # r59 判据桩：9 纯函数夹具 + 9 端到端反向腿（含「未登记草稿不判红、入库即拦」的棘轮腿；Ⓗ 腿当场抓到注入缝未接线的缺陷）
 python _test/api_egress_headers_check.py                  # r59 函数出口面：node 假 fetch 驱动真 chat.js，6 条 return 出口各断 5 类安全头 + 状态码 + 错误体形状
 python _test/api_egress_headers_check.py --selftest       # r59 判据桩：7 腿（正例／摘 CSP／摘 no-store／缺出口／状态码漂移／错误体漂移／SSE 语义被换）；首跑即抓到"没发 stream:true 导致 SSE 腿空转"
+python _test/storage_resilience_check.py                 # r60 持久层异常面：真开浏览器注 storage 禁用/内容损坏/配额写满/删不掉 四类故障 + 对照组，断"零未捕获异常／界面计数==数据源／星雾仍点亮／清空回执如实"
+python _test/storage_resilience_check.py --selftest      # r60 判据桩：10 腿（合规正例不假红 + 六形必红 + 坏页端到端真崩 + 零读数不判绿）
 python _test/peer_quality_tooling_probe.py   # r58 对标探针：lint／类型／单元可测性／CI 执行位（16 仓 + self，双通道）
 python _test/peer_quality_tooling_probe.py --selftest  # r58 探针桩：7 类桩 + 恒真守卫（含「NOISE 不得滤掉 tests 目录」反例）
 ```

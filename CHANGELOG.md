@@ -62,6 +62,35 @@
   `python _test/deploy_sync_check.py --selftest` → `DEPLOYSYNC-SELFTEST-PASS`；真面 →
   `DEPLOY-SYNC-PASS`，函数面回执 `分母 1 个`。
 
+### Added（r60 · 持久层异常面：四类存储故障第一次被真走一遍）
+- **起点**：`src/js/memory-store.js` 对 localStorage 的 8 处读写**全都包了 try/catch**，而
+  `grep -rn "QuotaExceeded|SecurityError" _test/*.py` → **0 命中** ⇒ 47 条判据里没有任何一条
+  把这条路径走过一次。「有 catch」被当成「降级是对的」，跟 r51 的「气泡说降级、徽章说在线」同族。
+- 新判据 `_test/storage_resilience_check.py`：真开浏览器注四类故障（禁用 / 内容损坏 / 配额写满 /
+  删不掉）+ 一个对照组，每条断四件 —— 零未捕获异常、`#chat-dock` 可用、
+  **`#mem-count` == `MemoryStore.count()`（两把尺对账，防界面上报没有出处的数）**、说一句情绪话后星雾仍点亮。
+- **抓到一条真缺陷（不只是盲区）**：点「清除我的数据」时 `beforeClear` 会 `syncStars()`，
+  但那一次量到的是**清除前**的条数；`clear()` 完成后只写回执，计数槽再没人刷 ⇒ 回执说「本机清除失败」，
+  而界面仍挂着旧条数（实测 界面 1 ⇄ 数据源 0）。修法＝`DataRights.init` 增 `afterClear` 钩子，
+  在 `.then` 里补一次 `syncStars()`。
+- ⚠️ **写 `afterClear` 时差点引入第二个缺陷**：顺手加的 `Chart.render()` 会把回执槽 `#chart-count`
+  重新覆成「还没有记录 —— 聊几句就有了」（该槽**双主人**：曲线条数 + 清除回执）。
+  判据的 F4 腿当场把它拦下，最终版只 `syncStars()`。这条风险已在注释里点名，不是修完就忘。
+- 反向腿 10 条（合规正例不假红 + 六形必红 + **真浏览器驱动一个无 try/catch 的坏页必须冒未捕获异常**
+  + 零读数不判绿）。首跑抓到判据自己的两处：①反例 needle 与红因文案不一致（我写「注错自身」而文案是
+  「自身抛错」）；②harness 的 `TimeoutError` 混进 `pageerrors` ⇒ 会把"取数失败"报成"应用崩了"，
+  现分成两栏并各有专属红因。
+- **一次 flake 的归因与修法**：判据单跑 rc=0，接进电池后同一条 F4 翻红 —— 原因在固定等待
+  （2600ms / 1500ms）：并发下服务端 `DELETE → /stats` 往返更慢，回执还停在「正在清除…」。
+  改成 `settle()` 有界轮询「被等对象的完成信号」（≤15s），超时记 `harness_error`（取数失败）
+  而不是判绿或误判红。修后连跑 2 次单跑 + 1 次电池内实跑全绿；⚠️ 这不构成"永不再 flake"，
+  只构成"再 flake 时红因会点名是取数问题"。
+- 部署面：改完 `src/` 走临时前缀 wrangler 重部（`Uploading Functions bundle` 在日志里），
+  `LIVE-SYNC-PASS` 资源 21 项逐字节相等（改前是 `live=15188B local=15658B` 内容漂移 2 项）。
+- 挂账（现象在册、**未归因**）：`#btn-clear` 真点击在 Playwright 默认 actionability 下超时，
+  `force=True` 可点；已排除"元素在动"（5 次采样 top/left 恒定 330.5/369、无 active 动画）。
+  `entry_reach_check.py` 名册里零命中 `btn-clear` ⇒ 该入口可达性无人管，登记见 07 台账。
+
 ### Added（r59 · 交付物清单面 + 函数出口面：两处"手工证过一次"换成常驻判据）
 - **起因是一手事故取证**：2026-09-28 00:19 实测 `交付物/提交包/` 下 **7 个被 git 跟踪的交付件从
   工作树消失**（含唯一的参赛成片 mp4、`render-pdf.ps1`、`提交清单与验收状态.md` 本体），
