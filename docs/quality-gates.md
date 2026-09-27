@@ -78,6 +78,12 @@ python _test/peer_community_probe.py     # 对标 r50 探针：协作治理与�
 python _test/peer_license_probe.py       # 对标 r46 探针：许可与供给链合规（16 仓 + self，双通道同尺）
 python _test/peer_mobile_probe.py        # 对标 r47 探针：移动端与触屏支持的结构性证据（16 仓 + self，双通道）
 python _test/peer_release_probe.py       # 对标 r45 探针：发布与版本治理（16 仓 + self，同一把尺）
+# ↓ r58 质量工程面（JS 侧从「0 个单元测试」起账；Java 侧 4 类 30 用例早已在册）
+node _test/js/emotion-engine.unit.test.mjs   # 被测件本身：node:test + vm 载入浏览器全局脚本（含跨 realm 归一与夹具自证）
+python _test/js_unit_check.py                # r58 JS 单测执行判据：枚举 _test/js/*.test.mjs 真跑，判据行自带 tests/pass/fail 计数
+python _test/js_unit_check.py --selftest     # r58 判据桩：7 类（零分母/计数不自洽/tests=0/stderr 挤行/node 缺失）+ 恒绿守卫
+python _test/peer_quality_tooling_probe.py   # r58 对标探针：lint／类型／单元可测性／CI 执行位（16 仓 + self，双通道）
+python _test/peer_quality_tooling_probe.py --selftest  # r58 探针桩：7 类桩 + 恒真守卫（含「NOISE 不得滤掉 tests 目录」反例）
 ```
 
 > 前置：多数判据需 fat jar 起在 8123（`java -jar server/target/soulisle-server.jar --server.port=8123`，

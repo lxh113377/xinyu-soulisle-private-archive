@@ -166,6 +166,10 @@ SUITES = [
     ("public_check", [sys.executable, "_test/public_check.py"]),
     ("live_sync", [sys.executable, "_test/live_sync_check.py"]),
     ("emotion_eval_js", ["node", "_test/emotion_eval.js"]),
+    # r58 质量工程面：JS 侧从"0 个单元测试"变成有常驻执行位（node --test + 跨 realm 归一）
+    ("js_unit", [sys.executable, "_test/js_unit_check.py"]),
+    ("js_unit_selftest", [sys.executable, "_test/js_unit_check.py", "--selftest"]),
+    ("quality_peer_selftest", [sys.executable, "_test/peer_quality_tooling_probe.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），

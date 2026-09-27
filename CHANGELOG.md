@@ -9,6 +9,31 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Added（r58 · 质量工程面：JS 侧单元测试从零起账）
+- **实测起点**：`peer_quality_tooling_probe.py --self-only` 量出本仓 **JS 测试文件 0 个**，
+  而 Java 侧是 4 个测试类 / 30 个用例且 CI 真跑。README 把 `docs/quality-gates.md` 指认为
+  「判据清单全文」，读者会自然把"有单测"当成全仓事实 —— 它只对 Java 半边成立。
+- **`_test/js/emotion-engine.unit.test.mjs`（7 用例）**：夹具自证 / 否定翻转 / 程度加权 /
+  危机优先级与强度钉 1 / `intensity` 值域不变量（含空串与 400 倍超长串）/ 多情绪共现的排序与去重 /
+  无线索回落平静。跑在 **`node --test` + `node:vm`** 上（被测对象是浏览器全局脚本，零构建仓库
+  不为此引入 node_modules；用的是 Node 自带运行器，不是自造框架）。
+- **踩到并修掉一处跨 realm 陷阱**（本轮最有价值的一条）：`node:vm` 里造的 `Array`/`Object` 原型属于
+  **vm realm**，与宿主 realm 不同 ⇒ `assert.deepEqual`（strict 版）会对两个**逐元素 `Object.is` 全 true**
+  的数组报 "Values have same structure but are not reference-equal"。正解是把返回值当数据过一道
+  JSON 归一（`scan()` 包装），**不是**放宽断言、也不是换回 loose equal。
+- **`js_unit_check.py`（常驻判据，已进电池 91）**：自己枚举 `_test/js/*.test.mjs`（分母由文件枚举得出，
+  新增测试文件自动进面），真跑 `node --test`，并把 `tests/pass/fail` **计数写进含判据词的那一行**
+  （电池对每个套件只留一行，`ℹ pass 7` 这种汇总行进不了 CI）。7 类桩覆盖：零分母 / `tests=0` /
+  计数不自洽 / 输出取不到计数 / stderr 挤掉汇总 / node 缺失。
+- **三态由真实运行取证**（不是只跑正向）：注入一条必红用例 ⇒ `rc=1` 并带 `AssertionError` 明细；
+  指向空目录 ⇒ `rc=2 UNVERIFIED`；真面 ⇒ `rc=0` 且 7/7。另跑**变异体**（把词表 `neg` 抹空后重载引擎），
+  「我不开心」立刻回判 `joy` ⇒ 证明否定那条断言真打在被审谓词上，夹具不是空转。
+- **新增对标探针 `peer_quality_tooling_probe.py`**：lint／formatter／tsconfig／JS 测试文件／
+  CI 执行位 五个结构类 + README 锚定声明面。**关键差异写进 docstring**：不能照抄 r54 探针的 `NOISE`
+  —— 它排除 `tests/`、`__tests__/`（对安全头是对的），照抄到这一面就会**把被测对象本身滤掉**，
+  由反例④专门钉住。CI 执行位另实现 `unit_steps()` 逐行联合判断：`mvn package` 阶段（surefire 实跑处）
+  必须算执行位，而 `package -DskipTests` 不得算。
+
 ## [1.6.1] - 2026-09-27
 
 > 切版动因（机器判据 R1）：距 `v1.6.0` 已攒 5 个 feat（上限 5、余量 0）。
