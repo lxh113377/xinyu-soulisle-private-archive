@@ -130,6 +130,17 @@ dialog::backdrop{background:var(--dialog-backdrop)}
 .settings-form label.check input{width:auto;margin:4px 0 0;flex:0 0 auto;accent-color:var(--accent)}
 
 /* 响应式三档（对标项目普遍 3 断点；旧版只有一条 640px，平板与折叠屏下坞会挤掉叙事卡片） */
+/* ===== 触屏可达性（r47；判据 _test/mobile_check.py M2/M3）=====
+   用 (pointer:coarse) 而非宽度断点：要大目标的是手指不是窄屏，桌面观感零改动。
+   动因是实测：7 个控件高 27-35px < WCAG 2.5.8 的 44；输入框 14-15px 触发 iOS 聚焦缩放。*/
+@media (pointer:coarse){
+  button,.ghost-btn,.chip{min-height:44px;min-width:44px;font-size:14px}
+  .ghost-btn.tiny{font-size:13px;padding:10px 12px}
+  input,select,textarea,input[type=text],input[type=url],input[type=password],input[type=email],
+  input[type=number],.settings-form select,.settings-form input,.chat-form input{font-size:16px}
+  input[type=text],input[type=url],input[type=password]{padding:12px 14px;min-height:44px}
+  .chat-form button{min-width:46px}
+}
 @media(max-width:1024px){
   .act{padding:88px 20px 140px}
   .act-copy{padding:36px 32px}

@@ -92,6 +92,11 @@ SUITES = [
     ("data_rights", [sys.executable, "_test/data_rights_check.py"]),
     ("data_rights_selftest", [sys.executable, "_test/data_rights_check.py", "--selftest"]),
     ("data_rights_probe_selftest", [sys.executable, "_test/peer_data_rights_probe.py", "--selftest"]),
+    # r47：移动端与触屏可达性。测的是**真实几何**（视口溢出 / 触控目标尺寸 / 输入字号 / 禁缩放），
+    # 不是"有没有写 @media"。⚠️ 必须 has_touch=True，否则 (pointer:coarse) 不匹配 = 空跑一轮。
+    ("mobile", [sys.executable, "_test/mobile_check.py"]),
+    ("mobile_selftest", [sys.executable, "_test/mobile_check.py", "--selftest"]),
+    ("mobile_peer_selftest", [sys.executable, "_test/peer_mobile_probe.py", "--selftest"]),
     # r45：发布/版本治理对标探针的判据自证（semver 合流 / 发布滞后 / CHANGELOG 三段，含小数天反例）
     ("release_probe_selftest", [sys.executable, "_test/peer_release_probe.py", "--selftest"]),
     # r46：许可与供给链对标探针的判据自证（LICENSE 类件 / 归属类件 / vendored 目录三个分类器，

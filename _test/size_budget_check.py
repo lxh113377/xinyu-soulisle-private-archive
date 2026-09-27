@@ -21,7 +21,9 @@ ROOT = Path(__file__).resolve().parents[1]
 #    —— 「逐文件预算」若靠手工维护，加文件这条最常见的退化路径恰好绕过门禁。
 BUDGETS = {
     "src/index.html": 9_936,   # r28 上调：加了离线壳注册块（9,463 实测 +5%），理由记在 CHANGELOG
-    "src/css/style.css": 13_368,
+    "src/css/style.css": 13_888,   # r47 上调：触屏可达性块（13,368→13,502 实测 +134B，含 5% 余量）。
+    #    动因不是"装不下就抬上限"：块内容由 _test/mobile_check.py M2/M3 实测驱动（7 控件高 27-35px
+    #    < WCAG 2.5.8 的 44；输入框 14-15px 触发 iOS 聚焦缩放），且已先把注释压到 3 行再登记。
     "src/js/app.js": 14_390,   # r32 上调：徽章加"网络不可用"降级分支（13,123→13,698 实测 +5%），理由记在 CHANGELOG
     "src/js/chat-agent.js": 11_729,
     "src/js/emotion-engine.js": 5_598,

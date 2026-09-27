@@ -1,0 +1,36 @@
+# 卷46 — r47 移动端与触屏面（下）：六个自犯 + 裁定对账 + 未闭环序（2026-09-27）
+
+> 上卷 `part45`：换面取证、实测三条、peers 结构数。
+
+## 3. 本轮六个我自己被抓到的（比结论更值钱的部分）
+
+1. **探针没开 `has_touch` ⇒ 空跑一轮**：`(pointer:coarse)` 只在触屏上下文匹配，
+   改完 CSS 数字一动不动，我差点判成"改错了"。⇒ 判据注释与 selftest 前置都钉死这条。
+2. **CSS 标准被我引错**：首版写"44×44 是 WCAG 2.5.8 要求"。**2.5.8 的 AA 底线是 24×24**，
+   44 来自 iOS HIG / Material（WCAG 对应 2.5.5 AAA）。真跑又暴露我把原生 checkbox 13px 一刀切判红。
+   ⇒ 双层口径：24 硬底线 / 44 为**独占型控件**自选并钉住的红线 / `label` 内 checkbox 按**等效控件**豁免
+   （label 自身 <24 则豁免不成立）+ **豁免个数打印在 PASS 行**，不静默。
+3. **半生效比不生效更坑**：裸 `input{font-size:16px}` 特异度 (0,0,1) 抢不过基线
+   `input[type=text]{font-size:15px}` 的 (0,1,1) ⇒ 首版实测**只有 checkbox 变了 16px**，其余仍 15px。
+   不复核就当修完了。⇒ 按同等特异度补齐后才生效，且以复测为准。
+4. **`css_largest` 名不副实**：按路径深度取 = 抓到最浅的小文件，`mq=0` 那批读数全部不可信。
+   ⇒ 改按 tree 的 blob `size` 取，补边界 D 反例钉住。
+5. **臆造后缀面** `\.cssx?`：`.cssx` 不存在，且让"没 CSS"与"0 条媒体查询"混同。
+6. **拿顺序冒充语义**：非 Web 仓（letta/chibi/MoodChat/Loyal-Elephie）本该判"范围外"，
+   却因我自己把 `css:NA` 塞进 `errs`、被第一条 `if err` 抢先判成"取数失败" ⇒ NA 从 2 虚增到 5。
+   ⇒ 范围判定前置。另：`tail` 后的 `rc=0` 是管道的退出码不是探针的（有 NA 应为 1）。
+
+## 4. 与既有裁定的对账（并行会话记的，不得被我的样式改动推翻）
+
+`_test/entry_reach_check.py` 复跑 → `ENTRY-REACH-PASS … btn-lightshow@<=480px 已登记豁免｜stale=0`。
+本面 coarse 块**只加尺寸不动 display** ⇒ 老大裁定的"窄屏藏一键点亮入口是设计内取舍"仍然成立。
+
+## 5. 登记与未闭环
+
+- `src/css/style.css` 预算 13,368 → **13,888**（实测 13,502，+134B）。**先把注释压到 3 行再登记**，
+  不是"装不下就抬上限"；动因与涨幅记在 `size_budget_check.py` 行内注释 + CHANGELOG。
+- 电池 71 → **74**（`mobile` + `mobile_selftest` 14/14 + `mobile_peer_selftest` 11/11）；README 同步。
+- [ ] **P1｜键盘态可视区**：`visualViewport` 量"软键盘弹出时聊天输入框是否仍可见可点"。
+- [ ] P2｜真机抽查一次（Android + iPhone Safari）：仿真是必要非充分 —— 本轮整个修复就依赖
+      只有仿真才暴露的匹配开关，反过来仿真也测不到真键盘/真手指的东西。
+- [ ] P2｜JVM 依赖许可证对账（承 r46）、`_test/release_cut.py`（承 r45）、README 数据隐私指针行（余量 16B）。
