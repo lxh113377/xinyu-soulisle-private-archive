@@ -4,6 +4,9 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+
+## [1.6.0] - 2026-09-27 — 对标轮 r46–r52 收口（许可合规 / 移动端几何 / 窄屏入口 / 协作治理 / 故障注入 / 记忆召回 随版发布）
+
 ### Added（r52 · 长期记忆召回与上下文管理面）
 - **`_test/memory_recall_check.py`（+2 套件，`--selftest` 9/9）**：量的是**「落库的记忆有没有回到发给模型的那条 messages」**——
   取数面 = 拦 `/api/chat` 读 `request.post_data`（真流量出口，不是读源码字符串）。五类用例：
