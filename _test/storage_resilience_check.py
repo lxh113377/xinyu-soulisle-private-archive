@@ -122,8 +122,11 @@ def assess(case, res):
     if res.get("lit") is None:
         bad.append("%s 星雾点亮读数取不到 ⇒ 未验" % case)
     elif res["lit"] <= 0:
-        bad.append("%s 说了一句情绪话后星雾没点亮（lit=%s）⇒ 存储故障把体验一起带走了 ｜诊断 %s"
-                   % (case, res["lit"], diag(res)))
+        stuck = "正在感受" in (res.get("last") or "")
+        bad.append("%s 说了一句情绪话后星雾没点亮（lit=%s）⇒ %s ｜诊断 %s"
+                   % (case, res["lit"],
+                      ("回复未落地：末条气泡停在 pending「正在感受」，界面无限等、这句话既没入库也没点亮"
+                       if stuck else "存储故障把体验一起带走了"), diag(res)))
     if case.startswith("F4"):
         rec = res.get("receipt") or ""
         if "失败" not in rec:
@@ -332,6 +335,10 @@ def selftest() -> int:
         out = assess("F3-quota", res)
         if not any("未捕获异常" in x for x in out):
             bad.append("⑧坏页真崩而判据没红 ⇒ 注错没打到被审对象，这条反例是假的：%s" % out)
+    pend = assess("F0-baseline", {"dock": True, "ui_count": 0, "src_count": 0, "lit": 0,
+                                  "pageerrors": [], "last": "心屿正在感受你的话…"})
+    if not any("pending" in x or "未落地" in x for x in pend):
+        bad.append("⑫回复未收敛的红因没点名（只说 lit=0 会误导成存储坏了）: %s" % pend)
     full = {"dock": True, "ui_count": 1, "src_count": 1, "lit": 5, "msgs": 2, "cons": 0,
             "write": "ok", "last": "在线", "receipt": "本机清除失败", "pageerrors": []}
     try:
@@ -347,7 +354,7 @@ def selftest() -> int:
                                   "lit": None, "pageerrors": []})
     if len(zero) < 2:
         bad.append("⑨零读数应当成「未验」堆红，实到 %d 条" % len(zero))
-    print("STORAGE-RESILIENCE-SELFTEST-%s（11 腿：合规正例 + 六形必红 + 坏页端到端 + 零读数 + 门面行渲染）"
+    print("STORAGE-RESILIENCE-SELFTEST-%s（12 腿：合规正例 + 六形必红 + 坏页端到端 + 零读数 + 门面行渲染 + pending 未收敛点名）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad)))
     for x in bad:
         print("  ✗ " + x)
