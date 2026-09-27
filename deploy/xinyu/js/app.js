@@ -225,10 +225,7 @@
     const pr = document.getElementById('probe-result');
     if (pr) pr.textContent = '星星已熄灭 —— 再和它说一句话，星雾会重新亮起来。';
   }, afterClear: function () {
-    // 只刷计数：此刻 MemoryStore 才是真值（r60 判据抓到界面挂着旧条数）。
-    // ⚠️ 这里**不能**再调 Chart.render() —— `#chart-count` 同时是曲线条数槽与清除回执槽
-    // （双主人），render 会把刚写下的回执覆成「还没有记录」，r44 那个"回执被探针覆写"的同族
-    // 只是换了方向。判据 F4 的 A4 腿就是盯着这件事的。
+    // 只刷计数；勿调 Chart.render()（#chart-count 双主人，回执会被覆成「还没有记录」）
     syncStars();
   } });
 

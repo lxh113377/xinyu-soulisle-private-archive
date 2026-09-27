@@ -23,6 +23,10 @@
   ⚠️ 立规缘由：修完 `src/js/emotion-engine.js` 缺陷后公网副本**仍是旧引擎**，差点把带缺陷的版本部署上线；且首次手工比对被 PowerShell 别名 `h`(Get-History) 覆盖自定义函数 → 两端哈希都取不到 → `None==None` → **全报 SAME（假通过）**。故脚本强制哈希非空 + 输入非空断言，并自带对照组用法。
   `js/demo-config.js` **不参与内容比对**（两端本就该不同：src 版含真实 Key，deploy 版是零密钥 stub），只做红线复核（零密钥 + 与 src 版不同）。
 - Java 任务（v2 起）：源码一律 UTF-8，编译必须 `javac -encoding UTF-8`；JDK 版本切换后必须重验编码
+- **推送前必跑整跑电池**：`python _test/run_all_suites.py --exclude-llm`（不是挑几条跑）。
+  立此条的一手代价（r60，2026-09-28）：我只跑了 `browser_check`/`data_rights`/`deploy_sync`/`repo_config`/`eol_parity`
+  五道就推了，CI 抓到 `size_budget` 的**逐文件字节预算**被新加的中文注释顶超（`data-rights.js 3,426/3,300`）——
+  本地片段回归零告警。中文注释按 3 B/字计，"多写解释"在本仓是直接花预算的动作；事实该进 CHANGELOG/台账，代码里留一行指针。
 - **Java 构建环境（2026-09-21 实测，禁凭记忆猜路径）**：JDK 17 = `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot`；Maven = `%USERPROFILE%\.local\maven\apache-maven-3.9.9\bin\mvn`（不在 PATH）。⚠️ **默认 `JAVA_HOME` 是 JDK 8，每次构建/启动前必须显式切换**，否则 Spring Boot 3 编译失败
 - **静态页托管红线**：服务端直读 `src/`（`static-locations=file:${XINYU_WEB_ROOT:./src/}`），**禁止**把前端复制进 `src/main/resources/static/`（会造出第三处副本同步点）
 - **评测集红线（J3）**：`GET /api/emotion/eval` 从 `_test/emotion-eval-dataset.json` **直读权威源**（`XINYU_EVAL_DATASET` 可覆盖），**禁止**把评测集复制进 jar/资源目录

@@ -85,6 +85,12 @@
   改成 `settle()` 有界轮询「被等对象的完成信号」（≤15s），超时记 `harness_error`（取数失败）
   而不是判绿或误判红。修后连跑 2 次单跑 + 1 次电池内实跑全绿；⚠️ 这不构成"永不再 flake"，
   只构成"再 flake 时红因会点名是取数问题"。
+- **失败面（本轮我自己的漏跑，被 CI 抓走而不是被本地抓走）**：推之前只跑了 5 道判据，CI 的
+  `size_budget` 报 `OVER src/js/data-rights.js 3,426 / 3,300`（+ app.js 共 2 项）—— 我为修缺陷写的
+  **中文注释按 3 B/字**顶破了逐文件字节预算。复算：`python _test/size_budget_check.py`。
+  处置按棘轮纪律＝**缩正文不动上限**（注释压成一行指针，事实现已在本条与台账里），修后
+  `BUDGET-PASS: 22 文件 + 总预算全在限内（total=846,359）`。已把「推送前必跑整跑电池」写进
+  `memory/AGENTS.md` 铁律，因为片段回归对本仓的字节预算类判据是结构性盲区。
 - 部署面：改完 `src/` 走临时前缀 wrangler 重部（`Uploading Functions bundle` 在日志里），
   `LIVE-SYNC-PASS` 资源 21 项逐字节相等（改前是 `live=15188B local=15658B` 内容漂移 2 项）。
 - 挂账（现象在册、**未归因**）：`#btn-clear` 真点击在 Playwright 默认 actionability 下超时，

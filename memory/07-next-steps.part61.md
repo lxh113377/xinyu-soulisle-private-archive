@@ -43,6 +43,12 @@
 - `grep -c btn-clear _test/entry_reach_check.py` → **0** ⇒ 该数据权利入口的可达性**没有判据管**。
   本轮只登记现象与排除项，**未**写成缺陷（未归因不得下结论）。
 
+## 失败面：本地片段回归漏掉的判据被 CI 抓走
+
+- 我只跑 5 道就推 ⇒ CI `size_budget` 报 `OVER src/js/data-rights.js 3,426 / 3,300`（含 app.js 共 2 项）：
+  新写的中文注释按 3 B/字顶破逐文件预算。处置＝缩正文不动上限；铁律「推送前必跑整跑电池」入
+  `memory/AGENTS.md`。复算：`python _test/size_budget_check.py`。
+
 ## 台账
 
 - 电池 95 → **97**（`storage_resilience` ± 自测）；`REPO-CONFIG-PASS 14/14`（G16 已登记）、

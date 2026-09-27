@@ -47,8 +47,7 @@ window.DataRights = (function () {
       window.MemoryStore.clear().then(function (r) {
         // 回执写自己的槽：#probe-result 是情绪探针读数位，会被探针渲染覆写（r44 实测）
         say(receipt(r));
-        // 计数刷新必须在清除**之后**：beforeClear 里那次 syncStars 量到的还是清除前的条数，
-        // 于是"清除失败/成功"两种回执都配着一个旧数字（r60 实测：界面 1 ⇄ 数据源 0）。
+        // 计数须在清除后刷新（r60：界面 1 ⇄ 源 0）
         if (h.afterClear) h.afterClear();
         syncDisclosure();
       });
