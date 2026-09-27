@@ -4,6 +4,18 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Fixed（r52 收口 · 切版之后落地的两处）
+- **生产方 `Path.write_text()` 在 Windows 下把 CRLF 写进自家快照**：`peer_memory_probe --json`
+  产出的 `对标数据/peer-memory-*.json` 工作树字节 ≠ git blob 字节，同族两处是切版时用
+  `write_text` 改 `ROADMAP.md` / `server/pom.xml`。本仓 `.gitattributes` 明写 `* text=auto eol=lf`
+  就是为了让"逐字节 / SHA256 / 字节预算"类主张在他人 clone 上可复算 —— 我把它破坏了三处。
+  处置顺序：先按字节归一回 LF（改后与 blob 逐字节等值：21530 / 3145 / 11177），
+  **再改生产方**为 `write_bytes(...encode)`（只还原产物不改生产方 ⇒ 下一跑还会再脏）。
+  由 `eol_parity` 在全量电池第二跑抓出（第一跑全绿是在我引入它之前）。
+- **切版结论回写三处**：报告 §5/§6、`memory/07-next-steps.md` 主壳、`part53` 里原先写的
+  "r53 硬前置 = 切 v1.6.0"已改成"本轮末已切"，并补两条本轮自抓（footer 文法连犯三次、
+  自己的产物写脏自己）。⚠️ v1.6.0 的 fat jar **未在本轮重构建**：`server/target/` 被在跑的 8123
+  进程持有，且该产物 gitignored、可再生；本轮 Java 源码零改动。
 
 ## [1.6.0] - 2026-09-27 — 对标轮 r46–r52 收口（许可合规 / 移动端几何 / 窄屏入口 / 协作治理 / 故障注入 / 记忆召回 随版发布）
 
