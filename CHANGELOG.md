@@ -52,6 +52,16 @@
   由反例④专门钉住。CI 执行位另实现 `unit_steps()` 逐行联合判断：`mvn package` 阶段（surefire 实跑处）
   必须算执行位，而 `package -DskipTests` 不得算。
 
+### Fixed（r58 尾 · 函数出口副本面进体系，r59 收口）
+- `deploy_sync_check.py` 此前从 r23 起**只比 `src/ → deploy/xinyu/`**，而 Pages Function 的副本在
+  `deploy/functions/`，且被 `EXCLUDE_DIRS = {"functions"}` 明确挡在比对面之外 ⇒ 「两份 `chat.js` 必须一致」
+  这条红线长期只有人手工 SHA256（r57 就是手工证的，还写进了报告）。**手工证明不留在体系里**，
+  下一轮改函数就可能悄悄漂移 ⇒ 补 `functions_sync_check()`：`src/functions ⇄ deploy/functions`
+  MISSING / DIFF / EXTRA 三类归零，且**分母为 0 或目录不存在一律判红**（R247 零输入不判绿）。
+- 6 类夹具走临时目录（正例／DIFF／MISSING／EXTRA／空分母／缺目录），实测
+  `python _test/deploy_sync_check.py --selftest` → `DEPLOYSYNC-SELFTEST-PASS`；真面 →
+  `DEPLOY-SYNC-PASS`，函数面回执 `分母 1 个`。
+
 ## [1.6.1] - 2026-09-27
 
 > 切版动因（机器判据 R1）：距 `v1.6.0` 已攒 5 个 feat（上限 5、余量 0）。

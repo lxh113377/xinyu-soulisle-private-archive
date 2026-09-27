@@ -38,3 +38,11 @@
 
 - 电池 88 → **91**（`js_unit` / `js_unit_selftest` / `quality_peer_selftest`）；README 的「91 套件」由 G4 钉住。
 - 提交：`f27b994 feat(r58 质量工程面)`；`v1.6.1` 切版为 `4c0e623`（tag 同指）。
+
+## 探针取数面自打（r58 同轮）
+
+- 16 仓采集挂了一小时：先误诊为「download_url 跨主机不可达」；改走 api.github.com/contents 后
+  **同一条 urllib 调用 3.9s 返回 360 节点** ⇒ 真因是链路抖动 + `api()` 零重试
+  （一次 RemoteDisconnected 就把整仓判 NA，攒起来即假盲区）。补有界重试（3 次；404 不重试）。
+- 「有重试」≠「有上界」：重试把单次最坏成本抬到 3×20s＋7s ⇒ 再补 `--budget`（默认 240s，到点剩余仓
+  零调用记 NA(budget-exhausted)）。实测 `--budget 15` 实耗 61s（超出＝在途那一仓自己的序列），恒等式 1＋15＝16。
