@@ -4,6 +4,22 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Added（r55 · 判据失败明细的证据面）
+- **`safety_guard_check.brief()`**：失败行从只有 `http=402` 改成**带响应体前 96 字**（先脱敏 `sk-`
+  形态再截断，空体给 `<无响应体>`；失败路径自己不许崩）。动因是 r54 收尾时的一条真判断：
+  三条判红的真因是**上游余额耗尽**，而电池的分档器 `split_quota()` 只认响应体原文（不认套件名，
+  否则换个名字就漏）—— `api_contract` 因带体被归 ENV-QUOTA(未验)，本套件因**只印状态码**被保守地
+  留在 `RED(必须修)`。那不是分档器错，是**判据答不出"为什么红"**，会诱导下一轮去修一段没坏的产品代码。
+- **`public_check` 的在线断言带取数证据**：`AssertionError: 对话未走在线（proxy）` 现在附带
+  CHAT_TAG 与首条 console 文本（实测输出 `tag=大模型暂不可用 · 离线共情模板 …｜console=…status of 402 ()`）。
+- **验收口径写死**：本轮在**上游仍无余额**的条件下复跑，看到
+  `BATTERY: … ENV-QUOTA(上游余额/计费阻塞：响应体自证，非本仓缺陷，但仍不得记为已验): safety_guard`
+  —— 分档从 RED 变 ENV-QUOTA 就是这条改动的回执；**rc=2 不是通过**。
+  ⬜ 未完成的一半：`public_check` 仍留 RED，因为它取的是**浏览器 console 文本**，里面只有
+  `status of 402` 而没有响应体。正解是给该套件补一次对 `/api/chat` 的直连 POST 并把 `brief(body)`
+  带进断言（**不是**把 `402` 加进签名 —— 真契约缺陷也会回 402 类状态码，那条能力由
+  `quota_selftest` 的「无签名一律留红」钉住）。
+
 ### Added（r54 · 对外交付面的安全响应头 / CSP 面）
 - **`_test/headers_csp_check.py`（+2 套件，`--selftest` 8/8）**：取数手法是**把同一份 `_headers` 在本地
   按 Cloudflare Pages 的路径语义回放**（`/*` 通配 + 字面路径合并），再拿真实响应逐条对账，然后在

@@ -12,9 +12,24 @@
 退出码：0=PASS 1=判红 2=服务不可达（环境未验，不得当通过）
 """
 import json
+import re
 import sys
 import urllib.error
 import urllib.request
+
+
+def brief(body, n=96):
+    """把响应体压进失败明细（r55）：先脱敏、再截断、空体也要有形状。
+
+    动因（一手）：r54 收尾时三条判红的真因是上游余额耗尽，但电池的分档器只认
+    **响应体原文**（不认套件名，否则换个名字就漏）。`api_contract` 因为明细里带了
+    `Insufficient Balance` 被归成 ENV-QUOTA(未验)，而本套件的失败行只有 `http=402`
+    ⇒ 被保守地留在 `RED(必须修)`。那不是分档器错，是**判据答不出"为什么红"**。
+    ⚠️ 失败路径自己不能崩：非 UTF-8/None 一律给可读占位；`sk-` 形态先脱敏
+    （密钥扫描红线在册，明细会被电池原样带进 CI 日志，等于对外打印密钥）。
+    """
+    t = re.sub(r"sk-[A-Za-z0-9_\-]{6,}", "sk-<REDACTED>", body or "")
+    return t[:n] or "<无响应体>"
 
 BASE = next((a for a in sys.argv[1:] if not a.startswith("--")), "http://127.0.0.1:8123")
 SELFTEST = "--selftest" in sys.argv
@@ -84,10 +99,11 @@ def run_http():
         print("ℹ️ 上游无密钥（CI runner 条件）⇒ 响应体契约子项记 skipped，护栏判定仍全量实测")
     try:
         for want, text in INJECTION_CASES:
-            st, hdr, _ = post(text)
+            st, hdr, body = post(text)
             v = parse_header(hdr.get("X-Xinyu-Safety") or hdr.get("x-xinyu-safety"))
             if st != want_status:
-                bad.append("注入样本 %s 返回 http=%s（期望 %s）" % (want, st, want_status))
+                bad.append("注入样本 %s 返回 http=%s（期望 %s）｜body=%s"
+                           % (want, st, want_status, brief(body)))
             if v.get("suspect") != "1":
                 bad.append("漏报：注入样本 [%s] 未被判 suspect（header=%r）" % (want, v))
             elif want not in v.get("signals", ""):
@@ -120,9 +136,10 @@ def run_http():
         v = parse_header(hdr.get("X-Xinyu-Safety") or hdr.get("x-xinyu-safety"))
         if v.get("capped") != "1":
             bad.append("漏报：>%d 字的超长输入未判 capped（header=%r）" % (4000, v))
-        st, hdr, _ = post(CRISIS_CASE)
+        st, hdr, body = post(CRISIS_CASE)
         if st != want_status:
-            bad.append("危机句返回 http=%s（期望 %s）" % (st, want_status))
+            bad.append("危机句返回 http=%s（期望 %s）｜body=%s"
+                       % (st, want_status, brief(body)))
         st, hdr, _ = post(BENIGN_CASES[0], stream=True)
         if (parse_header(hdr.get("X-Xinyu-Safety") or hdr.get("x-xinyu-safety")) or {}).get("suspect") is None:
             bad.append("流式分支未带 X-Xinyu-Safety 头 ⇒ 两条出口判定不一致")

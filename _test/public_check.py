@@ -72,7 +72,8 @@ assert "在线 AI" in badge, "公网版评委应看到在线AI（proxy）"
 assert strip, "体验条应显示（proxy模式）"
 assert not key_leak, "🔴 前端源码泄露密钥"
 assert "LLM" in probe and "词典" in probe, "双路情绪读数未生效"
-assert "在线大模型生成" in last_tag, "对话未走在线（proxy）"
+assert "在线大模型生成" in last_tag, ("对话未走在线（proxy）｜tag=%s｜console=%s"
+                                    % (last_tag[:90] or "<空>", (errors or ["<无>"])[0][:90]))
 assert "危机" in probe2, "危机拦截失效"
 # 中间页机制：CloudBase 测试域名首访那次导航本身返回 404（平台行为），
 # 但**除该根路径外的任何 4xx/5xx 都算失败** —— 过滤必须有边界，不能掩盖真缺陷。
