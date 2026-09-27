@@ -4,6 +4,22 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Fixed（r56 · 把 r55 我登记的欠账做成，并推翻我自己上一条的归因）
+- **`public_check` 现在能说出"为什么红"**：在线标签缺失时**在页面里**补发一次同源 `POST api/chat`，
+  把上游响应体并进失败文案。实测失败行已带
+  `同源直连=http=402 body={"error":{"message":"Insufficient Balance (request_id 6bdf868e…)"}}`
+  ⇒ 电池分档器 `split_quota()`（只认响应体原文、不认状态码）终于能把它从 `RED(必须修)` 归到
+  `ENV-QUOTA(未验)`。**断言阈值一字未动**，改的只是证据量。
+  ⚠️ 两条弯路都是我自己现踩的，写进注释免得再绕：① 另起 `urllib` 直连被 Cloudflare 回
+  `403 / error code: 1010`（非浏览器客户端被挡 —— 这个坑我 r54 刚记过一遍）；
+  ② 在 `response` 事件回调里读 `text()` 会卡在同步分发里。正解 = 回调外、页面流程内做页内 fetch。
+  另有一次半途失败：我按记忆把基址写成 `BASE`（本文件实际是 `URL`）⇒ 直连支路 `NameError`，
+  等于拿一条新故障去换旧故障 —— 已回退重做，未提交坏版本。
+- **`part56` 那个 ` M` 归因翻转（推翻我上一条口头结论）**：我先前断言它"是我 write_text 写出的
+  CRLF 污染"。实测三项：`git diff` 为空、文件 **CR 计数=0**、字节数 1,580 == blob 字节数
+  ⇒ **不是 CRLF、不是他人改动、不是内容漂移**，只是 git 的 stat 缓存 / eol 复检产生的假 M。
+  教训同族：口头归因必须先于措辞被量过 —— 我这次是先说了再测，测完发现自己错了就当场更正。
+
 ### Fixed（r56 · 一条无法归因的 CI 红，归因后是判据的等待形状）
 - **`browser_check` 在 CI 上红、本地两次都绿**：r54 的 CI 同一条是 success，r55 变 failure，而 r55 的
   改动只有 `safety_guard`/`public_check` 两文件 + CHANGELOG ⇒ 不可能是它引起的。取 CI 日志原文才看见

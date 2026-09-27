@@ -58,6 +58,22 @@ with sync_playwright() as p:
     pg.click("#chat-form button[type=submit]")
     pg.wait_for_timeout(8000)
     probe2 = pg.inner_text("#probe-result")
+    # r56 证据面：在线标签缺失时，**在页面里**补发一次同源 POST，把上游响应体取进失败文案。
+    # 两条弯路都实测踩过并写在这儿免得再绕：
+    #   ① 另起 urllib 直连 ⇒ Cloudflare 回 403 "error code: 1010"（非浏览器客户端被挡，r54 同族）
+    #   ② 在 response 事件回调里读 text() ⇒ 同步 API 会卡在分发里
+    # 正解是页内 fetch：同客户端同域，拿得到正文。断言阈值一字未动。
+    quota_probe = "<未触发>"
+    if "在线大模型生成" not in last_tag:
+        try:
+            quota_probe = pg.evaluate("""async () => {
+              const r = await fetch('api/chat', {method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({messages: [{role: 'user', content: '在吗'}], max_tokens: 4})});
+              return 'http=' + r.status + ' body=' + (await r.text()).slice(0, 96);
+            }""")
+        except Exception as e:
+            quota_probe = "<页内探测失败 %s>" % type(e).__name__
     b.close()
 
 print("TITLE:", title)
@@ -72,8 +88,9 @@ assert "在线 AI" in badge, "公网版评委应看到在线AI（proxy）"
 assert strip, "体验条应显示（proxy模式）"
 assert not key_leak, "🔴 前端源码泄露密钥"
 assert "LLM" in probe and "词典" in probe, "双路情绪读数未生效"
-assert "在线大模型生成" in last_tag, ("对话未走在线（proxy）｜tag=%s｜console=%s"
-                                    % (last_tag[:90] or "<空>", (errors or ["<无>"])[0][:90]))
+_red = quota_probe.split("sk-")[0] + ("sk-<已脱敏>" if "sk-" in quota_probe else "")
+assert "在线大模型生成" in last_tag, ("对话未走在线（proxy）｜tag=%s｜console=%s｜同源直连=%s"
+                                    % (last_tag[:90] or "<空>", (errors or ["<无>"])[0][:90], _red))
 assert "危机" in probe2, "危机拦截失效"
 # 中间页机制：CloudBase 测试域名首访那次导航本身返回 404（平台行为），
 # 但**除该根路径外的任何 4xx/5xx 都算失败** —— 过滤必须有边界，不能掩盖真缺陷。
