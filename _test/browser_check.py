@@ -75,7 +75,21 @@ with sync_playwright() as p:
     page.click("#btn-clear")
     page.wait_for_timeout(600)
     lit_after_clear = lit(page)
-    chart_after_clear = page.inner_text("#chart-count")
+    # ⚠️ r56 修的是**等待形状**，不是断言阈值（在册教训：等自己刚触发的副作用＝没等）。
+    #    旧写法在点完"清除"后立刻读 #chart-count，而清除动作自己会把回执文案短暂写进这个
+    #    区域 ⇒ 读到的是"本机已清除 ｜ 未连服务端（无需服务端清除）"而不是空态"还没有记录"。
+    #    实测：本地连跑两次均绿、CI 上 r54 绿 r55 红 —— 同提交同代码，纯时序抖动，
+    #    于是判据产出一条**无法归因的红**（会锁住后面每一轮）。
+    #    正解是对准被等对象的完成态：轮询到空态出现为止，超时才判红并回报尝试次数与末值。
+    chart_after_clear = ""
+    _tries = 0
+    for _ in range(32):                       # 最多约 8s（0.25s 一跳）
+        _tries += 1
+        chart_after_clear = page.inner_text("#chart-count")
+        if "还没有记录" in chart_after_clear:
+            break
+        page.wait_for_timeout(250)
+    chart_after_clear_tries = _tries
 
     # 7) 滚动驱动 + 回滚可见性回归（2026-09-19 修复：双补间争抢同一属性 → 回滚后文案不恢复）
     page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -136,7 +150,8 @@ assert lit_reload == lit2, f"刷新后星图未重建/数量不符: {lit2} → {
 assert "危机" in crisis_readout, "危机词未拦截"
 assert dock_collapsed, "对话坞无法收起（会遮住幕内按钮）"
 assert lit_after_clear == 0, f"清除数据后星星未熄灭: {lit_after_clear}"
-assert "还没有记录" in chart_after_clear, f"清除后曲线未清空: {chart_after_clear}"
+assert "还没有记录" in chart_after_clear, ("清除后曲线未清空（轮询 %d 次仍未见空态）: %r"
+                                       % (chart_after_clear_tries, chart_after_clear[:120]))
 assert back3 > 0.9, f"滚到底再回滚后 act3 文案未恢复（opacity={back3}）"
 assert o_enter < 0.6, f"面板刚进屏不够淡（{o_enter}）——随滚动淡入未生效"
 assert o_center > 0.9, f"面板居中不够实（{o_center}）——影响可读性"
