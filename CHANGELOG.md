@@ -4,6 +4,16 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Fixed（r49 · 手机端「✨ 一键点亮」入口恢复，撤掉窄屏豁免账）
+- **窄屏不再整块藏这个能力**：480 档的 `#btn-lightshow{display:none}`（`6cae042` 对标轮 M6 引入，行上无注释）
+  改为「收图标」——文案拆 `.ls-ico` / `.ls-word` 两段，窄屏只把文字做 sr-only 裁切，
+  所以**可访问名与桌面档逐字相同**（四档 `get_by_role(name="✨ 一键点亮")` 均命中 1，`a11y` 12 单元违规 0）。
+  实测：触屏档入口 44×44、1280 档 87×27 与改前逐像素一致；点下去 `LIT 0→900`、退出保留 900、回记忆清零，
+  320/390 零横向溢出、console 0 报错。
+- **为什么此前没人发现**：`lightshow_check` 视口固定 1280×800，而 `mobile_check` 的 M2 只量**可见**目标
+  （它自带反例「隐藏元素不得判」）⇒「由可见变不可见」对两条判据都天然豁免。
+  现由常驻判据 `_test/entry_reach_check.py` 盯「可见性单调性」，豁免账已清空（gap 必须为 0）。
+
 
 ### Added（r47 · 移动端与触屏可达性面，量真实几何而不是"有没有写 @media"）
 - **`_test/mobile_check.py`（+2 套件，`--selftest` 14/14）**：把页面渲进 4 档真视口

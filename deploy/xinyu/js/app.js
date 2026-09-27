@@ -98,12 +98,18 @@
   // 4.5) 一键点亮：六种情绪各点一簇（仅演示，不写入记忆）；再点一次回到「我的记忆」
   let showMode = false;
   let showTimer = null; // 声明前置：点击回调里读写它，禁止先用后声明
+  // 标签分两段（图标 + 文字）：窄屏只裁文字留图标，能力不消失（见 style.css 的 .ls-word）
+  const setShowLabel = (ico, word) => {
+    const b = $("#btn-lightshow");
+    b.querySelector(".ls-ico").textContent = ico;
+    b.querySelector(".ls-word").textContent = word;
+  };
   $("#btn-lightshow").addEventListener("click", () => {
     if (!gl) return;
     showMode = !showMode;
     if (showMode) {
       const { palette, duration } = window.ThreeScene.lightShow(180);
-      $("#btn-lightshow").textContent = "↺ 回到我的记忆";
+      setShowLabel("↺", "回到我的记忆");
       $("#probe-result").innerHTML = `<p class="muted">正在清屏，重新点亮六种情绪…（按 Esc 或点一下画面退出）</p>`;
       document.body.classList.add("showtime");   // 隐藏全部 UI，只留背景星雾
       // 播放结束**不跳回**：继续停在清屏画面欣赏，唯一退出口是右下角按钮
@@ -126,7 +132,7 @@
     if (gl) window.ThreeScene.cancelShow();
     showMode = false;
     replayStars();                              // 回到真实记忆（会清空演示点亮）
-    $("#btn-lightshow").textContent = "✨ 一键点亮";
+    setShowLabel("✨", "一键点亮");
     $("#probe-result").textContent = "已回到你的真实记忆 —— 继续和它说话，星雾会按你的情绪继续亮。";
   }
 

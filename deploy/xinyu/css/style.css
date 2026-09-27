@@ -168,7 +168,9 @@ dialog::backdrop{background:var(--dialog-backdrop)}
   .voice-btn{padding:9px 11px;font-size:15px}
   #chat-dock{max-height:72vh}
   #chat-dock .chat-log{height:min(30vh,210px)}
-  #btn-lightshow{display:none}
+  /* 窄屏收图标、不藏能力（r49）：旧版整块 display:none 让手机端演示入口彻底不可达；
+     文字走 sr-only 裁切而非 display:none，可访问名与桌面档逐字相同。判据 = entry_reach_check.py */
+  #btn-lightshow .ls-word{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 }
 
 /* 旧断点保留为兜底（<640px 时上述两档已覆盖大部分，这里补坞内边距与幕底留白） */
