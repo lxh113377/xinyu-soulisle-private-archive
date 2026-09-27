@@ -4,6 +4,16 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+
+（空 · v1.6.1 切版后重新起账，r58 起的新增功能登记到这里。
+ 本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
+ 而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
+
+## [1.6.1] - 2026-09-27
+
+> 切版动因（机器判据 R1）：距 `v1.6.0` 已攒 5 个 feat（上限 5、余量 0）。
+> 本段正文由 `[Unreleased]` **逐字节搬运**（脚本断言 bullet 数与原文一致），不是重写。
+
 ### Added（r57 · 判据清单与电池双向对账 G16）
 - `repo_config_check.py` 新增 **G16**：`run_all_suites.py` 的 SUITES 里真调用的 `_test/*.py|js`
   （**59 条**，分母从代码现读）必须逐条出现在 `docs/quality-gates.md`；反向同尺 —— 文档写了而
@@ -197,6 +207,7 @@
   "r53 硬前置 = 切 v1.6.0"已改成"本轮末已切"，并补两条本轮自抓（footer 文法连犯三次、
   自己的产物写脏自己）。⚠️ v1.6.0 的 fat jar **未在本轮重构建**：`server/target/` 被在跑的 8123
   进程持有，且该产物 gitignored、可再生；本轮 Java 源码零改动。
+
 
 ## [1.6.0] - 2026-09-27 — 对标轮 r46–r52 收口（许可合规 / 移动端几何 / 窄屏入口 / 协作治理 / 故障注入 / 记忆召回 随版发布）
 
