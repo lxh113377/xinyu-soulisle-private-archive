@@ -4,6 +4,40 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Added（r50 · 协作治理与健康度面）
+- **`_test/peer_community_probe.py`（`--selftest` 入电池 74→75，17/17）**：三通道独立取数 ——
+  A 声明面（git tree 扫 CONTRIBUTING/SECURITY/CODEOWNERS/CODE_OF_CONDUCT/ISSUE_TEMPLATE/PR模板/dependabot）、
+  B 平台面（GitHub 自己算的 `community/profile` health_percentage）、**C 行为面（dependabot 真开过几张、合并几张）**。
+  实测 `CONTRIBUTING 10/16｜SECURITY 6/16｜CODEOWNERS 1/16｜conduct 2/16｜dependabot 件 1/16`；
+  health min 28／中位 62／max 100；**有行为回执的只有 2 家**（lobehub 开 30 合 18、SillyTavern 开 7 合 7）。
+  self：health 71、dependabot 开 4 合 3。
+- **`G1b`（并入既有 `validate_dependabot`，不另造判据）**：maven 必须配 `ignore` 大版本。
+  自测 48→50 条且**双向**：摘掉 ignore 判红；actions 侧无 ignore **不得**判红（防策略无据扩面）。
+
+### Fixed（r50 · 两个"看着已覆盖、其实没生效"的洞）
+- **🔴 漏洞告警整条是关的**：`gh api repos/{slug}/dependabot/alerts` 实测回
+  `Dependabot alerts are disabled for this repository`（HTTP 403）。而 `dependabot.yml` 自 r21 在册、
+  也确实开过 4 张 PR ⇒ **任何"文件在不在"式检查都看不见这个洞**。
+  已 `PUT /repos/{slug}/vulnerability-alerts` 开启并**读回证明**：`GET` 从 `404(disabled)` 变
+  **`HTTP 204(enabled)`**，alerts 端点从 403 变可读、**当前告警数 0**。
+  ⇒ 修正结论：停在 Spring Boot 3.2.5 并无已知未修 CVE 压力（此前我把"该不该升"只当技术债评估，
+  漏了"平台本来就能告诉我们"这一格）。
+- **常红的 dependabot PR #2 已带证据关闭**：`spring-boot-starter-parent 3.2.5→4.1.1` 跨大版本，
+  java-build 与浏览器回归两条 job 直接 fail，自 09-24 挂到 r50；而同期另两张 major
+  （`actions/checkout 4→7`、`setup-python 5→7`）**已正常合并** ⇒ 问题不是"major 危险"，
+  是 Spring Boot 大版本升级属**需人工评估的迁移**，不该由自动直送。策略已落 `dependabot.yml`（只对 maven），
+  升 4.x 转为截止日（09-30）后的评估项。
+
+### 度量学（r50 · 被自己的工具骗了三次，全部当场纠正）
+- **org 级配置会让声明面假阴性**：lobehub 有 30 张 dependabot PR，其 tree 里却**没有** `dependabot.yml`
+  （配置挂在组织级）⇒ "仓内找不到 = 没挂 dependabot" 是错的，**行为面才是权威**。
+- **search 端点的 secondary rate limit 会造出假结论**：首版走 `search/issues?q=author:app/dependabot`，
+  单次成功后续即 403（同一请求走 `gh api` 与 core `/pulls` 都 200）⇒ 16 仓 15 个 NA，
+  汇总据此打印**"配了 dependabot 的 1 家里 0 家真跑过"**这个假结论。改走 `/pulls` + 按 `Retry-After`
+  退避后 NA 14→5；并修 `verdict()` 把 `None`（未取到）**塌缩成"无 PR 回执"**的缺陷 —— NA 必须有自己的形状。
+- **我的 `throttle()` 从来没生效过**：每次调用先 `del CALLS[:]` 清空历史再算"最近调用" = 不限流。
+  这才是换端点后仍全 403 的真因；我前两版分别怀疑"权限不足"和"间隔不够"，都被实测否证。
+
 ### Fixed（r49 · 手机端「✨ 一键点亮」入口恢复，撤掉窄屏豁免账）
 - **窄屏不再整块藏这个能力**：480 档的 `#btn-lightshow{display:none}`（`6cae042` 对标轮 M6 引入，行上无注释）
   改为「收图标」——文案拆 `.ls-ico` / `.ls-word` 两段，窄屏只把文字做 sr-only 裁切，

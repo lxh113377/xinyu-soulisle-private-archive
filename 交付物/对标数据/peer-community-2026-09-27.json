@@ -1,0 +1,557 @@
+{
+ "repos": {
+  "__self__": {
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug.yml",
+    "pr_template": true,
+    "pr_template_sample": ".github/pull_request_template.md",
+    "dependabot": true,
+    "dependabot_sample": ".github/dependabot.yml",
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 71,
+    "files": [
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 4,
+    "merged": 3,
+    "titles": [
+     "chore(deps-maven): bump com.baomidou:mybatis-plus-spring",
+     "chore(deps-actions): bump actions/setup-python from 5 to",
+     "chore(deps-maven): bump org.springframework.boot:spring-"
+    ]
+   }
+  },
+  "lobehub/lobehub": {
+   "tier": "A",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": ".agents/skills/deep-review/references/dimensions/security.md",
+    "codeowners": true,
+    "codeowners_sample": ".github/CODEOWNERS",
+    "conduct": true,
+    "conduct_sample": "CODE_OF_CONDUCT.md",
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/1_bug_report.yml",
+    "pr_template": true,
+    "pr_template_sample": ".github/PULL_REQUEST_TEMPLATE.md",
+    "dependabot": false,
+    "support": true,
+    "support_sample": "src/libs/email/support.test.ts",
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 87,
+    "files": [
+     "code_of_conduct",
+     "code_of_conduct_file",
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 30,
+    "merged": 18,
+    "titles": [
+     "build(deps-dev): bump vitest from 3.2.4 to 3.2.6 in /pac",
+     "chore(deps-dev): bump vitest from 3.2.4 to 3.2.6 in /app",
+     "chore(deps-dev): bump vitest from 3.2.4 to 3.2.6"
+    ]
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "SillyTavern/SillyTavern": {
+   "tier": "A",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug-report.yml",
+    "pr_template": true,
+    "pr_template_sample": ".github/pull_request_template.md",
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 75,
+    "files": [
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 7,
+    "merged": 7,
+    "titles": [
+     "Bump tar-fs from 3.0.9 to 3.1.1 in /tests",
+     "Bump multer from 2.0.0 to 2.0.1",
+     "Bump tar-fs from 3.0.8 to 3.0.9 in /tests"
+    ]
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "tier": "B",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug---question---get-help---bug---提问---求助.md",
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 62,
+    "files": [
+     "contributing",
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": null,
+    "merged": null
+   },
+   "truncated": false,
+   "err": "http=403 {   \"documentation_url\": \"https://docs.github.com/free-pro-team@latest/rest/overview/rate-limits-for-the-rest-api#about-"
+  },
+  "morettt/my-neuro": {
+   "tier": "B",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug_report.md",
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 71,
+    "files": [
+     "contributing",
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "letta-ai/letta": {
+   "tier": "D",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/config.yml",
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 62,
+    "files": [
+     "contributing",
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "hello-diana/MASCOT": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 42,
+    "files": [
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": null,
+    "merged": null
+   },
+   "truncated": false,
+   "err": "http=403 {   \"documentation_url\": \"https://docs.github.com/free-pro-team@latest/rest/overview/rate-limits-for-the-rest-api#about-"
+  },
+  "ddxfish/sapphire": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug_report.md",
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 57,
+    "files": [
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "v2rockets/Loyal-Elephie": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 42,
+    "files": [
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 28,
+    "files": [
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": null,
+    "merged": null
+   },
+   "truncated": false,
+   "err": "http=403 {   \"documentation_url\": \"https://docs.github.com/free-pro-team@latest/rest/overview/rate-limits-for-the-rest-api#about-"
+  },
+  "Lum1104/MER-Factory": {
+   "tier": "D",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": ".github/CONTRIBUTING.md",
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug_report.md",
+    "pr_template": true,
+    "pr_template_sample": ".github/pull_request_template.md",
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 71,
+    "files": [
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "CheaperjamRen/leemo": {
+   "tier": "C",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug.yml",
+    "pr_template": true,
+    "pr_template_sample": ".github/pull_request_template.md",
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 85,
+    "files": [
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "NJX-njx/opensoul": {
+   "tier": "C",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": true,
+    "conduct_sample": "CODE_OF_CONDUCT.md",
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug_report.md",
+    "pr_template": true,
+    "pr_template_sample": ".github/PULL_REQUEST_TEMPLATE.md",
+    "dependabot": true,
+    "dependabot_sample": ".github/dependabot.yml",
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 100,
+    "files": [
+     "code_of_conduct",
+     "code_of_conduct_file",
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": null,
+    "merged": null
+   },
+   "truncated": false,
+   "err": "http=403 {   \"documentation_url\": \"https://docs.github.com/free-pro-team@latest/rest/overview/rate-limits-for-the-rest-api#about-"
+  },
+  "s-nagaev/chibi": {
+   "tier": "C",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 57,
+    "files": [
+     "contributing",
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "29-Cu/succhia": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 42,
+    "files": [
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "zeroa234/ryza-ai-revive": {
+   "tier": "C",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": true,
+    "support_sample": "web/assets/icons/support.svg",
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 71,
+    "files": [
+     "contributing",
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": null,
+    "merged": null
+   },
+   "truncated": false,
+   "err": "http=403 {   \"documentation_url\": \"https://docs.github.com/free-pro-team@latest/rest/overview/rate-limits-for-the-rest-api#about-"
+  },
+  "Bwcx-songyu/MoodChat": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 28,
+    "files": [
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  }
+ },
+ "na": [
+  "Open-LLM-VTuber/Open-LLM-VTuber(http=403 {   \"documentation_url\": \"https://docs.;行为面 NA)",
+  "hello-diana/MASCOT(http=403 {   \"documentation_url\": \"https://docs.;行为面 NA)",
+  "Rogendo/Mental-health-Chatbot(http=403 {   \"documentation_url\": \"https://docs.;行为面 NA)",
+  "NJX-njx/opensoul(http=403 {   \"documentation_url\": \"https://docs.;行为面 NA)",
+  "zeroa234/ryza-ai-revive(http=403 {   \"documentation_url\": \"https://docs.;行为面 NA)"
+ ],
+ "denominator": 16,
+ "blind": 5,
+ "usable": 11,
+ "behavior_endpoint": "GET /repos/{owner}/{repo}/pulls?state=all（core 限流；search 端点受 secondary rate limit 影响实测不可用，已弃用）",
+ "note": "声明面(tree)与平台面(profile)与行为面(dependabot PR)三路独立取数，任一缺失记 NA，禁与 0 混同；漏洞告警开关仅对本仓可查(需管理权)，peers 侧不可见",
+ "ts": "2026-09-27T05:14:54Z"
+}

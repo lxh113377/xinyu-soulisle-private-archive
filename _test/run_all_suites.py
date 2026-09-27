@@ -97,6 +97,10 @@ SUITES = [
     ("mobile", [sys.executable, "_test/mobile_check.py"]),
     ("mobile_selftest", [sys.executable, "_test/mobile_check.py", "--selftest"]),
     ("mobile_peer_selftest", [sys.executable, "_test/peer_mobile_probe.py", "--selftest"]),
+    # r50：协作治理与健康度探针的判据自证。核心形状是"声明面 ≠ 行为面"——
+    # 实测教训：org 级 dependabot 配置对仓内 tree 不可见（lobehub 开 30 PR 却无 dependabot.yml），
+    # 而 search 端点受 secondary rate limit 影响会把 NA 塌缩成"0 家真跑过"的假结论（17/17 里含该反例）。
+    ("community_probe_selftest", [sys.executable, "_test/peer_community_probe.py", "--selftest"]),
     # r45：发布/版本治理对标探针的判据自证（semver 合流 / 发布滞后 / CHANGELOG 三段，含小数天反例）
     ("release_probe_selftest", [sys.executable, "_test/peer_release_probe.py", "--selftest"]),
     # r46：许可与供给链对标探针的判据自证（LICENSE 类件 / 归属类件 / vendored 目录三个分类器，

@@ -8,7 +8,8 @@
     （AGENTS.md 的 04/05 段就已长期陈旧，是同一类问题的既成实证）。
 
 判据（逐项独立，G1–G4、G6–G7 离线恒跑；G5 需 --online）：
-  G1 dependabot schema：version==2、ecosystem 在支持清单内、`directory` 指向**仓库里真实存在**的目录、
+  G1 dependabot schema：version==2、ecosystem 在支持清单内、`directory` 指向**仓库里真实存在**的目录；
+     G1b(r50) maven 必须配 ignore 大版本（实测 PR#2 spring-boot 3.2.5→4.1.1 常红），actions 侧无此症状故不扩面
      schedule.interval 合法、PR 上限为整数
   G2 CI 拓扑：`.github/workflows/ci.yml` 可解析，且 job 数 == README 声称的"N 条门禁"（数字对不上即红）
   G3 契约可发现：`docs/openapi.yaml` 存在、可解析，且被 `docs/README.md` 引用（孤文件即红）
@@ -92,6 +93,19 @@ def validate_dependabot(cfg):
             bad.append(f"{eco} schedule.interval 非法：{(u.get('schedule') or {}).get('interval')}")
         if not isinstance(u.get("open-pull-requests-limit", 5), int):
             bad.append(f"{eco} open-pull-requests-limit 不是整数")
+        # G1b 依赖升级策略（r50 加；按证据**只对 maven 要求**，不给 actions 也上一道）：
+        #   同时成立的两条实测 —— `actions/checkout 4→7`、`setup-python 5→7` 这类 major 升级
+        #   我们**正常合并过**（PR #1/#3，merged_at 有值）；而 dependabot PR #2 提的
+        #   `spring-boot-starter-parent 3.2.5→4.1.1`（跨大版本）从 09-24 挂到 r50，
+        #   java-build 与浏览器回归两条 job 直接 fail ⇒ 这张 PR 结构性不可能通过。
+        #   结论不是"dependabot 没用"，是"配置在册 ≠ 策略成立"：一张永远红的 PR 挂着，
+        #   等于把自动化的收益换成常 noise，还会掩盖真正该看的那张。
+        if eco == "maven":
+            ig = u.get("ignore") or []
+            if not any(re.search(r">=\s*\d", str(v)) for i in ig
+                       for v in (i.get("versions") or [])):
+                bad.append("maven 未配 ignore 大版本 ⇒ 会持续收到结构性不可能合并的 major PR"
+                           "（实测 PR #2 spring-boot 3.2.5→4.1.1 常红）")
     return bad
 
 
@@ -658,6 +672,18 @@ def selftest():
         bad.append("README 数字解析本身就是 999 ⇒ 判据读的是空气")
     if validate_dependabot({"version": 2, "updates": []}) == []:
         bad.append("篡改④（updates 清空）未被抓到 ⇒ 恒真")
+    db_ni = json.loads(json.dumps(cfg))
+    for _u in (db_ni.get("updates") or []):
+        if _u.get("package-ecosystem") == "maven":
+            _u.pop("ignore", None)
+    # 篡改④b（r50）：把 maven 的 ignore 摘掉 ⇒ 必须红。
+    # 反向还要证"不扩面"：actions 没有 ignore 也**不该**被判红（否则就是无据推广策略）。
+    if db_ni and not validate_dependabot(db_ni):
+        bad.append("篡改④b（摘掉 maven 的 ignore 大版本）未被抓到 ⇒ G1b 恒真")
+    acts_only = {"version": 2, "updates": [{"package-ecosystem": "github-actions", "directory": "/",
+                 "schedule": {"interval": "weekly"}}]}
+    if validate_dependabot(acts_only):
+        bad.append("篡改④c：actions 侧无 ignore 被判红 ⇒ 策略被无据扩面（实测 major 升级可正常合并）")
     nt = (ROOT / NOTICES).read_text("utf-8") if (ROOT / NOTICES).exists() else ""
     rt = (ROOT / "README.md").read_text("utf-8")
     vf, vp = manifest_vendor_files()
