@@ -1,0 +1,151 @@
+{
+ "repos": [
+  {
+   "repo": "__self__",
+   "tier": "-",
+   "tree": {
+    "cf_headers": [
+     "deploy/xinyu/_headers"
+    ]
+   },
+   "deps": [],
+   "readme": {}
+  },
+  {
+   "repo": "lobehub/lobehub",
+   "tier": "A",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "SillyTavern/SillyTavern",
+   "tier": "A",
+   "tree": {},
+   "deps": [
+    "package.json"
+   ],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
+   "tier": "B",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "morettt/my-neuro",
+   "tier": "B",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "letta-ai/letta",
+   "tier": "D",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "hello-diana/MASCOT",
+   "tier": "C",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "ddxfish/sapphire",
+   "tier": "C",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "v2rockets/Loyal-Elephie",
+   "tier": "C",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "Rogendo/Mental-health-Chatbot",
+   "tier": "C",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "Lum1104/MER-Factory",
+   "tier": "D",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "CheaperjamRen/leemo",
+   "tier": "C",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "NJX-njx/opensoul",
+   "tier": "C",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "s-nagaev/chibi",
+   "tier": "C",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "29-Cu/succhia",
+   "tier": "C",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "zeroa234/ryza-ai-revive",
+   "tier": "C",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  },
+  {
+   "repo": "Bwcx-songyu/MoodChat",
+   "tier": "C",
+   "tree": {},
+   "deps": [],
+   "readme": {},
+   "err": ""
+  }
+ ],
+ "na": [],
+ "denominator": 17,
+ "blind": 0,
+ "usable": 17,
+ "self_paths_scanned": 300,
+ "ceiling_note": "线上响应头只能测自己（未获授权扫他人部署域名）⇒ 本面 peers 侧只有结构与声明两类证据，不构成防护效果对比；self 的行为回执见 _test/headers_csp_check.py。"
+}

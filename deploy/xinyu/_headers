@@ -1,17 +1,37 @@
-# Cloudflare Pages 响应头（对标轮 r28，只钉真正有缺口的一条）
+# Cloudflare Pages 响应头（r28 建，r54 补 CSP 并修一条"声明没落在生效路径上"）
 #
-# 实测依据（判据 r28 现场测出来的，不是照抄最佳实践）：
-#   GET /                       → Cache-Control: public, max-age=0, must-revalidate   ✅ 已会回源校验
-#   GET /sw.js                  → Cache-Control: public, max-age=0, must-revalidate   ✅
-#   GET /vendor/three.min.js    → Cache-Control: public, max-age=0, must-revalidate   ✅
-#   GET /index.html             → **无 Cache-Control 头**                              ❌ 浏览器可启发式缓存
-# 本地 jar 侧则由 `spring.web.resources.cache.period=0` 统一给 `no-store`（比 no-cache 更严）。
+# ── r54 的两条实测依据（curl -D - 逐路径，本地时刻 18:04，全部**线上实测**不是照抄最佳实践）
+#   ① 修前所有路径 `content-security-policy` **一条都没有**（`/`、`/index.html`、`/sw.js`、
+#      `/js/app.js`、`/nope-404` 各测一次，计数 0）⇒ 十五份对标从没量过这一格（grep CSP/安全头/helmet = 0/15）。
+#   ② r28 那版只给 `/index.html` 写了 `Cache-Control: no-cache`，而 Pages 会把 `/index.html`
+#      **308 跳到 `/`**，用户真正访问的入口 `/` 拿到的是 `public, max-age=0, must-revalidate`
+#      ⇒ 声明与实际生效路径不一致。功能上仍会回源校验（不是缺陷），但"我给它加了 no-cache"这句话
+#      在入口 URL 上不成立，所以本轮把 `/` 与 `/*` 都写上，并由 `_test/headers_csp_check.py` 逐路径对账。
 #
-# 所以这里只补两条：入口 HTML 与 SW 脚本自身。
-# 为什么不顺手把 vendor 改成长缓存 + immutable：那是性能主张，不是离线壳的前提（离线收益来自
-# SW 自己的 Cache Storage，与 HTTP 缓存无关），而且会让两端策略分叉、判据要开始"容忍差异"。
-# 等赛后做性能项时再单独评估，别混进这轮。
+# ── CSP 为什么能开严格版（先证再开，别开完靠人肉点一遍）
+#   全站内联 <script> 只有 1 个（r28 的离线壳注册块）⇒ 已外提成 `js/sw-register.js` 并补进 SW 预缓存
+#   （r45 就踩过"外提模块没进预缓存致断网重载报错"，同族不再踩）。
+#   实测 src/js/*.js 里动态执行面（解释器执行字符串 / Function 构造器 / 专用线程 / document.write）**全为 0**
+#   ⇒ 不需要 'unsafe-eval'、不需要 worker-src/blob:。`<style>`=0、inline style 属性=0
+#   ⇒ script-src 与 style-src 都只给 'self'。
+#   唯一需要例外的是 favicon（`data:image/svg+xml`）⇒ img-src 允许 data:。
+#   浏览器直连模式（本地演示）会打 https://api.deepseek.com ⇒ connect-src 必须带上它，
+#   否则"在线 AI"会被 CSP 静默打断成降级——那是最难查的一种坏法。
+#
+# ── Permissions-Policy 故意**不写 microphone**：本站语音输入走 Web Speech ASR，要吃麦克风；
+#   写 microphone=() 会当场打断 `voice` 判据。缺省即允许，正是我们要的。
+#
+# ⚠️ 静态 `_headers` **不作用于 Pages Function**（`/api/*` 由函数自己回头），
+#   所以那一路径由判据单独取数，取不到记 UNVERIFIED 而不是"没有"。
 
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.deepseek.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=()
+/
+  Cache-Control: no-cache
 /index.html
   Cache-Control: no-cache
 /sw.js

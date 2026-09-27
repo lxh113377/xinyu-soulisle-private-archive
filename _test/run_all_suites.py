@@ -128,6 +128,14 @@ SUITES = [
     # （不让产品报给自己的数字自比）。修前该套件以 X2 判红，是真拦住过东西的判据。
     ("context_budget", [sys.executable, "_test/context_budget_check.py"]),
     ("context_budget_selftest", [sys.executable, "_test/context_budget_check.py", "--selftest"]),
+    # r54：安全响应头/CSP。取数面是「把同一份 _headers 在本地按 Pages 语义回放，再拿响应回来对账」
+    # —— 线上一份声明是否真生效，只有在真施加过头的服务器上才测得出来；H5 那条拦截探针负责证明
+    # "夹具真的在拦"，否则整套绿色都来自没生效的 CSP（同族：判具坏了长得像产品好了）。
+    ("headers_csp", [sys.executable, "_test/headers_csp_check.py", "--local"]),
+    ("headers_csp_selftest", [sys.executable, "_test/headers_csp_check.py", "--selftest"]),
+    # r54：安全响应头对标探针的判据自证。核心陷阱是裸子串：`csp` 是 .csproj 的子串、
+    # `helmet` 在散文里满地都是 ⇒ 路径与依赖两条通道都必须锚定（反例②③各盯一条）。
+    ("sec_headers_peer_selftest", [sys.executable, "_test/peer_sec_headers_probe.py", "--selftest"]),
     # r45：发布/版本治理对标探针的判据自证（semver 合流 / 发布滞后 / CHANGELOG 三段，含小数天反例）
     ("release_probe_selftest", [sys.executable, "_test/peer_release_probe.py", "--selftest"]),
     # r46：许可与供给链对标探针的判据自证（LICENSE 类件 / 归属类件 / vendored 目录三个分类器，

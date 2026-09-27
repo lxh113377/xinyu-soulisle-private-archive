@@ -42,6 +42,9 @@ BUDGETS = {
     "src/js/chat-window.js": 5845,
     "src/js/settings.js": 3000,
     "src/sw.js": 4814,
+    # r54 新增：CSP 要求把 index.html 里唯一那个内联 <script>（离线壳注册）外提，
+    #    基线 = 实测 1,078B +5%。它同时进了 SW 预缓存清单（r45 踩过"外提件没进预缓存"）。
+    "src/js/sw-register.js": 1_132,
     "src/js/scroll-story.js": 3_757,
     "src/js/three-scene.js": 15_793,
     # r45 上调 4,844 -> 7214：clear() 改为带回执并读 /stats 复核归零 + 新增 exportAll()

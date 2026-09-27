@@ -20,7 +20,7 @@ const PRECACHE = [
   "/js/app.js", "/js/chat-agent.js", "/js/chat-window.js", "/js/chart.js",
   "/js/settings.js", "/js/voice.js", "/js/emotion-engine.js", "/js/emotion-remote.js",
   "/js/memory-store.js", "/js/scroll-story.js", "/js/three-scene.js",
-  "/js/data-rights.js",
+  "/js/data-rights.js", "/js/sw-register.js",
   "/data/emotion-lexicon.js", "/data/emotion-strategy.js",
 ];
 const NO_STORE = ["/js/demo-config.js"];                 // 含本机密钥，绝不落缓存

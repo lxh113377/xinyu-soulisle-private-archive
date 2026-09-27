@@ -111,9 +111,20 @@ def sw_static_audit(text, html, stamp, headers_txt=""):
     cf = arr(text, "CACHE_FIRST_PREFIX")
     if cf is None or set(cf) - {"/vendor/", "/assets/"}:
         bad.append(f"A6 cache-first 前缀越界（只允许 vendor/assets）：{cf}")
-    if "serviceWorker.register" not in html:
-        bad.append("A7 页面里没有注册代码 ⇒ sw.js 是死文件")
-    if 'location.protocol.startsWith("http")' not in html or ".catch(" not in html:
+    # A7 取数面 = 页面 **+ 页面自己列出的 js/***（r54 动因：为开严格 CSP 把全站唯一那个内联
+    # <script> 外提成 js/sw-register.js，注册语义一个字没变；只搜 html 会把"外提"误判成"没了"。
+    # 这类"改了合法形状→判据假红"要修的是判据取数面，不是回退产品改动（R263）。
+    # 反向能力不受影响：合成用例里页面不列任何脚本，A7 照样能抓到"没注册"。
+    # 用 chr(10) 而不是转义字面量拼接 —— 本仓台账在册：内联/转义在这个位置会被吃掉。
+    reg_pages = [html]
+    for rel in re.findall(r'src="(js/[A-Za-z0-9_.-]+)"', html):
+        f = ROOT / "src" / rel
+        if f.is_file():
+            reg_pages.append(f.read_text("utf-8", errors="replace"))
+    reg_all = chr(10).join(reg_pages)
+    if "serviceWorker.register" not in reg_all:
+        bad.append("A7 页面与其列出的脚本里都没有注册代码 ⇒ sw.js 是死文件")
+    if 'location.protocol.startsWith("http")' not in reg_all or ".catch(" not in reg_all:
         bad.append("A7 注册缺协议守卫或缺 catch（file:// 或异常会把主链路带崩）")
     if "self.skipWaiting()" not in text or "clients.claim()" not in text:
         bad.append("A8 缺 skipWaiting/clients.claim ⇒ 更新要等第二次访问才生效")
