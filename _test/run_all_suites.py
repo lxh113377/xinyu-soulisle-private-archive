@@ -88,6 +88,10 @@ SUITES = [
     # 规则集必须含 experimental（默认集看不见 label-content-name-mismatch，首跑即被这一点骗过）。
     ("a11y", [sys.executable, "_test/a11y_check.py"]),
     ("a11y_selftest", [sys.executable, "_test/a11y_check.py", "--selftest"]),
+    # r44：数据主体权利（披露随模式翻转 / 删除有回执并复核归零 / 导出两份与计数对齐）
+    ("data_rights", [sys.executable, "_test/data_rights_check.py"]),
+    ("data_rights_selftest", [sys.executable, "_test/data_rights_check.py", "--selftest"]),
+    ("data_rights_probe_selftest", [sys.executable, "_test/peer_data_rights_probe.py", "--selftest"]),
     # r43：干净克隆可跑性——从 **HEAD** 克隆到临时目录再跑，证明"交出去的那份"能跑，
     # 而不是"我这台机器上恰好有一份 .gitignore 掉的文件"那一版能跑。
     ("clean_clone", [sys.executable, "_test/clean_clone_check.py"]),

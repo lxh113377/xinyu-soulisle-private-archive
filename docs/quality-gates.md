@@ -5,8 +5,10 @@
 
 
 ```powershell
-python _test/run_all_suites.py           # ★ 全量电池（64 套件逐条直取 rc，聚合不掩盖单项失败）
+python _test/run_all_suites.py           # ★ 全量电池（67 套件逐条直取 rc，聚合不掩盖单项失败）
 python _test/clean_clone_check.py         # r43 干净克隆可跑性：从 HEAD 克隆到临时目录再跑，未知报错即红（已登记缺口须计数命中，0 命中要销账）
+python _test/data_rights_check.py            # r44 数据权利：披露随模式翻转 + 删除回执并复核归零 + 导出与计数对齐
+python _test/peer_data_rights_probe.py --selftest  # r44 对标探针桩：10 例（路径 7｜README 2｜边界 1）
 python _test/a11y_check.py               # r42 运行时无障碍：6 状态 x 2 主题 x 含 experimental 规则集 + 动效降档像素实测 + 反例自证
 python _test/a11y_check.py --selftest    # r42 判据自身桩：合成图像走同一条像素通道 + A5/A7 双向 12 例
 python _test/peer_repro_probe.py --selftest  # r43 可复现面探针桩：19 例（路径 10/钉版 6/边界 3），含「一行 JSON 也逐条数分母」专属反例

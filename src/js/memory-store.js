@@ -74,12 +74,61 @@ window.MemoryStore = (function () {
     } catch { /* 忽略 */ }
   }
   function all() { return load().slice(); }
+  /**
+   * 清除我的数据 = 本机 + 服务端**都要清，并且要能自证清干净了**。
+   *
+   * 为什么改（对标轮 r44 实测）：旧写法是 fire-and-forget——
+   * `api("/" + sid, {method:"DELETE"}).then(guard).catch(markDown)`，
+   * 服务端明明回了 `{"ok":true,"removed":N}`，**这个 N 被整个丢掉**，
+   * 而 UI 在请求还没回来时就印「星星已熄灭」。于是"我帮你删干净了"是一句
+   * 没有任何回执支撑的承诺（同族：M5⑪「配置在册 ≠ 行为闭环」、交付只写成功面）。
+   * 现在：等 DELETE → 再读 `/stats` 复核归零 → 把三个数交回调用方去显示。
+   * 返回 Promise<{local, removed, verified, error}>；离线/未开远端时 verified 记 null（不谎报已核验）。
+   */
   function clear() {
     mem = [];
-    try { localStorage.removeItem(KEY); } catch { /* 忽略 */ }
-    if (isRemote()) {
-      try { api("/" + encodeURIComponent(sessionId()), { method: "DELETE" }).then(guard).catch(markDown); } catch { /* 忽略 */ }
-    }
+    let localOk = false;
+    try { localStorage.removeItem(KEY); localOk = true; } catch { localOk = false; }
+    const out = { local: localOk, removed: null, verified: null, error: "" };
+    if (!isRemote()) return Promise.resolve(out);
+    const sid = encodeURIComponent(sessionId());
+    return api("/" + sid, { method: "DELETE" })
+      .then(guard)
+      .then(r => {
+        if (!r.ok) { out.error = "HTTP " + r.status; return out; }
+        return r.json().then(j => {
+          out.removed = (j && typeof j.removed === "number") ? j.removed : null;
+          return api("/stats?sessionId=" + sid).then(guard)
+            .then(s => (s.ok ? s.json() : Promise.reject(new Error("stats HTTP " + s.status))))
+            .then(st => {
+              out.verified = !!(st && st.emotions === 0 && st.messages === 0);
+              if (!out.verified) {
+                out.error = "服务端仍有 emotions=" + (st && st.emotions) + " messages=" + (st && st.messages);
+              }
+              return out;
+            });
+        });
+      })
+      .catch(e => { out.error = String((e && e.message) || e); markDown(); return out; });
+  }
+  /**
+   * 导出我的数据（可携权）。用**已有**的只读端点拼装，不新增后端面：
+   * 情绪走 `/api/memory/emotions`，对话走 `/api/memory/messages`，本机 localStorage 一并带上，
+   * 保证"服务端不可达时也能拿走本机这一份"。返回一个对象（调用方负责下载与显示）。
+   */
+  function exportAll() {
+    const base = { sessionId: sessionId(), exportedAt: new Date().toISOString(),
+                   mode: isRemote() ? "remote" : "local-only", source: {} };
+    base.source.local = (() => { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } })();
+    if (!isRemote()) { base.source.server = null; return Promise.resolve(base); }
+    const sid = encodeURIComponent(sessionId());
+    return Promise.all([
+      api("/emotions?limit=500&sessionId=" + sid).then(guard).then(r => r.ok ? r.json() : []),
+      api("/messages?sessionId=" + sid).then(guard).then(r => r.ok ? r.json() : [])
+    ]).then(pair => {
+      base.source.server = { emotions: pair[0], messages: pair[1] };
+      return base;
+    }).catch(e => { base.error = String((e && e.message) || e); base.source.server = null; return base; });
   }
   /** 用服务端权威副本覆盖本地；返回 true 表示确实取到了数据（供调用方决定是否重绘星图） */
   function hydrate() {
@@ -103,5 +152,5 @@ window.MemoryStore = (function () {
       });
   }
 
-  return { record, all, clear, hydrate, pushMessage, isRemote, sessionId };
+  return { record, all, clear, exportAll, hydrate, pushMessage, isRemote, sessionId };
 })();
