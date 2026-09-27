@@ -86,6 +86,12 @@ def repo_slug():
     return m.group(1) if m else ""
 
 
+def gh_err_text(rc, stderr):
+    """从 gh 的输出里挑那句人读错误：实测它打在**末行**（前面是 JSON 分片噪声）。纯函数，可自证。"""
+    lines = [x for x in (stderr or "").strip().splitlines() if x.strip()]
+    return "gh-rc%d[%s]" % (rc, (lines[-1] if lines else "无输出")[:120])
+
+
 def compare_via_gh(tag):
     """第三通道：CI 的 actions/checkout 默认浅克隆**不带 tag**，本地 `git log tag..HEAD` 会直接失败。
     那样这条闸在受理面上就永远是 rc=2 惰性态（装了不等于在用），故走 GitHub compare API 补上。
@@ -100,7 +106,8 @@ def compare_via_gh(tag):
     except (OSError, subprocess.SubprocessError) as e:
         return None, "gh:%s" % type(e).__name__
     if p.returncode != 0:
-        return None, "gh-rc%d" % p.returncode
+        # 失败分支不许丢证据：只报 rc 会让下一轮再来一次"猜 rc=4 是什么"（CI 首跑就吃过这个）。
+        return None, gh_err_text(p.returncode, p.stderr or p.stdout or "")
     try:
         d = json.loads(p.stdout)
         return [(c["commit"]["message"].splitlines()[0],
@@ -270,7 +277,18 @@ def selftest():
         ok += 1
     else:
         fail.append("边界F 双通道皆否却没留证据：%s" % chan3)
-    total = len(cases) + 6
+    # 边界 G：gh 失败原因必须把"人读那一行"带出来（用本机实测的 401 原文形状，不是编的）
+    real401 = '{\n  "message": "Bad credentials",\n  "documentation_url": "https://docs.github.com/rest",\n  "status": "401"\n}\ngh: Bad credentials (HTTP 401)'
+    e = gh_err_text(1, real401)
+    if "HTTP 401" in e and e.startswith("gh-rc1["):
+        ok += 1
+    else:
+        fail.append("边界G 未取到末行人读错误：%s" % e)
+    if gh_err_text(4, "") == "gh-rc4[无输出]":
+        ok += 1
+    else:
+        fail.append("边界H 空输出未留 rc：%s" % gh_err_text(4, ""))
+    total = len(cases) + 8
     for x in fail:
         print("  SELFTEST-FAIL " + x)
     print("RELEASE-GOV-SELFTEST: %d/%d" % (ok, total))

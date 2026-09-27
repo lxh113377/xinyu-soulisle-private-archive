@@ -149,7 +149,12 @@ jobs:
       # （判据里 `lit1 > 0` 依赖 ThreeScene 真在跑）
       XINYU_BROWSER_ARGS: "--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader"
     steps:
+      # fetch-depth: 0 —— r45 实测必需：release_governance_check 要 `git log <tag>..HEAD` 数未发布的 feat，
+      # 而 checkout 默认 depth=1 既无 tag 也无共同历史 ⇒ 判据在受理面上只能落 rc=2（装了不等于在用）。
+      # 用原生 git 而不是 API 通道：不依赖 job token 权限，也不受网络抖动影响。
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
