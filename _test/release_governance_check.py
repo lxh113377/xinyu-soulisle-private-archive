@@ -78,6 +78,48 @@ def commits_since(tag):
     return [ln.split("\x01") for ln in out.splitlines() if ln.strip()], ""
 
 
+def repo_slug():
+    url, rc = git("remote", "get-url", "origin")
+    if rc != 0:
+        return ""
+    m = re.search(r"[:/]([^/:]+/[^/]+?)(?:\.git)?$", url.strip())
+    return m.group(1) if m else ""
+
+
+def compare_via_gh(tag):
+    """第三通道：CI 的 actions/checkout 默认浅克隆**不带 tag**，本地 `git log tag..HEAD` 会直接失败。
+    那样这条闸在受理面上就永远是 rc=2 惰性态（装了不等于在用），故走 GitHub compare API 补上。
+    返回 (rows|None, err)；rows 与 commits_since 同构 = [(subject, committer-iso)]。"""
+    slug = repo_slug()
+    if not slug:
+        return None, "no-slug"
+    try:
+        p = subprocess.run(["gh", "api", "repos/%s/compare/%s...HEAD" % (slug, tag)],
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=45)
+    except (OSError, subprocess.SubprocessError) as e:
+        return None, "gh:%s" % type(e).__name__
+    if p.returncode != 0:
+        return None, "gh-rc%d" % p.returncode
+    try:
+        d = json.loads(p.stdout)
+        return [(c["commit"]["message"].splitlines()[0],
+                 (c["commit"].get("committer") or {}).get("date") or "")
+                for c in d.get("commits") or []], ""
+    except Exception as e:
+        return None, "gh-parse:%s" % type(e).__name__
+
+
+def resolve_commits(log_rows, log_err, tag, fallback=None):
+    """通道择优的纯函数。fallback 可注入（selftest 据此不打真 gh，也不靠本机状态判分支）。"""
+    if log_err == "" and log_rows is not None:
+        return log_rows, "git-log"
+    rows, gerr = (fallback or compare_via_gh)(tag)
+    if rows is not None:
+        return rows, "gh-compare"
+    return None, "log=%s gh=%s" % (log_err or "ok", gerr)
+
+
 def unreleased_section(md_text):
     m = UNREL_HDR.search(md_text)
     if not m:
@@ -210,7 +252,25 @@ def selftest():
         ok += 1
     else:
         fail.append("边界C 刚切版被误判红：%s" % bad)
-    total = len(cases) + 3
+    # 边界 D：提交通道择优必须双向 —— 本地可用时不得去调外部 API，本地失败时才回落
+    rows, chan = resolve_commits([("feat: x", "y")], "", "v1.5.0",
+                                 fallback=lambda t: (_ for _ in ()).throw(AssertionError("不该被调用")))
+    if chan == "git-log":
+        ok += 1
+    else:
+        fail.append("边界D 本地可用却走了 %s" % chan)
+    rows2, chan2 = resolve_commits(None, "log-fail", "v1.5.0",
+                                   fallback=lambda t: ([("feat(r9): 靠 API 拿到", "z")], ""))
+    if chan2 == "gh-compare" and rows2 and rows2[0][0].startswith("feat"):
+        ok += 1
+    else:
+        fail.append("边界E 浅克隆态未回落到 gh-compare：%s/%s" % (chan2, rows2))
+    rows3, chan3 = resolve_commits(None, "log-fail", "v1.5.0", fallback=lambda t: (None, "no-gh"))
+    if rows3 is None and "no-gh" in chan3:
+        ok += 1
+    else:
+        fail.append("边界F 双通道皆否却没留证据：%s" % chan3)
+    total = len(cases) + 6
     for x in fail:
         print("  SELFTEST-FAIL " + x)
     print("RELEASE-GOV-SELFTEST: %d/%d" % (ok, total))
@@ -231,28 +291,31 @@ def main():
         return 2
     md_text = md.read_text("utf-8", errors="replace")
     tag, src = latest_tag()
-    commits, cerr = commits_since(tag)
+    log_rows, log_err = commits_since(tag)
+    commits, chan = resolve_commits(log_rows, log_err, tag)
     bullets = unreleased_bullets(md_text)
     bad, warn, notes = judge(tag, commits, bullets, md_text, a.ceiling)
     for w in warn:
         print("   ℹ️ " + w)
     if a.json:
-        print(json.dumps({"tag": tag, "tag_source": src, "commits": len(commits or []),
+        print(json.dumps({"tag": tag, "tag_source": src, "commit_channel": chan,
+                          "commits": len(commits or []),
                           "feats": len([c for c in (commits or []) if FEAT_RE.match(c[0])]),
                           "unreleased_bullets": bullets, "notes": notes, "problems": bad},
                          ensure_ascii=False))
     for b in bad:
         print("  · FAIL " + b)
     if not tag or commits is None:
-        print("RELEASE-GOV-UNVERIFIED: 权威源缺失（tag 通道=%s log=%s）⇒ 不算通过" % (src, cerr or "ok"))
+        print("RELEASE-GOV-UNVERIFIED: 权威源缺失（tag 通道=%s 提交通道=%s）⇒ 不算通过" % (src, chan))
         return 2
     n, c = len(commits), len([x for x in commits if FEAT_RE.match(x[0])])
     if bad:
-        print("RELEASE-GOV-FAIL: %d 项（%s｜feats=%d/%d unreleased=%s）"
-              % (len(bad), tag, c, a.ceiling, bullets))
+        print("RELEASE-GOV-FAIL: %d 项（%s｜feats=%d/%d unreleased=%s 提交通道=%s）"
+              % (len(bad), tag, c, a.ceiling, bullets, chan))
         return 1
     print("RELEASE-GOV-PASS: %s 之后 feats=%d（上限 %d 余量 %d）｜commits=%d unreleased_bullets=%s"
-          "｜R3 版本段在册｜R4 滞后只报不拦" % (tag, c, a.ceiling, max(0, a.ceiling - c), n, bullets))
+          "｜提交通道=%s R3 版本段在册｜R4 滞后只报不拦"
+          % (tag, c, a.ceiling, max(0, a.ceiling - c), n, bullets, chan))
     return 0
 
 

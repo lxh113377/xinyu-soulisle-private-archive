@@ -32,7 +32,7 @@ J1 骨架 / J2 契约 / J3 情绪引擎已落地，前端保留 Three.js 叙事�
 - [x] ✅ **r43 可复现面**：`peer_repro_probe` + `clean_clone_check`（HEAD 克隆真跑）；→64。`part37`。
 - [x] ✅ **r44 数据权利面**：披露随模式翻转 + 删除带回执并复核归零 + 导出对齐 `/stats`；→**67**。`part38`。
 - [x] ✅ **r45 发布治理面**：`peer_release_probe`(16 仓) + 常驻 `release_governance_check`
-      （R1 feat 增量≤5｜R2 CHANGELOG⇄git 逐轮点名｜R3 版本段）⇒ 治「lag 全池最优却 44 commit 未切版」：
+      （R1 feat 增量≤5｜R2 CHANGELOG⇄git 逐轮点名｜R3 版本段）⇒ 治「lag 账面第 3 却 44 commit 未切版」：
       补记 r41-r44 四轮、切 **v1.5.0**（双资产）、修公网离线态报错（外提模块漏进 SW PRECACHE）。→**70**。`part39/40`。
 - [ ] 🔴 **P0 需老大在场**：消 `demo-config.js` 那条 404 要动密钥面，而本轮已有一次明文 Key
       进会话输出 ⇒ 先撤销 Key。详 `part37`。
