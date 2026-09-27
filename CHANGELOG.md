@@ -4,6 +4,28 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Added（r57 · 函数侧安全响应头）
+- **`/api/chat`（Pages Function）现在自己回安全头**：`Content-Security-Policy: default-src 'none'`
+  + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`
+  + `Cross-Origin-Opener-Policy: same-origin` + JSON 侧 `Cache-Control: no-store`。
+  动因（r54 实测遗留）：静态 `deploy/xinyu/_headers` 已在页面侧生效 11 条指令，但**函数路径不吃它**，
+  于是 `/api/chat` 一条安全头都没有 —— r54/r55 两轮都把它挂着没做。
+- **只加头，`status` 与 `body` 一字未动**：AC-OBS-08 的契约是"上游响应逐字透传"
+  （`j2_chat_contract`/`api_contract` 两条判据正盯）。部署后直证：`HTTP/1.1 402` +
+  `body={"error":{"message":"Insufficient Balance (request_id dba2abcb…)"}}` 与部署前同形。
+- **四个出口全覆盖，不是一个**：`no-key` 500 ／ `bad-json` 400 ／ SSE 直通 ／ 整包透传。
+  SSE 分支把 `SEC_HEADERS` 放在**自身 headers 之前**展开，保住它的 `no-cache, no-transform`
+  （`no-transform` 被覆盖会让中间层改写流，打断逐字渲染）。
+  `src/` 与 `deploy/` 两份按 **SHA256 对账相同** —— `deploy_sync_check.py` 只覆盖 `deploy/xinyu/`，
+  函数这一路不在它的比对面内，所以本轮自己证（不给它留漂移口子）。
+
+### 更正（r57 · 推翻我自己本轮开头的假设）
+- 我在动手前的数据流假设里写「`OPTIONS` 预检分支同样要带上这些头，否则判据只测到 POST」。
+  实测**恰好相反**：`OPTIONS /api/chat` 由平台直接回 405，它**吃**静态 `_headers`
+  （线上看到完整 11 条指令的页面 CSP）；只有 **`POST` 交给函数**才没有头。
+  ⇒ 缺口比我写的更窄也更准：要补的是函数出口，不是给函数加 `onRequestOptions`
+  （加了反而把平台 405 变成 204，动到契约面）。
+
 ### Fixed（r56 · 把 r55 我登记的欠账做成，并推翻我自己上一条的归因）
 - **`public_check` 现在能说出"为什么红"**：在线标签缺失时**在页面里**补发一次同源 `POST api/chat`，
   把上游响应体并进失败文案。实测失败行已带
