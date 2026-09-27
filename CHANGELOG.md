@@ -5,6 +5,29 @@
 
 ## [Unreleased]
 
+### Added（r46 · 许可与供给链面）
+- **`_test/peer_license_probe.py`（`--selftest` 入电池，21/21，电池 70→71）**：双通道量 16 仓的许可合规形状
+  （通道 A = GitHub 自己检测的 `license.spdx_id`，不用"有 LICENSE 文件就算"这种自证；通道 B = 递归文件树）。
+  实测：**有 LICENSE 类件 14/16 ｜ 检测为 MIT 6/16 ｜ 带 vendored 第三方代码的只有 3/16 ｜
+  三者中带归属件的只有 1/3**。⇒ 这一维对手普遍缺位，真正的对手是我们自己的声明与实物是否一致。
+- **G6 的两条新断言（防伪登记）**：① 表行的**授权列**必须含许可 token（写"见上游"即红）；
+  ② 表里所写许可必须与**文件 banner 实测串**一致（把 GSAP 伪写成 MIT ⇒ 翻红，夹具 ⑤e）。
+  取交集而非全等，因为 GSAP 那行合法地写着「非 MIT、非 OSI」。自测断言 42 → **48** 条。
+
+### Fixed（r46 · 判据盲区让最好的那份文档带上假陈述）
+- **`_test/repo_config_check.py` 的 G6 分母从写死目录改名册现读**：原实现是
+  `sorted(x.name for x in (ROOT / "src" / "vendor").glob("*.js"))`，于是 `_test/vendor/axe-core-4.10.2.min.js`
+  （553,290B，banner 自证 **MPL-2.0**）对 G6 **永久隐形** —— 归属表不登记它也全绿。
+  这是 r43 在 `vendor_freshness_check.py` 上治过的**同一个盲区的第二处**（当时只修了一处，注记还留在名册里）。
+  本轮把活分母与自测夹具两处一起改成读 `vendor-manifest.json`，分母打印在 PASS 行里（`分母=4(名册现读)`）。
+- **更正归属表的假陈述**：正文原写"`src/`、`server/`、`_test/`、`deploy/functions/` 等全部由本团队原创"，
+  而 `_test/vendor/` 里坐着 Deque 的代码 ⇒ r42 之后即为假。现改为"四个文件除外，`_test/`（`_test/vendor/` 除外）原创"，
+  并补 axe-core 的逐件行（含"MPL 是文件级 copyleft，不修改即无义务外溢"的再分发注记）。
+- **README 授权口径行**同步到 4 件 / 两个目录（+4 B，未抬 16,384 B 预算）。
+- 一条**无效反例**被自己的前置条件检查抓住：篡改⑤b 首版只替换 `**MPL-2.0**` 五个字，而同一列里还留着
+  banner 原文 `Mozilla Public License, v. 2.0` ⇒ 反例没造成缺陷却期望判红（表现为"判据漏抓"）。
+  改为整列抹除，并加**夹具失效守卫**（锚点不命中时直接报"夹具失效"，禁静默跳过）。
+
 ### Added（r45 · 发布治理常驻判据——把"别忘了切版"从记性活变成闸）
 - **`_test/release_governance_check.py`（+2 套件，电池 68→70，`--selftest` 12/12）**：R1 距上次切版的 feat 增量
   ≤ 5（当前值与余量一起印在 PASS 行里，不做零余量地板）；R2 `[Unreleased]` ⇄ git 增量**双向**对账

@@ -94,6 +94,9 @@ SUITES = [
     ("data_rights_probe_selftest", [sys.executable, "_test/peer_data_rights_probe.py", "--selftest"]),
     # r45：发布/版本治理对标探针的判据自证（semver 合流 / 发布滞后 / CHANGELOG 三段，含小数天反例）
     ("release_probe_selftest", [sys.executable, "_test/peer_release_probe.py", "--selftest"]),
+    # r46：许可与供给链对标探针的判据自证（LICENSE 类件 / 归属类件 / vendored 目录三个分类器，
+    # 含"任意后缀会把 notice.html 当成归属件"这条被反例④当场抓到的宽匹配）
+    ("license_probe_selftest", [sys.executable, "_test/peer_license_probe.py", "--selftest"]),
     # r45：发布治理常驻判据。R1 盯「距上次切版的 feat 增量」，R2 把 CHANGELOG ⇄ git 增量做成双向对账
     # （首跑就以 feats=11/上限 5 判红，并抓出 r41/r42/r43 三轮漏记 —— 旧轮次的 bullet 会掩盖计数型判据）。
     ("release_governance", [sys.executable, "_test/release_governance_check.py"]),

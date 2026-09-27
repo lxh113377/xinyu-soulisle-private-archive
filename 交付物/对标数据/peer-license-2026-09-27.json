@@ -1,0 +1,303 @@
+{
+ "repos": {
+  "lobehub/lobehub": {
+   "tier": "A",
+   "spdx": "custom/none",
+   "tree": {
+    "license_files": 2,
+    "root_license": true,
+    "license_samples": [
+     ".agents/skills/acceptance/LICENSE",
+     "LICENSE"
+    ],
+    "notice_files": 1,
+    "notice_samples": [
+     "apps/desktop/THIRD_PARTY_NOTICES.md"
+    ],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "SillyTavern/SillyTavern": {
+   "tier": "A",
+   "spdx": "AGPL-3.0",
+   "tree": {
+    "license_files": 2,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE",
+     "public/lib/structured-clone/LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "tier": "B",
+   "spdx": "custom/none",
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "morettt/my-neuro": {
+   "tier": "B",
+   "spdx": "MIT",
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "letta-ai/letta": {
+   "tier": "D",
+   "spdx": "Apache-2.0",
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "hello-diana/MASCOT": {
+   "tier": "C",
+   "spdx": "Apache-2.0",
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "ddxfish/sapphire": {
+   "tier": "C",
+   "spdx": "AGPL-3.0",
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 3,
+    "vendored_samples": [
+     "interfaces/web/static/vendor/highlight-atom-one-dark.min.css",
+     "interfaces/web/static/vendor/highlight.min.js",
+     "interfaces/web/static/vendor/sortable.min.js"
+    ]
+   },
+   "truncated": false
+  },
+  "v2rockets/Loyal-Elephie": {
+   "tier": "C",
+   "spdx": "MIT",
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "tier": "C",
+   "spdx": "none",
+   "tree": {
+    "license_files": 0,
+    "root_license": false,
+    "license_samples": [],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "Lum1104/MER-Factory": {
+   "tier": "D",
+   "spdx": "MIT",
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "CheaperjamRen/leemo": {
+   "tier": "C",
+   "spdx": "Apache-2.0",
+   "tree": {
+    "license_files": 2,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE",
+     "src/gateway/vendor/llms/LICENSE"
+    ],
+    "notice_files": 1,
+    "notice_samples": [
+     "THIRD_PARTY_NOTICES.md"
+    ],
+    "vendored": 16,
+    "vendored_samples": [
+     "src/gateway/vendor/augmentations.ts",
+     "src/gateway/vendor/llms/package.json",
+     "src/gateway/vendor/llms/src/api/middleware.ts"
+    ]
+   },
+   "truncated": false
+  },
+  "NJX-njx/opensoul": {
+   "tier": "C",
+   "spdx": "MIT",
+   "tree": {
+    "license_files": 3,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE",
+     "Swabble/LICENSE",
+     "extensions/open-prose/skills/prose/LICENSE"
+    ],
+    "notice_files": 3,
+    "notice_samples": [
+     "apps/macos/Sources/OpenSoul/Resources/DeviceModels/NOTICE.md",
+     "docs/reference/credits.md",
+     "docs/zh-CN/reference/credits.md"
+    ],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "s-nagaev/chibi": {
+   "tier": "C",
+   "spdx": "MIT",
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "29-Cu/succhia": {
+   "tier": "C",
+   "spdx": "custom/none",
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "zeroa234/ryza-ai-revive": {
+   "tier": "C",
+   "spdx": "MIT",
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 1,
+    "vendored_samples": [
+     "web/vendor/spine-webgl.js"
+    ]
+   },
+   "truncated": false
+  },
+  "Bwcx-songyu/MoodChat": {
+   "tier": "C",
+   "spdx": "none",
+   "tree": {
+    "license_files": 0,
+    "root_license": false,
+    "license_samples": [],
+    "notice_files": 0,
+    "notice_samples": [],
+    "vendored": 0,
+    "vendored_samples": []
+   },
+   "truncated": false
+  },
+  "__self__": {
+   "tree": {
+    "license_files": 1,
+    "root_license": true,
+    "license_samples": [
+     "LICENSE"
+    ],
+    "notice_files": 1,
+    "notice_samples": [
+     "docs/THIRD-PARTY-NOTICES.md"
+    ],
+    "vendored": 7,
+    "vendored_samples": [
+     "_test/vendor/axe-core-4.10.2.min.js",
+     "deploy/xinyu/vendor/ScrollTrigger.min.js",
+     "deploy/xinyu/vendor/gsap.min.js"
+    ]
+   },
+   "spdx_local": "MIT",
+   "spdx_remote": "MIT"
+  }
+ },
+ "na": [],
+ "denominator": 16,
+ "ts": "2026-09-27T02:43:56Z"
+}

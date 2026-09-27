@@ -16,7 +16,9 @@
   G14 对标仓数自洽：README 的现行状态句「对标源数据台账（N 仓指标」== 台账 `peers_expected`
      （只锚现行句：历史轮次里的"14 仓"当时就是 14，宽口径会误伤）
   G5（--online）远端受理面：默认分支上 `.github/dependabot.yml` 确实存在（GitHub 只看默认分支）
-  G6 第三方授权：`src/vendor/*.js` 每一个文件都必须在 `docs/THIRD-PARTY-NOTICES.md` 里被点名
+  G6 第三方授权：**分母从 `_test/vendor-manifest.json` 现读**（不再写死 src/vendor），
+     每个 vendored 文件都必须在 `docs/THIRD-PARTY-NOTICES.md` 有**带许可条款的表行**；
+     名册含非 src/ 件时归属文必须显式交代 `_test/vendor` 边界（r46 补，同族第二处盲区）
   G7 README 必须含指向该授权清单的口径行（否则读者只会看到"MIT"，而 GSAP 其实不是 MIT）
   G8 --selftest：合成篡改类**逐轮累积**（条数以 --selftest 实际输出为准，正文不抄数字——
      抄过两次都脱节）：ecosystem 拼错 / 目录不存在 / interval 非法 / updates 清空 / 抹 gsap 登记 /
@@ -126,16 +128,127 @@ def remote_has_file(rel, repo):
 
 
 NOTICES = "docs/THIRD-PARTY-NOTICES.md"
+# 许可 token：归属行里必须出现其一，否则"提个文件名"也算登记（那是洗白不是声明）
+LIC_TOKEN = re.compile(r"\b(MIT|Apache|BSD|ISC|GPL|LGPL|MPL|Mozilla Public|GreenSock)"
+                       r"|标准许可|Standard License", re.I)
 
 
-def license_scope(notices_txt, readme_txt, vendor_files):
-    """G6/G7 纯函数：第三方授权边界必须被正式声明且不漏登记。"""
+def manifest_vendor_files():
+    """G6 的分母从 vendor 名册现读（与 r43 修好的 vendor_freshness_check 同一范式）。
+
+    ⚠️ 这条是**同族第二处**：r43 把 freshness 判据的枚举面从写死 `src/vendor` 改成读
+    `vendor_dirs`，当时只修了一处 —— G6 仍写死 `src/vendor/*.js`，于是 r42 引入的
+    `_test/vendor/axe-core-4.10.2.min.js`（**MPL-2.0，非 MIT**）在授权边界上又隐形了一整轮，
+    而 THIRD-PARTY-NOTICES 正文那句"`_test/` 全部由本团队原创"因此是假陈述。
+    返回 (basenames, relpaths)；名册取不到 ⇒ ([], []) 由调用方按 UNVERIFIED 处理，禁判绿。
+    """
+    fp = ROOT / "_test" / "vendor-manifest.json"
+    if not fp.exists():
+        return [], []
+    try:
+        libs = json.loads(fp.read_text("utf-8")).get("libs") or []
+    except Exception:
+        return [], []
+    rel = [str(x.get("file") or "") for x in libs if x.get("file")]
+    return sorted({Path(r).name for r in rel}), sorted(rel)
+
+
+def header_license(text):
+    """从文件头部 banner 里取**实测**许可（一手证据）。返回 token 集合，可能为空=无可识别声明。
+
+    为什么不往 vendor-manifest.json 再加 license 字段：那会让"用的是哪个许可"有两处声明源，
+    正好制造本仓已登记过的"改了声明没改文件"那族漂移。名册只管清单与哈希，许可只写在归属表，
+    而本函数负责把表里的说法**和文件本体对一次账**。
+    """
+    t = (text or "")[:4000]
+    out = set()
+    if re.search(r"SPDX-License-Identifier:\s*MIT|@license[^\n]*MIT", t, re.I):
+        out.add("MIT")
+    if re.search(r"GreenSock|standard-license", t, re.I):
+        out.add("GreenSock")
+    if re.search(r"Mozilla Public\s+License|MPL", t, re.I):
+        out.add("MPL")
+    if re.search(r"Apache License|Apache-2", t, re.I):
+        out.add("Apache")
+    if re.search(r"\bBSD[- ]?3-Clause|Redistribution and use in source", t, re.I):
+        out.add("BSD")
+    return out
+
+
+def row_license(row):
+    out = set()
+    if re.search(r"\bMIT\b", row):
+        out.add("MIT")
+    if re.search(r"GreenSock|标准许可|Standard License", row, re.I):
+        out.add("GreenSock")
+    if re.search(r"MPL|Mozilla Public", row, re.I):
+        out.add("MPL")
+    if re.search(r"Apache", row, re.I):
+        out.add("Apache")
+    if re.search(r"\bBSD\b", row):
+        out.add("BSD")
+    return out
+
+
+def vendor_headers(relpaths):
+    """读每个 vendored 文件的**头部 4KB**（banner 一定在最前面），作为许可的一手证据。"""
+    out = {}
+    for r in relpaths:
+        p = ROOT / Path(r)
+        if p.exists():
+            out[Path(r).name] = p.read_text("utf-8", errors="replace")[:4000]
+    return out
+
+
+def license_scope(notices_txt, readme_txt, vendor_files, vendor_paths=None, headers=None):
+    """G6/G7 纯函数：第三方授权边界必须被正式声明且不漏登记。
+
+    两条独立出口各自报告（不许第一条红就把后面的吞掉）：
+      · 未登记 —— 名册里有、归属表里没有对应表行
+      · 无许可 —— 有表行但行内不含任何许可 token（把声明写成"见上游"等于没声明）
+    """
     bad = []
     if "GreenSock" not in notices_txt:
         bad.append("授权清单未点明 GSAP 的实际条款（把整仓说成 MIT 是不准确的声明）")
-    missing = [f for f in vendor_files if f not in notices_txt]
-    if missing:
-        bad.append(f"vendor 文件未在授权清单登记 {missing}")
+    rows = [ln for ln in notices_txt.splitlines() if ln.lstrip().startswith("|")]
+
+    def lic_cell(r):
+        cells = [c.strip() for c in r.split("|")]
+        return cells[3] if len(cells) > 3 else r
+    unregistered, unlicensed = [], []
+    for f in vendor_files:
+        hit = [r for r in rows if f in r]
+        if not hit:
+            unregistered.append(f)
+        elif not any(LIC_TOKEN.search(lic_cell(r)) for r in hit):
+            unlicensed.append(f)
+    if unregistered:
+        bad.append(f"vendored 文件未在授权清单登记 {unregistered}")
+    if unlicensed:
+        bad.append(f"授权清单里有行但没写许可条款 {unlicensed}（提文件名不算声明）")
+    # G6b 对账：表里**说的**许可，必须与文件 banner 里**实测的**许可一致。
+    # 这条是判据的牙：否则我可以在表里把 MPL 的 axe-core 写成 MIT 就"合规"了。
+    # 取交集而非全等：GSAP 行合法地写着「非 MIT、非 OSI」，全等会把正确的句子判成错。
+    for f in vendor_files:
+        if f in unregistered or not headers:
+            continue
+        actual = header_license(headers.get(f, ""))
+        claimed = set()
+        for r in [x for x in rows if f in x]:
+            # 只取**授权列**做对账：扫整行会被上游 URL 里的 "greensock" 之类喂成正确，
+            # 也会让"MPL 写在别的列、授权列空着"这种洗白形态过关（⑤b 首跑就是这么漏的）。
+            claimed |= row_license(lic_cell(r))
+        if not actual:
+            bad.append(f"{f} 的 banner 里取不到可识别许可声明 ⇒ 无法与归属表对账（新增第三方件必须带上游 banner）")
+        elif claimed and not (claimed & actual):
+            bad.append(f"{f} 归属表写 {sorted(claimed)} 但文件 banner 实测是 {sorted(actual)} ⇒ 声明与实物不符")
+    # 「原创范围」是**可证伪断言**：名册里一旦存在非 src/ 的第三方件，归属文必须显式交代该边界。
+    # 不这么判的原因：旧写法靠正则找"`_test/` … 全部 … 原创"，而原句里 `_test/` 与「全部」隔着换行，
+    # 正则永远不匹配 ⇒ 假陈述照样过关（判据恒真的一种新形态）。改成要求正面出现 `_test/vendor` 面名。
+    off_src = [r for r in (vendor_paths or []) if not r.startswith("src/")]
+    if off_src and "_test/vendor" not in notices_txt:
+        bad.append("名册里有非 src/ 的第三方件 %s，但授权清单没交代 _test/vendor 这条边界"
+                   "（正文把 _test/ 说成全部原创即为假陈述）" % off_src)
     if "THIRD-PARTY-NOTICES" not in readme_txt:
         bad.append("README 没有指向授权清单的口径行（读者只会看到 MIT）")
     return bad
@@ -547,13 +660,37 @@ def selftest():
         bad.append("篡改④（updates 清空）未被抓到 ⇒ 恒真")
     nt = (ROOT / NOTICES).read_text("utf-8") if (ROOT / NOTICES).exists() else ""
     rt = (ROOT / "README.md").read_text("utf-8")
-    vf = sorted(x.name for x in (ROOT / "src" / "vendor").glob("*.js"))
-    if license_scope(nt, rt, vf):
-        bad.append(f"原样授权声明被判失败：{license_scope(nt, rt, vf)}")
-    if not license_scope(nt.replace("gsap.min.js", "zzz"), rt, vf):
+    vf, vp = manifest_vendor_files()
+    vh = vendor_headers(vp)
+    if not vf:
+        bad.append("G6 分母取不到（vendor-manifest.json 缺失或 libs 为空）⇒ 判据无从判，记失败不记通过")
+    if license_scope(nt, rt, vf, vp, vh):
+        bad.append(f"原样授权声明被判失败：{license_scope(nt, rt, vf, vp, vh)}")
+    if not license_scope(nt.replace("gsap.min.js", "zzz"), rt, vf, vp, vh):
         bad.append("篡改⑤（授权清单里抹掉 gsap.min.js）未被抓到 ⇒ G6 恒真")
-    if not license_scope(nt, rt.replace("THIRD-PARTY-NOTICES", "zzz"), vf):
+    if not license_scope(nt, rt.replace("THIRD-PARTY-NOTICES", "zzz"), vf, vp, vh):
         bad.append("篡改⑥（README 去掉指向授权清单的口径行）未被抓到 ⇒ G7 恒真")
+    # 篡改⑤b：**整列抹掉授权信息** ⇒ 必须红。
+    # ⚠️ 第一版只替换 "**MPL-2.0**" 那几个字，而同一列里还留着 banner 原文
+    # `Mozilla Public License, v. 2.0` ⇒ 反例根本没造成缺陷却期望判红（无效反例，见 [[invalid-negative-control]]）。
+    cell_anchor = "**MPL-2.0**（banner 自证 `Copyright (c) 2015 - 2024 Deque Systems, Inc.` + `Mozilla Public License, v. 2.0`）"
+    bare = nt.replace(cell_anchor, "见上游")
+    if cell_anchor not in nt:
+        bad.append("篡改⑤b 的夹具失效：授权列原文与判据锚点不一致（文档被改过，测试要同步）")
+    elif bare == nt or not license_scope(bare, rt, vf, vp, vh):
+        bad.append("篡改⑤b（把 axe-core 的授权列整列改成「见上游」）未被抓到 ⇒ 登记判据可被洗白")
+    # 篡改⑤c：名册新增一个 vendored 件而归属表没动 ⇒ 必须红（分母来自名册，不来自目录扫描）
+    if not license_scope(nt, rt, vf + ["brand-new-lib.min.js"], vp + ["_test/vendor/brand-new-lib.min.js"], vh):
+        bad.append("篡改⑤c（名册多一个未登记的 vendored 文件）未被抓到 ⇒ 新库仍可隐形")
+    # 篡改⑤d：把归属文里 `_test/vendor` 这条边界交代抹掉 ⇒ 必须红（正向要求的对偶断言）
+    if not license_scope(nt.replace("_test/vendor", "_test/zzz"), rt, vf, vp, vh):
+        bad.append("篡改⑤d（抹掉 _test/vendor 边界交代）未被抓到 ⇒ 边界声明判据恒真")
+    # 篡改⑤e：**把授权列改成与文件 banner 不符的说法**（GSAP 实物是 GreenSock 标准许可，写成 MIT 必须翻红）
+    forged = nt.replace("**GreenSock Standard License**（非 MIT、非 OSI；免费用于非竞争性产品）", "**MIT**")
+    if forged == nt:
+        bad.append("篡改⑤e 的夹具失效：授权列原文与判据锚点不再一致（文档被改过，测试要同步）")
+    elif not license_scope(forged, rt, vf, vp, vh):
+        bad.append("篡改⑤e（把 GSAP 授权列伪写成 MIT）未被抓到 ⇒ 许可对账恒真")
     ct = (ROOT / "memory" / "06-constraints.md").read_text("utf-8")
     seg0, files0 = eval_section(ct), eval_data_files()
     if eval_scope(seg0, files0, eval_counts(seg0)):
@@ -747,9 +884,17 @@ def main():
     if not ntxt:
         print("REPO-CONFIG-FAIL: 缺 docs/THIRD-PARTY-NOTICES.md（vendor 里有第三方库，必须逐文件声明授权）")
         return 1
-    vfiles = sorted(x.name for x in (ROOT / "src" / "vendor").glob("*.js"))
-    lbad = license_scope(ntxt, (ROOT / "README.md").read_text("utf-8"), vfiles)
-    check("G6+G7 第三方授权边界已声明且逐文件登记（GSAP 非 MIT 不可含糊）", not lbad, " ; ".join(lbad))
+    vfiles, vpaths = manifest_vendor_files()
+    vheads = vendor_headers(vpaths)
+    if not vfiles:
+        # 分母取不到不是"很干净"：名册是 vendored 资产的唯一声明源，缺它=全部第三方件同时隐形
+        check("G6+G7 第三方授权边界已声明且逐文件登记（GSAP 非 MIT 不可含糊）", False,
+              "取不到 _test/vendor-manifest.json 的 libs ⇒ G6 无分母，判红不判过")
+    else:
+        lbad = license_scope(ntxt, (ROOT / "README.md").read_text("utf-8"),
+                          vfiles, vpaths, vheads)
+        check("G6+G7 第三方授权边界已声明且逐文件登记（GSAP 非 MIT 不可含糊）", not lbad,
+              " ; ".join(lbad) + "｜分母=%d(名册现读)" % len(vfiles))
 
     ct = (ROOT / "memory" / "06-constraints.md").read_text("utf-8") if (ROOT / "memory" / "06-constraints.md").exists() else ""
     seg, dfiles = eval_section(ct), eval_data_files()
