@@ -17,6 +17,10 @@ python _test/readme_troubleshooting_check.py      # r52 README 排障段 ⇄ 代
 python _test/readme_troubleshooting_check.py --selftest  # r52 文档对账桩：5 例（含"取数面退化成空集"与"抽到注释"两形）
 python _test/context_budget_check.py             # r53 上下文预算：14 轮实测窗口内送 10／发前 26，截断 16 条须由概要注意送达且条数对账
 python _test/context_budget_check.py --selftest  # r53 判据桩：10 例（含"无概要""假条数""常量注入""窗口缩水""原话进概要"）
+python _test/headers_csp_check.py             # r54 安全头/CSP：本地按 Pages 语义回放 _headers，逐路径逐条对账 + CSP 下应用可用
+python _test/headers_csp_check.py --selftest  # r54 判据桩：8 例（含"H5 夹具没在施加 CSP"与"H0 取数面为空"两条专属反例）
+python _test/headers_csp_check.py --live https://xinyu-soulisle.pages.dev  # r54 线上复测：入口 CSP 在位且无放宽；不可达按 UNVERIFIED 带状态码（未进 CI，见报告 §6-1）
+python _test/peer_sec_headers_probe.py --selftest  # r54 安全头对标探针桩：6 例（csp⊂.csproj、helmet 散文化两形歧义）
 python _test/clean_clone_check.py         # r43 干净克隆可跑性：从 HEAD 克隆到临时目录再跑，未知报错即红（已登记缺口须计数命中，0 命中要销账）
 python _test/data_rights_check.py            # r44 数据权利：披露随模式翻转 + 删除回执并复核归零 + 导出与计数对齐
 python _test/peer_data_rights_probe.py --selftest  # r44 对标探针桩：10 例（路径 7｜README 2｜边界 1）

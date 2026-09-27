@@ -234,6 +234,23 @@ def lock_selftest():
 HIT_KEYS = ("FAIL", "🔴", "Error", "error:", "Traceback", "SKIP")
 
 
+# ── 上游配额签名的分档（r54）────────────────────────────────────────
+# 动因（一手）：本轮全量跑出 3 条红（api_contract / safety_guard / public_check），逐条读原文
+# 发现响应体都是 Insufficient Balance + HTTP 402 —— 即**上游账号余额耗尽**，不是本仓代码坏了。
+# r35 的在册教训是「账单阻塞与代码失败必须分开印」；这里补同一族的下半场：
+# **判据不许把上游计费故障留在「RED(必须修)」里** —— 那会诱导下一轮去「修」一段没坏的产品代码。
+# 严格性不降：这一档仍是**非零退出**（rc=2 未验），且只有命中上游自己写的计费文案才归此档；
+# 真契约违反（无此文案）照旧留 RED。匹配对象是套件 rc!=0 时带出的**响应体原文**，
+# 不是套件名白名单（按名字判等于把结论写进登记表，换个名字就漏）。
+QUOTA_SIG = re.compile("Insufficient Balance|insufficient quota|account balance", re.I)
+
+
+def split_quota(hard_names, blurbs):
+    """纯函数：从判红名单里分出「上游计费未验」与「真判红」；两侧都由 selftest 双向验。"""
+    quota = [n for n in hard_names if QUOTA_SIG.search(blurbs.get(n) or "")]
+    return [n for n in hard_names if n not in quota], quota
+
+
 def fold_detail(out_lines, err_text, rc):
     """rc≠0 时该把哪些证据带进收口行。纯函数，可自证。
 
@@ -282,6 +299,26 @@ def fold_selftest():
     return 1 if bad else 0
 
 
+def quota_selftest():
+    """双向自证：计费签名要能摘出未验，**无签名的真红一律不许被摘**（否则这一档就成了逃生门）。"""
+    b = {"api_contract": 'C4 -> 402 body={"error":{"message":"Insufficient Balance (request_id x)"}}',
+         "safety_guard": "FAIL 注入样本 override-en 返回 http=402（期望 200）",
+         "browser_check": "AssertionError: 对话未走在线（proxy）",
+         "empty_blurb": ""}
+    cases = [
+        ("签名命中→摘为未验", split_quota(["api_contract"], b)[1], ["api_contract"]),
+        ("无签名→留 RED（402 本身不是证据）", split_quota(["safety_guard"], b)[0], ["safety_guard"]),
+        ("真断言失败绝不被摘", split_quota(["browser_check"], b)[1], []),
+        ("明细为空不误判", split_quota(["empty_blurb"], b)[0], ["empty_blurb"]),
+        ("两侧之和==输入(不漏不重)",
+         sorted(split_quota(list(b), b)[0] + split_quota(list(b), b)[1]) == sorted(b), True),
+    ]
+    bad = ["%s got=%r want=%r" % (n, g, w) for n, g, w in cases if g != w]
+    print("QUOTA-SELFTEST-%s（%d/%d 类桩）"
+          % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(cases) - len(bad), len(cases)))
+    return 1 if bad else 0
+
+
 def acquire_lock():
     """整跑电池不是可重入的：两条链同时打同一个 jar + 同一个上游会互相踩出假红
     （r41 实测两次：`emotion_wiring` 与 `live_sync` 在并发窗口里判红，单独复跑均 PASS）。
@@ -320,10 +357,11 @@ def main():
     if "--selftest" in argv:
         rc1 = lock_selftest()
         rc2 = fold_selftest()
-        print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s）"
-              % ("PASS" if not (rc1 | rc2) else "FAIL", "ok" if not rc1 else "红",
-                 "ok" if not rc2 else "红"))
-        return 1 if (rc1 | rc2) else 0
+        rc3 = quota_selftest()
+        print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s ＋ 计费分档 %s）"
+              % ("PASS" if not (rc1 | rc2 | rc3) else "FAIL", "ok" if not rc1 else "红",
+                 "ok" if not rc2 else "红", "ok" if not rc3 else "红"))
+        return 1 if (rc1 | rc2 | rc3) else 0
     if "--list" in argv:
         print("SUITES:", len(SUITES))
         return 0
@@ -370,6 +408,7 @@ def main():
         return 2
 
     results = []
+    blurbs = {}
     for name, cmd in SUITES:
         p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=600)
@@ -385,6 +424,7 @@ def main():
             detail = fold_detail([], p.stderr, p.returncode)
         line = next((x for x in reversed(tail) if VERDICT_RE.search(x)),
                     tail[-1] if tail else "")
+        blurbs[name] = line + " " + " ".join(detail) + " " + (p.stderr or "")
         results.append((name, p.returncode, (line[:110] if tail else (p.stderr or "").strip()[:110])))
         print(f"{name:22s} rc={p.returncode} | {results[-1][2]}")
         for d in detail:
@@ -397,6 +437,7 @@ def main():
     # ⚠️ 三类而不是两类：本轮第一版把"非 1 即环境"写死，随即被自己的输出证伪 ——
     #    voice 两条套件硬崩（rc=0xC0000409、stdout 全空）被判成"环境未验"，等于给崩溃发了通行证。
     hard = [b[0] for b in bad if b[1] == 1]
+    hard, quota = split_quota(hard, blurbs)
     soft = [b[0] for b in bad if b[1] == 2]
     crash = [(b[0], b[1]) for b in bad if b[1] not in (1, 2)]
     parts = []
@@ -407,6 +448,9 @@ def main():
     if crash:
         parts.append("CRASH(判据自身崩溃，既不是判红也不是环境，必须查): "
                      + ",".join("%s=0x%08x" % (n, c & 0xFFFFFFFF) for n, c in crash))
+    if quota:
+        parts.append("ENV-QUOTA(上游余额/计费阻塞：响应体自证，非本仓缺陷，但仍不得记为已验): "
+                     + ",".join(quota))
     tail_msg = "ALL-GREEN" if not parts else "  |  ".join(parts)
     print("=" * 60)
     print(f"BATTERY: {len(results) - len(bad)}/{len(results)} rc=0", tail_msg)
@@ -414,7 +458,8 @@ def main():
         lock.unlink()
     except Exception:
         pass
-    return 1 if bad else 0
+    # 计费未验与软未验同档（非零、不给绿）；只有真判红/崩溃才是 rc=1
+    return 1 if (hard or crash) else (2 if (soft or quota) else 0)
 
 
 if __name__ == "__main__":

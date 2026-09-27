@@ -171,15 +171,30 @@ def serve(port=0):
 
 
 def head_via(url):
+    """取一次真实响应头。
+
+    ⚠️ 两处实测坑都在这儿（本仓 r54 一手）：
+      ① 默认 UA `Python-urllib/3.x` 会被 Cloudflare 判成 403，而 curl 同 URL 是 200
+         —— 于是判据把"我的 UA 被挡"读成"线上没有 CSP"。故显式带浏览器 UA。
+      ② HTTPError 是**带响应头的**异常：只记异常类型会把状态码丢掉，
+         "不可达"与"可达但回 403/404"就同形了（盲区不得读成零）。故从 e 上把头抄回来。
+    """
     import urllib.request
-    out = {}
+    import urllib.error
+    req = urllib.request.Request(url, headers={"User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"})
     try:
-        with urllib.request.urlopen(url, timeout=20) as r:
+        with urllib.request.urlopen(req, timeout=25) as r:
             out = {k.lower(): v for k, v in r.headers.items()}
             out["__status__"] = str(r.status)
+            return out
+    except urllib.error.HTTPError as e:
+        out = {k.lower(): v for k, v in (e.headers.items() if e.headers else [])}
+        out["__status__"] = "http=%s" % e.code
+        return out
     except Exception as e:
-        out = {"__err__": "%s" % type(e).__name__}
-    return out
+        return {"__err__": "%s" % type(e).__name__}
 
 
 def run_local():
@@ -263,8 +278,9 @@ def run_local():
 def run_live(url):
     """线上复测：只断言"入口有没有 CSP + 有没有放宽"。取不到 → UNVERIFIED（不判 0）。"""
     h = head_via(url.rstrip("/") + "/")
-    if h.get("__err__"):
-        return None, "live 不可达 %s（%s）" % (url, h["__err__"])
+    if h.get("__err__") or str(h.get("__status__", "")).startswith("http="):
+        return None, "live 未取得 2xx（%s｜状态=%s 错误=%s）" % (
+            url, h.get("__status__") or "-", h.get("__err__") or "-")
     csp = h.get("content-security-policy")
     if not csp:
         return ["L1 线上入口没有 Content-Security-Policy（头实测=%s）"

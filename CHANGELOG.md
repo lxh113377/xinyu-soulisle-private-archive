@@ -4,6 +4,54 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
 ## [Unreleased]
+### Added（r54 · 对外交付面的安全响应头 / CSP 面）
+- **`_test/headers_csp_check.py`（+2 套件，`--selftest` 8/8）**：取数手法是**把同一份 `_headers` 在本地
+  按 Cloudflare Pages 的路径语义回放**（`/*` 通配 + 字面路径合并），再拿真实响应逐条对账，然后在
+  施加了 CSP 的那个服务器上跑真页面。六条：H5 先判「拦截探针」——一段必须被挡下的内联脚本，
+  挡不住就说明夹具没在施加 CSP，**整套读数作废**（判夹具不判产品）｜H0 取数面为空不得判绿｜
+  H1 声明⇄回放逐路径等值｜H2 CSP 下应用可用（WebGL/五幕/对话/异常 0）｜H3 严格性棘轮
+  （script-src、style-src 禁 `'unsafe-inline'`/`'unsafe-eval'`，放宽须改判据留名）｜
+  H4 前置不变量（index.html 内联 script 计数须为 0）｜L1 线上入口复测（不可达按 UNVERIFIED 带状态码）。
+- **`_test/peer_sec_headers_probe.py`（+1 套件，桩 6 例）**：peers 两通道（结构面配置文件 / README 锚定词组）。
+  歧义形状两连反例：`csp` 是 `.csproj` 的子串、`helmet` 在散文里满地都是 ⇒ 路径与依赖通道一律锚定正则。
+  快照 `peer-sec-headers-2026-09-27.json` 带 `ceiling_note`。
+
+### Fixed（r54 · 两条实测缺陷）
+- **整站零 CSP，而 `_headers` 从 r28 就存在**：✅ 线上 `curl -D -` 逐路径实测
+  `/`、`/index.html`、`/sw.js`、`/js/app.js`、`/nope-404` 的 `content-security-policy` **一条都没有**。
+  唯一挡着严格 CSP 的是 r28 那段**全站仅存的内联 `<script>`**（离线壳注册）——留着它就只能写
+  `script-src 'unsafe-inline'`，等于把 CSP 最有价值的指令作废。处置：外提成 `src/js/sw-register.js`
+  （并补进 SW `PRECACHE`——r45 踩过"外提件没进预缓存"）+ 开 11 条指令的严格 CSP。
+  ⚠️ 注册相对路径显式以 `document.baseURI` 为基：外提后按脚本自身 URL 解析会变成 `/js/sw.js`（404），
+  而 `.catch(()=>{})` 会把它咽成**静默无操作**——症状是"离线壳悄悄没了"而不是报错。
+- **r28 的声明没落在生效路径上（26 天）**：那版只给 `/index.html` 写 `Cache-Control: no-cache`，
+  而 Pages 把 `/index.html` **308 跳到 `/`** ⇒ 用户真正访问的入口拿的是
+  `public, max-age=0, must-revalidate`。功能上仍回源校验（不是可用性缺陷），但"我给入口 HTML 加了
+  no-cache"这句话在入口 URL 上不成立。现 `/` 与 `/*` 都写，线上复测 `/` 已回 `no-cache`。
+- **`offline_shell_check` A7 取数面**从"只搜 index.html"扩成"页面 + 页面列出的 `js/*`"：
+  注册语义未变只换文件，**修判据取数面而不是回退产品改动**（R263）；反向能力保留（合成用例不列
+  脚本时 A7 照样红，`SELFTEST-PASS 13 类`）。
+
+### 度量学（r54 · 判据自己被抓三条）
+- **把"我的 UA 被 Cloudflare 挡"读成"线上没有 CSP"**：`urllib` 默认 UA 得 403，而同 URL 的 curl 得 200。
+  更根本的是 **HTTPError 是带响应头的异常**，首版只记异常类型 ⇒ 状态码丢了，"不可达"与"可达但 403"同形
+  （盲区不得读成零）。现带浏览器 UA + 把 `http=<code>` 回传并进结论行。
+- **`assess()` 在取数面为空时判绿**：`_headers` 解析出 0 条规则时 H1 循环不产 miss，直接印 PASS。
+  由 selftest 的边界用例当场抓出（R247 一族：0 命中须先证输入非空）⇒ 补 H0 显式守卫。
+- **H1 首版拿通配模式 `/*` 当路径去要响应** ⇒ `/* 未取到响应` 假红；改为按 Pages 语义把声明**展开到
+  每个被测路径**再对账。另：`/sw.js` 的第二份 CSP 变体删掉（同路径两处规则的合并顺序不可验证 =
+  测不准的复杂度）；`Permissions-Policy` **故意不写 `microphone=()`**（本站 ASR 要吃麦克风，
+  写了会当场打断 `voice` 判据）。
+
+### 未做（诚实登记）
+- `/api/*` 是 Pages Function，**不吃静态 `_headers`** ⇒ 它的头要由函数自己回，本轮未做（挂 §6-2）。
+  实测该路径 OPTIONS 回 `Access-Control-Allow-Origin: *` 而 POST 不回 ACAO（跨源浏览器调用事实上被
+  CORS 挡，但姿态含糊）；判据对它单独取数，取不到记 UNVERIFIED 不记 0。
+- `--live` 尚未进 CI（只有本轮我手跑过一次 PASS）：挂 §6-1，做法是不可达出 rc=2 单列一行，
+  既不因网络抖动拦主链，也不永远没人测。
+- peers 侧 `结构 0/16｜helmet 依赖 1/16｜README 声明 0/16` —— **不得**读成"防护领先 16 家"：
+  多数参照是自托管应用，安全头在运维方的 web server 里，仓库无配置文件是常态。
+
 ### Added（r53 · 上下文窗口预算与截断损失面）
 - **`_test/context_budget_check.py`（+2 套件，`--selftest` 10/10）**：量「本机攒下的对话，
   模型这一轮真看到了多少」。取数面 = 拦 `/api/chat` 读 `request.post_data` 反解 messages；
