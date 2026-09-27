@@ -62,6 +62,15 @@
   `python _test/deploy_sync_check.py --selftest` → `DEPLOYSYNC-SELFTEST-PASS`；真面 →
   `DEPLOY-SYNC-PASS`，函数面回执 `分母 1 个`。
 
+### Fixed（r61 · 收口我自己造的两处）
+- **公网漂移**：r61 中途缩注释改了 `src/` 却未重部 ⇒ `live_sync` 判红。补部后
+  `LIVE-SYNC-PASS` 21/21 逐字节等。收尾清单里"改 `src/` ⇒ 重部 + 跑 live_sync"不可省。
+- **CI 受理面**：`8aa03f9` run `36340519269` = `BATTERY: 93/94 rc=0`，**判红 0 条**
+  （唯一非绿 = `ENV-QUOTA(public_check)`，rc=2 属上游余额）。r60 的 `size_budget` 真红已消。
+- **新挂账（未归因）**：`data_rights` 整跑里红、随后 `--only` 3/3 绿 ⇒ 顺序/状态依赖。
+  登记于台账 `part62`，含归因路径；取证时我自用 `| tail -3` 把明细截掉了（同类坑第三次现形），
+  归因命令改为整跑落**全文 log**。
+
 ### Added（r60 · 持久层异常面：四类存储故障第一次被真走一遍）
 - **起点**：`src/js/memory-store.js` 对 localStorage 的 8 处读写**全都包了 try/catch**，而
   `grep -rn "QuotaExceeded|SecurityError" _test/*.py` → **0 命中** ⇒ 47 条判据里没有任何一条
