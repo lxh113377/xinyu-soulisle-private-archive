@@ -430,8 +430,10 @@ QG_CANDIDATES = {
 QG_THRESHOLD_SHAPE = {
     "coverage_gate": re.compile(r"(fail_under|cov-fail-under|check-coverage|thresholds?[^\n]{0,40}?\b(lines|functions|statements)"
                                 r"|<rule>|<limit>|minimum|coverage[^\n]{0,24}?(8|9)\d(\.\d+)?%)", re.I),
-    "mutation_gate": re.compile(r"(mutationScoreThreshold|thresholds[\s\S]{0,40}?break|failure_under"
-                                r"|min-msi|<mutationScale|coverage[^<]{0,20}<|mutationThreshold)", re.I),
+    "mutation_gate": re.compile(r"(mutationScoreThreshold|mutationThreshold|<mutationScale|failure_under"
+                                r"|min-msi|mutator[\s\S]{0,30}?(coverage|mutation)|thresholds[\s\S]{0,24}break"
+                                r"|\b(pitest|stryker|mutmut|infection)\b[\s\S]{0,60}?(threshold|limit|break|msi))",
+                               re.I),
 }
 QG_CI_EXEC_SHAPE = re.compile(r"(eslint|biome|flake8|ruff|pylint|mypy|pyright|tsc\s+--noEmit|gitleaks"
                               r"|trufflehog|detect-secrets|secretlint|jacoco|codecov|nyc|vitest\s+--coverage"
@@ -1206,6 +1208,21 @@ def selftest():
         print("SELFTEST-FAIL: 零输入升格成质量门（违反「零输入不得记 PASS」）：%s" % _g4)
         return 1
     _g95 = globals()
+    # 变异门反例（r75 首跑真面抓到，抓的是**我自己刚装的 jacoco**）：`<id>jacoco-check-line-coverage</id>`
+    # 里的 "coverage" 曾被宽松分支 `coverage[^<]{0,20}<` 认成变异门 ⇒ 本仓 pom 一度被判 `mutation_gate=True`。
+    # 现在必须：jacoco-only pom 判 False，真 stryker/pitest 配置判 True（两条方向相反，缺一即这条腿恒真）。
+    _jac_pom = ("<artifactId>jacoco-maven-plugin</artifactId>"
+                "<execution><id>jacoco-check-line-coverage</id><phase>verify</phase>"
+                "<goals><goal>check</goal></goals><configuration><rules><rule><limits><limit>"
+                "<counter>LINE</counter><minimum>0.35</minimum></limit></limits></rule></rules>"
+                "</configuration></execution>")
+    if qg_classify({"mutation_gate": ["server/pom.xml"]}, {"server/pom.xml": _jac_pom}, "")[0]["mutation_gate"]:
+        print("SELFTEST-FAIL: jacoco 的 coverage/check 被认成变异门（本仓 pom 亲自中招那条没修住）")
+        return 1
+    _stryker = ("module.exports = { mutate: 'src/**/*.ts', thresholds: { break: 80 } };")
+    if not qg_classify({"mutation_gate": ["stryker.conf.js"]}, {"stryker.conf.js": _stryker}, "")[0]["mutation_gate"]:
+        print("SELFTEST-FAIL: 真 stryker thresholds.break 配置没判出变异门（收紧时砍掉了真能力）")
+        return 1
     _orig_cov = _g95["QG_THRESHOLD_SHAPE"]["coverage_gate"]
     try:
         _g95["QG_THRESHOLD_SHAPE"]["coverage_gate"] = re.compile(r"(?!)")
