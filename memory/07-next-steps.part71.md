@@ -12,3 +12,9 @@
       验收=耗时 top5 的合计下降**且**电池红名单不减一条（并行制造假红即回退）
 - [ ] 🔴 **需老大** [推荐:R70-03] 二选一即可消 `live_sync`+`ci_status`：解冻对外发布（现受 09-24「先不办」裁决约束），
       或认可"公网停在旧版"进 09-30 提交；另 PII（五人学号/手机/邮箱+指导教师）仍只有老大能给
+- [ ] 🔴 **需老大** [推荐:R70-04] `release_governance` 现判红 **R1：距 v1.6.1 已攒 6 个 feat（上限 5）⇒ 该切版**
+      （本轮 r70 的 feat 是第 6 个；R2c 已由 CHANGELOG 补记消掉）。**不擅自切**的理由是在册规矩本身：
+      `memory/07-next-steps.part40.md:32` 定的是「push → 等 CI 绿 → `gh release create` → 远端回读 size/sha」，
+      而 CI 现在因 `live_sync` 红着 ⇒ 前置不成立，而 `live_sync` 只能由 R70-03 的发布授权消。
+      前提（可复算）：`python _test/release_governance_check.py`（现输出 `RELEASE-GOV-FAIL: 1 项 feats=6/5`）；
+      解冻后正解 = 按 part40 那条链切 v1.6.2 并 `gh release view --json assets` 回读，**任一步失败不产生对外可见物**

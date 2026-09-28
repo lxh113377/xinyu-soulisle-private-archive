@@ -9,7 +9,26 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
-### Fixed（r69 · 一次崩溃暴露的回归锁缺陷 + 运行器终于会报耗时）
+### Fixed（r70 · 台账里一格被尺子造出来的能力 + 分类腿的 60s 挂起预算 + 部署产物第一次有闸）
+- **`vector_memory` 假阳更正**：`_test/benchmark_metrics.py` 的 `CAP_RULES` 用裸子串 `"rag" in path`
+  认「向量记忆」，于是 self 那一格由 `_test/storage_resilience_check.py` 与
+  `_test/plan_pdf_coverage_check.py` 两个文件名撑起（`git ls-files` 里真 vector/embedding/独立 rag = 0）。
+  同一条尺跑在 16 仓整树上 ⇒ **对手侧也虚高**。改尺重采后 **peers 9→7**（chibi、ryza 出局），
+  self 该格撤销；报告 §1/§2 的「同类标配 9/16」按 7/16 更正。双向控制进 `--selftest`
+  （6 条假阳全拒 + 5 条真阳全收，且假阳清单先自证旧规则确实会命中）。
+- **`/api/emotion` 分类腿超时 60s → 可配（缺省 8s）**：`LlmProxy.newRequest()` 原硬写 60s，
+  上游挂起时一条请求占住工作线程整整一分钟才回落词典；同一条链的前端侧 r51/r65 已压到 15s 与整轮看门狗。
+  新增带超时的 `call()` 重载 + `xinyu.emotion.llm-timeout-ms`；**`/api/chat` 仍 60s**（长回答要留给它）。
+  验收：JUnit 32 例（新增挂起预算 + 危机不建连）；变异对照写死 60s 即 FAIL「实测 60.057s」；
+  HTTP 面单变量 A/B（独立实例 + 黑洞上游）3000ms→3.11s ／ 60000ms→60.22s。
+- **thin jar 成因登记（销 r65 挂账）**：在有 `java -jar` 占着 8123 的机器上裸跑 `mvn package` ⇒
+  jar-plugin 先把 fat 原地覆盖成 thin（实测 56,728 B，无 Main-Class），`spring-boot:repackage`
+  随后改名 `.original` 被运行中 JVM 锁住（`Unable to rename …`）⇒ BUILD FAILURE，
+  **盘上留下「存在但 `java -jar` 起不来」的产物**。新增 `_test/jar_shape_check.py`
+  （fat + 不比源码旧才 PASS；产物不存在如实 SKIP）并折进 `_test/server_preflight.py` 的收口行，
+  读数放在前 60 字符内（聚合器按宽度截断长行，值写行尾等于没写）。
+
+
 - **一手现场**：本轮给运行器打补丁时一次 `NameError`（`import timeit` 之类子串让
   `"import time" in t` 假命中 ⇒ 我的断言以为已导入，实际没有）崩溃后，
   `BATTERY-UNVERIFIED(并发): pid=18600` 把后续整跑挡了 30 分钟，而 `tasklist` 实数 **0 个进程**；
