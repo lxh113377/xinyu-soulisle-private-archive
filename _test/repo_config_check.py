@@ -46,6 +46,12 @@
      `regression_suites=101`（含并行会话未入库的 2 条）与真值 99 并存、零报错，
      台账被下一轮当"横向现状"抄走就追不回责任方。台账记的套件数与 HEAD 现算值的**差值只印不拦**
      ——CI 里无法重跑联网采集来刷新台账，拦它就是造一条不可自愈的红（违 R-10 进链前三问）
+  G18 聚合器收口行的 rc 必须由**真退出码**派生（r74，`_test/run_all_suites.py:584` 一手）：
+     该行原为 `print(f"BATTERY: … rc=0")` 的字面量，退出码却在下面才 `return` ⇒ 本地整跑 rc=1、
+     同 SHA 的 CI 两个 job failure，两处日志都还印着 `rc=0`。判据取 **HEAD 正文**（工作树可能混着
+     他人未入库 hunk：既不能把别人现场算成我的红，也不能被他人在途态掩护），要求
+     ①存在 BATTERY 摘要行 ②该行 rc 是 `{...}` 插值而非数字字面量 ③存在 `return bat_rc|rc` 的同源返回。
+     取不到正文／没有摘要行一律判红（R247：无对象可判不得静默放行）
   G13 判据账本自洽：本文件头部登记的 G 清单与 `main()` 里实际执行的 check("G..") 一一对应
      —— 漏登记与幽灵登记都判红（这条由 G13 自己盯着自己，根因见 guard_inventory 的 docstring）
 
@@ -650,12 +656,44 @@ def peer_count_audit(readme_text, truth):
     return bad
 
 
+def head_blob(rel):
+    """HEAD 面的文件正文（git 决定的量，他人未入库的在途改动结构性进不了判定面）。"""
+    r = subprocess.run(["git", "-C", str(ROOT), "show", "HEAD:%s" % rel],
+                       capture_output=True, timeout=60)
+    if r.returncode != 0:
+        raise RuntimeError("git show HEAD:%s 失败" % rel)
+    return (r.stdout or b"").decode("utf-8", "replace")
+
+
+def battery_rc_facade_problems(src):
+    """G18 纯函数：聚合器的收口摘要行必须由**真退出码**派生，不得硬印 rc 字面量。
+
+    根因（r74 一手）：`print(f"BATTERY: … rc=0")` 里的 `rc=0` 一直是字面量，而退出码在下面才算是
+    ⇒ 本地整跑 rc=1、CI 同 SHA 两个 job failure，两处日志都还印着 `rc=0`；这行是人与机器共同的收口读数，
+    印错等于**伪造回执**（本仓台账里"94/98 rc=0"那类句子全部来自它）。
+    只在 HEAD 面判（工作树里可能混着他人未入库的 hunk，不能把别人的现场算成我的红，也不能被他人在途态掩护）。
+    """
+    if not src:
+        return ["G18 取不到 run_all_suites.py 的 HEAD 正文 ⇒ 无对象可判，不得记绿"]
+    lines = re.findall(r'print\(.{0,4}BATTERY:[^\n]*', src)
+    if not lines:
+        return ["G18 没找到 BATTERY 摘要行（聚合器形状变了 ⇒ 这条判据须随之重写，禁止静默放行）"]
+    bad = []
+    for ln in lines:
+        if re.search(r'rc=\d+["\']', ln):
+            bad.append("G18 摘要行硬印 rc 字面量：%s ⇒ 印出的 rc 与进程退出码不同源" % ln[:64])
+        elif "rc={" not in ln:
+            bad.append("G18 摘要行的 rc 不是插值（%s）⇒ 无法证明它跟着 return 走" % ln[:64])
+    if not re.search(r'return\s+(bat_rc|rc)\b', src):
+        bad.append("G18 没找到「退出码由同一变量返回」的形状 ⇒ 打印与返回可能两处各算各的")
+    return bad
+
+
 def head_battery_count():
     """HEAD 面现算的 SUITES 条目数（只用于**印差值**，不参与判定：
     拿"台账 ⇄ 当前 HEAD"做阻断会撞 R-10 不可自愈——CI 里没法重跑联网采集来刷新台账。"""
     try:
-        txt = subprocess.run(["git", "-C", str(ROOT), "show", "HEAD:_test/run_all_suites.py"],
-                             capture_output=True, timeout=60).stdout.decode("utf-8", "replace")
+        txt = head_blob("_test/run_all_suites.py")
         seg = txt.split("SUITES = [", 1)[1].split(chr(10) + "]", 1)[0]
         return len(re.findall(r'^\s*\("', seg, re.M))
     except Exception:
@@ -1046,6 +1084,26 @@ def selftest():
         bad.append("篡改㉒前提：真台账 self_face 不是 HEAD 或读不到，㉒b-e 全部未取证")
     if not ledger_face_problems(None):
         bad.append("篡改㉒f（整个 self 行缺失）被判绿 ⇒ 无对象可判时不得判绿")
+    # ㉓ G18 收口摘要行：正向取 HEAD 真面必须零问题，四条反向各自必须**点名的**红（r74 一手：该行的 rc 曾是字面量）
+    g18_real = ""
+    try:
+        g18_real = head_blob("_test/run_all_suites.py")
+    except Exception as e:
+        bad.append("篡改㉓前提：取不到 HEAD 的聚合器正文（%s）⇒ G18 未取证" % str(e)[:40])
+    if g18_real:
+        if battery_rc_facade_problems(g18_real):
+            bad.append("篡改㉓a（当前 HEAD 聚合器正文）被判红：%s" % battery_rc_facade_problems(g18_real))
+        probs_b = battery_rc_facade_problems(g18_real.replace("rc={bat_rc}", "rc=0"))
+        if not probs_b:
+            bad.append("篡改㉓b（插值改回硬印 rc=0）未被抓到 ⇒ 判据对本仓真实历史形状恒绿")
+        elif "硬印" not in " ".join(probs_b):
+            bad.append("篡改㉓b 红了但没点名「硬印」：%s" % probs_b)
+        if not battery_rc_facade_problems(re.sub(r'print\(.{0,4}BATTERY:[^\n]*', "", g18_real)):
+            bad.append("篡改㉓c（抹掉整行摘要）被判绿 ⇒ 形状漂移静默放行")
+        if not battery_rc_facade_problems(g18_real.replace("return bat_rc", "return 0")):
+            bad.append("篡改㉓d（return 与打印不同源）未被抓到 ⇒ 只查打印行")
+    if not battery_rc_facade_problems(""):
+        bad.append("篡改㉓e（空正文）被判绿 ⇒ 违 R247 零输入不得判绿")
     real = sorted((ROOT / "_test").glob("*.py"))
     viol = [p.name for p in real if import_safety(p.read_text("utf-8", errors="replace"))]
     if viol:
@@ -1117,6 +1175,14 @@ def main():
     check("G17 对标台账 self 行的取数面必须显式为 HEAD（禁把工作树态写成现状）", not g17bad,
           f"self_face={(lself or {}).get('self_face')!r} 台账记 suites={led_n} ｜ HEAD 现算={head_now} ｜ {diff_txt}（差值只报不拦：CI 无法重跑采集来刷新台账） | "
           + (" ; ".join(g17bad) or "面声明齐"))
+    try:
+        g18src = head_blob("_test/run_all_suites.py")
+    except Exception as e:
+        g18src = ""
+    g18bad = battery_rc_facade_problems(g18src)
+    g18line = (re.findall(r'print\(.{0,4}BATTERY:[^\n]*', g18src) or ["（HEAD 里没有 BATTERY 摘要行）"])[0].strip()
+    check("G18 聚合器收口行必须印真退出码（禁硬印 rc 字面量；只在 HEAD 面判）", not g18bad,
+          "HEAD 摘要行=%s ｜ %s" % (g18line[:74], " ; ".join(g18bad) or "rc 跟着 return 走"))
     ac_text = _read("memory/08-ac-obs.md")
     acbad = ac_id_audit(ac_text)
     check("G15 AC 追溯键唯一性棘轮（08 一个 id 一条命题，存量基线 %d）" % AC_DUP_BASELINE,

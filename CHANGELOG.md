@@ -9,6 +9,42 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Added（r74 · 文档维/性能维的**同址尺**：把"不同源的对照"换成同一把尺）
+- **问题（读自己上一轮报告抓到的，不是猜的）**：r73 报告 §1 的「文档」行 self 侧印 `docs 9/9`（官方九项覆盖），
+  peers 侧印 `api_spec 1/16`（另一格能力）⇒ 两个**不同判据**的数字并排当对照，等于没有对照；「性能」行更直接——
+  peers 侧写「无 perf 字段 ⇒ 不可比」，可"这 16 仓有没有公开过测量装置或数字"从来没被问过，
+  **结论先于取数**。
+- **做法**：`doc_perf_tree_class()` / `doc_perf_text_class()` / `doc_perf_class()` / `doc_perf_audit()` /
+  `self_doc_perf()` + CLI `--doc-perf`。peers 侧取 tree 清单 + README 正文，self 侧取 `git ls-tree HEAD` + `git show HEAD:README.md`
+  ——**同一套规则、同一张脸**，两侧才谈得上差距。与 r73 通道同源：不参与 caps、不设兜底、两路皆空记 `unverified`。
+- **首跑真面抓到四处冒充，全部钉成永久反例**（真实文本照抄，防我下一轮把同一形状再判成"已修"）：
+  `lobehub` 的 `.github/workflows/deploy-workbench.yml`（裸 `bench` 把 workbench 认成性能步）、
+  `leemo` 的 `bundled-skills/.../scripts/aggregate_benchmark.py`（技能模板里的汇总脚本）、
+  `succhia` 的「与网络延迟无关」（设计陈述冒充性能数字）、以及**我自己的采集器**
+  `_test/benchmark_metrics.py` 被算成"性能测量装置" ⇒ 加 `BENCH_DENY`（名字含 bench 但职责是指标汇总的一律否掉），
+  并给它配**专属输入面**（`scripts/benchmark_metrics.py`；实测：只留规则不配样本时它是死规则——摘掉 deny 后 selftest 仍 rc=0）。
+- **读数（08:59 UTC 现采 16/16）**：`docs_site 9/16`｜`agent_facing_doc 7/16`｜`readme_thorough 6/16`｜`changelog_root 3/16`
+  ⇒ self 四项全有（`AGENTS.md`+`memory/` 体系不是稀有物，但 9/16 有文档站、7/16 有 agent 说明，我们处在前排）；
+  性能侧 `bench_script 3/16`、`ci_perf_step 0/16`、`published_numbers 0/16` ⇒ self 有装置（`_test/perf_baseline_check.py`，
+  在册两条套件）但**不公开数字**，而 peers **一个都没有** ⇒ "不可比"这句话现在有出处了：这一行行业普遍不公开，
+  公开数字不是差距而是**可选项**（低优先，不照抄）。
+- **自证**：`--selftest` 加 10 类腿（五结构类各配方向相反的成对用例 + 长度不冒充好文档 + 营销词/★数不冒充性能数字 +
+  零输入不升格 + self 侧接线用注入读数自证），另跑外部变异对照：**10 条规则各自摘掉必翻红、红因点名到那一类、对照组 rc=0**。
+
+### Fixed（r74 · 聚合器收口行硬印 `rc=0`——人和机器共同的读数在伪造回执）
+- `_test/run_all_suites.py:584` 的 `print(f"BATTERY: … rc=0")` 里 `rc=0` 是**字面量**，退出码在下面才 `return`。
+  两面实测：本地整跑 `BATTERY: 94/98 rc=0` 而 shell `BATTERY_RC=1`；同 SHA 在受理面 run `36398947963`
+  两个 job `conclusion=failure`，CI 日志照旧印 `BATTERY: 93/96 rc=0`。
+  ⇒ 台账/提交说明里"94/98 rc=0"那类句子**全部来自这行**，我自己 r72 的收口账就抄过一次。
+- 修法：先算 `bat_rc = 1 if (hard or crash) else (2 if (soft or quota) else 0)`，打印与 `return` 同用一个变量。
+  二元对照（`--only`，同一命令两次）：合规面 `BATTERY: 1/1 rc=0`＋shell rc=0；判红面 `BATTERY: 1/2 rc=1 RED(判红): release_governance`＋shell rc=1。
+- **回归锁 G18**（`repo_config_check.py`，判据 15→16，`--selftest` 合成篡改 64→71）：取 **HEAD 正文**判三件事
+  ——存在 BATTERY 摘要行、该行 rc 是插值不是数字字面量、存在同源 `return bat_rc`；取不到正文/没有摘要行一律判红。
+  真实历史驱动：同一判据打在 `HEAD~1` 的 blob 上点名列出「硬印 rc 字面量」+「打印与返回不同源」两条，打在 `HEAD` 上零问题。
+  只在 HEAD 面判的理由：该文件同时有并行会话**未入库**的 5 处 hunk——不能把别人现场算成我的红，也不能被他人在途态掩护。
+- 提交面隔离：本次对 `run_all_suites.py` 用 `hash-object`+`update-index` 只造"HEAD+我这一处"的 blob，
+  他人 hunk 原样留在工作树（复验：`git status` 该文件仍 ` M`、`git diff` 里 `bat_rc` 命中 0 次、他人 7 个 hunk 计数未变）。
+
 ### Added（r73 · 流式/端到端的第二观测通道：把"文件名法是不是下限"变成可测的事）
 - **问题**：`streaming` 与 `e2e_browser` 这两格，self 侧长期是**盲区**（SSE 写在 `chat.js`/`ChatController.java`、
   端到端在 `_test/*.py` 用 playwright，文件名匹配器看不见 ⇒ 只能靠 `caps_blind` 点名）；

@@ -123,6 +123,155 @@ RE_E2E = re.compile(r"(\be2e\b|end[-\s]?to[-\s]?end\s+(test|suite|coverage)|visu
 RE_BROWSER_TOOL = re.compile(r"(scrap(e|er|ing)|web automation|browser automation|puppeteer"
                              r"|headless browser|爬虫|网页抓取)", re.I)
 
+# ── r74：「文档完善程度」与「性能表现」两格的**同址尺**（peers 与 self 同一套规则、同一张脸）。
+#     起因是本轮读 r73 报告 §1 时抓到的两件事：
+#       · 「文档」行 self 侧印 `docs 9/9`（官方九项覆盖），peers 侧印 `api_spec 1/16`（另一格能力）
+#         ⇒ 两个不同判据的数字被并排当对照，等于没有对照；
+#       · 「性能」行 peers 侧写「peers 无 perf 字段 ⇒ 不可比」，但**这 16 仓里有没有人公开过测量装置
+#         或测量数字**从来没被问过——"不可比"是先于取数下的结论。
+#     所以这里补一组类，并让 self 侧走 git HEAD 面（r71 的取数面纪律），peers 侧走同一棵 tree+README，
+#     两侧同法才有"差距"可言。与 r73 通道同源：**不参与 caps、不设兜底、取不到记 unverified**。
+DOC_CLASSES = ("docs_site", "agent_facing_doc", "changelog_root", "readme_thorough")
+PERF_CLASSES = ("bench_script", "ci_perf_step", "published_numbers")
+RE_DOCS_SITE_DIR = re.compile(r"(^|/)(docs|doc|documentation|guides?|wiki|handbook)/", re.I)
+RE_DOCS_SITE_CFG = re.compile(r"(^|/)(mkdocs\.ya?ml|docusaurus\.config\.(js|ts|mjs)|book\.toml"
+                              r"|\.vitepress/|\.vuepress/|docs/conf\.py$)", re.I)
+# 面向 AI agent 的说明文件——2026 年 peers 里新出现的可借鉴面，与"给人看的 docs"是两件事，必须分开计
+RE_AGENT_DOC = re.compile(r"(^|/)(AGENTS\.md|CLAUDE\.md|GEMINI\.md|llms(-full)?\.txt|\.cursorrules"
+                          r"|\.clinerules|\.cursor/rules/|\.github/copilot-instructions\.md|\.agents/)", re.I)
+RE_CHANGELOG_ROOT = re.compile(r"^CHANGELOG(\.|_|$)", re.I)
+RE_BENCH_PATH = re.compile(r"(^|/)(bench|benchmarks|benchmark|perf|performance|load_?tests?|stress|jmh|asv_bench)/"
+                           r"|(^|/)(locustfile\.py|k6[\w.-]*\.js|[\w.-]+\.jmx|wrk[\w.-]*\.lua|vegeta\.ya?ml|hey\.sh)"
+                           r"|(^|/)perf[\w.-]*\.(py|js|ts|go|rb|sh)$"
+                           r"|^(tools|scripts|bin)/[\w.-]*bench[\w.-]*\.(py|js|ts|go|rb|sh)$", re.I)
+# 反deny：名字里带 bench 但职责是**指标汇总器**而不是测量装置（r74 首跑真面抓到的两处：
+# 本仓 `_test/benchmark_metrics.py` 与 leemo 的 `aggregate_benchmark.py`）——同名不同事，必须显式否掉，
+# 否则这条尺会把自己的采集器记成"我们有性能装置"。规则对 peers 与 self 同样生效（同址）。
+BENCH_DENY = re.compile(r"(bench|benchmark)[\w-]*(_?metrics?|_?collect|_?aggregat|_?report|_?summary)", re.I)
+RE_CI_PERF = re.compile(r"^\.github/workflows/(?:[\w.-]*[-_])?(perf|bench|benchmark|load[-_]?test|stress)"
+                        r"[\w.-]*\.ya?ml$", re.I)
+# r74 首跑抓到 `deploy-workbench.yml` 被裸 `bench` 认成性能步 ⇒ 名字边界必须是分隔符或行首（workbench 不算）
+RE_PERF_KW = re.compile(r"(benchmark|latency|throughput|\bp\d{2}\b|qps|req/s|\brps\b|tokens?/s|tok/s"
+                        r"|\bttft\b|首字|吞吐|压测|实测|measured)", re.I)
+RE_PERF_NUM = re.compile(r"\d+(\.\d+)?\s*(ms|µs|μs|req/s|tokens/s|tok/s|qps|rps|tps)\b|\d+(\.\d+)?\s*倍|P\d{2}=\d")
+README_MIN_CHARS = 3000
+README_MIN_SIGNALS = 3
+
+
+def doc_perf_tree_class(paths):
+    """纯函数：文件清单 → 结构类命中（docs_site/agent_facing_doc/changelog_root/bench_script/ci_perf_step）。
+
+    零输入 ⇒ 五类全 False，**不得**因为"什么都没看见"就升格成任何结论（R247 同族）。
+    """
+    hits = {k: False for k in ("docs_site", "agent_facing_doc", "changelog_root",
+                               "bench_script", "ci_perf_step")}
+    ev = {}
+    for p in paths or []:
+        if len(p) >= 300:
+            continue
+        if not hits["docs_site"] and (RE_DOCS_SITE_DIR.search(p) or RE_DOCS_SITE_CFG.search(p)):
+            hits["docs_site"] = True
+            ev["docs_site"] = p
+        if not hits["agent_facing_doc"] and RE_AGENT_DOC.search(p):
+            hits["agent_facing_doc"] = True
+            ev["agent_facing_doc"] = p
+        if not hits["changelog_root"] and "/" not in p and RE_CHANGELOG_ROOT.search(p):
+            hits["changelog_root"] = True
+            ev["changelog_root"] = p
+        if not hits["bench_script"] and RE_BENCH_PATH.search(p) and not BENCH_DENY.search(p.rsplit("/", 1)[-1]):
+            hits["bench_script"] = True
+            ev["bench_script"] = p
+        if not hits["ci_perf_step"] and RE_CI_PERF.search(p):
+            hits["ci_perf_step"] = True
+            ev["ci_perf_step"] = p
+    return hits, ev
+
+
+def doc_perf_text_class(text):
+    """纯函数：README 正文 → readme_thorough / published_numbers。
+
+    `readme_thorough` 要 **长度 ∧ ≥3 个结构信号**（单看长度会把"长篇营销文"算成好文档）；
+    `published_numbers` 要 **同一行里既有指标词又有数+单位**（单看"高性能/极致性能"不算数字）。
+    """
+    t = text or ""
+    signals = [len(re.findall(r"(?m)^#{1,4}\s+\S", t)) >= 5,
+               bool(re.search(r"!\[", t)),
+               bool(re.search(r"\[!\[", t)),
+               bool(re.search(r"(?im)^#{1,4}.*(quick\s?start|getting started|install|部署|安装|快速开始|使用方法|usage)", t))]
+    thorough = len(t) >= README_MIN_CHARS and sum(signals) >= README_MIN_SIGNALS
+    published = False
+    for line in t.splitlines():
+        if RE_PERF_KW.search(line) and RE_PERF_NUM.search(line):
+            published = True
+            evidence = line.strip()[:120]
+            break
+    ev = {}
+    if thorough:
+        ev["readme_thorough"] = "len=%d signals=%d/4" % (len(t), sum(signals))
+    if published:
+        ev["published_numbers"] = evidence
+    return {"readme_thorough": thorough, "published_numbers": published}, ev
+
+
+def doc_perf_class(paths, text):
+    """两侧共用的合并判据：结构类来自清单，内容类来自正文。返回 dict（含 evidence/partial 由调用方补）。"""
+    tree_hits, tree_ev = doc_perf_tree_class(paths)
+    text_hits, text_ev = doc_perf_text_class(text)
+    out = dict(tree_hits)
+    out.update(text_hits)
+    out["classes"] = sorted(k for k, v in out.items() if v is True)
+    out["evidence"] = dict(tree_ev, **text_ev)
+    return out
+
+
+def self_doc_perf(rev="HEAD"):
+    """self 侧用**同一套规则**跑 git 面（清单=ls-tree，正文=README blob），不读工作树。"""
+    paths = git_ls_tree(rev)
+    dirs = []
+    for p in paths:
+        head = p.rsplit("/", 1)[0] if "/" in p else ""
+        if head:
+            dirs.append(head + "/")
+    joined = "\n".join(dirs) + "\n" + "\n".join(paths)
+    readme = git_blob("README.md", rev) if "README.md" in paths else ""
+    cls = doc_perf_class(paths, readme)
+    cls["face"] = rev
+    cls["self_paths"] = len(paths)
+    cls["readme_chars"] = len(readme)
+    return cls
+
+
+def doc_perf_audit(repos, limit=200000):
+    """对每个参照仓取 tree 清单 + README 正文跑同一判据；取不到必须记 unverified 并点名。"""
+    out = {}
+    for r in repos:
+        full = r["repo"]
+        branch = r.get("default_branch") or "HEAD"
+        paths, errs = [], []
+        try:
+            tr = gh("repos/%s/git/trees/%s?recursive=1" % (full, branch), timeout=90)
+            paths = [e["path"] for e in tr.get("tree", []) if e.get("type") == "blob"]
+            if tr.get("truncated"):
+                errs.append("tree_truncated")
+        except Exception as e:
+            errs.append("tree:" + str(e)[:70])
+        text = ""
+        try:
+            rd = gh("repos/" + full + "/readme")
+            text = base64.b64decode((rd.get("content") or "").strip()).decode("utf-8", errors="replace")[:limit]
+        except Exception as e:
+            errs.append("readme:" + str(e)[:70])
+        if not paths and not text.strip():
+            out[full] = {"classes": [], "evidence": {}, "unverified": "; ".join(errs) or "两路均空"}
+            continue
+        cls = doc_perf_class(paths, text)
+        cls["partial"] = bool(errs)
+        if errs:
+            cls["partial_errors"] = "; ".join(errs)
+        cls["path_count"] = len(paths)
+        out[full] = cls
+    return out
+
 
 def offline_signal_class(text):
     """纯函数：无网络无副作用 ⇒ 可离线自证。返回 (类别, 证据片段)。
@@ -709,13 +858,131 @@ def selftest():
     if _vm("src/storage/db.js") is _vm("src/rag/store.py"):
         print("SELFTEST-FAIL: 两条相反用例同判 ⇒ 这条控制是恒真的摆设")
         return 1
+    # ── r74 同址尺（文档维 / 性能维）：五类结构 + 两类内容，每类都配方向相反的腿
+    _d1, _e1 = doc_perf_tree_class(["docs/index.md", "src/app.tsx"])
+    if not _d1["docs_site"] or _d1["agent_facing_doc"] or _d1["changelog_root"]:
+        print("SELFTEST-FAIL: docs 目录面判错（docs_site 应真、agent 面与 changelog 应假）：%s" % _d1)
+        return 1
+    # docs_site 的第二条腿只走"站点配置文件"这一形（与目录那条规则各自专属，摘掉任一都必须翻红）
+    _d1b, _ = doc_perf_tree_class(["mkdocs.yml", "src/app.tsx"])
+    if not _d1b["docs_site"]:
+        print("SELFTEST-FAIL: docs_site 的配置文件腿恒假（mkdocs.yml 没被认出）：%s" % _d1b)
+        return 1
+    _d2, _ = doc_perf_tree_class(["AGENTS.md", "README.md"])
+    if not _d2["agent_facing_doc"] or _d2["docs_site"]:
+        print("SELFTEST-FAIL: AGENTS.md 与「文档站」互相冒充（反向腿①）：%s" % _d2)
+        return 1
+    _d3, _ = doc_perf_tree_class(["CHANGELOG.md"])
+    _d4, _ = doc_perf_tree_class(["pkg/CHANGELOG.md"])
+    if not _d3["changelog_root"] or _d4["changelog_root"]:
+        print("SELFTEST-FAIL: changelog_root 不分根级/子目录（两条相反用例必须一真一假）")
+        return 1
+    _d5, _ = doc_perf_tree_class([".github/workflows/ci.yml"])
+    _d6, _ = doc_perf_tree_class([".github/workflows/perf-bench.yml"])
+    if _d5["ci_perf_step"] or not _d6["ci_perf_step"]:
+        print("SELFTEST-FAIL: CI 性能步判错（普通 ci.yml 不得算，perf-bench.yml 必须算）")
+        return 1
+    _d7, _ = doc_perf_tree_class(["benchmarks/run.go", "locustfile.py", "k6.load.js"])
+    if not _d7["bench_script"]:
+        print("SELFTEST-FAIL: 三种常见压测件形态都没认出来 ⇒ 结构类恒假")
+        return 1
+    # r74 首跑真面抓到的四处冒充，逐条钉成永久反例（原文照抄，不是我编的形状）
+    # 最后一条是给 BENCH_DENY 的**专属输入面**：收紧 RE_BENCH_PATH 后，深路径已结构性出局，
+    # 但 `scripts/` 根级仍会命中，此时只有 deny 能否掉"指标汇总器"——没有这条样本，deny 就是死规则（实测摘掉它 rc 仍 0）。
+    _must_not_bench = ["_test/benchmark_metrics.py",
+                       "bundled-skills/default-enabled/skill-creator/scripts/aggregate_benchmark.py",
+                       "apps/server/src/router-hono/devtools/handlers/memoryUserMemoryBenchmarkLocomo.ts",
+                       "docs/performance-notes.md",
+                       "scripts/benchmark_metrics.py", "scripts/collect_bench_metrics.py"]
+    _fp = [p for p in _must_not_bench if doc_perf_tree_class([p])[0]["bench_script"]]
+    if _fp:
+        print("SELFTEST-FAIL: 采集器/汇总器/深路径仍被算成测量装置（假阳未修住）：" + " ; ".join(_fp))
+        return 1
+    _must_bench = ["_test/perf_baseline_check.py", "tools/tts_benchmark.py",
+                   "scripts/bench-model.ts", "bench/http.py"]
+    _fn = [p for p in _must_bench if not doc_perf_tree_class([p])[0]["bench_script"]]
+    if _fn:
+        print("SELFTEST-FAIL: 收紧时把真装置一起砍掉了（正例失控）：" + " ; ".join(_fn))
+        return 1
+    _deny_on = doc_perf_tree_class(["_test/benchmark_metrics.py", "_test/perf_baseline_check.py"])[0]
+    if not _deny_on["bench_script"] or "benchmark_metrics" in str(_deny_on.get("evidence", {}).get("bench_script", "")):
+        print("SELFTEST-FAIL: bench 类的取样顺序失真（应命中 perf_baseline_check 而非采集器）：%s" % _deny_on)
+        return 1
+    if doc_perf_tree_class([".github/workflows/deploy-workbench.yml"])[0]["ci_perf_step"]:
+        print("SELFTEST-FAIL: deploy-workbench.yml 仍被当成 CI 性能步（lobehub 首跑那处假阳没修住）")
+        return 1
+    if doc_perf_text_class("- 曲线由控制页本地生成（250ms 步进的正弦/方波/斜坡），只有波形*规格*走网络"
+                           "——丝滑程度与网络延迟无关。")[0]["published_numbers"]:
+        print("SELFTEST-FAIL: 「与网络延迟无关」这类设计陈述被当成公开性能数字（succhia 首跑假阳）")
+        return 1
+    _tx = lambda s: doc_perf_text_class(s)[0]          # 只取判定字典（证据留给合并函数）
+    _t_good = "\n".join(["# Title"] + ["## S%d" % i for i in range(6)]
+                        + ["[![CI](x.svg)](y)", "![shot](a.png)", "## Install", "x" * 3000])
+    _t_long_only = "y" * 5000
+    _t_marketing = "\n".join(["# 标题"] + ["## S%d" % i for i in range(6)] + ["我们追求极致性能，快到飞起。", "z" * 3000])
+    if not _tx(_t_good)["readme_thorough"]:
+        print("SELFTEST-FAIL: 合规长 README（6 标题+徽章+截图+Install）未判 thorough")
+        return 1
+    if _tx(_t_long_only)["readme_thorough"]:
+        print("SELFTEST-FAIL: 只有长度没有结构信号被判成好文档（营销文混进来）")
+        return 1
+    if not _tx("Throughput benchmark: p95 latency is 240 ms at 1,200 req/s.")["published_numbers"]:
+        print("SELFTEST-FAIL: 同行含指标词与数+单位却没认出公开数字")
+        return 1
+    if _tx(_t_marketing)["published_numbers"]:
+        print("SELFTEST-FAIL: 「极致性能」这类营销词被当成性能证据（反向腿②）")
+        return 1
+    if _tx("We have 12000 stars, thanks! (2024)")["published_numbers"]:
+        print("SELFTEST-FAIL: 无关数字行（★ 数）冒充性能数字")
+        return 1
+    _z = doc_perf_class([], "")
+    if _z["classes"] or _z["evidence"]:
+        print("SELFTEST-FAIL: 零输入升格成能力（违反「零输入不得记 PASS」）：%s" % _z["classes"])
+        return 1
+    if _z.get("caps"):
+        print("SELFTEST-FAIL: 同址尺返回值里出现 caps 键 ⇒ 它正在变成第二把 caps 尺")
+        return 1
+    # 变异腿：摘掉 agent 面与"数+单位"两条正则，对应类必须翻（证明判定力在它们身上）
+    _g74 = globals()
+    _orig_agent, _orig_num = _g74["RE_AGENT_DOC"], _g74["RE_PERF_NUM"]
+    try:
+        _g74["RE_AGENT_DOC"] = re.compile(r"(?!)")
+        if doc_perf_tree_class(["AGENTS.md"])[0]["agent_facing_doc"]:
+            print("SELFTEST-FAIL: 摘掉 RE_AGENT_DOC 后仍判 agent_facing_doc ⇒ 该类没在被判对象上")
+            return 1
+        _g74["RE_PERF_NUM"] = re.compile(r"(?!)")
+        if _tx("p95 latency is 240 ms")["published_numbers"]:
+            print("SELFTEST-FAIL: 摘掉 RE_PERF_NUM 后仍判 published_numbers ⇒ 恒真是营销词在替它判")
+            return 1
+    finally:
+        _g74["RE_AGENT_DOC"], _g74["RE_PERF_NUM"] = _orig_agent, _orig_num
+    # self 侧同址的**接线**自证：不读真实仓（桩不得依赖本机态），改用注入的 git 读数
+    _orig_ls, _orig_blob = _g74["git_ls_tree"], _g74["git_blob"]
+    asked = []
+    try:
+        _g74["git_ls_tree"] = lambda rev="HEAD": (asked.append(("ls", rev)),
+                                                  ["README.md", "AGENTS.md", "CHANGELOG.md",
+                                                   "docs/quality-gates.md"])[1]
+        _g74["git_blob"] = lambda p, rev="HEAD": (asked.append(("blob", p, rev)), _t_good)[1]
+        _s = self_doc_perf()
+        if _s["face"] != "HEAD" or not _s["docs_site"] or not _s["agent_facing_doc"]:
+            print("SELFTEST-FAIL: self 侧没走同址尺（face=%s %s）" % (_s["face"], _s["classes"]))
+            return 1
+        if ("ls", "HEAD") not in asked or ("blob", "README.md", "HEAD") not in asked:
+            print("SELFTEST-FAIL: self 侧未从 git HEAD 面取数（取数面没被问到 = 接线是假的）：%s" % asked)
+            return 1
+    finally:
+        _g74["git_ls_tree"], _g74["git_blob"] = _orig_ls, _orig_blob
     print("SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（"
           f"{len(got)} 条）；分档正确（实质 {len(sub)} / 抖动 {len(noise)}）且纯抖动场景零实质；"
           "分母证明正确（1 有效 / 2 盲区点名，健康仓不误踢）；"
           "r30 盲区点名三侧正确（有证据→点名、无证据→空、已看见→不重复）；"
           "r31 离线四分类各判对 + 训练语境不冒充离线壳 + 摘掉归因正则即翻判（变异体）+ 零输入判 none；"
           f"r70 vector_memory 匹配器 {len(_must_red)} 条假阳全拒 + {len(_must_green)} 条真阳全收；"
-          f"r71 self 行取数面 = git HEAD（未入库件结构性进不了人口，零人口不判绿）")
+          "r71 self 行取数面 = git HEAD（未入库件结构性进不了人口，零人口不判绿）；"
+          "r73 流式/端到端通道：四类归因 + 4 条真实冒充反例 + 变异体 + 通道不带 caps 键；"
+          "r74 同址尺：docs/agent/changelog(根级)/bench/CI性能步 五类各有相反用例 + 长度不冒充好文档 + "
+          "「极致性能」与★数行都不冒充性能数字 + 零输入不升格 + 两条变异腿翻判 + self 侧接线用注入读数自证")
     return 0
 
 
@@ -726,6 +993,8 @@ def main():
                     help="跑第二条离线观测通道（16 仓 × 2 次 API，较慢；判据本体由 --selftest 常驻守着）")
     ap.add_argument("--cap-channel", action="store_true",
                     help="跑流式/端到端的第二观测通道（r73；同样 16 仓 × 2 次 API，只作复核与下限揭示，不改 caps）")
+    ap.add_argument("--doc-perf", action="store_true",
+                    help="跑 r74 同址尺：文档维/性能维，peers 与 self 用同一套规则（16 仓 × 2 次 API，较慢）")
     ap.add_argument("--out", default=str(SNAP))
     args = ap.parse_args()
 
@@ -790,6 +1059,29 @@ def main():
         if unv:
             print(f"  ⚠️ 通道分母不全（{len(unv)} 仓两路皆空：{'、'.join(unv)}）⇒ 不得据"
                   f"「内容法也没见到」下否定结论")
+    if args.doc_perf:
+        # 同一套规则跑两侧：peers 走 tree+README（GitHub API），self 走 git HEAD 的 ls-tree+blob。
+        # 目的就是把 r73 报告里「self=docs 9/9 vs peers=api_spec 1/16」那种**不同源对照**换成同址读数。
+        audit = doc_perf_audit(cur)
+        self_dp = self_doc_perf()
+        run["doc_perf_channel"] = {"peers": audit, "self": self_dp,
+                                   "rule": "两侧同规则；不参与 caps；两路皆空记 unverified"}
+        unv = sorted(k for k, v in audit.items() if v.get("unverified"))
+        print("  同址尺（文档维/性能维；peers 与 self 同一套规则，不改 caps）：")
+        for title, keys in (("文档", DOC_CLASSES), ("性能", PERF_CLASSES)):
+            for c in keys:
+                members = sorted(k for k, v in audit.items() if v.get(c))
+                mark = "✅有" if self_dp.get(c) else "❌无"
+                print(f"    [{title}] {c:<18} peers={len(members)}/{len(audit)} "
+                      f"self(HEAD)={mark}  例：{'、'.join(members[:3]) or '—'}")
+        print(f"    self 面：face={self_dp['face']} paths={self_dp['self_paths']} "
+              f"README={self_dp['readme_chars']}字符 classes={self_dp['classes']}")
+        for c in DOC_CLASSES + PERF_CLASSES:
+            if self_dp.get(c):
+                print(f"      ▶ self 证据 [{c}] {self_dp['evidence'].get(c, '')[:80]}")
+        if unv:
+            print(f"  ⚠️ 同址尺分母不全（{len(unv)} 仓两路皆空：{'、'.join(unv)}）"
+                  f"⇒ 不得据「peers 全零」下否定结论")
     hist = (hist + [run])[-6:]
     drift = diff_snap(prev_repos, cur)
 
