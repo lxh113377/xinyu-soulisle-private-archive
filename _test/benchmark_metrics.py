@@ -858,16 +858,34 @@ def diff_snap(prev_repos, cur_repos,
 
 
 def classify_drift(drift):
-    """把漂移分成「实质」与「抖动」两档 ⇒ (substantive, noise)。
+    """把漂移分成「实质 / 抖动 / 补录」三档 ⇒ (substantive, noise, roster)。
 
     r26 加：本轮 6 处漂移里 4 处是 ★ 数 ±1（含 lobehub 82,808→82,807 的**倒退**，
     平台清虚假账号所致），单点 star 差值不构成趋势证据；若与"对手发布 v2.5.0→v2.13.1"
     混在一张表里报，台账就失去了指方向的能力。故 stars 一律入抖动档，
-    其余字段（pushed_at / latest_release / ci_workflows / caps / docs / 新仓）全部算实质。
+    其余字段（pushed_at / latest_release / ci_workflows / caps / docs）算实质。
+
+    r77 加第三档：`repo_added`（基线里根本没有这仓）**不是对手动了**，而是我这把尺
+    自己上一轮没数到它——一手代价：02:53 那次采集 3 个仓 `unexpected EOF` 判红，
+    但它已经把残缺快照**覆写进台账**，下一次采集于是报出 5 处「实质（可行动）」
+    （opensoul/succhia/ryza/MoodChat 全是 `None -> 值`）。把"我补齐了覆盖"记成
+    "对手发生了变化"，会把人支去做一件不存在的动作。
     """
-    sub = [d for d in drift if d[1] != "stars"]
+    roster = [d for d in drift if d[1] == "repo_added"]
+    sub = [d for d in drift if d[1] not in ("stars", "repo_added")]
     noise = [d for d in drift if d[1] == "stars"]
-    return sub, noise
+    return sub, noise, roster
+
+
+def pick_snapshot_path(path, fetched, expected):
+    """降级采集不得覆写权威台账（r77）：取数不全时另写 `.partial.json`，基线留给上一次完整采集。
+
+    与 r76「存在性 ≠ 能力」「没读到 ≠ 没有」同一族：**残缺读数一旦进了分母，
+    下一轮就没人能区分"世界变了"与"我上轮瞎了"。**
+    """
+    if expected and fetched < expected:
+        return path.with_name(path.stem + ".partial" + path.suffix)
+    return path
 
 
 def coverage_hits(rows):
@@ -912,17 +930,36 @@ def selftest():
         print(f"SELFTEST-FAIL: 期望抓到 {sorted(want)}，实际 {[(g[0], g[1]) for g in got]}")
         return 1
     # 分档判据（r26）：两侧都要验，否则"分类器"只是把漂移换个名字再报一遍
-    sub, noise = classify_drift(got)
+    sub, noise, roster = classify_drift(got)
     if [(s[0], s[1]) for s in noise] != [("lobehub/lobehub", "stars")]:
         print(f"SELFTEST-FAIL: 抖动档应只有 stars，实际 {[(n[0], n[1]) for n in noise]}")
         return 1
     if len(sub) != 3 or any(s[1] == "stars" for s in sub):
         print(f"SELFTEST-FAIL: 实质档应含 pushed_at/caps/docs 三条且不含 stars，实际 {[(s[0], s[1]) for s in sub]}")
         return 1
+    if roster:
+        print(f"SELFTEST-FAIL: 基线未缺仓却判出补录档（判据过敏）：{roster}")
+        return 1
     only_stars = [d for d in got if d[1] == "stars"]
-    s2, n2 = classify_drift(only_stars)
-    if s2 or len(n2) != 1:
+    s2, n2, r2 = classify_drift(only_stars)
+    if s2 or len(n2) != 1 or r2:
         print(f"SELFTEST-FAIL: 纯 ★ 抖动被误判为实质（分类器恒真）：sub={s2}")
+        return 1
+    # r77 反例：基线缺仓（上一轮取数失败留下的残缺快照）必须落「补录」档，不得算成对手的变化
+    degraded_prev = [r for r in base if r["repo"] != "s-nagaev/chibi"]
+    s3, n3, r3 = classify_drift(diff_snap(degraded_prev, base))
+    if s3 or n3 or len(r3) != 1 or r3[0][0] != "s-nagaev/chibi" or r3[0][1] != "repo_added":
+        print(f"SELFTEST-FAIL: 基线缺仓应只进补录档，实际 sub={[(x[0], x[1]) for x in s3]} "
+              f"noise={[(x[0], x[1]) for x in n3]} roster={[(x[0], x[1]) for x in r3]}")
+        return 1
+    # r77 写盘守卫：降级采集另写 .partial，完整采集才覆写权威台账（两侧都验）
+    from pathlib import Path as _P
+    snap = _P("交付物/对标数据/benchmark-metrics.json")
+    if pick_snapshot_path(snap, 13, 16) != snap.with_name("benchmark-metrics.partial.json"):
+        print("SELFTEST-FAIL: 降级采集（13/16）没有另写 partial ⇒ 残缺读数会覆写基线")
+        return 1
+    if pick_snapshot_path(snap, 16, 16) != snap or pick_snapshot_path(snap, 16, 0) != snap:
+        print("SELFTEST-FAIL: 完整采集（或无分母）却把台账改道了")
         return 1
     # 分母证明（r27）：截断/取数失败的仓必须出局并点名，否则"全零"无法区分真假
     rows = [{"repo": "a/a", "caps": ["container"], "file_count": 10},
@@ -1328,7 +1365,10 @@ def selftest():
           "r75 质量门：**有配置≠有门**（.coveragerc 无 fail_under 判否 / eslint 无 CI 执行位判否）＋ "
           "正文取不到记 unverified 不塌缩 False ＋ 阈值正则变异体翻判 ＋ self 侧走 HEAD 面接线自证 ＋ 零输入不升格；"
           "r76 同址尺的同一洞另一半：**整棵 tree 没取到时树派生类降到未验**（不是 False），文本派生类不受牵连，"
-          "有/无/未验 三档分开计数，摘掉树派生类名单即翻判（变异体证明这条腿作用在被判对象上）")
+          "有/无/未验 三档分开计数，摘掉树派生类名单即翻判（变异体证明这条腿作用在被判对象上）；"
+          "r77 台账自伤：**基线缺仓只进「补录」档不进「实质」档**（把「我上轮瞎了」报成「对手动了」"
+          "会支使人做一件不存在的动作），且**降级采集改道 .partial、完整采集才覆写权威台账**"
+          "（13/16 与 16/16 两侧都验）")
     return 0
 
 
@@ -1461,17 +1501,22 @@ def main():
             print(f"    ⚠️ self 侧未验项：{qg_self.get('unverified')} {qg_self.get('partial_errors')[:80]}")
     hist = (hist + [run])[-6:]
     drift = diff_snap(prev_repos, cur)
+    # 降级采集不得覆写权威台账（r77 一手：02:53 那次 3 仓 EOF 仍把残缺快照写进基线，
+    # 下一次于是报出 5 处"实质漂移"，全是 None -> 值 —— 是我上轮瞎了，不是对手动了）
+    snap_target = pick_snapshot_path(path, len(cur), len(PEERS))
 
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"generated_by": "_test/benchmark_metrics.py",
                "peers_expected": len(PEERS), "runs": hist}
-    tmp = path.with_suffix(".json.tmp")
+    tmp = snap_target.with_suffix(".json.tmp")
     # write_bytes 而非 write_text：文本模式在 Windows 会把 \n 翻成 \r\n，
     # 台账一旦带 CRLF，"逐字节对账/SHA256"类主张在别人 clone 上就复算不出来（eol_parity 实测抓到过一次）
     tmp.write_bytes(json.dumps(payload, ensure_ascii=False, indent=1).encode("utf-8"))
-    os.replace(tmp, path)
+    os.replace(tmp, snap_target)
 
-    print(f"采集: {len(cur)}/{len(PEERS)} 仓 | 快照 {path.relative_to(ROOT).as_posix()} | 历史 {len(hist)} 次")
+    print(f"采集: {len(cur)}/{len(PEERS)} 仓 | 快照 {snap_target.relative_to(ROOT).as_posix()}"
+          + ("｜⚠️ 降级：权威台账未覆写，基线仍取上一次完整采集" if snap_target != path else "")
+          + f" | 历史 {len(hist)} 次")
     if not cur:
         print("BENCHMARK-FAIL: 零仓取到数据")
         return 1
@@ -1496,13 +1541,17 @@ def main():
         print(f"  ⚠️ 盲区点名（这些仓的 caps 不计入分母，全零不可解读为「对手没有」）: " + " ; ".join(blind))
     if prev_repos:
         if drift:
-            sub, noise = classify_drift(drift)
+            sub, noise, roster = classify_drift(drift)
             print(f"漂移: {len(drift)} 处 = 实质 {len(sub)} 处（可行动）+ 抖动 {len(noise)} 处"
-                  f"（★ 单点差值含倒退，不作趋势证据）｜与上一次快照逐字段比对，禁止沿用旧数字")
+                  f"（★ 单点差值含倒退，不作趋势证据）+ 补录 {len(roster)} 处"
+                  f"（基线上轮没数到 ⇒ 是我补齐了覆盖，不是对手变化）"
+                  f"｜与上一次快照逐字段比对，禁止沿用旧数字")
             for repo, k, o, n in sub:
                 print(f"  ▶ 实质 {repo} {k}: {o} -> {n}")
             for repo, k, o, n in noise:
                 print(f"    抖动 {repo} {k}: {o} -> {n}")
+            for repo, k, o, n in roster:
+                print(f"      ▷ 补录 {repo} {k}: {o} -> {n}")
         else:
             print("漂移: 0 处（与上一次快照完全一致）")
     else:

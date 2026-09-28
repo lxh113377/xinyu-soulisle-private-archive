@@ -55,3 +55,6 @@ _trash/
 # 工具运行态（handoff savepoint 的心跳/快照与重复执行守卫），不入库：
 # 与 R269 同源纪律——活跃工具运行态文件走 .gitignore 豁免，不迁 _trash 也不提交
 memory/sessions/
+# 对标采集的**降级快照**（r77：取数不全时另写此件，权威台账 benchmark-metrics.json 不覆写）
+# 它是一次性诊断件——入库会让下一轮的"逐字段比对"多一个来源，正是本件要防的那类污染
+交付物/对标数据/benchmark-metrics.partial.json
