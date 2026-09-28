@@ -133,6 +133,10 @@ RE_BROWSER_TOOL = re.compile(r"(scrap(e|er|ing)|web automation|browser automatio
 #     两侧同法才有"差距"可言。与 r73 通道同源：**不参与 caps、不设兜底、取不到记 unverified**。
 DOC_CLASSES = ("docs_site", "agent_facing_doc", "changelog_root", "readme_thorough")
 PERF_CLASSES = ("bench_script", "ci_perf_step", "published_numbers")
+# 树派生类：结论只能从**整棵文件清单**读出来。清单没取到就是「未验」，不得写成「该仓没有」。
+# （r76 一手：chibi 的 tree 取数失败、README 取成功，旧写法把 docs_site/changelog_root 直接判 False，
+#   于是 6 小时内同一条尺从 9/16 掉到 8/16、changelog_root 从 3/16 掉到 2/16，而漂移行不会点名这类翻转。）
+TREE_DERIVED_CLASSES = ("docs_site", "agent_facing_doc", "changelog_root", "bench_script", "ci_perf_step")
 RE_DOCS_SITE_DIR = re.compile(r"(^|/)(docs|doc|documentation|guides?|wiki|handbook)/", re.I)
 RE_DOCS_SITE_CFG = re.compile(r"(^|/)(mkdocs\.ya?ml|docusaurus\.config\.(js|ts|mjs)|book\.toml"
                               r"|\.vitepress/|\.vuepress/|docs/conf\.py$)", re.I)
@@ -241,6 +245,28 @@ def self_doc_perf(rev="HEAD"):
     return cls
 
 
+def doc_perf_downgrade(cls, tree_present):
+    """纯函数：树清单没取到 ⇒ 树派生类一律降到 None（未验），**不得**留 False（＝"该仓没有"）。
+
+    这是 r75 给执行型质量门修的同一个洞的另一半：那一半修在 `qg_exec_verdict`，
+    这一半修在同址尺的文档/性能维。R263 精神——先修判据，不改数据凑绿。
+    """
+    if tree_present:
+        return cls
+    out = dict(cls)
+    for c in TREE_DERIVED_CLASSES:
+        out[c] = None
+    return out
+
+
+def doc_perf_counts(audit, key):
+    """纯函数：把 {仓: 读数} 切成 (有, 无, 未验, 分母)；未验**单列**，不并进"无"。"""
+    has = [k for k, v in audit.items() if v.get(key) is True]
+    no = [k for k, v in audit.items() if v.get(key) is False]
+    unv = [k for k, v in audit.items() if v.get(key) is None]
+    return len(has), len(no), len(unv), len(audit), sorted(has), sorted(unv)
+
+
 def doc_perf_audit(repos, limit=200000):
     """对每个参照仓取 tree 清单 + README 正文跑同一判据；取不到必须记 unverified 并点名。"""
     out = {}
@@ -265,6 +291,8 @@ def doc_perf_audit(repos, limit=200000):
             out[full] = {"classes": [], "evidence": {}, "unverified": "; ".join(errs) or "两路均空"}
             continue
         cls = doc_perf_class(paths, text)
+        # 只「整棵清单没取到」才降级；truncated（取到一部分）留在 partial 里由人工判，不静默改口径
+        cls = doc_perf_downgrade(cls, tree_present=bool(paths))
         cls["partial"] = bool(errs)
         if errs:
             cls["partial_errors"] = "; ".join(errs)
@@ -1163,6 +1191,29 @@ def selftest():
             return 1
     finally:
         _g74["git_ls_tree"], _g74["git_blob"] = _orig_ls, _orig_blob
+    # ── r76：树派生类的「没读到 ≠ 没有」必须可演习（r75 只给执行型质量门修了这个洞的另一半）
+    _d = doc_perf_downgrade({"docs_site": False, "changelog_root": False, "readme_thorough": True}, False)
+    if _d["docs_site"] is not None or _d["changelog_root"] is not None or _d["readme_thorough"] is not True:
+        print("SELFTEST-FAIL: 整棵 tree 取不到时存在性类没降到未验，或把文本派生类一起降了：%s" % (_d,))
+        return 1
+    if doc_perf_downgrade({"docs_site": False}, True)["docs_site"] is not False:
+        print("SELFTEST-FAIL: 树明明取到了却被降成未验 ⇒ 这把尺会把自己的读数洗成不可知")
+        return 1
+    _a = {"x/y": {"docs_site": True, "readme_thorough": False},
+          "z/w": {"docs_site": None},
+          "q/r": {"docs_site": False, "readme_thorough": True}}
+    _n = doc_perf_counts(_a, "docs_site")
+    if (_n[0], _n[1], _n[2], _n[3]) != (1, 1, 1, 3):
+        print("SELFTEST-FAIL: 有/无/未验 三档没分开（本轮治的正是把未验并进无）：%s" % (_n,))
+        return 1
+    _orig_tdc = globals()["TREE_DERIVED_CLASSES"]
+    try:
+        globals()["TREE_DERIVED_CLASSES"] = ()
+        if doc_perf_downgrade({"docs_site": False}, False)["docs_site"] is None:
+            print("SELFTEST-FAIL: 摘掉树派生类名单后仍降级 ⇒ 这条腿没作用在被判对象上（恒真）")
+            return 1
+    finally:
+        globals()["TREE_DERIVED_CLASSES"] = _orig_tdc
     # ── r75 质量门同址尺：阈值型类必须"有牙"才算 gate；执行型类必须"配置 ∧ CI 真跑"
     _q_pom = "<project><plugin>jacoco-maven-plugin</plugin><configuration><rules><rule>" \
              "<limit><minimum>0.80</minimum></limit></rule></rules></configuration></project>"
@@ -1275,7 +1326,9 @@ def selftest():
           "r74 同址尺：docs/agent/changelog(根级)/bench/CI性能步 五类各有相反用例 + 长度不冒充好文档 + "
           "「极致性能」与★数行都不冒充性能数字 + 零输入不升格 + 两条变异腿翻判 + self 侧接线用注入读数自证；"
           "r75 质量门：**有配置≠有门**（.coveragerc 无 fail_under 判否 / eslint 无 CI 执行位判否）＋ "
-          "正文取不到记 unverified 不塌缩 False ＋ 阈值正则变异体翻判 ＋ self 侧走 HEAD 面接线自证 ＋ 零输入不升格")
+          "正文取不到记 unverified 不塌缩 False ＋ 阈值正则变异体翻判 ＋ self 侧走 HEAD 面接线自证 ＋ 零输入不升格；"
+          "r76 同址尺的同一洞另一半：**整棵 tree 没取到时树派生类降到未验**（不是 False），文本派生类不受牵连，"
+          "有/无/未验 三档分开计数，摘掉树派生类名单即翻判（变异体证明这条腿作用在被判对象上）")
     return 0
 
 
@@ -1365,10 +1418,14 @@ def main():
         print("  同址尺（文档维/性能维；peers 与 self 同一套规则，不改 caps）：")
         for title, keys in (("文档", DOC_CLASSES), ("性能", PERF_CLASSES)):
             for c in keys:
-                members = sorted(k for k, v in audit.items() if v.get(c))
-                mark = "✅有" if self_dp.get(c) else "❌无"
-                print(f"    [{title}] {c:<18} peers={len(members)}/{len(audit)} "
+                n_has, n_no, n_unv, n_den, members, unv_members = doc_perf_counts(audit, c)
+                sv = self_dp.get(c)
+                mark = "✅有" if sv is True else ("❌无" if sv is False else "⚠️未验")
+                print(f"    [{title}] {c:<18} peers 有={n_has}/{n_den} 无={n_no} 未验={n_unv} "
                       f"self(HEAD)={mark}  例：{'、'.join(members[:3]) or '—'}")
+                if n_unv:
+                    print(f"      ⚠️ 该类不得写成「{n_no} 仓无 {c}」——下列仓的取数面未验"
+                          f"（多为整棵 tree 没取到，r76）：{'、'.join(unv_members[:4])}")
         print(f"    self 面：face={self_dp['face']} paths={self_dp['self_paths']} "
               f"README={self_dp['readme_chars']}字符 classes={self_dp['classes']}")
         for c in DOC_CLASSES + PERF_CLASSES:
