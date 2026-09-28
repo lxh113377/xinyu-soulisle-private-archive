@@ -9,6 +9,27 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Fixed（r66 · 修掉一条「只印不写」的取证通道，并把我自己写错的结论改判回来）
+- **上一轮的错误**：r65 我曾把「`peer_quality_tooling_probe --budget 240` 使 counted=1」的根因
+  判为**已否证**，理由是自己用 `--budget 1400` 重跑仍是 1/16。那次读到的 `counted=1` 其实是
+  **00:18 的旧产物** —— `--json` 是**带参数**的输出路径且缺省为空，`if a.json:` 才写盘 ⇒
+  我那次运行**一个字节都没写过**。带正确入参重跑：82s、停取=否、**计入分母 16／BLIND 0**，
+  JSON 亦 `counted=16/na=0` ⇒ **原根因成立、抬高预算这条处方有效**。
+- **真缺陷（已修）**：工具可以在盘上产物纹丝不动的情况下打印一条完整的「覆盖恒等式：OK」。
+  修法三条：① 缺省必写当日台账；② 写后**按字节回读**打印自证指纹
+  （`台账指纹 sha256=<16位> bytes=<N>`，禁字符串长度口径——Windows 文本模式会改字节）；
+  ③ `--json -` 逃生门必须在**写之前**拦住并印 `QUALITYPEER-NOLEDGER`。
+  ⚠️ 第一版我把 `-` 判断漏在写之后，当场在仓根落出一个名叫 `-` 的文件（已走 recycle 回收）。
+- **新数据（分母终于=16）**：peers 有 JS 测试文件 **6/16**、CI 有单测执行位 **5/16**、
+  有 linter 配置 **2/16**、有 tsconfig **4/16**。self 有 js+java 测试与 CI unit 位、**无 linter**
+  ⇒ lint 从今往后是一个**有可信分母**的决策，不再是一句"业界都有"。
+- **登记未修（G3）**：`rows[].struct` 用同一个 `null` 表示「没测到」与「测到但零命中」
+  （源码 `sorted(s) if s else None`），只能靠 `flag` 区分 ⇒ 两态必须拆分并与
+  `benchmark_metrics.py` 的漂移比对同批改，避免两次改产物格式互相打脸。
+- 方法论：否证一条既有结论之前，先证明我引用的产物**是本次运行写出来的**（mtime 不够，要指纹对得上）。
+- 复算：`python _test/peer_quality_tooling_probe.py --budget 1400`（缺省即落台账并自证指纹）；
+  离线桩 `python _test/peer_quality_tooling_probe.py --selftest` → **7 类桩 + 恒真守卫 PASS**。
+
 ### Fixed（r65 补 · `#chart-count` 双主人拆槽 —— 一条"同提交忽绿忽红"的判据红）
 - 整跑 B 轮 `browser_check` 判红而单跑 3/3 绿，折叠行给出决定性差异：
   `after clear: 本机已清除 ｜ 未连服务端…` vs 单跑的 `还没有记录` ⇒ **不是产品抖动，是同一槽两位主人**。

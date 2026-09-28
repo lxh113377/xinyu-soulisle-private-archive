@@ -27,6 +27,7 @@
 """
 import argparse
 import base64
+import hashlib
 import json
 import os
 import re
@@ -274,13 +275,17 @@ def selftest():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--json", default="")
+    ap.add_argument("--json", default="",
+                help="台账输出路径；缺省=当日件（必落盘）。传 '-' 才不落盘，且会印 NOLEDGER 声明读数不得据以改判")
     ap.add_argument("--self-only", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--budget", type=int, default=240,
                 help="联网采集的总秒数上界（默认 240）；到点后剩余仓记 NA(budget-exhausted)，"
                      "不折叠成通过，也不让一次人工轮次挂成无限等")
     a = ap.parse_args()
+    if not a.json:   # r66：旧行为"只印不写"使 stdout 结论与盘上台账可以互相矛盾（我据此误判过一次）
+        a.json = str(ROOT / ("交付物/对标数据/peer-quality-tooling-%s.json"
+                                % time.strftime("%Y-%m-%d")))
     if a.selftest:
         return selftest()
     DEADLINE[0] = time.time() + max(10, a.budget)
@@ -332,7 +337,7 @@ def main():
     print("应测 %d 仓 ｜ 计入分母 %d ｜ BLIND(NA) %d ｜ 恒等式：%s"
           % (len(peers), len(okp), len(blind),
              "OK" if len(okp) + len(blind) == len(peers) else "不成立⇒分母可疑"))
-    if a.json:
+    if a.json and a.json != "-":   # '-' 必须在写之前拦住，否则会落出个名叫 - 的文件（r66 实踩过）
         payload = {"generated_by": "peer_quality_tooling_probe.py",
                    "ceiling": "只出结构化在册证据；不得据此比较代码质量/缺陷率（覆盖率不在取数面内）",
                    "noise_note": "本件 NOISE 故意不滤 tests 目录，否则会把被测对象滤掉",
@@ -343,7 +348,11 @@ def main():
                              "ci": sorted(x) if x else [], "declared": sorted(d), "flag": f,
                              "files": ln} for n, s, c, x, d, f, ln in rows]}
         Path(a.json).write_bytes(json.dumps(payload, ensure_ascii=False, indent=1).encode("utf-8"))
-        print("快照 -> %s" % a.json)
+        raw = Path(a.json).read_bytes()   # 按字节回读：字符串长度口径在 Windows 会少算 CRLF
+        print("快照 -> %s ｜ 台账指纹 sha256=%s bytes=%d"
+              % (a.json, hashlib.sha256(raw).hexdigest()[:16], len(raw)))
+    if a.json == "-":
+        print("QUALITYPEER-NOLEDGER: 本次未落台账 ⇒ stdout 读数不得据以改判（r66 立的逃生门，禁当默认用）")
     return 1 if blind else 0
 
 

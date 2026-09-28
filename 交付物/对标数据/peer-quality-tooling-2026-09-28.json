@@ -3,24 +3,8 @@
  "ceiling": "只出结构化在册证据；不得据此比较代码质量/缺陷率（覆盖率不在取数面内）",
  "noise_note": "本件 NOISE 故意不滤 tests 目录，否则会把被测对象滤掉",
  "peers_expected": 16,
- "counted": 1,
- "na": [
-  "SillyTavern/SillyTavern",
-  "Open-LLM-VTuber/Open-LLM-VTuber",
-  "morettt/my-neuro",
-  "letta-ai/letta",
-  "hello-diana/MASCOT",
-  "ddxfish/sapphire",
-  "v2rockets/Loyal-Elephie",
-  "Rogendo/Mental-health-Chatbot",
-  "Lum1104/MER-Factory",
-  "CheaperjamRen/leemo",
-  "NJX-njx/opensoul",
-  "s-nagaev/chibi",
-  "29-Cu/succhia",
-  "zeroa234/ryza-ai-revive",
-  "Bwcx-songyu/MoodChat"
- ],
+ "counted": 16,
+ "na": [],
  "self": {
   "struct": [
    "java_test_file",
@@ -51,7 +35,7 @@
    ],
    "declared": [],
    "flag": "n/a",
-   "files": 354
+   "files": 372
   },
   {
    "repo": "lobehub/lobehub",
@@ -63,23 +47,35 @@
     "typecheck"
    ],
    "counts": {
-    "js_test_file": 3772
+    "js_test_file": 3783
    },
-   "ci": [],
+   "ci": [
+    "lint",
+    "typecheck",
+    "unit"
+   ],
    "declared": [
     "linter_declared"
    ],
    "flag": "ok",
-   "files": 17536
+   "files": 17568
   },
   {
    "repo": "SillyTavern/SillyTavern",
-   "struct": null,
-   "counts": {},
-   "ci": [],
+   "struct": [
+    "js_test_cfg",
+    "js_test_file",
+    "linter"
+   ],
+   "counts": {
+    "js_test_file": 19
+   },
+   "ci": [
+    "unit"
+   ],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 1010
   },
   {
    "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
@@ -87,26 +83,34 @@
    "counts": {},
    "ci": [],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 253
   },
   {
    "repo": "morettt/my-neuro",
-   "struct": null,
-   "counts": {},
+   "struct": [
+    "js_test_file",
+    "py_test_file"
+   ],
+   "counts": {
+    "js_test_file": 3,
+    "py_test_file": 4
+   },
    "ci": [],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 645
   },
   {
    "repo": "letta-ai/letta",
    "struct": null,
    "counts": {},
    "ci": [],
-   "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "declared": [
+    "typecheck_declared"
+   ],
+   "flag": "ok",
+   "files": 12
   },
   {
    "repo": "hello-diana/MASCOT",
@@ -114,26 +118,34 @@
    "counts": {},
    "ci": [],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 81
   },
   {
    "repo": "ddxfish/sapphire",
-   "struct": null,
-   "counts": {},
+   "struct": [
+    "js_test_file",
+    "py_test_file"
+   ],
+   "counts": {
+    "py_test_file": 379,
+    "js_test_file": 4
+   },
    "ci": [],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 1230
   },
   {
    "repo": "v2rockets/Loyal-Elephie",
-   "struct": null,
+   "struct": [
+    "typecheck"
+   ],
    "counts": {},
    "ci": [],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 124
   },
   {
    "repo": "Rogendo/Mental-health-Chatbot",
@@ -141,44 +153,77 @@
    "counts": {},
    "ci": [],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 10
   },
   {
    "repo": "Lum1104/MER-Factory",
-   "struct": null,
-   "counts": {},
+   "struct": [
+    "py_test_file"
+   ],
+   "counts": {
+    "py_test_file": 2
+   },
    "ci": [],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 158
   },
   {
    "repo": "CheaperjamRen/leemo",
-   "struct": null,
-   "counts": {},
-   "ci": [],
+   "struct": [
+    "js_test_cfg",
+    "js_test_file",
+    "py_test_file",
+    "typecheck"
+   ],
+   "counts": {
+    "js_test_file": 316,
+    "py_test_file": 3
+   },
+   "ci": [
+    "typecheck",
+    "unit"
+   ],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 1518
   },
   {
    "repo": "NJX-njx/opensoul",
-   "struct": null,
-   "counts": {},
-   "ci": [],
-   "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "struct": [
+    "js_test_cfg",
+    "js_test_file",
+    "typecheck"
+   ],
+   "counts": {
+    "js_test_file": 1066
+   },
+   "ci": [
+    "lint",
+    "unit"
+   ],
+   "declared": [
+    "typecheck_declared",
+    "unit_declared"
+   ],
+   "flag": "ok",
+   "files": 6141
   },
   {
    "repo": "s-nagaev/chibi",
-   "struct": null,
-   "counts": {},
-   "ci": [],
+   "struct": [
+    "py_test_file"
+   ],
+   "counts": {
+    "py_test_file": 74
+   },
+   "ci": [
+    "unit"
+   ],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 249
   },
   {
    "repo": "29-Cu/succhia",
@@ -186,8 +231,8 @@
    "counts": {},
    "ci": [],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 7
   },
   {
    "repo": "zeroa234/ryza-ai-revive",
@@ -195,8 +240,8 @@
    "counts": {},
    "ci": [],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 1762
   },
   {
    "repo": "Bwcx-songyu/MoodChat",
@@ -204,8 +249,8 @@
    "counts": {},
    "ci": [],
    "declared": [],
-   "flag": "NA(budget-exhausted)",
-   "files": 0
+   "flag": "ok",
+   "files": 54
   }
  ]
 }
