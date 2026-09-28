@@ -149,7 +149,7 @@
 - `交付物/` — iCAN 评审文档与截图（`iCAN评审/`）、提交包大纲（`提交包/`）
 
 ### 验证与记忆
-- `_test/` — 常驻回归脚本：`browser_check.py`（离线降级链路 + 回滚可见性 + 双色 + 滚动淡入淡出）、`pixel_dual_check.py`（双色像素级三用例）、`lightshow_check.py`、`online_check.py`、`public_check.py`、`emotion_eval.js` + `emotion-eval-dataset.json`（评测集：现 **73 条**，本行旧值 36 条见更正注 r76）+ Java 构建期测试 10 类/62 用例（**在 `server/src/test/java/`，不在 `_test/`**）；`_shots/`（脚本生成的截图，已 ignore）
+- `_test/` — 常驻回归脚本：`browser_check.py`（离线降级链路 + 回滚可见性 + 双色 + 滚动淡入淡出）、`pixel_dual_check.py`（双色像素级三用例）、`lightshow_check.py`、`online_check.py`、`public_check.py`、`emotion_eval.js` + `emotion-eval-dataset.json`（评测集：现 **73 条**，本行旧值 36 条见更正注 r76）+ Java 构建期测试 11 类/82 用例（更正注 r77，2026-09-29：旧值 10 类/62 为 r76 当日数；复算一律用 `python _test/java_test_guard.py`，它现读 `server/src/test/java` 的文件数与 `@Test` 数并报余量）（**在 `server/src/test/java/`，不在 `_test/`**）；`_shots/`（脚本生成的截图，已 ignore）
 - `memory/` — 本项目交接记忆（01–08 + `AGENTS.md` 绑定表 + 阶段基线文件）
 - `archive/` — 阶段归档（`A-project-handoff archive` 产出）
 - `.codebuddy/` — 工作记忆与会话数据（已 ignore，勿删）
@@ -233,7 +233,7 @@
 - **结论**：**按原定方向继续用 Java**，不返工。
   - 支持 Java 的三条真实理由：① 产物干净（fat jar，无需 venv 管理）② 强类型 + 可单测（36 条评测可做成 JUnit，比跑 node 脚本正规）③ 部署不受平台风控挟制（⚠️ 此条与语言无关，Python 容器化同样能做到）
     ⚠️ **第②条曾长期是空头主张（r41 实测更正，2026-09-27）**：从 09-20 立此理由到 09-26，`server/src` 下 JUnit 用例数 = **0**、
-    `pom.xml` 连 junit 依赖都没有 ⇒ 「可单测」是**能力声称**而非**产物**。现已补齐：4 个测试类 / 30 个用例（**更正注 r75，2026-09-28**：现测 `grep -rho @Test server/src/test/java | wc -l` = **32**——r73 给分类器补的 2 条超时/危机短路用例；原文按当日为真保留不改写。**更正注 r76，2026-09-29**：r76 把「36 条评测可做成 JUnit」这句话真正做成产物——`EmotionControllerTest` 在构建期复跑评测集，并当场打出 AC-OBS-09 引用的 `94.4% / 3-3` 已是过期值（现值 73 条 / 98.6% / 6-6）；新增 6 个测试类后现测 = **10 类 / 62 @Test**，jacoco LINE **40.06% → 91.93%**，覆盖率门阈值随之 0.35 → **0.85**（顺序仍是先补测试再改那一行））
+    `pom.xml` 连 junit 依赖都没有 ⇒ 「可单测」是**能力声称**而非**产物**。现已补齐：4 个测试类 / 30 个用例（**更正注 r75，2026-09-28**：现测 `grep -rho @Test server/src/test/java | wc -l` = **32**——r73 给分类器补的 2 条超时/危机短路用例；原文按当日为真保留不改写。**更正注 r76，2026-09-29**：r76 把「36 条评测可做成 JUnit」这句话真正做成产物——`EmotionControllerTest` 在构建期复跑评测集，并当场打出 AC-OBS-09 引用的 `94.4% / 3-3` 已是过期值（现值 73 条 / 98.6% / 6-6）；新增 6 个测试类后现测 = **10 类 / 62 @Test**，jacoco LINE **40.06% → 91.93%**，覆盖率门阈值随之 0.35 → **0.85**（顺序仍是先补测试再改那一行）。**更正注 r77，2026-09-29**：本轮换了一把尺——只量 LINE 的门会骗人，r76 收口时 LINE 91.93% 而**分支只有 83.11%**（一行 `a ? b : c` 记 1 行、却是 2 个分支，而本项目最要命的危机短路/上游回落/鉴权放行全是分支）。补 `LlmProxyTest`（JDK `HttpServer` 回环桩，零新依赖/零公网/零密钥）+ 词表加载器包内 seam + 五个控制器的坏形态用例后：现测 **11 类 / 82 @Test**，LINE **651/666 = 97.75%**（分母 669→666 是删掉 `ChatController` 里实测零调用点的 2 参 `bytes()` 重载 ⇒ **分母缩水，不是覆盖提升**），BRANCH **285/296 = 96.28%**；门随之 LINE 0.85→**0.90** 并**新挂 BRANCH 0.90**，验牙=把 BRANCH 阈值临时改 0.99 ⇒ `rc=1` 且红因点名 `branches covered ratio is 0.96`，按字节还原（sha256 前后同为 `d675b7e4…`）⇒ `rc=0`；剩 11 支未覆盖分支已逐条归类为**不可达/短路边**（`readTree` 永不返回 null 3 支、`payload == null` 2 支、`ofString` 永不返回 null 1 支、`harden()` 被上游守卫挡住 1 支、`||`/`&&` 短路 2 支、删重载后 `safety != null` false 侧 1 支、三元组合 1 支），**不为凑数写反射**）
     （`EmotionLexiconTest`·`EmotionEngineTest`·`EmotionClassifierTest`·`SafetyGuardTest`），并由常驻判据
     `_test/java_test_guard.py` 盯住三件事：用例数下限、`pom` 里 starter-test 在位、**CI 的 java-build 构建步不得带 `-DskipTests`**
     （否则这个门禁会在受理面上静默消失，而本地看到的仍是「CI 全绿」）。复算：`mvn -B -f server/pom.xml test`。

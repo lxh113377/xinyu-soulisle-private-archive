@@ -9,6 +9,40 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Added（r77 · 换尺：只量 LINE 的覆盖率门会放行「三元表达式从没走过另一半」）
+- **本轮做的是 r76 §4 的第 3 条**（"覆盖率下一步不是抬阈值，而是补分支"）。落点：
+  ① 新增 `LlmProxyTest`(9) —— 上游换成 JDK 内置 `com.sun.net.httpserver.HttpServer`（127.0.0.1 + 端口 0），
+  零新增依赖、零公网出口、零密钥；要测的就是"请求怎么拼、响应怎么折"这段真走 socket 的逻辑，
+  把 socket 桩掉等于把被测对象换掉。② `EmotionLexicon` 的 `private static` 降为**包内 seam**
+  （`resolvePath(String,String)` / `readLexicon` / `toStringList`），无参入口仍传 `System.getenv`
+  ⇒ 运行时取值路径一字未改，而 fat jar 与 Docker 各自走的那两条回落腿第一次有了构建期用例。
+  ③ 五个控制器的坏形态补形（顶层 `null`/数组、`temperature` 给字符串、`intensity` 非数字、
+  `items` 写成对象、`createdAt` 有值的一侧）+ 否定窗两侧（`太不开心` vs `不太开心`）。
+- **读数（一律现读 `jacoco.xml` 的 `<report><counter>`，禁逐类求和）**：LINE **615/669 = 91.93% → 651/666 = 97.75%**，
+  BRANCH **246/296 = 83.11% → 285/296 = 96.28%**。⚠️ 分母 669→666 是本轮删掉 `ChatController` 里
+  **实测零调用点**的 2 参 `bytes()` 重载（5 个调用点全走 4 参）⇒ 这是**分母缩水不是覆盖提升**，两侧都列在这。
+  门禁随之 LINE 0.85→**0.90**（余量 7.75 点）并**新挂 BRANCH 0.90**（余量 6.28 点）。
+- **门的牙（两形各一次，改完按字节还原）**：BRANCH 阈值临时 0.99 ⇒ `rc=1` 且红因点名
+  `branches covered ratio is 0.96, but expected minimum is 0.99`；还原 sha256 前后同为 `d675b7e463c24594…` ⇒ `rc=0`。
+- **`java_test_guard.py` 同源升级**：T6 从"随便一个 `<minimum>`"改为**按 counter 配对解析、缺 BRANCH 即判红**
+  （旧写法会读第一个 minimum 就印"LINE 阈值 0.90"，把 BRANCH 那一路删掉它照样 PASS）；
+  下限从 3 件/24 例抬到 **8 件/70 例**（现测 11 件/82 例，余量 3 件/12 例）；
+  新增反例⑫（LINE-only pom）+ 点名E（共用夹具必须全绿，否则其余反例的红无法归因）+ 点名F/G（红因点名 BRANCH），
+  自证 **22/22**。头注里的"四件"随维度增长早已失真，改为"条数以本列表为准，标题不抄数字"。
+- **失败面（同条登记，不许只写成功）**：
+  ① `mvn verify` 第一次 **rc=1**，红因**不是**覆盖率门而是 `repackage: Unable to rename soulisle-server.jar`
+  ——8123 上的演示进程持有该 jar（PID 24208，`wmic process where 'ProcessId=24208' get CommandLine` 取到原文）。
+  归因后走仓内既有通道 `python _test/build_jar.py --restart`（先 stop_holders 再 `clean package`）⇒ `mvn rc=0` +
+  验货 PASS + 重新起服务；密钥仅注入子进程环境、未打印。
+  ② 我的**取数脚本自己造出一条假 drift**：第一版按"逐类求和 + 再加一次 missed"算出 `296/346 = 85.55%`，
+  据此宣称 r76 报告 §4 的 `246/296 = 83.11%` 是过期手抄值——**报告那行是对的，错的是我的尺**。
+  等式自证（`sum(covered)+sum(missed)` 是否等于 counter 属性）改在写报告之前，GM 日志已追加自纠块。
+  ③ G8 锚点第一次写成带尾巴的 `【数据流假设】轮77` ⇒ `dag_precheck` 判 `[GATE:dag-fail] rc=1`，
+  而我把源码写入接在同一条链的 `||` 回退分支后面 ⇒ **门没绿就落了笔**。已按规范重落并通过，
+  时序违规本身写进修正块，不靠"结果后来是绿的"抹掉。
+- **复算**：`mvn -B -ntp -f server/pom.xml test` → 读 `server/target/site/jacoco/jacoco.xml` counter；
+  `python _test/java_test_guard.py [--selftest]`；`python _test/build_jar.py --restart`。
+
 ### Added（r76 · 四个 0% 覆盖类补到构建期 + 覆盖率门 0.35→0.85；新锁当场打出 AC-OBS-09 的过期数字）
 - **本轮做的是 r75 §4 的第 1 步**：补 `/api/emotion`·`/api/memory`·`/api/chat`·`MemoryService` 四类 0% 用例
   （缺口 277/401 行 = 69% 集中在这四张类），顺带把 `/api/health` 与 `ApiTokenFilter` 也从「只有带外验过」
