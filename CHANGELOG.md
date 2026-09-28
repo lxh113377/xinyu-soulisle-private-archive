@@ -9,6 +9,22 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Fixed（r72 · 把台账取数面钉成闸，并补完技能镜像闭环）
+- **G17 新判据**（`_test/repo_config_check.py`，`[推荐:R71-01]` 的机器落点）：对标台账末次 run 的 self 行必须
+  显式带 `self_face="HEAD"`、`regression_suites` 须为正整数、`self_face_errors` 须为空，否则判红。
+  动因是 r71 一手：采集器曾一半走 git、一半 `rglob` 工作树 ⇒ 同一行里 `regression_suites=101`
+  （含并行会话未入库的 2 条）与真值 99 并存、零报错。**差值只印不拦**：CI 无法重跑联网采集刷新台账，
+  拦它就是造一条不可自愈的红。验收：`--selftest` 合成篡改 **56→64 条**（真台账不误伤 + 抹面声明/降级成
+  worktree/面报错仍落账/suites=0/整个 self 行缺失 各自必红），并另做**端到端**三态实测（走读取器不止喂谓词）。
+- **技能侧闭环补完**：r70/r71 我两次改 `A-get-memory/SKILL.md` 权威源却没跑镜像同步与派生件重建（链条断在中间）。
+  本轮补并留回执：`check-skill-mirror.ps1` 先报 `missing=4 mismatch=16`（含 `A-get-memory\SKILL.md`，归属实测），
+  `-Fix` 后复检 `[GATE:mirror-pass] missing=0 mismatch=0`；`build_indexes.py --apply` 守恒 PASS（166 条）；
+  `verify_truth_consistency.py` **34 PASS / 0 FAIL / 0 SKIP**；`disk_registry_diff.py` 漏注册 0/回滚 0/幽灵 0。
+- **他人现场的取证（不代改）**：`handoff.py noise` 共扫出 **36 条 VIOL**，其中在**焚诀**根目录有 **5 个 0 字节散件**（文件名是
+  `处置：…`/`成因：…`/`⚠️` 这类句子片段，mtime 09-28 08:34，早于本会话任何写入 ⇒ 非我所有），
+  形态正是"未加引号 heredoc 被命令替换后把正文当文件名"。**不代改**：该仓实测 `porcelain=242`/`staged=175`
+  ⇒ 入场三闸 G-b 命中（禁 add/rebuild 他人半成品），只登记挂账与复算命令。
+
 ### Fixed（r71 · 台账的取数面换到 git，另把"吞标题"升成阻断判据 R6）
 - **self 行取数面统一 = `git HEAD`**：`_test/benchmark_metrics.py` 的 `self_metrics()` 原先只有 SUITES 走 git，
   src 行数/文件数、判据脚本数、CI job 数、docs/caps 人口都 `rglob` **工作树** ⇒ 两件事被写成"横向现状"：

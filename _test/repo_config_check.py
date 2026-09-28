@@ -40,6 +40,12 @@
   G16 电池脚本 ⇄ `docs/quality-gates.md` 明细双向对账：电池里跑的 `_test/*.py|js` 必须在该文档出现，
      文档写了而 `_test/` 查无此件也算红（r57 实证：该文档被当作"判据清单"读，而 44 条套件里 16 条从未在其中，
      同族根因 M5⑥ 一处清单两处实现；分母从 SUITES 现读，零分母不判绿）
+  G17 对标台账 self 行的**取数面必须显式为 git HEAD**（r72，[推荐:R71-01] 的机器落点）：
+     缺 `self_face` / 值非 HEAD / `self_face_errors` 非空 / `regression_suites` 非正整数 ⇒ 红。
+     动因（r71 一手）：`self_metrics()` 曾一半走 git、一半 `rglob` 工作树，同一行里
+     `regression_suites=101`（含并行会话未入库的 2 条）与真值 99 并存、零报错，
+     台账被下一轮当"横向现状"抄走就追不回责任方。台账记的套件数与 HEAD 现算值的**差值只印不拦**
+     ——CI 里无法重跑联网采集来刷新台账，拦它就是造一条不可自愈的红（违 R-10 进链前三问）
   G13 判据账本自洽：本文件头部登记的 G 清单与 `main()` 里实际执行的 check("G..") 一一对应
      —— 漏登记与幽灵登记都判红（这条由 G13 自己盯着自己，根因见 guard_inventory 的 docstring）
 
@@ -644,12 +650,60 @@ def peer_count_audit(readme_text, truth):
     return bad
 
 
+def head_battery_count():
+    """HEAD 面现算的 SUITES 条目数（只用于**印差值**，不参与判定：
+    拿"台账 ⇄ 当前 HEAD"做阻断会撞 R-10 不可自愈——CI 里没法重跑联网采集来刷新台账。"""
+    try:
+        txt = subprocess.run(["git", "-C", str(ROOT), "show", "HEAD:_test/run_all_suites.py"],
+                             capture_output=True, timeout=60).stdout.decode("utf-8", "replace")
+        seg = txt.split("SUITES = [", 1)[1].split(chr(10) + "]", 1)[0]
+        return len(re.findall(r'^\s*\("', seg, re.M))
+    except Exception:
+        return None
+
+
 def ledger_peer_count():
     p = ROOT / "交付物" / "对标数据" / "benchmark-metrics.json"
     try:
         return int(json.loads(p.read_text("utf-8", errors="replace"))["peers_expected"])
     except Exception:
         return None
+
+
+def ledger_last_self(path=None):
+    """台账末次 run 的 self 行（取不到返回 None，由调用方判红，不得当"没问题"）。"""
+    p = path or (ROOT / "交付物" / "对标数据" / "benchmark-metrics.json")
+    try:
+        runs = json.loads(Path(p).read_text("utf-8", errors="replace"))["runs"]
+        return (runs[-1].get("self") or {}) if runs else None
+    except Exception:
+        return None
+
+
+def ledger_face_problems(last_self):
+    """G17 纯函数：对标台账 self 行的**取数面必须显式声明且必须是 git 面**。
+
+    为什么钉这一格（r71 一手）：`self_metrics()` 曾经一半走 git、一半 `rglob` 工作树，
+    于是同一行里 `regression_suites=101`（工作树：含并行会话未入库的 2 条）与真值 99 并存，
+    看上去完全自洽、零报错 ⇒ 台账一旦被下一轮当"横向现状"抄走，就再也追不回是谁写错的。
+    r72 把它钉成闸（[推荐:R71-01] 的机器落点）。
+    """
+    if not last_self:
+        return ["G17 读不到台账末次 run 的 self 行 ⇒ 无对象可判，不得据此判绿"]
+    bad = []
+    face = last_self.get("self_face")
+    if face is None:
+        bad.append("G17 self 行没有 `self_face` 字段 ⇒ 无法证明它是 git 面（r71 之前的形状，正是事故源）")
+    elif face != "HEAD":
+        bad.append("G17 `self_face=%r` 非 HEAD ⇒ 台账正在把工作树/降级态写成横向现状" % (face,))
+    if last_self.get("regression_suites_face") not in (None, "HEAD"):
+        bad.append("G17 `regression_suites_face=%r` 非 HEAD" % (last_self.get("regression_suites_face"),))
+    if last_self.get("self_face_errors"):
+        bad.append("G17 面取数有错却仍落账：%s ⇒ 禁止静默退回工作树后照常打印" % str(last_self["self_face_errors"])[:80])
+    n = last_self.get("regression_suites")
+    if not isinstance(n, int) or n <= 0:
+        bad.append("G17 `regression_suites=%r` 非正整数 ⇒ 零输入/缺值不得记为已验" % (n,))
+    return bad
 
 
 def pom_version():
@@ -970,6 +1024,28 @@ def selftest():
         bad.append("篡改㉑c（文档引用不存在的判据脚本）未被抓到 ⇒ 反向腿失效")
     if not gate_doc_audit(set(), real_doc, real_disk):
         bad.append("篡改㉑d（分母取空）被判绿 ⇒ 违 R247 零命中不得判绿")
+    # ㉒ G17 台账取数面：正向必须零问题（不误伤真台账），四条负向各自必须红，零输入不得判绿
+    ls_real = ledger_last_self()
+    if ledger_face_problems(ls_real):
+        bad.append("篡改㉒a（当前真实台账）被判红：%s" % ledger_face_problems(ls_real))
+    if ls_real and ls_real.get("self_face") == "HEAD":
+        noface = {k: v for k, v in ls_real.items() if k != "self_face"}
+        if not ledger_face_problems(noface):
+            bad.append("篡改㉒b（抹掉 self_face 字段）未被抓到 ⇒ 面声明缺失可隐形")
+        else:
+            ok_face = ledger_face_problems(dict(ls_real, self_face="HEAD"))
+            if ok_face:
+                bad.append("篡改㉒b 的正面对照失效（合规值也判红，说明这条腿恒真）：%s" % ok_face)
+        if not ledger_face_problems(dict(ls_real, self_face="worktree")):
+            bad.append("篡改㉒c（self_face 改成 worktree）未被抓到 ⇒ 只查字段存在不查值")
+        if not ledger_face_problems(dict(ls_real, self_face_errors="boom")):
+            bad.append("篡改㉒d（面取数报错仍落账）未被抓到 ⇒ 静默降级照样能绿")
+        if not ledger_face_problems(dict(ls_real, regression_suites=0)):
+            bad.append("篡改㉒e（suites 记 0）未被抓到 ⇒ 零输入被判成已验")
+    else:
+        bad.append("篡改㉒前提：真台账 self_face 不是 HEAD 或读不到，㉒b-e 全部未取证")
+    if not ledger_face_problems(None):
+        bad.append("篡改㉒f（整个 self 行缺失）被判绿 ⇒ 无对象可判时不得判绿")
     real = sorted((ROOT / "_test").glob("*.py"))
     viol = [p.name for p in real if import_safety(p.read_text("utf-8", errors="replace"))]
     if viol:
@@ -1032,6 +1108,15 @@ def main():
     g14bad = peer_count_audit(claim_text, ledger_peer_count())
     check("G14 对标仓数断言 == 台账权威值（README 现行状态句）", not g14bad,
           f"台账 peers_expected={ledger_peer_count()} | " + (" ; ".join(g14bad) or "README 断言与台账一致"))
+    # G17（r72，[推荐:R71-01] 的机器落点）：台账 self 行必须显式声明自己取自 git 面
+    lself = ledger_last_self()
+    g17bad = ledger_face_problems(lself)
+    head_now = head_battery_count()
+    led_n = (lself or {}).get("regression_suites")
+    diff_txt = ("差值=%s" % ("?" if (head_now is None or not isinstance(led_n, int)) else led_n - head_now))
+    check("G17 对标台账 self 行的取数面必须显式为 HEAD（禁把工作树态写成现状）", not g17bad,
+          f"self_face={(lself or {}).get('self_face')!r} 台账记 suites={led_n} ｜ HEAD 现算={head_now} ｜ {diff_txt}（差值只报不拦：CI 无法重跑采集来刷新台账） | "
+          + (" ; ".join(g17bad) or "面声明齐"))
     ac_text = _read("memory/08-ac-obs.md")
     acbad = ac_id_audit(ac_text)
     check("G15 AC 追溯键唯一性棘轮（08 一个 id 一条命题，存量基线 %d）" % AC_DUP_BASELINE,
