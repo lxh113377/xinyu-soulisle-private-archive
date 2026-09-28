@@ -7,7 +7,8 @@
   · 整跑并发锁（`acquire_lock`/`lock_state`，TTL 1800s）：电池不可重入，并跑的第二条一律
     `rc=2 未验`——不给绿，也不产出一条无法归因的红。两者均由 `--selftest` 双向自证（11 类桩）。
 """
-import subprocess, sys, io, re
+import os
+import subprocess, sys, io, re, time
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from pathlib import Path
 
@@ -214,13 +215,34 @@ USAGE = """run_all_suites.py — 全量回归电池（SUITES 是条数唯一真�
 KNOWN_FLAGS = {"--list", "--exclude-llm", "--only", "--slice", "--selftest", "--help", "-h"}
 
 
-def lock_state(data, now, ttl, mypid):
+def pid_alive(pid):
+    """锁属主是否还活着。r69 实测：NameError 崩掉的运行不会删锁，
+    而 `lock_state` 原来只看 TTL ⇒ 一个**已经不存在的 pid** 能挡整跑 30 分钟
+    （本轮 pid=18600 存活=0 仍被拦，且它给的绕行提示 `--only` 同样被拦）。
+    探测失败一律按"活着"处理 ⇒ 宁可维持原有的误拦，也不借这条改动放宽锁。
+    """
+    try:
+        if os.name == "nt":
+            import ctypes
+            h = ctypes.windll.kernel32.OpenProcess(0x1000, False, int(pid))
+            if not h:
+                return False
+            ctypes.windll.kernel32.CloseHandle(h)
+            return True
+        os.kill(int(pid), 0)
+        return True
+    except Exception:
+        return True
+
+
+def lock_state(data, now, ttl, mypid, alive=pid_alive):
     """纯函数：判定这把锁该不该拦。返回 (可继续?, 原因)。
 
     判据（宁可放行也不误拦，但**读到别人的活锁必须拒绝**）：
       · 空/不可解析          → 放行（旧版本写的锁或半截写，不能因此卡死回归）
       · pid == 自己         → 放行并接管（同进程重入，或上次没清干净）
       · now - start > ttl   → 放行（陈旧锁：被 kill 掉的运行不会自己删）
+      · 属主 pid 已不存在     → 放行（r69：崩溃残留不该挡后面每一轮）
       · 别人的、且没过期     → 拒绝
     """
     try:
@@ -232,6 +254,8 @@ def lock_state(data, now, ttl, mypid):
         return True, "自己的锁 ⇒ 接管"
     if now - start > ttl:
         return True, "锁已过期 %ds ⇒ 视为陈旧" % int(now - start)
+    if not alive(pid):
+        return True, "锁属主 pid=%d 已不存在 ⇒ 崩溃残留，放行" % pid
     return False, "另一台进程(pid=%d)起于 %ds 前，未到 TTL %ds" % (pid, int(now - start), ttl)
 
 
@@ -241,7 +265,10 @@ def lock_selftest():
         ("正例 空文件放行", lock_state("", 1000.0, LOCK_TTL, 7)[0], True),
         ("正例 自己的锁放行", lock_state("7\t999.0", 1000.0, LOCK_TTL, 7)[0], True),
         ("正例 陈旧锁放行", lock_state("8" + chr(9) + "1.0", 10000.0, LOCK_TTL, 7)[0], True),
-        ("反例 别人的活锁必须拦", lock_state("8\t999.5", 1000.0, LOCK_TTL, 7)[0], False),
+        ("反例 别人的活锁必须拦", lock_state("8\t999.5", 1000.0, LOCK_TTL, 7, alive=lambda pid: True)[0], False),
+        # r69：既有反例原本**读本机 pid 8 是否存活**，加了判活后它会随机器状态翻面
+        #（夹具读机器状态＝一条可能在别人机器上永远绿/永远红的用例）⇒ 两边都注入。
+        ("r69 正例 属主已死的锁必须放行", lock_state("8\t999.5", 1000.0, LOCK_TTL, 7, alive=lambda pid: False)[0], True),
         ("边界 半截内容不得判拦", lock_state("garbage", 1000.0, LOCK_TTL, 7)[0], True),
         ("边界 零输入不得判绿成脏", lock_state("\t", 1000.0, LOCK_TTL, 7)[0], True),
     ]
@@ -356,7 +383,7 @@ def acquire_lock():
             data = ""
         ok, why = lock_state(data, now, LOCK_TTL, os.getpid())
         if not ok:
-            return path, "BATTERY-UNVERIFIED(并发): " + why + " ｜ 要并跑请改目录或用 --only 子集"
+            return path, "BATTERY-UNVERIFIED(并发): " + why + " ｜ 属主若已死会被自动放行；仍活着请等 TTL 或换目录跑（`--only` 同样受此锁约束）"
     path.write_bytes(("%d\t%.3f" % (os.getpid(), now)).encode("utf-8"))
     return path, None
 
@@ -429,9 +456,12 @@ def main():
 
     results = []
     blurbs = {}
+    times = {}   # r69：此前不记每套件耗时 ⇒ "先出耗时分布再谈并行"根本取不到读数
     for name, cmd in SUITES:
+        t0 = time.monotonic()
         p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=600)
+        times[name] = round(time.monotonic() - t0, 1)
         tail = (p.stdout or "").strip().splitlines()
         # 聚合器只留最后一行 ⇒ 判据说 FAIL 却答不出"哪一条 FAIL"，等于没判（r28 CI 实测踩到）。
         # 现在：rc≠0 时把该套件的 FAIL/🔴/异常行原样带出来；成功仍是一行，不制造噪声。
@@ -446,7 +476,7 @@ def main():
                     tail[-1] if tail else "")
         blurbs[name] = line + " " + " ".join(detail) + " " + (p.stderr or "")
         results.append((name, p.returncode, (line[:110] if tail else (p.stderr or "").strip()[:110])))
-        print(f"{name:22s} rc={p.returncode} | {results[-1][2]}")
+        print(f"{name:22s} rc={p.returncode} {times[name]:>5.1f}s | {results[-1][2]}")
         for d in detail:
             print(" " * 25 + "· " + d)
 
@@ -473,6 +503,9 @@ def main():
                      + ",".join(quota))
     tail_msg = "ALL-GREEN" if not parts else "  |  ".join(parts)
     print("=" * 60)
+    top = sorted(times.items(), key=lambda kv: -kv[1])[:5]
+    print("耗时 top5(秒): %s ｜ 合计 %.0fs ⇒ 并行方案只能在这个读数存在之后才提"
+          % (", ".join("%s=%s" % (k, v) for k, v in top), sum(times.values())))
     print(f"BATTERY: {len(results) - len(bad)}/{len(results)} rc=0", tail_msg)
     try:
         lock.unlink()
