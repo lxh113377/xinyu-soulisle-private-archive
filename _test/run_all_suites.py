@@ -180,6 +180,10 @@ SUITES = [
     ("api_egress_headers_selftest", [sys.executable, "_test/api_egress_headers_check.py", "--selftest"]),
     # r60 持久层异常面：memory-store 8 处 try/catch 从没被走过一遍（47 条判据零覆盖）。
     # 五种存储故障 × 四条断言，F4 那条当场抓出"清除后界面计数不刷新"的真缺陷。
+    # r67：JS 语法面从"没人量"变成有守卫。加它不是因为 peers 有 lint（实测仅 2/16），
+    # 而是因为此前 src/js 的 parse 错只能被浏览器判据间接发现，报出来是"断言超时"而不是文件名。
+    ("js_syntax", [sys.executable, "_test/js_syntax_check.py"]),
+    ("js_syntax_selftest", [sys.executable, "_test/js_syntax_check.py", "--selftest"]),
     ("storage_resilience", [sys.executable, "_test/storage_resilience_check.py"]),
     ("storage_resilience_selftest", [sys.executable, "_test/storage_resilience_check.py", "--selftest"]),
 ]

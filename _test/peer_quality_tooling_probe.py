@@ -239,6 +239,16 @@ STUBS = [
 ]
 
 
+def row_shape(s):
+    """rows[].struct 的唯一形状出口（r67 拆两态）。
+
+    `None` = 该仓**没测到**（取数失败/预算内停取）；`[]` = **测到了但零命中**。
+    旧写法 `sorted(s) if s else None` 把两者折叠成同一个 null ⇒ 只看 struct 的读者
+    会把"零命中"读成"盲区"或反之，只能靠 flag 兜（r66 报告 G3）。
+    """
+    return None if s is None else sorted(s)
+
+
 def selftest():
     bad = []
     for name, paths, want_keys, want_count in STUBS:
@@ -267,6 +277,15 @@ def selftest():
         bad.append("声明面：期望 linter,unit 实得 %s" % sorted(doc))
     if classify_readme("we ship the type of thing ajest never sees"):
         bad.append("声明面误伤：裸子串 ajest/type 被当成声明")
+    # r67 两态形状：未测与"测到零命中"必须可分，且各有一专属反例
+    if row_shape({}) != []:
+        bad.append("两态折叠复发：测到但零命中的 struct 必须是 []，实得 %r ⇒ 又变回一个 null 表示两件事" % (row_shape({}),))
+    if row_shape(None) is not None:
+        bad.append("未测态被写成非 null：%r ⇒ NA 与零命中重新同形" % (row_shape(None),))
+    if row_shape({"b", "a"}) != ["a", "b"]:
+        bad.append("命中态未排序或形状改变：%r" % (row_shape({"b", "a"}),))
+    if json.dumps({"s": row_shape({})}) == json.dumps({"s": row_shape(None)}):
+        bad.append("序列化后两态同文 ⇒ 台账读者无从区分，判未闭环")
     if classify_tree(["node_modules/jest/bin/jest.js"])[0]:
         bad.append("判据恒真：依赖目录里的 jest 仍被计入 ⇒ NOISE 失效")
     print("QUALITYPEER-SELFTEST-%s（%d 类桩 + 恒真守卫）" % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(STUBS)))
@@ -344,7 +363,7 @@ def main():
                    "peers_expected": len(peers), "counted": len(okp), "na": blind,
                    "self": {"struct": sorted(rows[0][1]), "test_counts": rows[0][2],
                             "ci_steps": sorted(rows[0][3]), "declared": sorted(rows[0][4])},
-                   "rows": [{"repo": n, "struct": sorted(s) if s else None, "counts": c,
+                   "rows": [{"repo": n, "struct": row_shape(s), "counts": c,
                              "ci": sorted(x) if x else [], "declared": sorted(d), "flag": f,
                              "files": ln} for n, s, c, x, d, f, ln in rows]}
         Path(a.json).write_bytes(json.dumps(payload, ensure_ascii=False, indent=1).encode("utf-8"))

@@ -88,7 +88,9 @@ python _test/api_egress_headers_check.py                  # r59 函数出口面�
 python _test/api_egress_headers_check.py --selftest       # r59 判据桩：7 腿（正例／摘 CSP／摘 no-store／缺出口／状态码漂移／错误体漂移／SSE 语义被换）；首跑即抓到"没发 stream:true 导致 SSE 腿空转"
 python _test/storage_resilience_check.py                 # r60 持久层异常面：真开浏览器注 storage 禁用/内容损坏/配额写满/删不掉 四类故障 + 对照组，断"零未捕获异常／界面计数==数据源／星雾仍点亮／清空回执如实"
 python _test/storage_resilience_check.py --selftest      # r60 判据桩：10 腿（合规正例不假红 + 六形必红 + 坏页端到端真崩 + 零读数不判绿）
-python _test/peer_quality_tooling_probe.py   # r58 对标探针：lint／类型／单元可测性／CI 执行位（16 仓 + self，双通道）
+python _test/js_syntax_check.py                     # r67 JS 语法面：src/js 与 deploy/xinyu/js 双份逐文件 node --check（覆盖面=可解析性；不覆盖面=风格/未定义变量/lint 规则）
+python _test/js_syntax_check.py --selftest           # r67 判据桩：5 腿（坏文件点名 + 未闭合字符串 + 合规正例不假红 + 零输入不判绿 + 枚举下限防 FACES 拼错静默少测）
+python _test/peer_quality_tooling_probe.py   # r58 对标探针：lint／类型／单元可测性／CI 执行位（16 仓 + self，双通道）；r66 修「只印不写」＋r67 拆 struct 两态：null=未测、[]=测到零命中）
 python _test/peer_quality_tooling_probe.py --selftest  # r58 探针桩：7 类桩 + 恒真守卫（含「NOISE 不得滤掉 tests 目录」反例）
 ```
 

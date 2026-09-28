@@ -16,7 +16,7 @@
 ### 前端（零构建纯静态，无打包器 / 无 node_modules）
 - Three.js（`src/vendor/three.min.js` 本地 vendor）+ 自写 `ShaderMaterial`（逐粒子 `aSize`，暗星 0.05 / 点亮 0.26）
 - GSAP + ScrollTrigger（`src/vendor/gsap.min.js`、`src/vendor/ScrollTrigger.min.js` 本地 vendor）
-- 原生 ES Module JS，无框架；Canvas 2D 情绪曲线；Web Speech API（zh-CN）语音输入
+- 经典脚本 JS（`window.X` 挂载；r67 实测更正"ES Module"误称），无框架；Canvas 2D 情绪曲线；Web Speech API（zh-CN）语音输入
 - 本机持久化：`localStorage`（键 `peiliao.history.v1`）
 - 降级：WebGL 不可用 → CSS 渐变；在线 LLM 不可用 → 离线模板（界面明示模式，禁伪装在线）
 
@@ -150,7 +150,7 @@
 - 红线：**密钥零落前端、零入库**；`deploy/xinyu/js/demo-config.js` 是公网零密钥代理版，禁止被 `src/js/demo-config.js`（含 Key，已 ignore）覆盖
 
 ## 运行时要求
-- 前端：现代浏览器（WebGL2 + ES Module）；无 WebGL 时降级 CSS 渐变
+- 前端：现代浏览器（WebGL2 + 经典 script 标签）；无 WebGL 时降级 CSS 渐变
 - v2 服务端：JDK 17+；MySQL 8（或 H2 演示模式）；需出网访问 `api.deepseek.com`
 
 ---

@@ -35,7 +35,7 @@
    ],
    "declared": [],
    "flag": "n/a",
-   "files": 372
+   "files": 373
   },
   {
    "repo": "lobehub/lobehub",
@@ -79,7 +79,7 @@
   },
   {
    "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
-   "struct": null,
+   "struct": [],
    "counts": {},
    "ci": [],
    "declared": [],
@@ -103,7 +103,7 @@
   },
   {
    "repo": "letta-ai/letta",
-   "struct": null,
+   "struct": [],
    "counts": {},
    "ci": [],
    "declared": [
@@ -114,7 +114,7 @@
   },
   {
    "repo": "hello-diana/MASCOT",
-   "struct": null,
+   "struct": [],
    "counts": {},
    "ci": [],
    "declared": [],
@@ -149,7 +149,7 @@
   },
   {
    "repo": "Rogendo/Mental-health-Chatbot",
-   "struct": null,
+   "struct": [],
    "counts": {},
    "ci": [],
    "declared": [],
@@ -227,7 +227,7 @@
   },
   {
    "repo": "29-Cu/succhia",
-   "struct": null,
+   "struct": [],
    "counts": {},
    "ci": [],
    "declared": [],
@@ -236,7 +236,7 @@
   },
   {
    "repo": "zeroa234/ryza-ai-revive",
-   "struct": null,
+   "struct": [],
    "counts": {},
    "ci": [],
    "declared": [],
@@ -245,7 +245,7 @@
   },
   {
    "repo": "Bwcx-songyu/MoodChat",
-   "struct": null,
+   "struct": [],
    "counts": {},
    "ci": [],
    "declared": [],

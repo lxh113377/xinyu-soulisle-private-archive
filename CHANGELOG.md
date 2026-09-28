@@ -9,6 +9,34 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Added / Fixed（r67 · 两态形状 + JS 语法面入账）
+- **拆 `rows[].struct` 两态**（探针）：旧写法 `sorted(s) if s else None` 把「没测到」与「测到但零命中」
+  折叠成同一个 `null` ⇒ 只看 struct 的读者两种情况读不出区别（r66 报告 G3）。现由唯一出口
+  `row_shape()` 分开：`null`=未测、`[]`=测到零命中。真面立刻改写了可声明的事实：
+  **16 仓里 7 仓是"测到了但零命中"**（此前与盲区同形，只能靠 flag 兜）。
+  反例腿 4 条挂进 `--selftest`（5 类桩仍 PASS）；**变异对照**＝把唯一出口换回旧折叠写法
+  （即 r66 之前盘上真实存在的那一行）→ `SELFTEST-FAIL 两态折叠复发…实得 None`，
+  且变异只打 `_test/` 内副本（第一次打在临时目录时红在 `ModuleNotFoundError`——环境错不是判据红，
+  那条对照不作数，已按"夹具必须落在被保护分支的输入面内"重做），真实源跑前跑后 sha 相等。
+- **新增 JS 语法守卫** `_test/js_syntax_check.py`：`src/js` 与 `deploy/xinyu/js` **双份**逐文件
+  `node --check`，实测两面 28 个文件全过。此前 97 道电池里**没有任何**静态语法判据
+  （`grep -l "node --check" _test/*` = 0 命中），src/js 的 parse 错只能被浏览器判据**间接**发现，
+  报出来是"某断言超时"而不是"哪个文件第几行"。
+  ⚠️ **口径钉死**：覆盖面=语法与严格模式可解析性；**不覆盖面**=风格/未定义变量/lint 规则。
+  门面行逐字携带这句话，防止后来人把它读成"linter 已就位"。三态退出码 0/1/2，node 不可用记
+  UNVERIFIED（不记通过）；桩 5 腿含"枚举下限"（FACES 拼错会静默少测）。
+- 两处消费者同批改（`repo_config` G16 当场拦下第一次漏改）：SUITES 97→**99** ＋ README 声称条数
+  ＋ `docs/quality-gates.md` 明细行；改完 `REPO-CONFIG-PASS` 14 条。
+- **文档与代码不符（r67 为新判据取证时抓到）**：`README.md`／`AGENTS.md`／`memory/03-tech-stack.md`
+  共 5 处把前端写成「原生 ES Module」，而实测 `grep -lE "^\s*(import|export)\s" src/js/*.js` → **0 文件**、
+  `grep -c 'type="module"' src/index.html` → **0** ⇒ 代码是 `window.X = (function(){…})()` **经典脚本**。
+  这不是措辞问题：若按 ESM 解释，本轮新增的 `node --check *.js` 会把合法文件判红。已改正 5 处，
+  旧措辞以引号留在更正句内留痕（不静默删）。反向对照：`node --check` 一个含 `import` 的 `.mjs` → rc=0
+  ⇒ 工具支持 ESM 目标，坏的是文档口径。
+
+- 修自己的打印崩：`Path.relative_to(ROOT)` 对 selftest 的仓外临时件抛 `ValueError` ⇒ selftest
+  曾经 rc=0 是因为我把管道尾的 `tail` 退出码当成了 python 的（本仓在册「退出码死在管道里」当场复现）。
+
 ### Fixed（r66 · 修掉一条「只印不写」的取证通道，并把我自己写错的结论改判回来）
 - **上一轮的错误**：r65 我曾把「`peer_quality_tooling_probe --budget 240` 使 counted=1」的根因
   判为**已否证**，理由是自己用 `--budget 1400` 重跑仍是 1/16。那次读到的 `counted=1` 其实是
