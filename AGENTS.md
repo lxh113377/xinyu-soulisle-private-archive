@@ -233,7 +233,7 @@
 - **结论**：**按原定方向继续用 Java**，不返工。
   - 支持 Java 的三条真实理由：① 产物干净（fat jar，无需 venv 管理）② 强类型 + 可单测（36 条评测可做成 JUnit，比跑 node 脚本正规）③ 部署不受平台风控挟制（⚠️ 此条与语言无关，Python 容器化同样能做到）
     ⚠️ **第②条曾长期是空头主张（r41 实测更正，2026-09-27）**：从 09-20 立此理由到 09-26，`server/src` 下 JUnit 用例数 = **0**、
-    `pom.xml` 连 junit 依赖都没有 ⇒ 「可单测」是**能力声称**而非**产物**。现已补齐：4 个测试类 / 30 个用例
+    `pom.xml` 连 junit 依赖都没有 ⇒ 「可单测」是**能力声称**而非**产物**。现已补齐：4 个测试类 / 30 个用例（**更正注 r75，2026-09-28**：现测 `grep -rho @Test server/src/test/java | wc -l` = **32**——r73 给分类器补的 2 条超时/危机短路用例；原文按当日为真保留不改写）
     （`EmotionLexiconTest`·`EmotionEngineTest`·`EmotionClassifierTest`·`SafetyGuardTest`），并由常驻判据
     `_test/java_test_guard.py` 盯住三件事：用例数下限、`pom` 里 starter-test 在位、**CI 的 java-build 构建步不得带 `-DskipTests`**
     （否则这个门禁会在受理面上静默消失，而本地看到的仍是「CI 全绿」）。复算：`mvn -B -f server/pom.xml test`。
