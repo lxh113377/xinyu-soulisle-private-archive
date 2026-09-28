@@ -140,9 +140,9 @@ def main():
             pg.locator("#btn-clear").scroll_into_view_if_needed()
             pg.wait_for_timeout(600)
             pg.locator("#btn-clear").click(timeout=15000)
-            pg.wait_for_function("() => { const e=document.getElementById('chart-count');"
+            pg.wait_for_function("() => { const e=document.getElementById('chart-receipt');"
                                  "return /复核|失败|未连服务端/.test(e.textContent); }", timeout=20000)
-            rcpt = pg.locator("#chart-count").inner_text()
+            rcpt = pg.locator("#chart-receipt").inner_text()
             check("D2b 清除回执写明服务端删了几条并复核", "复核为 0" in rcpt and "服务端已删" in rcpt,
                   rcpt[:88])
             st2 = stats("r44-probe")

@@ -22,6 +22,11 @@
   F4 挂起不返回 ⇒ 必须在 **≤ 25s** 内出现兜底（不是"最终会好"，是"多快好"）
   F5 故障后一次成功 ⇒ 徽章必须**翻回**在线（否则我只是把开关焊死在另一个方向）
   F6 全程 pageerror 必须为 0（降级路径自己崩了是最坏形态）
+  F7 半开流（**响应头已到、体永不发**）⇒ 同样吃 25s 预算。它与 F4 的区别就是缺陷本体：
+     黑洞不回任何字节，首包定时器管得住；头一旦到达，旧实现的定时器即被解除，
+     此后 readSSE/res.json() 完全无界（r64 实测：界面永停「正在感受」、徽章谎称在线、该句静默丢失）。
+     首次真跑曾被**自己的夹具**骗过一遍（跨源缺 CORS 头 ⇒ 浏览器 4ms 就 Failed to fetch），
+     故本文件把"夹具真打到了那条路径"写成硬前置：见 half_open_stream 文档与 hit_count 纪律。
 ⚠️ 取数纪律：每条 case 都带 `hit_count`（注入通道被打到几次）。
    **`hit_count==0` 时该 case 判 INVALID 而不是 PASS** —— r51 首版探针用了不存在的 `#chat-send`，
    消息根本没发出去，却报出"0.0s 恢复、无异常"的漂亮假读数（无效夹具第 6 次，见 selftest 边界 B）。
@@ -44,9 +49,13 @@ HANG_BUDGET_S = 25.0          # F4：挂起型兜底上界。修前 60.6s → r5
 FINGERPRINT = "先坐下歇会儿"      # recover 用例的正对照指纹（必须出现在 GOOD_BODY 里）
 GOOD_BODY = ('{"choices":[{"message":{"content":"听起来今天真的把你累坏了，先坐下歇会儿。"}}],'
              '"usage":{}}')
-CASES = ("http500", "garbage", "abort", "hang", "recover")
+CASES = ("http500", "garbage", "abort", "hang", "stalled_stream", "recover")
 CFG_KEY = "peiliao.cfg.v1"          # 与 src/js/chat-agent.js 同源，改键必须两处同改
 HANG_WAIT_S = HANG_BUDGET_S + 14.0  # 黑洞用例的等待窗（客户端 15s 超时 ⇒ 25s 预算内应见兜底）
+# r65：半开流与黑洞**共用同一条 25s 兜底预算**（不另立第二把尺：两者对用户是同一件事——"等多久"）。
+# 实测两条路径的构成不同但同界：黑洞 = classify 腿 6s + reply 腿 15s；
+# 半开流 = classify 腿落到 BODY_IDLE_MS 6s + reply 腿首包 15s。
+LOCAL_INJECT = ("hang", "stalled_stream")   # 这两类走真 socket，不经 route 回调（见 black_hole 文档）
 
 
 def black_hole():
@@ -92,6 +101,67 @@ def black_hole():
     return srv, port, box
 
 
+def half_open_stream():
+    """半开流：**响应头正常返回**，随后一个字节体都不发且连接不关。
+
+    与 black_hole() 的分工（这条分工就是缺陷本体）：黑洞 accept 后不回任何字节 ⇒ 客户端的
+    `await fetch()` 永不 resolve ⇒ **首包**超时管得住它。本注入器故意让 fetch() 立刻成功，
+    于是"定时器在响应头到达时就被解除"的写法完全失效 —— 只有覆盖**响应体**的看门狗拦得住。
+    r64 hunt 抓到的正是这一类，而当时 F4 全绿：不是判据松了，是它压根没测这条路径。
+    """
+    import socket
+    import threading
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(16)
+    port, box = srv.getsockname()[1], {"n": 0, "conn": 0}
+    # ⚠️ 夹具坑（r65 一手，首次真跑被自己骗过一次）：注入器是**跨源**端口，浏览器对
+    #    `Content-Type: application/json` 的 POST 先发 OPTIONS 预检；响应缺 CORS 头时
+    #    Chromium 4ms 就抛 `TypeError: Failed to fetch` ⇒ 客户端"快速降级"，半开流根本没被测到，
+    #    未修版照样判 PASS。黑洞注入器之所以没暴露这条，是因为它**一个字节都不回**，
+    #    CORS 评估永不发生。判据的牙齿取决于夹具是否真打到了那条路径——先证夹具再下结论。
+    pre = (b"HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\n"
+           b"Access-Control-Allow-Methods: POST, OPTIONS\r\n"
+           b"Access-Control-Allow-Headers: Content-Type\r\nAccess-Control-Max-Age: 600\r\n\r\n")
+    hdr = (b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\n"
+           b"Access-Control-Allow-Origin: *\r\nTransfer-Encoding: chunked\r\n\r\n")
+
+    def loop():
+        while True:
+            try:
+                c, _ = srv.accept()
+            except Exception:
+                return
+            box["conn"] += 1
+
+            def serve(conn):
+                conn.settimeout(None)
+                try:
+                    buf = b""
+                    while True:
+                        d = conn.recv(65536)
+                        if not d:
+                            return
+                        buf += d
+                        while b"\r\n\r\n" in buf:
+                            head, buf = buf.split(b"\r\n\r\n", 1)
+                            if head.startswith(b"OPTIONS"):
+                                conn.sendall(pre)          # 放行预检，连接继续留着
+                                continue
+                            box["n"] += 1                  # 只数 POST：与 black_hole 同一计数口径
+                            conn.sendall(hdr)              # 头给足，让 await fetch() resolve
+                            time.sleep(600)                # 体永不发，也不关连接 = 半开
+                except Exception:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            threading.Thread(target=serve, args=(c,), daemon=True).start()
+    threading.Thread(target=loop, daemon=True).start()
+    return srv, port, box
+
+
 def js_state():
     return """() => {
       const msgs=[...document.querySelectorAll('#chat-log > *')];
@@ -128,6 +198,11 @@ def assess(cases):
             bad.append("F1-F4 %s：输入框停在 disabled，用户无法继续" % k)
         if k == "hang" and (c.get("settled_s") is None or c["settled_s"] > HANG_BUDGET_S):
             bad.append("F4 hang：兜底耗时 %s > %.0fs 预算（现场等于死掉）"
+                       % (c.get("settled_s"), HANG_BUDGET_S))
+        if k == "stalled_stream" and (c.get("settled_s") is None
+                                      or c["settled_s"] > HANG_BUDGET_S):
+            bad.append("F7 stalled_stream：响应头已到、体停滞 ⇒ 兜底耗时 %s（预算 %.0fs）。"
+                       "首包定时器在头到达时就解除了，这一类只有覆盖响应体的看门狗拦得住"
                        % (c.get("settled_s"), HANG_BUDGET_S))
     rec = [c for c in cases if c.get("kind") == "recover"]
     if not rec:
@@ -215,13 +290,16 @@ def run(base):
                 pg.route(u, handler)
             rec = {"kind": mode}
             hole = None
-            if mode == "hang":
-                hole = black_hole()
+            if mode in LOCAL_INJECT:
+                hole = black_hole() if mode == "hang" else half_open_stream()
+                # stream 位按用例分岔：黑洞测"对端理不理我"（整包即可）；
+                # 半开流必须**走流式**才进得来 readSSE —— 那才是 r64 卡死的那条腿。
+                st = "false" if mode == "hang" else "true"
                 # 分相计时（r52 归因用）：把每次 fetch 的**发出时刻**记在页面内，
                 # 于是"总耗时里多出来的那一段"要么落到某条腿上，要么当场承认没归因。
                 pg.add_init_script(
                     "try{localStorage.setItem('%s',JSON.stringify({proxy:'http://127.0.0.1:%d/',"
-                    "stream:false}))}catch(e){}" % (CFG_KEY, hole[1]))
+                    "stream:%s}))}catch(e){}" % (CFG_KEY, hole[1], st))
                 pg.add_init_script(
                     "window.__PH={calls:[]};"
                     "const _f=window.fetch;"
@@ -311,6 +389,17 @@ def selftest():
                                   "disabled": False, "timeout_s": 15.0, "phases": [[180, "/api/"]],
                                   "badge": "● 大模型暂不可用（已降级本机模板）",
                                   "last": "离线共情模板", "errors": []}, dict(good["recover"])], True),
+        # F7（r65）：半开流——头到了、体永不到。修前形状是**永远不收敛**（settled=None），
+        # 而 F4 对它是绿的（黑洞注入器压根不触发这条路径），所以必须单列一类故障。
+        ("反例⑨：stalled_stream 永不收敛（r64 修前真实形状：界面停在「正在感受」）",
+         [dict(good["http500"]), {"kind": "stalled_stream", "hit_count": 2, "settled_s": None,
+                                  "disabled": False, "badge": "● 在线 AI",
+                                  "last": "心屿正在感受你的话…", "errors": []},
+          dict(good["recover"])], True),
+        ("正例③：stalled_stream 21.4s 收敛并如实降级",
+         [dict(good["http500"]), {"kind": "stalled_stream", "hit_count": 2, "settled_s": 21.4,
+                                  "disabled": False, "badge": "● 大模型暂不可用（已降级本机模板）",
+                                  "last": "离线共情模板", "errors": []}, dict(good["recover"])], False),
     ]
     for name, cs, want in cases:
         bad, _s = assess(cs)

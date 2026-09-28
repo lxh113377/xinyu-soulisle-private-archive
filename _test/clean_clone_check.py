@@ -137,7 +137,11 @@ def main():
         old_cwd = os.getcwd()
         os.chdir(str(web))
         try:
-            with socketserver.TCPServer(("127.0.0.1", port), Quiet) as httpd:
+            # 线程化托管：单线程 TCPServer 会把浏览器并发的 6 条连接串成队列，
+            # 是"哪两个 js 恰好报失败"这种**不可归因抖动**的候选源之一（r65 先摘掉变量再归因）。
+            httpd_cls = socketserver.ThreadingTCPServer
+            httpd_cls.daemon_threads = True
+            with httpd_cls(("127.0.0.1", port), Quiet) as httpd:
                 threading.Thread(target=httpd.serve_forever, daemon=True).start()
                 try:
                     from playwright.sync_api import sync_playwright
@@ -153,9 +157,13 @@ def main():
                         return 2
                     pg = b.new_page(viewport={"width": 1280, "height": 860})
                     errs, failed = [], []
+                    failed_why = []   # r65：原实现只留 URL 末段，把 `failure` 原因丢了 ⇒
+                    # 良性中止与真缺件在证据上不可分（同族：测量须带状态码）。C4 判红时必须能自证是哪一类。
                     pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
                     pg.on("pageerror", lambda e: errs.append("PAGEERROR: " + str(e)))
-                    pg.on("requestfailed", lambda x: failed.append(x.url.split("/")[-1]))
+                    pg.on("requestfailed", lambda x: (failed.append(x.url.split("/")[-1]),
+                                                      failed_why.append("%s<-%s" % (
+                                                          x.url.split("/")[-1], x.failure))))
                     resp = pg.goto("http://127.0.0.1:%d/index.html" % port,
                                    wait_until="networkidle")
                     pg.wait_for_timeout(2500)
@@ -183,8 +191,8 @@ def main():
 
                     hits, unknown, unknown_req = classify_errors(errs, failed)
                     check("C4 报错必须 ⊆ 已知缺口（新面孔即红）", not unknown and not unknown_req,
-                          "未解释 console %d 条 %s；未登记失败请求 %s"
-                          % (len(unknown), unknown[:1], unknown_req[:2]))
+                          "未解释 console %d 条 %s；未登记失败请求 %s；失败原因 %s"
+                          % (len(unknown), unknown[:1], unknown_req[:2], failed_why[:4]))
                     closed = [g for g, c in hits.items() if c == 0]
                     check("C5 已知缺口不得变成永久豁免", not closed,
                           "登记 %d 条，实测命中 %s%s"

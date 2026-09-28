@@ -212,7 +212,7 @@ def probe_case(browser, case, fault, click_clear):
             # 完成信号 = 回执离开「正在清除…」。15s 内没离开就是**没测到**，记 harness_error，
             # 绝不允许把"还在进行中"读成"报失败了"或"报成功了"。
             res["receipt"] = settle(page, """() => {
-                const el = document.getElementById('chart-count');
+                const el = document.getElementById('chart-receipt');
                 const t = el ? (el.textContent || '') : '';
                 return (t && t.indexOf('正在清除') !== 0) ? t : ''; }""")
             if not (res.get("receipt") or "").strip():

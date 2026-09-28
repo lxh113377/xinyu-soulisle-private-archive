@@ -38,7 +38,7 @@ window.DataRights = (function () {
   function init(hooks) {
     const h = hooks || {};
     syncDisclosure();
-    const count = el("chart-count");
+    const count = el("chart-receipt");
     const say = function (t) { if (count) count.textContent = t; };
     const btnClear = el("btn-clear");
     if (btnClear) btnClear.addEventListener("click", function () {

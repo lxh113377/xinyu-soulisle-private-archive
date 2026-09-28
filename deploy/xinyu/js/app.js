@@ -13,7 +13,8 @@
   // 2) 滚动叙事
   window.ScrollStory.init(
     (t) => { if (gl) window.ThreeScene.setScrollProgress(t); },
-    (act) => { if (act === 4) window.Chart.render(); }
+    // r61 遮挡：见 CHANGELOG
+    (act) => { if (act === 4) { window.Chart.render(); if (dockOpen()) setDock(false); } }
   );
 
   // 3) 引擎徽章
@@ -145,12 +146,13 @@
   });
 
   // 底部对话坞折叠：点标题按钮切换；点叙事区自动收起（避免坞长期遮住幕内按钮）
+  const dockOpen = () => $("#chat-dock").classList.contains("open");
   function setDock(open) {
     $("#chat-dock").classList.toggle("open", open);
     $("#btn-dock").textContent = open ? "收起 ▾" : "展开 ▴";
     $("#btn-dock").setAttribute("aria-expanded", String(open));
   }
-  $("#btn-dock").addEventListener("click", () => setDock(!$("#chat-dock").classList.contains("open")));
+  $("#btn-dock").addEventListener("click", () => setDock(!dockOpen()));
   $("#story").addEventListener("click", (e) => { if (!e.target.closest("#chat-dock")) setDock(false); });
 
   // 5) 对话（刷新后恢复历史，多轮上下文不丢）
@@ -225,8 +227,7 @@
     const pr = document.getElementById('probe-result');
     if (pr) pr.textContent = '星星已熄灭 —— 再和它说一句话，星雾会重新亮起来。';
   }, afterClear: function () {
-    // 只刷计数；勿调 Chart.render()（#chart-count 双主人，回执会被覆成「还没有记录」）
-    syncStars();
+    syncStars(); window.Chart.render();   // r65 拆槽后条数与回执不再同槽互覆
   } });
 
   // 7) 情绪曲线：r25 外提到 `src/js/chart.js`（行为零改动；判据=browser_check 的曲线计数断言）

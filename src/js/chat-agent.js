@@ -33,27 +33,25 @@ window.ChatAgent = (function () {
   function isOnline() { const c = cfg(); return !!c.proxy || !!(c.base && c.key && c.model); }
 
   /* 统一 LLM 请求：proxy 模式走同源 /api/chat（密钥在云端 Function）；否则前端直连（本地演示）。
-   * ⚠️ r51 故障注入实测：原 60s 在"上游挂起不返回"时让界面**空转 60,604ms 才降级**
-   *（气泡里那行 latency 就是它自己印的），而演示现场一分钟空转等于演示失败。
-   * 该 timer 只在 `await fetch()` 之前生效（响应头一到就 clearTimeout），
-   * 所以它约束的恰好是"对端多久之内理我"，不影响已经开始流式输出的长回答
-   * ⇒ 降到 15s：DeepSeek 正常首包 <5s，15s 已留 3 倍余量，且远小于 Java 侧 LlmProxy 的 60s。 */
+   * 超时取值的一手实测与归因（60s→15s、分类腿单列 6s、两腿串行 30.2s→21s）记在 CHANGELOG r51/r52。
+   * 这里约束的是"对端多久之内理我"；响应体阶段的停滞由 BODY_IDLE_MS 逐分片续期兜住。 */
   const LLM_TIMEOUT_MS = 15000;
-  /* r52 分相归因实测：黑洞挂起下兜底 30.2s **不是玄学**，而是 classify 腿与 reply 腿各吃满
-     一个 15s 熔断后**串行相加**（fetch 2 次、两腿间隔 15.0s、已归因 30.0s／30.2s）。
-     分类腿只回 ~20 token 的 JSON，15s 是给它发答案用的预算而不是等首包用的 ⇒ 单独给 6s
-     （DeepSeek 正常分类 <2s，仍留 3 倍余量），挂起场景整轮 30.2s → 约 21s。 */
   const CLASSIFY_TIMEOUT_MS = 6000;
+  const BODY_IDLE_MS = 6000;    // 分片之间的停滞上界（r64：半开流曾完全无界）；首包仍各按自己那条腿的预算
   let llmBad = false;                      // r51：最近一次是否"配了在线却降级了"（徽章要跟着翻）
   async function fetchWithTimeout(url, opts, ms) {
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), ms || LLM_TIMEOUT_MS);
+    const w = { t: null };
+    w.arm = (v) => { clearTimeout(w.t); w.t = setTimeout(() => ctl.abort(), v); };
+    w.arm(ms || LLM_TIMEOUT_MS);
+    let res;
     try {
-      return await fetch(url, { ...opts, signal: ctl.signal });
-    } finally {
-      clearTimeout(timer);
-    }
+      res = await fetch(url, { ...opts, signal: ctl.signal });
+    } catch (e) { clearTimeout(w.t); throw e; }
+    res.arm = w.arm;   // 交回消费方续期：整轮不限长，只有"停滞"才熔断
+    return res;
   }
+  const readJson = (res) => { if (res.arm) res.arm(BODY_IDLE_MS); return res.json(); };
 
   function endpoint(c, body, ms) {
     if (c.proxy) {
@@ -82,26 +80,33 @@ window.ChatAgent = (function () {
     const reader = res.body.getReader();
     const dec = new TextDecoder("utf-8");
     let buf = "", full = "";
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let nl;
-      while ((nl = buf.indexOf("\n")) !== -1) {
-        const line = buf.slice(0, nl).trim();
-        buf = buf.slice(nl + 1);
-        if (!line.startsWith("data:")) continue;
-        const payload = line.slice(5).trim();
-        if (payload === "[DONE]") continue;
-        try {
-          const j = JSON.parse(payload);
-          const piece = j?.choices?.[0]?.delta?.content;
-          if (typeof piece === "string" && piece) {
-            full += piece;
-            if (onDelta) onDelta(full);
-          }
-        } catch { /* 分片不完整或非 JSON 噪声行：跳过 */ }
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (res.arm) res.arm(BODY_IDLE_MS);   // 每片续期：长回答不限总时长，只有停滞才熔断
+        buf += dec.decode(value, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf("\n")) !== -1) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line.startsWith("data:")) continue;
+          const payload = line.slice(5).trim();
+          if (payload === "[DONE]") continue;
+          try {
+            const j = JSON.parse(payload);
+            const piece = j?.choices?.[0]?.delta?.content;
+            if (typeof piece === "string" && piece) {
+              full += piece;
+              if (onDelta) onDelta(full);
+            }
+          } catch { /* 分片不完整或非 JSON 噪声行：跳过 */ }
+        }
       }
+    } catch (e) {
+      // 停滞熔断且已吐过字 → 保留半句（换成离线模板会抹掉用户已看到的逐字内容），尾 … 就地示意未收完
+      if (e && e.name === "AbortError" && full.trim()) return full.trim() + "…";
+      throw e;
     }
     if (!full.trim()) throw new Error("empty-stream");
     return full.trim();
@@ -119,19 +124,19 @@ window.ChatAgent = (function () {
     if (!wantStream) {
       const res = await endpoint(c, body, ms);
       if (!res.ok) throw new Error("HTTP " + res.status);
-      return contentOf(await res.json());
+      return contentOf(await readJson(res));
     }
     try {
       const res = await endpoint(c, { ...body, stream: true }, ms);
       if (!res.ok) throw new Error("HTTP " + res.status);
       const ct = res.headers.get("content-type") || "";
       if (ct.includes("text/event-stream") && res.body) return await readSSE(res, onDelta);
-      return contentOf(await res.json());        // 代理回落成整包：按非流式解析
+      return contentOf(await readJson(res));      // 代理回落成整包：按非流式解析
     } catch (e) {
       if (e && e.name === "AbortError") throw e;
       const res = await endpoint(c, body, ms);       // 流式路径任何异常 → 再走一次原整包路径
       if (!res.ok) throw new Error("HTTP " + res.status);
-      return contentOf(await res.json());
+      return contentOf(await readJson(res));
     }
   }
 

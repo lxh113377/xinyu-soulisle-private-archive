@@ -9,6 +9,42 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Fixed（r65 补 · `#chart-count` 双主人拆槽 —— 一条"同提交忽绿忽红"的判据红）
+- 整跑 B 轮 `browser_check` 判红而单跑 3/3 绿，折叠行给出决定性差异：
+  `after clear: 本机已清除 ｜ 未连服务端…` vs 单跑的 `还没有记录` ⇒ **不是产品抖动，是同一槽两位主人**。
+- 结构上无解：`browser_check` 要条数空态（:88-92 轮询「还没有记录」），`data_rights_check` 与
+  `storage_resilience_check` 要清除回执，而 `data-rights.js` 的 `say()` 只写 `#chart-count`。
+  此前 `app.js` 的 `afterClear` **故意不调** `Chart.render()`（怕把回执覆成条数）——
+  等于用一个"少做一件事"的规避把冲突压成时序运气，r56 注释早已写下同一现象（CI r54 绿 r55 红）。
+- 拆法：`index.html` 新增 `#chart-receipt`（`role="status"`，读屏可听回执），`say()` 改指该槽；
+  `#chart-count` 的唯一写入方回到 `Chart.render()`，`afterClear` 恢复调用它。
+  两个判据的读侧选择器**同批**改指（只改写侧会当场把绿判据换成红判据）。
+- 复验：`browser_check` ×2 rc=0 且 `after clear: 还没有记录`（不再靠运气）｜
+  `data_rights` rc=0（回执含"服务端已删/复核为 0"照常断言）｜`storage_resilience` rc=0
+  （故障注入下回执仍如实报"本机清除失败"）。字节反降：`app.js` 15,457→15,418（余量 33→72）。
+- 销账：本条即 `memory/07` 与项目记忆里 r60/r61 反复登记的「`#chart-count` 双主人待拆」。
+
+### Fixed（r65 · 半开流让回复永不落地 —— 界面无限等 + 那句话静默消失）
+- **一手根因**（r64 hunt 抓到，本轮定位到具体一行）：`fetchWithTimeout` 的熔断定时器写在
+  `finally { clearTimeout(timer) }` 里，而 `await fetch()` **在响应头到达时即 resolve** ⇒
+  定时器恰好在"最需要它的地方"之前被解除，此后 `res.json()` 与 `readSSE` 的 `reader.read()`
+  **零超时、零 signal**。上游发完 200 + `text/event-stream` 头就停滞（半开流）时，
+  `respond()` 永不 settle → `app.js` 的 pending 气泡留在「心屿正在感受你的话…」，
+  这句话**既不入库也不点亮**（r64 实测：正常 3.1s 落地 3/3 一致，红轮 15s 未落地）。
+- **修法**：定时器升级为整轮看门狗 —— 首包用 `LLM_TIMEOUT_MS`/`CLASSIFY_TIMEOUT_MS`，
+  响应头到达后经 `res.arm` 交回消费方，`readJson()` 与 `readSSE` 每收到分片续期 `BODY_IDLE_MS`
+  ⇒ **长回答不受总时长限制**（这是 r51 降 15s 时特意保住的行为），只有"停滞"才熔断。
+- **两种停滞分别如实处置**：① 未吐过字即熔断 → `AbortError` 上抛 → 走既有降级链
+  （离线共情模板 + 徽章翻面），这句话照常落库点亮，不静默丢失；② 已吐部分字才熔断 →
+  **保留用户已看到的半句**并就地以 `…` 示意未收完，不拿模板覆盖已生成的逐字内容。
+- **同类出口已枚举，只有一处受影响**：`emotion-remote.js` 的 4s 定时器写在包住 `res.json()` 的
+  `finally` 内（覆盖整轮），实测**不是**同类缺陷，本轮不改 —— 防把非缺陷修成缺陷。
+- 反向腿：`fault_injection_check.py` 新增 `stalled_stream` 故障类（头先到、体永不到），
+  与既有 `black_hole()`（头前挂起）分列两类 —— 后者管不到前者，这正是 F4 曾经全绿却漏掉本缺陷的原因。
+- ⚠️ 顺带纠正一条**已成假陈述的在案注释**：原注释写"该 timer 只在 `await fetch()` 之前生效
+  （响应头一到就 clearTimeout）"，它描述的是缺陷而非设计；本条变更把 r51/r52 的取值实测
+  （60s→15s 的 60,604ms 空转、两腿串行 30.2s→21s）从代码注释迁入本节，源码留一行指针（r60 铁律）。
+
 ### Fixed（r58 · 探针自己的取数通道，两处由实测翻案）
 - **误诊过一次**：16 仓全量跑挂了一小时以上，我先归因到「`download_url` 指向
   `objects.githubusercontent.com`，那个主机在本机连不上」，并把 workflow 正文改成走
