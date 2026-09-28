@@ -488,15 +488,61 @@ def qg_ci_face(paths):
     return wf
 
 
+# r78 第二条路由：**自写门禁**。旧 `qg_classify` 对执行型三类的第一句是 `if not files: out=False`，
+# 而 `files` 只来自"标准工具文件名"清单（.gitleaks.toml / eslint.config.* / mypy.ini…）⇒
+# 本仓的密钥门 `_test/tracked_secret_scan.py` 明明被 CI 每一步跑着（ci.yml 现读第 56 行确有该步骤），
+# 却被这把尺读成「self=❌无」，r77 总览表因此带了一条**假缺口**；同法对 peers 也失效，
+# 那一格的分子分母从来就不是对手的事实。
+# 与 r75「有配置≠有门」互为对偶：那条防"假阳"，这条防"假阴"。
+QG_RUN_CMD = re.compile(r"^(?:-\s*)?(?:run:\s*)?(?:[\w./-]*/)?(?:npx|npm\s+run|yarn|pnpm|uvx?|pipx|"
+                        r"python3?|bash|sh|go|cargo|make|gradle|mvn|deno|bun)\b")
+QG_INVOKED_TOKENS = {
+    "lint_gate": re.compile(r"\b(eslint|biome|flake8|ruff|pylint|rubocop|clippy|golint|revive)\b"
+                            r"|[\w./-]*(?:lint|eslint)[\w.-]*\.(?:py|sh|js|ts)", re.I),
+    "typecheck_gate": re.compile(r"\b(mypy|pyright|pytype)\b|\btsc\s+(?:-p|--noEmit)\b"
+                                 r"|[\w./-]*(?:typecheck|tsc|mypy|pyright)[\w.-]*\.(?:py|sh|js|ts)", re.I),
+    "secret_scan_gate": re.compile(r"\b(gitleaks|trufflehog|secretlint|git-secrets|detect[-_]secrets)\b"
+                                   r"|[\w./-]*(?:secret|gitleaks|trufflehog)[\w.-]*\.(?:py|sh|js|ts)", re.I),
+}
+
+
+def qg_invoked_line(cls, ci_text):
+    """纯函数：找 CI 里"执行行真调用了一个带该类工具词的可执行体"的第一行。
+
+    只认执行行（`run:` 之后或以解释器/构建工具开头的行）——**注释与步骤名不算**，
+    否则 `起 fat jar（无密钥，仅情绪接口）` 这种描述性文字会把"没门"读成"有门"。
+    """
+    rx = QG_INVOKED_TOKENS.get(cls)
+    if not rx:
+        return ""
+    for line in (ci_text or "").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or s.startswith("- name:") or s.startswith("name:"):
+            continue
+        if not QG_RUN_CMD.search(s):
+            continue
+        if rx.search(s):
+            return s[:120]
+    return ""
+
+
 def qg_exec_verdict(cls, files, ci_text, ci_complete):
-    """执行型类的三态判定：True=找到执行位 / False=CI 面读全了且确实没有 / None=面没读全，不得下结论。"""
-    rx = QG_EXEC_TOKENS[cls]
-    m = rx.search(ci_text or "")
-    if m:
-        return True, "%s ∧ CI 执行位=%s" % (files[0], m.group(0)[:40])
+    """执行型类的三态判定：True=找到执行位 / False=CI 面读全了且确实没有 / None=面没读全，不得下结论。
+
+    两条路由任一命中即 True：① 标准配置文件 ∧ CI 执行位（r75 原口径）；
+    ② 无标准配置但 CI 执行行真调用了带该类工具词的可执行体（r78 新增，覆盖自写门禁）。
+    """
+    if files:
+        m = QG_EXEC_TOKENS[cls].search(ci_text or "")
+        if m:
+            return True, "%s ∧ CI 执行位=%s" % (files[0], m.group(0)[:40])
+    inv = qg_invoked_line(cls, ci_text)
+    if inv:
+        return True, "自写门禁 ∧ CI 真调用：%s" % inv
     if not ci_complete:
-        return None, "%s 在，但 CI 面未取全 ⇒ 不得判「无门」" % files[0]
-    return False, "%s 在而 CI 面取全后未见执行位" % files[0]
+        return None, "%s CI 面未取全 ⇒ 不得判「无门」" % ("%s 在，但" % files[0] if files else "")
+    return False, ("%s 在而 CI 面取全后未见执行位" % files[0]) if files \
+        else "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
 
 
 def qg_tree_candidates(paths):
@@ -517,10 +563,10 @@ def qg_classify(cand, blobs, ci_text, ci_complete=True):
     out, ev, unv = {}, {}, []
     for cls in QG_CLASSES:
         files = cand.get(cls) or []
-        if not files:
-            out[cls] = False
-            continue
         if cls in QG_THRESHOLD_SHAPE:
+            if not files:
+                out[cls] = False
+                continue
             read = [f for f in files if f in blobs]
             if not read:
                 unv.append("%s(候选 %s 正文未取到)" % (cls, files[0]))
@@ -532,6 +578,7 @@ def qg_classify(cand, blobs, ci_text, ci_complete=True):
             if hit:
                 ev[cls] = "%s :: %s" % (hit[0], hit[1].group(0)[:60])
         else:
+            # r78：执行型三类**不得**因为"没有标准配置文件"就直接判无——自写门禁只看 CI 执行行
             v, why = qg_exec_verdict(cls, files, ci_text, ci_complete)
             out[cls] = v
             ev[cls] = why
@@ -561,8 +608,10 @@ def self_quality_gates(rev="HEAD"):
         except Exception as e:
             errs2.append("ci:%s" % str(e)[:40])
     cls, ev, unv = qg_classify(cand, blobs, ci_text, ci_complete=(len(ci_all) <= len(ci_take)))
-    # 天花板自证：本尺只认**标准工具形态**（jacoco/eslint/gitleaks…）。本仓的门禁是 78 个自写判据脚本，
-    # 文件名尺看不见它们 ⇒ 这里把 CI 步骤名一并带出，**只作 self 侧说明，不参与两侧对照**（对照必须同法）。
+    # 天花板自证：本尺认两形——① 标准工具配置（.gitleaks.toml / eslint.config.* / jacoco `<limit>`…）
+    #   ∧ CI 执行位；② r78 补：**无标准配置但 CI 执行行真调用了一个带该类工具词的可执行体**（自写门禁）。
+    #   两侧同一函数 ⇒ 同法；注释与步骤名不计（防"提到关键词就算有门"）。
+    # `ci_steps_homegrown` 继续带出全部自写步骤名，供人核"名册 vs 判定"是否同源，只作说明不参与对照。
     step_names = re.findall(r"(?m)^\s*-\s+name:\s*(.+)$", ci_text)
     return {"classes": cls, "evidence": ev, "unverified": unv + errs, "ci_face": "%d/%d" % (len(ci_take), len(ci_all)),
             "candidates": {k: v[:3] for k, v in cand.items()}, "face": rev,
@@ -1291,11 +1340,47 @@ def selftest():
     if _gzh["secret_scan_gate"] is not True:
         print("SELFTEST-FAIL: 中文 CI 步骤名没认出（英文工具词假阴）：%s %s" % (_gzh, _ezh))
         return 1
+    # ③ r78 自写门禁路由（正例）：**没有**任何标准配置文件，只靠 CI 执行行真调用 `_test/tracked_secret_scan.py`
+    #    ⇒ 必须判 True，且证据点名那一行（这条腿抓的是 r77 报告总览表里那条 `self=❌无` 假缺口）
+    _own_ci = ("jobs:\n  sync:\n    steps:\n      - name: 密钥零入库扫描\n        run: |\n"
+               "          python _test/tracked_secret_scan.py --selftest\n"
+               "          python _test/tracked_secret_scan.py\n")
+    _gown, _eown, _uown = qg_classify({"secret_scan_gate": []}, {}, _own_ci)
+    if _gown["secret_scan_gate"] is not True or "tracked_secret_scan" not in (_eown.get("secret_scan_gate") or ""):
+        print("SELFTEST-FAIL: 自写门禁（无标准配置、CI 真调用）没认出或证据没点名行：%s %s" % (_gown, _eown))
+        return 1
+    # ③-b 反例（同一条腿的另一侧）：CI 里只有**描述性文字**提到"无密钥"、执行行是 java -jar ⇒ 必须 False，
+    #      否则这条路由就把"提到关键词"升格成"有门"（与 r75「有配置≠有门」互为对偶）
+    _li_ci = ("jobs:\n  demo:\n    steps:\n      - name: 起 fat jar（无密钥，仅情绪接口）\n"
+              "        run: java -jar server/target/soulisle-server.jar\n")
+    _gli, _eli, _uli = qg_classify({"secret_scan_gate": []}, {}, _li_ci)
+    if _gli["secret_scan_gate"] is not False:
+        print("SELFTEST-FAIL: 注释/步骤名里的「无密钥」被升格成有门（假阳）：%s %s" % (_gli, _eli))
+        return 1
+    # ③-c 盲区侧：无标准配置 ∧ CI 面没取全 ⇒ None（不得塌缩成 False；这正是本轮从 `if not files: False` 救回来的形状）
+    _gbl, _ebl, _ubl = qg_classify({"lint_gate": []}, {}, "nothing relevant", ci_complete=False)
+    if _gbl["lint_gate"] is not None or not _ubl:
+        print("SELFTEST-FAIL: 无候选 + CI 未取全却判成「无门」：%s %s" % (_gbl, _ubl))
+        return 1
     _g4, _, _u4 = qg_classify(qg_tree_candidates([]), {}, "")
     if any(bool(v) for v in _g4.values()) or _u4:
         print("SELFTEST-FAIL: 零输入升格成质量门（违反「零输入不得记 PASS」）：%s" % _g4)
         return 1
     _g95 = globals()
+    # ③-d 变异腿（证明 ③ 的正例不是被别的腿喂绿的）：摘掉"自写门禁"路由 ⇒ 同一个输入必须回 False
+    _orig_inv = dict(_g95["QG_INVOKED_TOKENS"])
+    try:
+        _g95["QG_INVOKED_TOKENS"] = {}
+        _gmut, _emut, _umut = qg_classify({"secret_scan_gate": []}, {}, _own_ci)
+    finally:
+        _g95["QG_INVOKED_TOKENS"] = _orig_inv
+    if _gmut["secret_scan_gate"] is not False:
+        print("SELFTEST-FAIL: 摘掉自写门禁路由后正例仍判有门（这条腿没作用在被审对象上）：%s" % _gmut)
+        return 1
+    _gback, _, _ = qg_classify({"secret_scan_gate": []}, {}, _own_ci)
+    if _gback["secret_scan_gate"] is not True:
+        print("SELFTEST-FAIL: 还原路由后正例没回 True（变异腿与还原不可信）：%s" % _gback)
+        return 1
     # 变异门反例（r75 首跑真面抓到，抓的是**我自己刚装的 jacoco**）：`<id>jacoco-check-line-coverage</id>`
     # 里的 "coverage" 曾被宽松分支 `coverage[^<]{0,20}<` 认成变异门 ⇒ 本仓 pom 一度被判 `mutation_gate=True`。
     # 现在必须：jacoco-only pom 判 False，真 stryker/pitest 配置判 True（两条方向相反，缺一即这条腿恒真）。
@@ -1335,10 +1420,17 @@ def selftest():
         if _s75["face"] != "HEAD" or _s75["classes"].get("coverage_gate") is not True:
             print("SELFTEST-FAIL: self 侧质量门没走同址尺（face=%s %s）" % (_s75["face"], _s75["classes"]))
             return 1
-        # 天花板必须被**机械地**说出来：本尺只认标准工具文件名，所以"CI 真跑密钥守卫但没有 .gitleaks.toml"
-        # 这类自写门**应当**判 False（判 True 才是错），同时 `ci_steps_homegrown` 必须把那条步骤带出来。
-        if _s75["classes"].get("secret_scan_gate") is not False:
-            print("SELFTEST-FAIL: 没有标准配置文件却判出 secret_scan_gate ⇒ 尺在猜，不在测：%s" % _s75["classes"])
+        # 口径翻转（r78，随证据改判，不是"把尺调松到能过"）：r75 这条腿当年把"本尺只认标准工具文件名"
+        # 固化成断言（自写门**应当**判 False），于是 `secret_scan_gate` 实际测的是"有没有用 gitleaks 这类名牌货"，
+        # 而不是这一类宣称的"能不能让构建失败"。本仓 CI 每一步真跑着 `_test/tracked_secret_scan.py`（rc≠0 就红），
+        # 判 False 是把行为存在的门报成缺口 ⇒ 与 r75「有配置≠有门」同族、方向相反的另一侧（行为有、尺看不见）。
+        # 现在两侧同法：合成 CI 里的 `run: python _test/secret_leak_check.py` 必须认出，且证据点名那一行。
+        if _s75["classes"].get("secret_scan_gate") is not True:
+            print("SELFTEST-FAIL: 自写密钥守卫（CI 真调用）仍判无门 ⇒ 尺只认名牌货：%s" % _s75["classes"])
+            return 1
+        if "secret_leak_check.py" not in (_s75["evidence"].get("secret_scan_gate") or ""):
+            print("SELFTEST-FAIL: secret_scan_gate 判了 True 却没点名那条调用行（证据不可追溯）：%s"
+                  % _s75["evidence"].get("secret_scan_gate"))
             return 1
         if not any("密钥" in s for s in _s75.get("ci_steps_homegrown") or []):
             print("SELFTEST-FAIL: 自写门的名册没带出（天花板没说出来＝下一轮会把它读成「我方无门」）：%s"
@@ -1368,7 +1460,10 @@ def selftest():
           "有/无/未验 三档分开计数，摘掉树派生类名单即翻判（变异体证明这条腿作用在被判对象上）；"
           "r77 台账自伤：**基线缺仓只进「补录」档不进「实质」档**（把「我上轮瞎了」报成「对手动了」"
           "会支使人做一件不存在的动作），且**降级采集改道 .partial、完整采集才覆写权威台账**"
-          "（13/16 与 16/16 两侧都验）")
+          "（13/16 与 16/16 两侧都验）；"
+          "r78 口径翻转：**自写门禁（无标准配置、CI 执行行真调用）必须认出且点名那一行**，"
+          "另一侧反例＝CI 里只有步骤名/注释提「无密钥」而执行行是 java -jar ⇒ 必须判无（防升格）；"
+          "摘掉该路由正例即回 False（变异腿）、还原即回 True")
     return 0
 
 

@@ -29,6 +29,7 @@ import json
 import re
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -149,7 +150,93 @@ def check_gate_on_chain(yml_text):
     return False, "CI 未跑 verify ⇒ jacoco check（绑 verify 相位）永不执行"
 
 
-def evaluate(test_root, main_root, pom_text, yml_text):
+# ---------------- T8 覆盖率读数（r78：把"具名缺口清单"接进阻断链） ----------------
+# 动因（r77 报告 §3 建议 7）：门只报总比值，"还剩哪 4 个方法/哪 46 条指令没碰"从来没有名单，
+# 于是下一轮要么盲补、要么干脆不补。**没有名单的缺口指标等于没有指标。**
+JACOCO = ROOT / "server" / "target" / "site" / "jacoco" / "jacoco.xml"
+COUNTER_FLOORS = {"LINE": 0.90, "BRANCH": 0.90, "METHOD": 0.90}
+
+
+def _parse_jacoco(xml_text):
+    """载具是**本机 mvn 生成**的 jacoco.xml；只拒 `<!ENTITY`（实体定义＝膨胀/外带的那一矢量），**允许 DOCTYPE**。
+
+    两条一手代价写在这里：
+    ① 不拒实体的话，畸形读数会让解析器抛错并被 except 吞成"未验"，一个坏 XML 就悄悄变成不红不绿；
+    ② 但 DOCTYPE **不能**一起拒 —— 真件首行实测就是
+       `<?xml …?><!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd">`，
+       第一版连 DOCTYPE 一起拒 ⇒ 守卫把**真读数**判成未验（r78 落地当场撞上）。
+       门禁拒绝真话，就是在逼下一轮虚报（同「Gate shape must admit the honest value」）。
+    """
+    if "<!ENTITY" in xml_text.upper():
+        raise ValueError("jacoco.xml 含实体声明 ⇒ 拒解析（正常产物理应没有）")
+    return ET.fromstring(xml_text)
+
+
+def read_counters(xml_text):
+    """纯函数：jacoco.xml → {counter 类型: (missed, covered)}。
+
+    **只取 `<report>` 直属的 counter**——r77 一手代价：按"逐类求和 + 再加一次 missed"算分母
+    造出一条假 drift（296/346 vs 真实 246/296），差点据此去"更正"一份本来写对了的报告。
+    """
+    out = {}
+    for c in _parse_jacoco(xml_text).findall("counter"):
+        m, cv = int(c.get("missed")), int(c.get("covered"))
+        out[c.get("type")] = (m, cv)
+    return out
+
+
+def top_gaps(xml_text, k=3):
+    """具名清单：还带着未覆盖分支/行的类，按 missed 分支降序，最多 k 条。"""
+    root = _parse_jacoco(xml_text)
+    rows = []
+    for cls in root.iter("class"):
+        mb = mc = ml = 0
+        for c in cls.findall("counter"):
+            if c.get("type") == "BRANCH":
+                mb, mc = int(c.get("missed")), int(c.get("covered"))
+            elif c.get("type") == "LINE":
+                ml = int(c.get("missed"))
+        if mb or ml:
+            rows.append((mb, ml, mc, cls.get("name").split("/")[-1]))
+    rows.sort(reverse=True)
+    return ["%s(分支漏%d/%d·行漏%d)" % (r[3], r[0], r[0] + r[2], r[1]) for r in rows[:k]]
+
+
+def jacoco_fresh(xml_path, src_root):
+    """产物新鲜度：读数不得早于被测源码最新一次改动（否则那是"上一轮的现状"）。"""
+    try:
+        newest = max((p.stat().st_mtime for p in Path(src_root).rglob("*.java")), default=0)
+    except OSError:
+        return False
+    try:
+        return xml_path.stat().st_mtime >= newest
+    except OSError:
+        return False
+
+
+def check_coverage_counters(counters, fresh):
+    """返回 (状态, 是否判红, 值)。状态 ∈ {ok, red, unverified}；unverified 既不绿也不红。"""
+    if not counters or not fresh:
+        return ("unverified", False,
+                "jacoco.xml %s ⇒ 未验（没跑过 mvn test / 产物比源码旧，禁止拿旧读数当现状）"
+                % ("取不到" if not counters else "陈旧"))
+    bad = []
+    for name, floor in COUNTER_FLOORS.items():
+        if name not in counters:
+            return ("unverified", False, "jacoco 里没有 %s counter ⇒ 未验" % name)
+        m, cv = counters[name]
+        ratio = cv / (m + cv) if (m + cv) else 0.0
+        if ratio < floor:
+            bad.append("%s %.2f%%<%.0f%%" % (name, ratio * 100, floor * 100))
+    vals = " ".join("%s=%.2f%%" % (n, counters[n][1] / (counters[n][0] + counters[n][1]) * 100)
+                    for n in COUNTER_FLOORS if (counters[n][0] + counters[n][1]))
+    if bad:
+        return ("red", True, "低于下限：" + "、".join(bad) + "｜现读 " + vals)
+    return ("ok", False, vals + "｜下限 " + "/".join("%d%%" % (f * 100) for f in COUNTER_FLOORS.values()))
+
+
+def evaluate(test_root, main_root, pom_text, yml_text, jacoco_text=None, jacoco_fresh_flag=True,
+             gaps=None):
     """返回 (rows, ok)。rows = [(判据, 通过?, 值/原因)]"""
     st = scan_tests(test_root, main_root)
     has_dep, has_workdir = check_pom(pom_text)
@@ -169,7 +256,16 @@ def evaluate(test_root, main_root, pom_text, yml_text):
         ("T6 覆盖率门（jacoco check + 阈值）", gate_ok, gate_why),
         ("T7 覆盖率门在链上（CI 跑 verify）", chain_ok, chain_why),
     ]
-    return rows, all(r[1] for r in rows), st
+    cov_state, gap_txt = "unverified", ""
+    try:
+        counters = read_counters(jacoco_text) if jacoco_text else {}
+        gap_txt = "；".join(top_gaps(jacoco_text)) if counters else ""
+        cov_state, cov_red, cov_val = check_coverage_counters(counters, jacoco_fresh_flag)
+    except Exception as e:                      # 畸形读数不许静默变成"未验"再变成绿
+        cov_state, cov_red, cov_val = "unverified", False, "jacoco 读数失败：%s" % str(e)[:70]
+    rows.append(("T8 覆盖率读数 + 具名缺口", not cov_red,
+                 cov_val + ("｜还带缺口的类：" + gap_txt if gap_txt else "")))
+    return rows, all(r[1] for r in rows), st, cov_state
 
 
 def main():
@@ -184,10 +280,23 @@ def main():
         if not p.exists():
             print("JAVA-TEST-GUARD-UNVERIFIED: 取不到 %s ⇒ 不判绿" % name)
             return 2
-    rows, ok, st = evaluate(SRC_TEST, SRC_MAIN, _read(POM), _read(CIYML))
+    jtext, jfresh = "", True
+    if JACOCO.exists():
+        try:
+            jtext = JACOCO.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            jtext = ""
+            print("  ⚠️ jacoco.xml 读不动：%s" % str(e)[:60])
+        jfresh = jacoco_fresh(JACOCO, SRC_MAIN)
+    rows, ok, st, cov_state = evaluate(SRC_TEST, SRC_MAIN, _read(POM), _read(CIYML),
+                                       jacoco_text=jtext, jacoco_fresh_flag=jfresh)
     for name, passed, val in rows:
         print("  %-26s %s  %s" % (name, "OK  " if passed else "FAIL", val))
     detail = "；".join("%s=%s" % (r[0].split()[0], r[2]) for r in rows)
+    if ok and cov_state == "unverified":
+        print("JAVA-TEST-GUARD-UNVERIFIED: 其余判据绿，但 T8 取不到/读数陈旧 ⇒ 覆盖率现状未验"
+              "（跑 `mvn -B -f server/pom.xml test` 后复算；不判红也不判绿）")
+        return 2
     if ok:
         t6 = next((r for r in rows if r[0].startswith("T6")), ("T6", False, "未取到"))
         t7 = next((r for r in rows if r[0].startswith("T7")), ("T7", False, "未取到"))
@@ -250,6 +359,28 @@ BAD_CI_NOJOB = "  other:\n    steps: []\n"
 # 相位陷阱（r75 一手）：CI 仍跑 package ⇒ jacoco 的 check（绑 verify）一次也不会执行，
 # 而 pom 里那道门看着齐全、本地 `mvn test` 也全绿。这条反例专门钉"门禁在不在链上"。
 BAD_CI_PACKAGE = ("  java-build:\n    steps:\n      - run: mvn -B -ntp -f server/pom.xml package\n  live-sync:\n")
+
+# T8 夹具（r78）：三路 counter 齐且过下限 / BRANCH 掉到 50% / "陷阱件"——类内 counter 故意与总 counter 不一致，
+# 用来钉住"分母只许取 <report> 直属 counter"这条 r77 学来的口径（当年把 246/296 算成 296/346）。
+GOOD_JACOCO = ('<report>'
+               '<counter type="LINE" missed="5" covered="95"/>'
+               '<counter type="BRANCH" missed="10" covered="90"/>'
+               '<counter type="METHOD" missed="4" covered="96"/>'
+               '<class name="com/x/Big"><counter type="BRANCH" missed="6" covered="94"/>'
+               '<counter type="LINE" missed="5" covered="95"/></class>'
+               '<class name="com/x/Small"><counter type="BRANCH" missed="4" covered="40"/></class>'
+               '</report>')
+BAD_JACOCO = ('<report>'
+              '<counter type="LINE" missed="5" covered="95"/>'
+              '<counter type="BRANCH" missed="50" covered="50"/>'
+              '<counter type="METHOD" missed="4" covered="96"/>'
+              '<class name="com/x/Big"><counter type="BRANCH" missed="50" covered="50"/></class>'
+              '</report>')
+TRAP_JACOCO = ('<report>'
+               '<counter type="BRANCH" missed="10" covered="90"/>'
+               '<class name="com/x/Trap"><counter type="BRANCH" missed="40" covered="40"/></class>'
+               '<class name="com/x/Trap2"><counter type="BRANCH" missed="9" covered="81"/></class>'
+               '</report>')
 
 
 def _fixture(tmp, n_files, n_methods_each, main_classes=8, pom=None, ci=None):
@@ -329,6 +460,47 @@ def run_selftest():
         # 边界②：真实仓库若被改名，判据必须报"取不到"而不是"没有"（由 main() 的 rc=2 承担）
         cases.append(("边界②：pom 文本为空时 T2 必判红",
                       evaluate(tr, mr, "", ci)[1], False))
+
+        # ---------------- T8 覆盖率读数（r78）：正反例 + 盲区 + 变异 + 分母口径回归锁 ----------------
+        cases.append(("T8 正例：三路 counter 齐且过下限",
+                      evaluate(tr4, mr4, GOOD_POM, GOOD_CI, GOOD_JACOCO, True)[1], True))
+        cases.append(("T8 正例状态=ok",
+                      evaluate(tr4, mr4, GOOD_POM, GOOD_CI, GOOD_JACOCO, True)[3], "ok"))
+        bad_rows, bad_ok, _, bad_state = evaluate(tr4, mr4, GOOD_POM, GOOD_CI, BAD_JACOCO, True)
+        cases.append(("T8 反例①：BRANCH 50% 必须判红", bad_ok, False))
+        cases.append(("T8 反例①：红因必须点名 BRANCH",
+                      any(r[0].startswith("T8") and "BRANCH" in r[2] for r in bad_rows), True))
+        _, ok_blank, _, st_blank = evaluate(tr4, mr4, GOOD_POM, GOOD_CI, "", True)
+        cases.append(("T8 反例②：取不到读数不得判红也不得判绿（须 unverified）",
+                      (st_blank, ok_blank), ("unverified", True)))
+        _, _, _, st_stale = evaluate(tr4, mr4, GOOD_POM, GOOD_CI, GOOD_JACOCO, False)
+        cases.append(("T8 反例③：产物比源码旧必须落 unverified（禁拿旧读数当现状）",
+                      st_stale, "unverified"))
+        cases.append(("T8 具名缺口：必须点出带缺口的类名（按 missed 分支降序）",
+                      top_gaps(GOOD_JACOCO),
+                      ["Big(分支漏6/100·行漏5)", "Small(分支漏4/44·行漏0)"]))
+        # 分母口径回归锁（r77 一手：逐类求和再加一次 missed ⇒ 246/296 被算成 296/346）
+        cases.append(("T8 口径锁：分母只取 <report> 直属 counter，类内 counter 不得混进总分母",
+                      read_counters(TRAP_JACOCO)["BRANCH"], (10, 90)))
+        _g = globals()
+        _orig_floors = dict(_g["COUNTER_FLOORS"])
+        try:
+            _g["COUNTER_FLOORS"] = {"LINE": 0.0, "BRANCH": 0.0, "METHOD": 0.0}
+            _, mut_ok, _, mut_state = evaluate(tr4, mr4, GOOD_POM, GOOD_CI, BAD_JACOCO, True)
+        finally:
+            _g["COUNTER_FLOORS"] = _orig_floors
+        cases.append(("T8 变异腿：阈值归零后同一份坏读数必须变绿（否则阈值这条腿没咬在被审对象上）",
+                      (mut_ok, mut_state), (True, "ok")))
+
+        # 硬化边界（r78 一手：第一版连 DOCTYPE 一起拒，把**真读数**判成未验 ⇒ 门禁拒绝真话＝逼下一轮虚报）
+        cases.append(("T8 边界①：真件形状（带 DOCTYPE）必须读得动",
+                      read_counters('<!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd">'
+                                    + GOOD_JACOCO)["BRANCH"], (10, 90)))
+        try:
+            read_counters('<!ENTITY x "y">' + GOOD_JACOCO)
+            cases.append(("T8 边界②：含 <!ENTITY 必须拒解析", "没抛", "抛")),
+        except ValueError:
+            cases.append(("T8 边界②：含 <!ENTITY 必须拒解析", "抛", "抛"))
 
     n_ok = 0
     for name, got, want in cases:
