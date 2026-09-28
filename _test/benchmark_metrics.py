@@ -108,6 +108,21 @@ RE_ML_TRAIN = re.compile(r"offline\s+(dpo|rl|rlhf|train|training|preference|fine
 RE_LOCAL_OFF = re.compile(r"(run|runs|work|works|use|deploy).{0,40}offline|offline\s+mode|completely\s+offline"
                           r"|no\s+internet\s+required|离线运行|完全离线", re.I)
 
+# r73 第二通道（流式 / 端到端）的四条归因正则。分开的理由与上面三条同源：
+# "streaming" 一词至少有三种互不相干的含义（逐字输出 / 视音频直播 / Kafka 那类数据流），
+# "playwright" 既可能是"有 e2e 测试"也可能是"用浏览器抓取当产品功能"——合并成一条正则就会互相冒充。
+RE_SSE = re.compile(r"\b(sse|server[-\s]?sent events?|text/event-stream|streaming\s+(response|output|token)"
+                    r"|token[-\s]?by[-\s]?token|stream\s+the\s+response|逐字|流式输出|流式响应)", re.I)
+RE_MEDIA = re.compile(r"(live\s?stream|streaming\s+(video|audio|media|tts|voice)|video\s+streaming"
+                      r"|\bhls\b|dynamic\s+adaptive\s+streaming|webrtc|直播|音视频流)", re.I)
+RE_DATAINFRA = re.compile(r"(kafka|flink|spark streaming|data[-\s]?stream(ing)?|stream(ing)?\s+pipeline"
+                          r"|event[-\s]?stream(ing)?\s+(platform|pipeline)|ETL)", re.I)
+RE_E2E = re.compile(r"(\be2e\b|end[-\s]?to[-\s]?end\s+(test|suite|coverage)|visual\s+regression|浏览器回归"
+                    r"|(playwright|cypress|selenium)[^\n]{0,60}?\b(test|tests|spec|runner|suite)\b"
+                    r"|\b(test|tests|testing|ci)\b[^\n]{0,40}?\b(playwright|cypress|selenium)\b)", re.I)
+RE_BROWSER_TOOL = re.compile(r"(scrap(e|er|ing)|web automation|browser automation|puppeteer"
+                             r"|headless browser|爬虫|网页抓取)", re.I)
+
 
 def offline_signal_class(text):
     """纯函数：无网络无副作用 ⇒ 可离线自证。返回 (类别, 证据片段)。
@@ -165,6 +180,75 @@ def offline_audit(repos):
             continue
         cls, ev = offline_signal_class(hay)
         out[full] = {"class": cls, "evidence": ev, "partial": bool(errs)}
+    return out
+
+
+def cap_channel_class(text):
+    """第二观测通道（r73）：从 description+README **正文**判两格能力，与文件名法并行但不改 caps。
+
+    为什么要有它：`streaming` / `e2e_browser` 这两格在 self 侧长期是**盲区**
+    （SSE 写在 `chat.js`/`ChatController.java` 里、端到端在 `_test/*.py` 用 playwright，
+    文件名匹配器都看不见 ⇒ 只能靠 `caps_blind` 点名）。而 peers 侧这两格**一直只由文件名规则单独得出**，
+    于是"对手 streaming=2/16"其实是**下限**却被读成现状。本通道用与 r31 离线通道同一套纪律补上这条不对称：
+    只做复核与下限揭示，**不参与 caps 计数**（参与了就是"自己用尺 A、别人用尺 B"的反向版本）。
+    归因顺序＝先窄后宽，且**不设兜底**：宁可漏计对手，也不凭一句"提到 streaming"造出一格能力。
+    """
+    t = text or ""
+    low = t.lower()
+    if not low.strip():
+        return {"streaming": "none", "e2e_browser": "none", "evidence": {}, "fetched": False}
+    ev = {}
+    m = RE_SSE.search(t)
+    if m:
+        cls = "token_stream"
+        ev["streaming"] = _snippet(t, m)
+    elif RE_MEDIA.search(t):
+        cls = "media_stream"
+        ev["streaming"] = _snippet(t, RE_MEDIA.search(t))
+    elif RE_DATAINFRA.search(t):
+        cls = "data_infra"
+        ev["streaming"] = _snippet(t, RE_DATAINFRA.search(t))
+    else:
+        cls = "none"
+    m = RE_E2E.search(t)
+    if m:
+        cls2 = "test_e2e"
+        ev["e2e_browser"] = _snippet(t, m)
+    elif RE_BROWSER_TOOL.search(t):
+        cls2 = "browser_tool_feature"
+        ev["e2e_browser"] = _snippet(t, RE_BROWSER_TOOL.search(t))
+    else:
+        cls2 = "none"
+    return {"streaming": cls, "e2e_browser": cls2, "evidence": ev, "fetched": True}
+
+
+def cap_channel_audit(repos):
+    """对每个参照仓取 description+homepage+README，跑第二通道；取不到必须记 unverified 并点名。"""
+    out = {}
+    for r in repos:
+        full = r["repo"]
+        parts, errs = [], []
+        try:
+            meta = gh("repos/" + full)
+            parts.append(f"{meta.get('description') or ''} | {meta.get('homepage') or ''}")
+        except Exception as e:
+            errs.append("meta:" + str(e)[:70])
+        try:
+            rd = gh("repos/" + full + "/readme")
+            parts.append(base64.b64decode((rd.get("content") or "").strip())
+                         .decode("utf-8", errors="replace")[:200000])
+        except Exception as e:
+            errs.append("readme:" + str(e)[:70])
+        hay = "\n".join(parts)
+        if not hay.strip():
+            out[full] = {"streaming": "unverified", "e2e_browser": "unverified",
+                         "evidence": {}, "unverified": "; ".join(errs) or "两路均空"}
+            continue
+        c = cap_channel_class(hay)
+        c["partial"] = bool(errs)
+        if errs:
+            c["partial_errors"] = "; ".join(errs)
+        out[full] = c
     return out
 
 
@@ -552,6 +636,60 @@ def selftest():
     if offline_signal_class("")[0] != "none" or offline_signal_class(None)[0] != "none":
         print("SELFTEST-FAIL: 零输入被判成有能力 ⇒ 违反「零输入不得记 PASS」")
         return 1
+    # r73 第二观测通道：四类归因各有专属样本 + 两条方向相反的控制 + 一个变异体（缺任一＝通道不可信）
+    chan_samples = {
+        "token_stream": "Chat UI with **SSE** streaming responses, token-by-token rendering via text/event-stream.",
+        "media_stream": "A live streaming room with WebRTC audio/video and HLS playback for watchers.",
+        "data_infra": "Built on Kafka and Spark streaming: an event streaming pipeline for ETL workloads.",
+        "test_e2e": "CI runs Playwright end-to-end tests (e2e suite) against the dockerized app.",
+        "browser_tool_feature": "AI agent that does web scraping and page automation with a headless browser.",
+    }
+    for want_cls, sample in list(chan_samples.items()):
+        # 变量名刻意避开 `got`：本函数后半段的漂移对照组就叫 got，
+        # 首版我在这里写 `got = ...` 把它**遮蔽**了 ⇒ SELFTEST-PASS 那行的「全等对照零误报（N 条）」
+        # 当场从 4 变成 20（20 = len("browser_tool_feature")）——数字动了但断言没动，正是"打印的数来自被遮蔽变量"那一族。
+        chan_cls = cap_channel_class(sample)["e2e_browser" if want_cls in ("test_e2e", "browser_tool_feature")
+                                           else "streaming"]
+        if chan_cls != want_cls:
+            print(f"SELFTEST-FAIL: 通道把 {want_cls} 的样本判成 {chan_cls}（归因串味）")
+            return 1
+    # 反向腿①：视音频直播不得冒充"逐字流式"；否则 streaming 那格会被 media-only 仓灌满
+    if cap_channel_class(chan_samples["media_stream"])["streaming"] == "token_stream":
+        print("SELFTEST-FAIL: media_stream 被升格成 token_stream ⇒ 通道会凭空造能力")
+        return 1
+    # 反向腿②：把浏览器当工具的仓库不得算"有 e2e 测试"
+    if cap_channel_class(chan_samples["browser_tool_feature"])["e2e_browser"] == "test_e2e":
+        print("SELFTEST-FAIL: browser_tool_feature 被升格成 test_e2e ⇒ 反向腿失效")
+        return 1
+    # 反向腿③④：这两条**照抄 r73 首跑真面抓到的两处冒充**（不是我编的形状，是实测文本）
+    # ③ `dash.cloudflare.com` 里的 "dash" 曾被 `\bdash\b` 认成 DASH 流媒体 ⇒ 整仓被升格成 media_stream
+    if cap_channel_class("**Cloudflare Workers AI**: [dash.cloudflare.com/profile/api-tokens]")["streaming"] != "none":
+        print("SELFTEST-FAIL: dash.cloudflare.com 仍被当成流媒体能力 ⇒ 首跑抓到的那处冒充没修住")
+        return 1
+    # ④ README 里链接 `microsoft/playwright-mcp`（当作网页操作工具）曾被裸 `playwright` 认成"有 e2e 测试"
+    if cap_channel_class("mcp网页操作工具： https://github.com/microsoft/playwright-mcp 记忆系统")["e2e_browser"] == "test_e2e":
+        print("SELFTEST-FAIL: playwright-mcp 依赖仍被判成有 e2e 测试 ⇒ 工具名与测试语境仍互相冒充")
+        return 1
+    # 正向对照：真写测试的句子必须仍然算 test_e2e（防我为了消红把规则砍成恒假）
+    if cap_channel_class("CI runs the Playwright test suite against the dockerized app.")["e2e_browser"] != "test_e2e":
+        print("SELFTEST-FAIL: 合规正例不判 test_e2e ⇒ 收紧规则时把真能力一起砍掉了")
+        return 1
+    if cap_channel_class("")["streaming"] != "none" or cap_channel_class("React + FastAPI chat app.")["streaming"] != "none":
+        print("SELFTEST-FAIL: 零输入/无证据文本被判成有流式能力（违反「零输入不得记 PASS」）")
+        return 1
+    _g73 = globals()
+    _orig_sse = _g73["RE_SSE"]
+    try:
+        _g73["RE_SSE"] = re.compile(r"(?!)")   # 变异体：摘掉逐字流式那条归因，必须改变判定
+        if cap_channel_class(chan_samples["token_stream"])["streaming"] == "token_stream":
+            print("SELFTEST-FAIL: 摘掉 RE_SSE 后仍判 token_stream ⇒ 该类根本没在被判的东西上")
+            return 1
+    finally:
+        _g73["RE_SSE"] = _orig_sse
+    # 通道不得改写 caps：同一份文本走两遍，caps 相关的键必须完全不动（第二把尺防线）
+    if cap_channel_class(chan_samples["token_stream"]).get("caps"):
+        print("SELFTEST-FAIL: 通道返回值里出现 caps 键 ⇒ 它正在变成第二把尺")
+        return 1
     # 能力匹配器本体（r70）：`rag` 裸子串会把 storage/coverage 白送成一格能力 ⇒ 两向都验
     _vm = CAP_RULES["vector_memory"]
     _must_red = ["src/storage/db.js", "test/coverage.py", "_test/plan_pdf_coverage_check.py",
@@ -586,6 +724,8 @@ def main():
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--offline-audit", action="store_true",
                     help="跑第二条离线观测通道（16 仓 × 2 次 API，较慢；判据本体由 --selftest 常驻守着）")
+    ap.add_argument("--cap-channel", action="store_true",
+                    help="跑流式/端到端的第二观测通道（r73；同样 16 仓 × 2 次 API，只作复核与下限揭示，不改 caps）")
     ap.add_argument("--out", default=str(SNAP))
     args = ap.parse_args()
 
@@ -629,6 +769,27 @@ def main():
             print(f"  ⚠️ 分母不全（{len(unv)} 仓未取到：{'、'.join(unv)}）⇒ **不得**据全零下差异结论")
         for k in shell + local:
             print(f"    ▶ {k} [{audit[k]['class']}] {audit[k]['evidence'][:90]}")
+    if args.cap_channel:
+        chan = cap_channel_audit(cur)
+        run["cap_channel"] = chan
+        buckets = {}
+        for cap in ("streaming", "e2e_browser"):
+            for k, v in chan.items():
+                buckets.setdefault((cap, v.get(cap)), []).append(k)
+        unv = sorted(k for k, v in chan.items() if v.get("streaming") == "unverified")
+        print("  第二通道（内容法，仅供复核，不改 caps）：")
+        for cap, order in (("streaming", ("token_stream", "media_stream", "data_infra", "none")),
+                           ("e2e_browser", ("test_e2e", "browser_tool_feature", "none"))):
+            line = " ".join("%s=%d" % (c, len(buckets.get((cap, c), []))) for c in order)
+            filename_n = sum(1 for r in cur if cap in (r.get("caps") or []))
+            print(f"    {cap}: {line} unverified={len(unv)} ｜ 文件名法 caps={filename_n}/{len(cur)}"
+                  f" ⇒ 内容法只用于判断「文件名法是不是下限」")
+            for c in order[:2]:
+                for k in sorted(buckets.get((cap, c), []))[:4]:
+                    print(f"      ▶ [{c}] {k} :: {chan[k]['evidence'].get(cap, '')[:88]}")
+        if unv:
+            print(f"  ⚠️ 通道分母不全（{len(unv)} 仓两路皆空：{'、'.join(unv)}）⇒ 不得据"
+                  f"「内容法也没见到」下否定结论")
     hist = (hist + [run])[-6:]
     drift = diff_snap(prev_repos, cur)
 

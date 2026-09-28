@@ -9,6 +9,22 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Added（r73 · 流式/端到端的第二观测通道：把"文件名法是不是下限"变成可测的事）
+- **问题**：`streaming` 与 `e2e_browser` 这两格，self 侧长期是**盲区**（SSE 写在 `chat.js`/`ChatController.java`、
+  端到端在 `_test/*.py` 用 playwright，文件名匹配器看不见 ⇒ 只能靠 `caps_blind` 点名）；
+  而 peers 侧这两格**一直只由文件名规则单独得出**（当日实测 `streaming=2/16`、`e2e_browser=3/16`）
+  ⇒ 一句"对手只有两家做流式"其实是**下限**被读成现状，且两侧用的不是同一套眼睛。
+- **做法**：新增 `cap_channel_class()` / `cap_channel_audit()`（CLI `--cap-channel`），沿用 r31 离线通道的纪律：
+  取 `description+homepage+README` 正文，按**先窄后宽**归因分类
+  （`token_stream` / `media_stream` / `data_infra` / `none`；`test_e2e` / `browser_tool_feature` / `none`），
+  **不设兜底、不参与 caps 计数**（参与了就是第二把尺），两路皆空一律记 `unverified` 并点名。
+- **为什么必须分类**：`streaming` 一词至少三种互不相干的含义（逐字输出 / 视音频直播 / Kafka 那类数据流），
+  `playwright` 既可能是"有 e2e 测试"也可能是"把浏览器抓取当产品功能"——合并成一条正则就会互相冒充。
+  `--selftest` 因此配了：四类各一条专属样本 + **两条方向相反的反向腿**（media 不得升格成 token、
+  浏览器工具不得升格成 e2e）+ 零输入判 `none` + **变异体**（摘掉 `RE_SSE` 必须翻判）+ 通道不得返回 caps 键。
+- **G8 时序自证**：本轮【数据流假设】块在**首个源码写入之前**落盘并跑 `[GATE:dag-pass]`，
+  改掉 r71/r72 连续两轮"改完才补块"的坏形（V10.79.0 要求 precheck 与写盘同链）。
+
 ### Fixed（r72 · 把台账取数面钉成闸，并补完技能镜像闭环）
 - **G17 新判据**（`_test/repo_config_check.py`，`[推荐:R71-01]` 的机器落点）：对标台账末次 run 的 self 行必须
   显式带 `self_face="HEAD"`、`regression_suites` 须为正整数、`self_face_errors` 须为空，否则判红。
