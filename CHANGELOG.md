@@ -9,6 +9,24 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Fixed（r68 · JS 守卫的静默空转面：`node --check` 对含 ESM 语法的 `.js` 连坏文件都放行）
+- **前提被自己实测否证**：r67 我写下「`node --check` 对 `.js` 按 CommonJS 解析，项目一转 ESM 就会把
+  合法文件判红」—— 那句话**从未实测过**。本轮直测（node v24.16）：
+  `export const z = 1;` 的 `.js` → rc=0；`import x from "y";` 的 `.js` → rc=0；
+  **`import x from "y";` + `function oops( {` 的 `.js` → 仍 rc=0**，而同一字节改名 `.mjs` → 抓到错。
+  ⇒ 真相反向且更坏：这类文件上守卫**静默空转**，坏代码照样记绿。
+- **修法**：`check_one()` 先按顶层 `import|export` 判形态，ESM 形态一律把同一份字节落到
+  临时 `.mjs` 再检（`TemporaryDirectory`/`NamedTemporaryFile`，随上下文销毁，不在仓内留残渣）。
+  门面行加 `script=N module=M` 计数（CI 聚合面只留一行 ⇒ 计数必须折进含判据词那行）。
+- **两条专属用例**：①含 ESM 语法的 `.js` 必须通过且被归进 `module`（分类不生效即红）；
+  ②**语法真坏的 ESM 件必须 FAIL 并点名文件与 kind**。变异对照＝只摘掉"改检目标"这一步
+  （kind 照样算）→ `SELFTEST-FAIL ESM 反向腿未咬：…ok=1 fails=[]`，套件 6/7；
+  真实源跑前跑后 sha 相等，副本已清。⚠️ 用例①的第一条断言在本机 Node 上是**惰性的**
+  （坏文件也 rc=0），判定力全在②与①的分类断言上 —— 如实标注，不冒充两条都咬得住。
+- **CI 回执取到（r67 那条"只认回执"闭口）**：run `36370771737`（sha `8b1d526`）
+  → 电池 **94/96 rc=0，判红仅 `live_sync`**；`js_syntax`／`js_syntax_selftest` 在 Linux 受理面双绿。
+  ⇒ 新增判据已被受理面确认，`ci_status` 的红完全由"公网未发布"解释，不是代码缺陷。
+
 ### Added / Fixed（r67 · 两态形状 + JS 语法面入账）
 - **拆 `rows[].struct` 两态**（探针）：旧写法 `sorted(s) if s else None` 把「没测到」与「测到但零命中」
   折叠成同一个 `null` ⇒ 只看 struct 的读者两种情况读不出区别（r66 报告 G3）。现由唯一出口
