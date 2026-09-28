@@ -247,53 +247,114 @@ EXCLUDE_PARTS = {"vendor", "target", "node_modules", "__pycache__", ".git", ".wr
                  ".codebuddy", "_shots", "archive", "_test"}
 
 
+def git_ls_tree(rev="HEAD"):
+    """rev 的文件清单（git 面）。失败即抛——**禁止静默退回工作树面**（那等于把两台机器的读数混进同一格）。"""
+    r = subprocess.run(["git", "-C", str(ROOT), "ls-tree", "-r", "--name-only", rev],
+                       capture_output=True, timeout=60)
+    if r.returncode != 0:
+        raise RuntimeError("ls-tree %s 失败：%s" % (rev, (r.stderr or b"").decode("utf-8", "replace")[:100]))
+    return [x.decode("utf-8", "replace") for x in (r.stdout or b"").split(b"\n") if x]
+
+
+def git_blob(path, rev="HEAD"):
+    r = subprocess.run(["git", "-C", str(ROOT), "show", "%s:%s" % (rev, path)],
+                       capture_output=True, timeout=60)
+    if r.returncode != 0:
+        raise RuntimeError("show %s:%s 失败" % (rev, path))
+    return (r.stdout or b"").decode("utf-8", "replace")
+
+
+def summarize_self_paths(paths):
+    """纯函数：git 面的路径清单 → (src 文件数, 判据脚本文件名集)。
+
+    拆成纯函数是为了让 selftest 能用**合成人口**驱动它（含一件未跟踪的形状），
+    而不是去动真实工作树——判据要能证明"未入库的件不计数"，又不能靠往仓里塞临时件来证明。
+    """
+    exts = (".js", ".css", ".html", ".json")
+    src_files = [p for p in paths
+                 if p.startswith("src/") and p.rsplit("/", 1)[-1].endswith(exts)
+                 and not (EXCLUDE_PARTS & set(p.split("/")))]
+    scripts = {p.rsplit("/", 1)[-1] for p in paths
+               if p.startswith("_test/") and (p.endswith("_check.py") or "contract" in p.rsplit("/", 1)[-1])}
+    return len(src_files), src_files, scripts
+
+
 def self_metrics():
-    """心屿自身坐标——与参照仓同口径机器生成，禁止手抄进报告（M2 同源纪律）。"""
-    src = ROOT / "src"
-    loc, files = 0, 0
-    for p in src.rglob("*"):
-        if p.is_file() and p.suffix in (".js", ".css", ".html", ".json") \
-                and not (EXCLUDE_PARTS & set(p.parts)):
-            try:
-                loc += len(p.read_text("utf-8", errors="replace").splitlines())
-                files += 1
-            except Exception:
-                continue
-    suites_files = len({p.name for p in (ROOT / "_test").glob("*_check.py")}
-                       | {p.name for p in (ROOT / "_test").glob("*contract*.py")})
-    # ⚠️ 口径分母（M3 纪律，r21 自纠）：`regression_suites` 必须是**电池里真正会跑的条目数**，
-    #    不是"文件名看起来像判据脚本"的个数 —— 上一轮 self 报 19、报告写 24，就是两个分母混用了。
-    #    唯一真相源 = run_all_suites.py 的 SUITES 列表；解析失败即报错，绝不回退到 glob 计数。
-    battery, battery_err = None, ""
+    """心屿自身坐标——与参照仓同口径机器生成，禁止手抄进报告（M2 同源纪律）。
+
+    ⚠️ r71 起**整行统一取 git 面（HEAD）**：上一版只有 SUITES 走 git，其余（src 行数/文件数、
+    判据脚本数、CI job 数）仍 rglob 工作树，于是"并行会话未入库的在途件"会被写成横向现状——
+    实测同一天两次采集记 `regression_suites=101` 而 HEAD 实数 99。混面比单一面更坏，
+    因为它让台账在别的机器/CI 上必然复算不出，却在本机永远自洽。
+    """
+    src_loc, files, suites_files = 0, 0, 0
+    self_face, self_err = "HEAD", ""
     try:
-        txt = (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace")
-        seg = txt.split("SUITES = [", 1)[1].split("\n]", 1)[0]
-        battery = len(re.findall(r'^\s*\("', seg, re.M))
+        paths = git_ls_tree("HEAD")
+        n_src, src_paths, scripts = summarize_self_paths(paths)
+        files = n_src
+        for p in src_paths:
+            src_loc += len(git_blob(p, "HEAD").splitlines())
+        suites_files = len(scripts)
     except Exception as e:
-        battery_err = str(e)[:80]
-    ci = ROOT / ".github" / "workflows" / "ci.yml"
-    jobs = 0
-    if ci.exists():
+        self_err = str(e)[:120]
+        self_face = "取数失败"
+    # 工作树与 HEAD 的差必须**看得见**：只印数字，不参与任何计数（否则又回到混面）。
+    # 实测本仓合法的差有两种：① 并行会话在途未入库件；② 按红线 ignore 的本机密钥件
+    # （`src/js/demo-config.js` 含 Key、故意不入库 ⇒ 它本就不该出现在与参照仓同口径的 src 统计里）。
+    try:
+        others = subprocess.run(["git", "-C", str(ROOT), "ls-files", "--others", "--exclude-standard",
+                                 "-z", "--", "src", "_test"], capture_output=True, timeout=60)
+        worktree_extra = len([x for x in (others.stdout or b"").split(b"\0") if x])
+    except Exception:
+        worktree_extra = -1
+    EXT_ALL = (".js", ".css", ".html", ".json")
+    wt_src = {str(q.relative_to(ROOT)).replace("\\", "/") for q in (ROOT / "src").rglob("*")
+              if q.is_file() and q.suffix in EXT_ALL and not (EXCLUDE_PARTS & set(q.parts))}
+    head_src = {x for x in locals().get("paths", []) or []
+                if x.startswith("src/") and x.rsplit("/", 1)[-1].endswith(EXT_ALL)
+                and not (EXCLUDE_PARTS & set(x.split("/")))}
+    ignored_src = len(wt_src - head_src)
+    ci_jobs, ci_err = 0, ""
+    try:
         in_jobs = False
-        for line in ci.read_text("utf-8").splitlines():
+        for line in git_blob(".github/workflows/ci.yml", "HEAD").splitlines():
             if line.startswith("jobs:"):
                 in_jobs = True
             elif in_jobs and line and not line.startswith(" "):
                 break
             elif in_jobs and line.startswith("  ") and not line.startswith("   "):
-                jobs += 1
+                ci_jobs += 1
+    except Exception as e:
+        ci_err = str(e)[:80]
+    # ⚠️ 口径分母（M3 纪律，r21 自纠）：`regression_suites` 必须是**电池里真正会跑的条目数**，
+    #    不是"文件名看起来像判据脚本"的个数 —— 上一轮 self 报 19、报告写 24，就是两个分母混用了。
+    #    唯一真相源 = run_all_suites.py 的 SUITES 列表；解析失败即报错，绝不回退到 glob 计数。
+    battery, battery_err, battery_face = None, "", "HEAD"
+    try:
+        # r71 改面：取 `git show HEAD:_test/run_all_suites.py`，**不是工作树那一份**。
+        # 一手现场：09-28 同日两次采集都记 regression_suites=101，而 HEAD 实数 99 ——
+        # 多出的 2 条是并行会话**尚未入库**的在途套件。台账是跨轮/跨机复算的"横向现状"源，
+        # 把工作树状态写成现状＝换台机器（或 CI 干净克隆）必然对不上。
+        txt = subprocess.run(["git", "-C", str(ROOT), "show", "HEAD:_test/run_all_suites.py"],
+                             capture_output=True, timeout=60).stdout.decode("utf-8", "replace")
+        seg = txt.split("SUITES = [", 1)[1].split(chr(10) + "]", 1)[0]
+        battery = len(re.findall(r'^\s*\("', seg, re.M))
+        if battery == 0:
+            battery_err = "HEAD 面解析到 0 条 ⇒ 不得当现状"
+    except Exception as e:
+        battery_err = str(e)[:80]
+    ci = ROOT / ".github" / "workflows" / "ci.yml"
     # ⚠️ self 的 docs/caps **必须走与参照仓同一个匹配器**（r21 自纠）：上一版这里另写一套
     #    手写存在性判断，等于"自己用尺 A、别人用尺 B"，横向对比不可信（M2 同源纪律）。
-    #    唯一真相源 = git ls-files 的整仓路径清单，喂给同一份 DOC_FILES / CAP_RULES。
-    tracked = []
+    #    r71：人口也统一到 git 面（HEAD），不再用 `ls-files`（那是索引＝会被他人的 staged 改动带偏）。
     try:
-        gp = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"],
-                            capture_output=True, timeout=60)
-        tracked = [x.decode("utf-8", "replace") for x in gp.stdout.split(b"\0") if x]
-    except Exception:
+        tracked = git_ls_tree("HEAD")
+    except Exception as e:
         tracked = []
+        self_err = (self_err + " ; tracked:" + str(e)[:80]).strip(" ;")
     roots = {p.split("/")[0] if "/" in p else p for p in tracked}
-    dirs = {r for r in roots if (ROOT / r).is_dir()}
+    dirs = {r for r in roots if any(p.startswith(r + "/") for p in tracked)}
     # 归一化：本项目用 `_test/` 承担参照仓 `tests/` 的角色，不同名但同职能 ⇒ 映射后计数，
     # 否则"文档齐备度 8/9 vs 9/9"的差别只是目录取名不同，属于假差距
     own = {("tests" if x == "_test" else x) for x in dirs} | {p for p in tracked if "/" not in p}
@@ -303,16 +364,25 @@ def self_metrics():
         for cap, fn in CAP_RULES.items():
             if len(p) < 300 and fn(p):
                 caps.add(cap)
-    if any("/api/emotion" in f.read_text("utf-8", errors="replace") for f in src.glob("js/*.js")):
-        caps.add("emotion_backend_wired")
+    try:
+        if any("/api/emotion" in git_blob(p, "HEAD")
+               for p in tracked if p.startswith("src/js/") and p.endswith(".js")):
+            caps.add("emotion_backend_wired")
+    except Exception as e:
+        self_err = (self_err + " ; emotion:" + str(e)[:80]).strip(" ;")
     return {"repo": "xinyu-soulisle (私有归档仓，本项目)", "tier": "self",
             "stars": None, "pushed_at": None, "latest_release": None,
-            "ci_workflows": jobs or None, "language": "JavaScript/Java",
+            "ci_workflows": ci_jobs or None, "language": "JavaScript/Java",
             "license": None, "default_branch": "main",
             "docs": docs, "caps": sorted(caps), "file_count": files,
             "caps_blind": blind_spot_caps(ROOT, tracked, caps),
-            "src_loc_excl_vendor": loc, "regression_suites": battery,
+            "src_loc_excl_vendor": src_loc, "regression_suites": battery,
+            "regression_suites_face": battery_face,
             "regression_script_files": suites_files,
+            "self_face": self_face, "self_face_errors": self_err or None,
+            "worktree_extra_untracked": worktree_extra,
+            "worktree_only_src_files": ignored_src,
+            "ci_yml_error": ci_err or None,
             "battery_parse_error": battery_err or None}
 
 
@@ -438,6 +508,19 @@ def selftest():
         if blind_spot_caps(troot, ["src/chat.js"], {"streaming"}):
             print("SELFTEST-FAIL: 文件名匹配器已看见的能力仍进盲区名单（重复计数）")
             return 1
+    # r71：self 行的取数面必须是 git HEAD ⇒ 人口由 ls-tree 给出，未入库的件**结构上**不在人口里。
+    # 反例的专属输入面：往合成人口里塞一件 `*_check.py` 形状的"在途件"，先证计数器真的会数它
+    # （否则"它没被数"只是因为计数器恒零），再证从人口里去掉它 ⇒ 计数恰好少一。
+    pop = ["src/js/app.js", "src/index.html", "_test/foo_check.py", "_test/j2_chat_contract.py", "README.md"]
+    n_all, srcs_all, scripts_all = summarize_self_paths(pop)
+    n_wo, srcs_wo, scripts_wo = summarize_self_paths([x for x in pop if x != "_test/foo_check.py"])
+    if (n_all, len(scripts_all)) != (2, 2) or (n_wo, len(scripts_wo)) != (2, 1):
+        print("SELFTEST-FAIL: r71 取数面控制失效（加一件应 +1、减一件应 -1，实测 "
+              f"{(n_all, len(scripts_all))} / {(n_wo, len(scripts_wo))}）")
+        return 1
+    if summarize_self_paths([]) != (0, [], set()):
+        print("SELFTEST-FAIL: 零人口却给出非零计数（违反「零输入不得记 PASS」）")
+        return 1
     # 第二条离线观测通道（r31）：四类各一条 + 两条反向 + 一个变异体，缺任一 = 判据不可信
     samples = {
         "app_shell": ("This PWA ships a **service worker** (sw.js) using workbox precaching, "
@@ -493,7 +576,8 @@ def selftest():
           "分母证明正确（1 有效 / 2 盲区点名，健康仓不误踢）；"
           "r30 盲区点名三侧正确（有证据→点名、无证据→空、已看见→不重复）；"
           "r31 离线四分类各判对 + 训练语境不冒充离线壳 + 摘掉归因正则即翻判（变异体）+ 零输入判 none；"
-          f"r70 vector_memory 匹配器 {len(_must_red)} 条假阳全拒 + {len(_must_green)} 条真阳全收")
+          f"r70 vector_memory 匹配器 {len(_must_red)} 条假阳全拒 + {len(_must_green)} 条真阳全收；"
+          f"r71 self 行取数面 = git HEAD（未入库件结构性进不了人口，零人口不判绿）")
     return 0
 
 

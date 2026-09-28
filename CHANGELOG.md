@@ -9,6 +9,23 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Fixed（r71 · 台账的取数面换到 git，另把"吞标题"升成阻断判据 R6）
+- **self 行取数面统一 = `git HEAD`**：`_test/benchmark_metrics.py` 的 `self_metrics()` 原先只有 SUITES 走 git，
+  src 行数/文件数、判据脚本数、CI job 数、docs/caps 人口都 `rglob` **工作树** ⇒ 两件事被写成"横向现状"：
+  ① 把按红线 gitignore 的本机密钥件 `src/js/demo-config.js` 算进"与 16 仓同构的 src 统计"
+  （历史报告因此一直写 2,516 行 / 20 文件；HEAD 面真值 **2,488 行 / 19 文件**）；
+  ② 把并行会话**尚未入库**的 2 条在途套件算成"电池现状 101"（HEAD 实数 **99**，CI 干净克隆复算不出）。
+  修法：人口取 `git ls-tree -r HEAD`＋正文取 `git show HEAD:<path>`；面取不到即记 `self_face=取数失败`，
+  **禁止静默退回工作树**。三向控制入 `--selftest`：合成人口加/减一件 `*_check.py` ⇒ 计数 +1/-1、零人口不判绿。
+- **R6 新判据（CHANGELOG 段落标题只增不减）**：动因是 r70 我自己拿"既有条目行的前缀"当 Edit 锚点、
+  替换文本里没回写 ⇒ 一整条 `### Fixed（r69 · …）` 静默消失，全靠人眼比 `numstat 20/1` 才发现。
+  两个基准面各管一段窗口：`HEAD` 管未提交的吞行、`HEAD~1` 管已提交的吞行；都取不到 ⇒ `R6(未验)` 不判绿。
+  `--selftest` **17/17→21/21**（边界 I 正例／J 吞行必红且点名／K 无基准⇒未验／L 零改动⇒零误报）。
+  双向验真：真实历史两笔驱动同一判据（`20f0da6→ea8a0b3` 判红并点名 r69 标题；`→6ac8722` 转绿）；
+  **变异只打在副本**（守本轮新立的 A-get-memory ⑰-b）：摘掉 R6 判红分支 ⇒ 边界J 翻红 `20/21`，真实源 sha 前后相等。
+- **一次采集失效如实登记**：当日第 2 次采集跑在我正改采集器源码的当口 ⇒ 读数作废，第 3 次才作数
+  （同族：r70 的 `eol_parity` 瞬时红发生在整跑期间改文档）。纪律补一句：**整跑/采集期间本会话不改仓内文件**。
+
 ### Fixed（r70 · 台账里一格被尺子造出来的能力 + 分类腿的 60s 挂起预算 + 部署产物第一次有闸）
 - **`vector_memory` 假阳更正**：`_test/benchmark_metrics.py` 的 `CAP_RULES` 用裸子串 `"rag" in path`
   认「向量记忆」，于是 self 那一格由 `_test/storage_resilience_check.py` 与

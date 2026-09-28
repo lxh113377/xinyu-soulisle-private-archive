@@ -8,7 +8,7 @@
 11 个 feat**（r40c/r40d/r41/r42/r43/r44/r45 整轮的功能增量），全躺在 `CHANGELOG [Unreleased]` 的
 20 条 bullet 里没有切版。⇒ **滞后指标只看两端时间，看不见中间增量**，这就是本件要补的形状。
 
-五条判据（R1/R2/R3 阻断，R4 只报，R5 明确不重复造）：
+六条判据（R1/R2/R3/R6 阻断，R4 只报，R5 明确不重复造）：
   R1 距上次切版的 feat 增量 ≤ CEILING（5）。超了就是「攒了够多能力却还在用旧版本号对外」。
      取 5 而非 0：0 会让每轮对标都必先切版才能推进，把判据变成拦路的闸门（advisory 不拦、
      阻断要留真实余量）。当前值与上限一起印进行里，余量可见。
@@ -21,6 +21,13 @@
         计数型判据被存量掩盖 = 恒真风险的又一形态，故改成按轮次集合求差。取数面上只对
         commit 正文里**确实存在**的 `rNN` 求差，无轮次号的提交不新增要求（不误伤）。
   R3 最新 tag 必须能在 CHANGELOG 里找到对应段（`## [x.y.z]`）⇒ 发出去的版本有说明
+  R6 CHANGELOG 的 `### ` 段落标题集对上一版**只增不减**（r71 落地）。
+     动因是 r70 我自己的一手代价：拿"既有条目行的前缀"当 Edit 锚点、替换文本里没把原表头回写
+     ⇒ 一整条 `### Fixed（r69 · …）` 静默消失，`git diff --numstat` 的 20/1 才被看见，靠的是人眼。
+     本仓纪律＝「补更正注不删原文」，标题留着才是下一轮对账的锚，故有意改名也必须把原标题留下。
+     取数面**两个基准都要看**：`HEAD` 管"还没提交的吞行"（出事那一层在本机），
+     `HEAD~1` 管"已经提交的吞行"（CI/干净克隆里 worktree==HEAD，只看 HEAD 会恒等而看不见失效）；
+     两个基准都取不到（浅克隆/首提交）⇒ 记 `R6(未验)` 并**不得记为通过**（零输入不判绿）。
   R4 发布滞后天数：**只报不拦**。墙钟判据会在「零提交」的情况下自己从绿翻红，
      那是时间的颜色不是代码的颜色，进默认链就是误报源（本机既有铁律：默认链禁墙钟断言）。
   R5 版本三源对账（tag == pom == 文档）**已由 `repo_config_check.py` G12 负责**，本件不重复实现
@@ -158,8 +165,21 @@ def tag_section_present(md_text, tag):
     return bool(re.search(r"^## \[?v?" + re.escape(v) + r"\]?", md_text, re.M))
 
 
-def judge(tag, commits, bullets, md_text, ceiling=CEILING):
-    """纯函数：输入全是已解析好的读数（含 CHANGELOG 正文），故 selftest 不碰 git、不碰本机状态。"""
+HEAD_LINE_RE = re.compile(r"(?m)^### .*$")
+
+
+def heading_set(md_text):
+    """CHANGELOG 的段落标题集（`### ` 整行）。R6 用它做「只增不减」的对照。"""
+    return set(HEAD_LINE_RE.findall(md_text or ""))
+
+
+def judge(tag, commits, bullets, md_text, ceiling=CEILING, prev_bases=None):
+    """纯函数：输入全是已解析好的读数（含 CHANGELOG 正文），故 selftest 不碰 git、不碰本机状态。
+
+    `prev_bases`＝[(基准名, 该基准的 CHANGELOG 正文), …]（main 取 HEAD 与 HEAD~1 两面）。
+    **取不到就必须不传**，R6 于是记「未验」而不是记「通过」——浅克隆里没有 HEAD~1，
+    把「看不见」当成「没消失」就会造出一条在 CI 上永远绿的假腿。
+    """
     bad, warn, notes = [], [], []
     if not tag:
         return ["R0 取不到最新 tag（describe 与 ls-remote 双否）⇒ 本件无权威源，不判绿"], [], []
@@ -191,6 +211,29 @@ def judge(tag, commits, bullets, md_text, ceiling=CEILING):
     days = lag_days(commits)
     if days is not None:
         warn.append("R4(只报) 距上次切版 %.1f 天、%d 个 commit" % (days, n))
+    # R6：CHANGELOG 段落标题集对上一版**只增不减**（r70 一手代价：拿既有条目行当 Edit 锚点、
+    #     替换文本里没把它回写 ⇒ 一整条 `### Fixed（r69 · …）` 静默消失，靠人眼看 numstat 才抓到）。
+    #     有意改写标题在本仓不是理由——纪律是「补更正注不删原文」，标题留着才是下一轮对账的锚。
+    # R6：CHANGELOG 段落标题集对上一版**只增不减**（r70 一手代价：拿既有条目行当 Edit 锚点、
+    #     替换文本里没把它回写 ⇒ 一整条 `### Fixed（r69 · …）` 静默消失，靠人眼看 numstat 才抓到）。
+    #     有意改写标题在本仓不是理由——纪律是「补更正注不删原文」，标题留着才是下一轮对账的锚。
+    #     两个基准面各管一段窗口：HEAD 管「还没提交的吞行」（本机＝出事那一层），
+    #     HEAD~1 管「已经提交的吞行」（CI/干净克隆里 worktree==HEAD，只看 HEAD 会恒等而看不见失效）。
+    if not prev_bases:
+        warn.append("R6(未验) 取不到 CHANGELOG 的任何上一版基准（浅克隆/首提交）⇒ 段落完整性未验证，不得记为通过")
+    else:
+        cur_h = heading_set(md_text)
+        lost_all, seen = [], set()
+        for label, text in prev_bases:
+            lost = sorted(heading_set(text) - cur_h)
+            notes.append("R6[%s] 基准标题 %d 条｜消失 %d 条" % (label, len(heading_set(text)), len(lost)))
+            for x in lost:
+                if x not in seen:
+                    seen.add(x)
+                    lost_all.append((label, x))
+        if lost_all:
+            bad.append("R6 CHANGELOG 段落标题消失 %d 条：%s ⇒ 把原标题按原文加回去（本仓纪律＝补更正注不删原文）"
+                       % (len(lost_all), " ; ".join("%s 缺 %s" % (lb, x[:52]) for lb, x in lost_all[:2])))
     return bad, warn, notes
 
 
@@ -288,7 +331,37 @@ def selftest():
         ok += 1
     else:
         fail.append("边界H 空输出未留 rc：%s" % gh_err_text(4, ""))
-    total = len(cases) + 8
+    # 边界 I..L：R6「CHANGELOG 段落标题只增不减」——r70 我自己吞掉一条 r69 标题才立的这条规矩
+    _NL = chr(10)
+    PREV = _NL.join(["## [Unreleased]", "### Added（r70 · 甲）", "- 一条",
+                     "### Fixed（r69 · 乙）", "- 两条", "", "## [1.5.0] - 历史", ""])
+    CUR_OK = _NL.join(["## [Unreleased]", "### Added（r71 · 丙）", "- 新",
+                      "### Added（r70 · 甲）", "- 一条", "### Fixed（r69 · 乙）", "- 两条",
+                      "", "## [1.5.0] - 历史", ""])
+    CUR_LOST = _NL.join(["## [Unreleased]", "### Added（r71 · 丙）", "- 新",
+                        "### Added（r70 · 甲）", "- 一条", "", "## [1.5.0] - 历史", ""])
+    COMMITS = [("feat(r71): 新", "2026-09-28T10:00:00+08:00")]
+    _b, _w, _n = judge("v1.5.0", COMMITS, 3, CUR_OK, prev_bases=[("HEAD", PREV)])
+    if not any("R6" in x for x in _b):
+        ok += 1
+    else:
+        fail.append("边界I 正例（标题只增）被 R6 误判红：%s" % _b)
+    _b2, _w2, _n2 = judge("v1.5.0", COMMITS, 3, CUR_LOST, prev_bases=[("HEAD", PREV)])
+    if any("R6" in x for x in _b2) and "r69 · 乙" in " ".join(_b2):
+        ok += 1
+    else:
+        fail.append("边界J 反例（吞掉一条标题）未咬或没点名标题：%s" % _b2)
+    _b3, _w3, _n3 = judge("v1.5.0", COMMITS, 3, CUR_OK)
+    if not any("R6" in x for x in _b3) and any("R6(未验)" in x for x in _w3):
+        ok += 1
+    else:
+        fail.append("边界K 无基准面时把「看不见」当通过（应记 R6(未验) 且不判红）：bad=%s warn=%s" % (_b3, _w3))
+    _b4, _w4, _n4 = judge("v1.5.0", COMMITS, 3, PREV, prev_bases=[("HEAD", PREV), ("HEAD~1", PREV)])
+    if not any("R6" in x for x in _b4) and all("消失 0 条" in x for x in _n4 if x.startswith("R6")):
+        ok += 1
+    else:
+        fail.append("边界L 同一基准（零改动）误报消失或读数没进 notes：bad=%s notes=%s" % (_b4, _n4))
+    total = len(cases) + 12
     for x in fail:
         print("  SELFTEST-FAIL " + x)
     print("RELEASE-GOV-SELFTEST: %d/%d" % (ok, total))
@@ -312,14 +385,21 @@ def main():
     log_rows, log_err = commits_since(tag)
     commits, chan = resolve_commits(log_rows, log_err, tag)
     bullets = unreleased_bullets(md_text)
-    bad, warn, notes = judge(tag, commits, bullets, md_text, a.ceiling)
+    prev_bases, prev_rc = [], []
+    for label in ("HEAD", "HEAD~1"):
+        txt, rc = git("show", "%s:CHANGELOG.md" % label)
+        prev_rc.append("%s=%s" % (label, "ok" if (rc == 0 and txt.strip()) else "取不到"))
+        if rc == 0 and txt.strip():
+            prev_bases.append((label, txt))
+    bad, warn, notes = judge(tag, commits, bullets, md_text, a.ceiling, prev_bases)
     for w in warn:
         print("   ℹ️ " + w)
     if a.json:
         print(json.dumps({"tag": tag, "tag_source": src, "commit_channel": chan,
                           "commits": len(commits or []),
                           "feats": len([c for c in (commits or []) if FEAT_RE.match(c[0])]),
-                          "unreleased_bullets": bullets, "notes": notes, "problems": bad},
+                          "unreleased_bullets": bullets, "prev_bases": prev_rc,
+                          "notes": notes, "problems": bad},
                          ensure_ascii=False))
     for b in bad:
         print("  · FAIL " + b)
