@@ -9,6 +9,37 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Added（r76 · 四个 0% 覆盖类补到构建期 + 覆盖率门 0.35→0.85；新锁当场打出 AC-OBS-09 的过期数字）
+- **本轮做的是 r75 §4 的第 1 步**：补 `/api/emotion`·`/api/memory`·`/api/chat`·`MemoryService` 四类 0% 用例
+  （缺口 277/401 行 = 69% 集中在这四张类），顺带把 `/api/health` 与 `ApiTokenFilter` 也从「只有带外验过」
+  升为构建期用例。新增 6 个测试类：`EmotionControllerTest`(10)·`MemoryControllerTest`(4)·`ChatControllerTest`(5)·
+  `MemoryServiceTest`(5)·`HealthControllerTest`(2)·`ApiTokenFilterTest`(4)。
+  现测 `find server/src/test/java -name '*.java' | wc -l` = **10**、`grep -rho @Test … | wc -l` = **62**。
+- **形态取舍（写进注释，防后人再问一遍）**：四个控制器一律**直接调用方法**取 `ResponseEntity` 断言，不走 MockMvc——
+  `ChatController` 返回 `StreamingResponseBody`，standalone MockMvc 对该返回类型的处理器注册是否齐备不确定，
+  直接调用既覆盖全部行、又不把结论押在 MVC 装配细节上；上游/mapper 一律 Mockito 假对象，构建期不联网、
+  **不碰 `server/data/` 那份演示库**（06-constraints 的 env_mode 红线）。
+- **覆盖率门抬档且先证它有牙**：LINE **268/669 = 40.06% → 615/669 = 91.93%**（23 类里 10 个 0% → 只剩
+  `SoulIsleApplication` 3 行），`<minimum>` 0.35 → **0.85**（不取 0.90：只剩 1.93 点＝零余量地板，同 r75 那条算法）。
+  验牙＝把阈值临时改 0.99 跑 `mvn -B -ntp -f server/pom.xml test jacoco:check@jacoco-check-line-coverage`
+  ⇒ `rc=1` + 红因 `lines covered ratio is 0.91, but expected minimum is 0.99`；随后**按字节还原**
+  （还原前后 sha256 `626fe300…` 相等）再跑 ⇒ `rc=0` + `All coverage checks have been met`。顺序仍是先补测试再改那一行。
+- **新锁第一次真跑就打出一条挂了三轮的过期断言**（本轮最有用的一条）：
+  `EmotionControllerTest.evalOnRealDataset` 按 AGENTS.md 写的 `36 条 / 94.4% / crisis 3-3 / misses 两条` 直接判红，
+  磁盘与双端现值都是 **73 条 / 98.6% / 6-6 / misses 1 条**（评测集 09-23 由 36 扩到 73，`memory/03`·`06` 早就对，
+  只有**注入面 AGENTS.md** 没人重算标题数字）。处置＝按实测改判据的引用值 + 给 AGENTS.md 四处加更正注（保留原文当日为真），
+  而不是反过来改数据凑绿，也不是"报告里提一句"了事。
+- **两条边界由失败用例逼出来**（都是我先写错、实测否证，不是代码缺陷）：
+  ① 危机词短路比文档写的更靠前——实测连 `llm.hasKey()` 都不问，断言据此加了一条 `never()`；
+  ② **词典危机词表与 `SafetyGuard` 的输出高危词表是两套**，「跳楼」只在后者，测试夹具一度把它当前者用。
+- **踩坑实录（同族第 N 次，仍值得记）**：`Wrappers.lambdaQuery().eq(Entity::getX, …)` 在构建期不起容器时
+  会抛 `can not find lambda cache for this entity`——MP 的列名缓存由容器扫描实体时安装，
+  正解是 `TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Entity.class)`
+  只装缓存、不引数据源；另一条是 SSOT 的**注释里**同时出现过 `${XINYU_LEXICON}` 和裸 `window.__XINYU_LEXICON__`，
+  测试用「第一个花括号」定位会吃到注释里的 `{`，锚点必须带赋值号（`EmotionLexicon.java:117-119` 早就把这两个坑写在注释里）。
+- **未闭合**：`mvn verify` 的 CI 实跑回执要等本次推送后读 `java-build` 日志（本地仍不跑 `package`，
+  8123 上他人 08:36 起的 java 进程持有 jar ⇒ `preflight` 那条真红继续挂 R75-05，不代停不洗绿）。
+
 ### Added（r75 · 质量门同址尺「能不能让构建失败」＋ Java 覆盖率门（jacoco，阈值 0.35 带余量））
 - **换尺到没人量的那一半**：`_test/peer_quality_tooling_probe.py`（r58）自己写明天花板是
   「覆盖率与缺陷率都不在本轮取数面内」——它量的是**配置在不在、CI 有没有执行位**；

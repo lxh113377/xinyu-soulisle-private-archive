@@ -149,7 +149,7 @@
 - `交付物/` — iCAN 评审文档与截图（`iCAN评审/`）、提交包大纲（`提交包/`）
 
 ### 验证与记忆
-- `_test/` — 常驻回归脚本：`browser_check.py`（离线降级链路 + 回滚可见性 + 双色 + 滚动淡入淡出）、`pixel_dual_check.py`（双色像素级三用例）、`lightshow_check.py`、`online_check.py`、`public_check.py`、`emotion_eval.js` + `emotion-eval-dataset.json`（36 条评测集）；`_shots/`（脚本生成的截图，已 ignore）
+- `_test/` — 常驻回归脚本：`browser_check.py`（离线降级链路 + 回滚可见性 + 双色 + 滚动淡入淡出）、`pixel_dual_check.py`（双色像素级三用例）、`lightshow_check.py`、`online_check.py`、`public_check.py`、`emotion_eval.js` + `emotion-eval-dataset.json`（评测集：现 **73 条**，本行旧值 36 条见更正注 r76）+ Java 构建期测试 10 类/62 用例（**在 `server/src/test/java/`，不在 `_test/`**）；`_shots/`（脚本生成的截图，已 ignore）
 - `memory/` — 本项目交接记忆（01–08 + `AGENTS.md` 绑定表 + 阶段基线文件）
 - `archive/` — 阶段归档（`A-project-handoff archive` 产出）
 - `.codebuddy/` — 工作记忆与会话数据（已 ignore，勿删）
@@ -233,7 +233,7 @@
 - **结论**：**按原定方向继续用 Java**，不返工。
   - 支持 Java 的三条真实理由：① 产物干净（fat jar，无需 venv 管理）② 强类型 + 可单测（36 条评测可做成 JUnit，比跑 node 脚本正规）③ 部署不受平台风控挟制（⚠️ 此条与语言无关，Python 容器化同样能做到）
     ⚠️ **第②条曾长期是空头主张（r41 实测更正，2026-09-27）**：从 09-20 立此理由到 09-26，`server/src` 下 JUnit 用例数 = **0**、
-    `pom.xml` 连 junit 依赖都没有 ⇒ 「可单测」是**能力声称**而非**产物**。现已补齐：4 个测试类 / 30 个用例（**更正注 r75，2026-09-28**：现测 `grep -rho @Test server/src/test/java | wc -l` = **32**——r73 给分类器补的 2 条超时/危机短路用例；原文按当日为真保留不改写）
+    `pom.xml` 连 junit 依赖都没有 ⇒ 「可单测」是**能力声称**而非**产物**。现已补齐：4 个测试类 / 30 个用例（**更正注 r75，2026-09-28**：现测 `grep -rho @Test server/src/test/java | wc -l` = **32**——r73 给分类器补的 2 条超时/危机短路用例；原文按当日为真保留不改写。**更正注 r76，2026-09-29**：r76 把「36 条评测可做成 JUnit」这句话真正做成产物——`EmotionControllerTest` 在构建期复跑评测集，并当场打出 AC-OBS-09 引用的 `94.4% / 3-3` 已是过期值（现值 73 条 / 98.6% / 6-6）；新增 6 个测试类后现测 = **10 类 / 62 @Test**，jacoco LINE **40.06% → 91.93%**，覆盖率门阈值随之 0.35 → **0.85**（顺序仍是先补测试再改那一行））
     （`EmotionLexiconTest`·`EmotionEngineTest`·`EmotionClassifierTest`·`SafetyGuardTest`），并由常驻判据
     `_test/java_test_guard.py` 盯住三件事：用例数下限、`pom` 里 starter-test 在位、**CI 的 java-build 构建步不得带 `-DskipTests`**
     （否则这个门禁会在受理面上静默消失，而本地看到的仍是「CI 全绿」）。复算：`mvn -B -f server/pom.xml test`。
@@ -266,10 +266,13 @@
 - **理由**：本项目是对外演示的**单体**应用，需求只是"私有部署时别让人随便打接口"；引入全家桶会带来配置复杂度与依赖体积，收益不匹配。
 - **已知代价**：**无多用户 / 无角色 / 无会话管理**。若将来要做账号体系，需重新评估（届时 Spring Security 才有价值）。
 - **实测**：无 token 放行 200；有 token 时 无头 401 / 错头 401 / 对头 200 / `/api/health` 与静态页放行。
+  更正注 r76（2026-09-29）：这一条自 J5 起只有 curl 带外验过、构建期 0 用例；现由
+  `server/src/test/.../config/ApiTokenFilterTest`（4 例，含「null/纯空白 token 都按放行」与「/apifoo 不被
+  `startsWith("/api/")` 误伤」两条边界）钉住，复算 `mvn -B -f server/pom.xml test`。
 
 ### 决策 #5 —— 评测集不复制进 jar
 
-- **背景**：`GET /api/emotion/eval` 需读 36 条评测集。
+- **背景**：`GET /api/emotion/eval` 需读 36 条评测集。（更正注 r76：现为 **73 条**，见 `memory/06-constraints.md` 评测集隔离清单；本行是 09-22 当日值）
 - **结论**：从 `_test/emotion-eval-dataset.json` **直读**（`XINYU_EVAL_DATASET` 可覆盖），不复制进 `resources/`。
 - **理由**：同决策 #2 —— 消灭第二份副本，保证「Java 侧跑的就是 JS 侧跑的那份数据」，这也是双端对账能逐项一致的前提。
 - **已知代价**：jar 离开项目目录后需显式设置 `XINYU_EVAL_DATASET`（Docker 已处理）。
@@ -350,7 +353,10 @@
 ### 分阶段（每阶段都要能跑、能回归，禁止一次性推倒重写）
 - [x] **J1 骨架** ✅ 2026-09-21：`server/`（Maven 3.9.9 + Spring Boot 3.2.5 + JDK 17）+ `/api/health` + 托管现有前端静态页（**直读 `src/` 权威源，零副本**）→ `java -jar server\target\soulisle-server.jar --server.port=8123` 实测 `status=UP` / `webRoot` 解析到项目 `src/` / `indexFound=true` / `vendorFound=true`，首页与 `js`、`css`、`vendor` 全 200；`_test/browser_check.py` **原样复用（同端口 8123）ALL-ASSERT-PASS**。对照组：换回旧 `python -m http.server` 同为 4 条 `ERR_CONNECTION_REFUSED` ⇒ 该错误出自脚本自注入的不可达端点 `127.0.0.1:18123`（离线降级用），与 Java 服务端无关
 - [x] **J2 API 契约对齐** ✅ 2026-09-22：`POST /api/chat` 与 v1 **1:1**（契约实读自 `deploy/functions/api/chat.js` + `src/js/chat-agent.js:25-43`，非凭记忆）。请求认 `{messages,temperature,max_tokens}`；**上游响应逐字透传**（含 status）；错误体与 v1 完全一致（`no-key` 500 / `bad-json` 400 / `upstream-nonjson` / `upstream-error` 502），且**判定顺序一致**（先查 key 再解析 body）。验收：`_test/j2_chat_contract.py` **J2-CONTRACT-PASS**（A 组走 Java 965ms 在线 / B 组不可达端点 3ms 回落离线，单变量对照）+ curl 三例（no-key 500、bad-json 400、真实调用 200 中文无损）+ `browser_check.py` ALL-ASSERT-PASS
-- [x] **J3 情绪引擎 Java 化** ✅ 2026-09-22：`engine` 包（`EmotionLexicon` 词表逐字搬 / `EmotionEngine.scan` 同公式 / `EmotionClassifier` 双路）+ `POST /api/emotion` + `GET /api/emotion/eval`。**双端逐项对账完全一致**：Java 侧 `94.4%` / `crisis_recall 3/3` / `per_class` 七类全同 / `misses` 两条逐字相同（JS 侧 `node _test/emotion_eval.js` 为对照）。危机命中**不调 LLM**（实测 `llm=null`）；分歧案例 `lex anger 0.625 vs llm sadness 0.75 → 采信 LLM` 与前端路径一致
+- [x] **J3 情绪引擎 Java 化** ✅ 2026-09-22：`engine` 包（`EmotionLexicon` 词表逐字搬 / `EmotionEngine.scan` 同公式 / `EmotionClassifier` 双路）+ `POST /api/emotion` + `GET /api/emotion/eval`。**双端逐项对账完全一致**：Java 侧 `94.4%` / `crisis_recall 3/3` / `per_class` 七类全同 / `misses` 两条逐字相同（JS 侧 `node _test/emotion_eval.js` 为对照）。危机命中**不调 LLM**（实测 `llm=null`）；分歧案例 `lex anger 0.625 vs llm sadness 0.75 → 采信 LLM` 与前端路径一致。
+      更正注 r76（2026-09-29）：本行的 `94.4% / 3/3 / misses 两条` 为当日值，现值 **98.6% / 6-6 / misses 1 条**（评测集 09-23 扩至 73 条）；
+      「危机命中不调 LLM」与「分歧采信 LLM」两条本轮升为构建期用例（`EmotionControllerTest`），且实测危机分支**连 `hasKey()` 都不问**——优先级比原描述更严。
+      另本轮实测补一条边界：**「跳楼」不在词典危机词表里**（它是 `SafetyGuard` 的输出高危词），两套词表不得互相冒充。
 
 ## P0 — 必须做
 
@@ -399,6 +405,11 @@
 - [x] AC-OBS-07: 服务端托管前端静态页且能自证源命中 → `GET /api/health` 返回 `status=UP` + `webRoot` 绝对路径 + `indexFound=true` + `vendorFound=true`；首页与 `js/css/vendor` 均 200 | API响应
 - [x] AC-OBS-08: `POST /api/chat` 与 v1 契约 1:1（前端零代码改动即可切换） → `j2_chat_contract.py` **单变量对照**：A（proxy=Java）在线、B（不可达）回落离线；curl 补验 `no-key` 500 / `bad-json` 400 且**判定顺序与 v1 一致** | 测试输出 + API响应
 - [x] AC-OBS-09: 情绪引擎评测可现场复跑且双端一致 → `GET /api/emotion/eval` 返回 `accuracy=94.4%` / `crisis_recall=3/3`，且 `per_class`、`misses` 与 `node _test/emotion_eval.js` **逐项相同** | API响应 + 测试输出
+      ⚠️ **更正注 r76（2026-09-29 一手实测）**：本行的 `94.4% / 3-3 / misses 两条 / 36 条` 是 **09-22 当日值**，
+      评测集 09-23 由 36 扩到 **73 条**后标题数字没人重算（`memory/06-constraints.md` 与 `03-tech-stack.md` 是对的，
+      只有本注入面滞留旧值）。现值 **73 条 / 98.6% / crisis 6-6 / misses 1 条**，双端仍**逐项一致**（结论成立，数字过期）。
+      这条漂移本轮由新建的 `EmotionControllerTest.evalOnRealDataset` **当场打出来**（构建期第一次有 JUnit 锁这个接口），
+      并已在 `server/pom.xml` 覆盖率门 + `_test/java_test_guard.py` 之下成为常驻回归。
 - [x] AC-OBS-10: 情绪记忆真落库（跨浏览器、跨重启不丢） → `j4_memory_check.py` **核心断言**：清空 `localStorage` 后刷新星图仍点亮；`GET /api/memory/stats` 计数正确；重启服务后计数不变 | 数据库查询 + 测试输出
 - [x] AC-OBS-11: 密钥零落前端、零入库 → `public_check.py` 报 `KEY_LEAK: False`；`git grep -E "sk-[A-Za-z0-9]{20,}" HEAD` 0 命中 | 测试输出
 - [x] AC-OBS-12: 可选鉴权可开可关且边界正确 → 无 token 时全放行 200；有 token 时 无头 401 / 错头 401 / 对头 200，且 `/api/health` 与静态页**始终放行** | API响应

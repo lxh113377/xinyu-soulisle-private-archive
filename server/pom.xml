@@ -104,14 +104,21 @@
                     <limit>
                       <counter>LINE</counter>
                       <value>COVEREDRATIO</value>
-                      <!-- 阈值＝2026-09-28 实测 LINE 覆盖率 268/669 = 40.06% **再下探一档**取 0.35。
-                           为什么不取 0.40：40.06% 距 0.40 只有 0.06 个点＝"零余量地板"，
-                           任何一处未覆盖的改动都会把构建判红，逼人抬阈值而不是补测试（在册教训）。
-                           0.35 留 5.06 个点余量；**抬阈值的前置条件是先补测试再改这一行**，
-                           复算：`mvn -B -f server/pom.xml test` 后读 server/target/site/jacoco/jacoco.xml 的 LINE counter。
+                      <!-- 阈值沿革（每轮随实测更新，禁手抄上一轮）：
+                           · 2026-09-28 r75 立门：实测 LINE 268/669 = 40.06%，下探一档取 0.35（余量 5.06 点）。
+                           · 2026-09-29 r76 抬门：补齐四个 0% 类（EmotionController / MemoryController /
+                             ChatController / MemoryService）+ HealthController + ApiTokenFilter 后，
+                             实测 LINE **615/669 = 91.93%**，取 **0.85**（余量 6.93 点）。
+                           为什么不取 0.90：91.93 距 0.90 只剩 1.93 点＝零余量地板，任何一处未覆盖的新代码
+                           都会把构建判红，逼人抬阈值而不是补测试（r75 在册教训，同一把尺同一算法）。
+                           抬阈值的前提「先补测试再改这一行」本轮成立：本轮就是先补的测试，
+                           且 0.35 那一格从未被用来掩盖缺口（10 个 0% 类里 6 个本轮清零，剩 SoulIsleApplication 3 行）。
+                           复算：`mvn -B -f server/pom.xml test` 后读 server/target/site/jacoco/jacoco.xml 的 LINE counter；
+                           验牙：把上面 `<minimum>` 临时改成 0.99 跑 `mvn -B -ntp -f server/pom.xml test jacoco:check@jacoco-check-line-coverage`
+                           ⇒ 必须 rc=1 且红因带实测比值（**改完务必按字节还原**）。
                            绑在 verify 相位 ⇒ CI 必须跑 `mvn verify`（java-build job 已从 package 改过来），
                            否则这道门根本不会被执行（与 r41「CI 不得 -DskipTests」同族）。 -->
-                      <minimum>0.35</minimum>
+                      <minimum>0.85</minimum>
                     </limit>
                   </limits>
                 </rule>

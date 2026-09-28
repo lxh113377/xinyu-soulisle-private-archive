@@ -1,0 +1,145 @@
+package com.xinyu.soulisle.api;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xinyu.soulisle.entity.ChatMessage;
+import com.xinyu.soulisle.entity.EmotionRecord;
+import com.xinyu.soulisle.service.MemoryService;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.ResponseEntity;
+
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * {@code /api/memory/**} 契约守卫（r76；r75 实测本类目标 0% 覆盖、63 行）。
+ *
+ * <p>这里只锁**控制器的边界行为**：必填字段缺失一律 400、响应形状与计数串、
+ * 以及「服务端是权威副本」这条承诺下前端依赖的字段名。落库本身（clamp、limit 归一、
+ * 倒序反转）在 {@code MemoryServiceTest} 里锁，跨重启真落库在 {@code _test/j4_memory_check.py} 里锁。
+ *
+ * <p>MemoryService 用假对象：构建期不起容器、不碰 {@code server/data/} 那份**演示库**
+ * （06-constraints 的 env_mode 红线：测试不得写生产/演示数据面）。
+ */
+class MemoryControllerTest {
+
+    private static final ObjectMapper M = new ObjectMapper();
+
+    private static String text(ResponseEntity<byte[]> r) {
+        return new String(r.getBody(), StandardCharsets.UTF_8);
+    }
+
+    private static EmotionRecord emotion(long id, String e, double i) {
+        EmotionRecord r = new EmotionRecord();
+        r.setId(id);
+        r.setEmotion(e);
+        r.setIntensity(i);
+        r.setSecondary("sadness");
+        r.setText("今天答辩过了");
+        r.setCreatedAt(LocalDateTime.of(2026, 9, 28, 10, 30, 0));
+        return r;
+    }
+
+    @Test
+    @DisplayName("addEmotion：必填齐备则落库并回传该会话累计条数；intensity 非数字时按 0.5 缺省")
+    void addEmotionHappyPath() throws Exception {
+        MemoryService svc = mock(MemoryService.class);
+        when(svc.countEmotions("s1")).thenReturn(3L);
+        MemoryController c = new MemoryController(svc);
+
+        JsonNode b = M.readTree(text(c.addEmotion(
+                "{\"sessionId\":\"s1\",\"emotion\":\"joy\",\"intensity\":0.8,\"secondary\":\"sadness\",\"text\":\"过了\"}")));
+        assertTrue(b.path("ok").asBoolean());
+        assertEquals(3, b.path("count").asInt());
+        verify(svc).addEmotion("s1", "joy", 0.8, "sadness", "过了");
+
+        // intensity 传进来的是字符串 ⇒ 不是数字，必须落到 0.5 缺省（前端脏数据不打穿落库）
+        text(c.addEmotion("{\"sessionId\":\"s1\",\"emotion\":\"joy\",\"intensity\":\"很强烈\"}"));
+        verify(svc).addEmotion("s1", "joy", 0.5, null, null);
+    }
+
+    @Test
+    @DisplayName("addEmotion：缺 sessionId / 缺 emotion / 空体 / 坏 JSON / 非对象 一律 400 且不落库")
+    void addEmotionRejectsIncompleteBody() throws Exception {
+        MemoryService svc = mock(MemoryService.class);
+        MemoryController c = new MemoryController(svc);
+        assertEquals(400, c.addEmotion(null).getStatusCode().value());
+        assertEquals(400, c.addEmotion("").getStatusCode().value());
+        assertEquals(400, c.addEmotion("{\"emotion\":\"joy\"}").getStatusCode().value());
+        assertEquals(400, c.addEmotion("{\"sessionId\":\"s1\"}").getStatusCode().value());
+        assertEquals(400, c.addEmotion("[1]").getStatusCode().value());
+        assertEquals(400, c.addEmotion("{oops").getStatusCode().value());
+        assertEquals("{\"error\":\"bad-json\"}", text(c.addEmotion("{\"sessionId\":\"s1\"}")));
+        verify(svc, never()).addEmotion(anyString(), anyString(), anyDouble(), any(), any());
+    }
+
+    @Test
+    @DisplayName("emotions：逐条回传前端曲线要的全部字段，createdAt 为空时不写成当前时间")
+    void emotionsMapped() throws Exception {
+        MemoryService svc = mock(MemoryService.class);
+        when(svc.emotions("s1", 200)).thenReturn(List.of(emotion(1, "joy", 0.7), emotion(2, "calm", 0.3)));
+        JsonNode arr = M.readTree(text(new MemoryController(svc).emotions("s1", 200)));
+        assertEquals(2, arr.size());
+        for (String k : new String[] {"id", "emotion", "intensity", "secondary", "text", "createdAt"}) {
+            assertTrue(arr.get(0).has(k), "缺字段 " + k);
+        }
+        assertEquals("2026-09-28T10:30", arr.get(0).path("createdAt").asText());
+
+        EmotionRecord bare = new EmotionRecord();
+        bare.setId(9L);
+        when(svc.emotions("s2", 50)).thenReturn(List.of(bare));
+        JsonNode arr2 = M.readTree(text(new MemoryController(svc).emotions("s2", 50)));
+        assertTrue(arr2.get(0).has("createdAt"), "字段必须在，否则前端读成 undefined");
+        assertTrue(arr2.get(0).path("createdAt").isNull(), "createdAt 为空不得伪造当前时间");
+    }
+
+    @Test
+    @DisplayName("addMessage：role 必填；messages/stats/clear 的响应形状与计数串是前端硬依赖")
+    void messageAndStats() throws Exception {
+        MemoryService svc = mock(MemoryService.class);
+        when(svc.countMessages("s1")).thenReturn(7L);
+        MemoryController c = new MemoryController(svc);
+
+        JsonNode added = M.readTree(text(c.addMessage("{\"sessionId\":\"s1\",\"role\":\"user\",\"content\":\"你好\"}")));
+        assertTrue(added.path("ok").asBoolean());
+        assertEquals(7, added.path("count").asInt());
+        verify(svc).addMessage("s1", "user", "你好");
+
+        assertEquals(400, c.addMessage("{\"sessionId\":\"s1\"}").getStatusCode().value());
+        assertEquals(400, c.addMessage("{\"role\":\"user\"}").getStatusCode().value());
+        assertEquals(400, c.addMessage("null").getStatusCode().value());
+
+        ChatMessage m = new ChatMessage();
+        m.setId(1L);
+        m.setRole("assistant");
+        m.setContent("我在");
+        m.setCreatedAt(LocalDateTime.of(2026, 9, 29, 1, 2, 3));
+        when(svc.messages("s1", 40)).thenReturn(List.of(m));
+        JsonNode arr = M.readTree(text(c.messages("s1", 40)));
+        assertEquals("assistant", arr.get(0).path("role").asText());
+        assertEquals("我在", arr.get(0).path("content").asText());
+        assertEquals("2026-09-29T01:02:03", arr.get(0).path("createdAt").asText());
+
+        when(svc.countEmotions("s1")).thenReturn(4L);
+        JsonNode st = M.readTree(text(c.stats("s1")));
+        assertEquals("s1", st.path("sessionId").asText());
+        assertEquals(4, st.path("emotions").asInt());
+        assertEquals(7, st.path("messages").asInt());
+
+        when(svc.clear("s1")).thenReturn(11);
+        JsonNode cleared = M.readTree(text(c.clear("s1")));
+        assertEquals(11, cleared.path("removed").asInt());
+    }
+}
