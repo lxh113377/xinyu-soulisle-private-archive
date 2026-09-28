@@ -36,7 +36,7 @@
 
 ## 五、未闭合（不折叠）
 
-R1↔切版锁死（实测 **`feats=8/5`**，且本轮 feat 提交后会到 9/5；须授权发布或授权降 advisory）｜`live_sync`/`ci_status` 待发布授权｜
+R1↔切版锁死（收口 16:2x 实测 **`feats=9/5`** rc=1；写本卷时为 8/5，"落盘后将到 9/5"的预测命中 ⇒ 锁每轮自紧一格；须授权发布或授权降 advisory）｜`live_sync`/`ci_status` 待发布授权｜
 `jar_shape` 未占独立 SUITES 名额（他方第 4 轮未入库，`census 在 HEAD 里=False`）｜
 两格能力的"证据文件行"待落 `docs/quality-gates.md`（同因，该文件在途）｜真机复跑｜flake 原文｜
 8123 旧 jar 进程｜焚诀根 5 个 0 字节散件（他人现场，G-b 拦）｜`i18n_locale` 按裁决排后
