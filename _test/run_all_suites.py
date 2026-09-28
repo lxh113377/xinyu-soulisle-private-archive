@@ -506,13 +506,17 @@ def main():
     top = sorted(times.items(), key=lambda kv: -kv[1])[:5]
     print("耗时 top5(秒): %s ｜ 合计 %.0fs ⇒ 并行方案只能在这个读数存在之后才提"
           % (", ".join("%s=%s" % (k, v) for k, v in top), sum(times.values())))
-    print(f"BATTERY: {len(results) - len(bad)}/{len(results)} rc=0", tail_msg)
+    # rc 必须由真退出码算出来再印：**本行此前长期硬印 `rc=0`**（r74 两面实测：本地整跑 rc=1、
+    # 同 SHA 的 CI job 也判 failure，而摘要行照旧印 "rc=0"）——这条摘要是人和机器共同的收口读数，
+    # 印错等于伪造回执（台账里"94/98 rc=0"那类句子全部来自它）。
+    bat_rc = 1 if (hard or crash) else (2 if (soft or quota) else 0)
+    print(f"BATTERY: {len(results) - len(bad)}/{len(results)} rc={bat_rc}", tail_msg)
     try:
         lock.unlink()
     except Exception:
         pass
     # 计费未验与软未验同档（非零、不给绿）；只有真判红/崩溃才是 rc=1
-    return 1 if (hard or crash) else (2 if (soft or quota) else 0)
+    return bat_rc
 
 
 if __name__ == "__main__":
