@@ -31,7 +31,7 @@
 
 - **采集器自己的源码也是被测面**：当日第 2 次采集跑在我改 `benchmark_metrics.py` 的当口 ⇒ 作废重跑。
   与 r70 `eol_parity` 瞬时红同族 ⇒ **整跑/采集期间本会话不改仓内文件**。
-- ⚠️ **R1 与切版规矩互相咬死（自我锁死）**：`release_governance` R1 现判红（6 个 feat＞上限 5）且是阻断项，
+- ⚠️ **R1 与切版规矩互相咬死（自我锁死）**：`release_governance` R1 现判红（**7 个 feat＞上限 5**，本轮自己的 feat 又把计数推一格）且是阻断项，
   而在册切版链条要求「push → **CI 绿** → `gh release create`」；CI 绿又要求 R1 不红 ⇒
   **唯一开环仍是发布授权**（消 `live_sync`）或把 R1 降为 advisory。本轮**两条都不擅自做**，交裁决。
 
