@@ -81,8 +81,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: mvn package
-        run: mvn -B -ntp -f server/pom.xml package
+      - name: mvn verify（覆盖率门绑在 verify 相位；写成 package 就等于没装这道门，r75）
+        run: mvn -B -ntp -f server/pom.xml verify
       # 产物自证（2026-09-25 r20 实证补）：本机曾在 **jar 进程存活时**跑 package —— Windows 文件锁让
       # spring-boot:repackage 无法把 soulisle-server.jar 改名为 .original，BUILD FAILURE 且磁盘上留下
       # 48,920B 的**瘦 jar**，而旧进程仍在内存里跑、/api/health 照常 200 ⇒ **假健康**。

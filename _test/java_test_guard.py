@@ -92,11 +92,51 @@ def check_ci_wiring(yml_text):
     return True, pkg[0].strip()[:60]
 
 
+JACOCO_PLUGIN = re.compile(r"<artifactId>jacoco-maven-plugin</artifactId>")
+JACOCO_CHECK_GOAL = re.compile(r"<goal>check</goal>")
+JACOCO_MINIMUM = re.compile(r"<minimum>\s*(0?\.\d+|1(?:\.0+)?)\s*</minimum>")
+JACOCO_CHECK_AT_VERIFY = re.compile(r"<phase>verify</phase>[\s\S]{0,240}?<goal>check</goal>")
+MVN_VERIFY = re.compile(r"mvn[^\n]*\bverify\b")
+
+
+def check_coverage_gate(pom_text):
+    """T6 覆盖率门本体：jacoco 在位 ∧ 有 check 目标 ∧ 有合法 <minimum> 数值。
+
+    只写 `prepare-agent`/`report` 的仓**量得到但不会拦** ⇒ 不算门（与 r75 同址尺同一口径：
+    "存在性 ≠ 行为"，必须能让构建失败）。
+    """
+    if not JACOCO_PLUGIN.search(pom_text or ""):
+        return False, "pom 里没有 jacoco-maven-plugin"
+    if not JACOCO_CHECK_GOAL.search(pom_text):
+        return False, "jacoco 只有 report（量得到、不拦人）⇒ 缺 check 目标"
+    m = JACOCO_MINIMUM.search(pom_text)
+    if not m:
+        return False, "check 目标在但没有 <minimum> 数值"
+    return True, "LINE 阈值 %s" % m.group(1)
+
+
+def check_gate_on_chain(yml_text):
+    """T7 门必须在链上：check 绑 verify 相位，CI 若仍跑 `package` 则这道门**永远不会执行**。
+
+    这条与 r41 的「CI 不得 -DskipTests」同族——那次是门禁被跳过，这次是门禁相位不触发；
+    两者都会让"本地全绿 + CI 也绿 + 门其实没装"同时成立。
+    """
+    m = re.search(r"^  java-build:(.*?)^  [a-z0-9-]+:\s*$", yml_text or "", re.S | re.M)
+    if not m:
+        return False, "java-build job 未找到"
+    block = m.group(1)
+    if MVN_VERIFY.search(block):
+        return True, "CI 跑 verify（覆盖率门会被触发）"
+    return False, "CI 未跑 verify ⇒ jacoco check（绑 verify 相位）永不执行"
+
+
 def evaluate(test_root, main_root, pom_text, yml_text):
     """返回 (rows, ok)。rows = [(判据, 通过?, 值/原因)]"""
     st = scan_tests(test_root, main_root)
     has_dep, has_workdir = check_pom(pom_text)
     wired, why = check_ci_wiring(yml_text)
+    gate_ok, gate_why = check_coverage_gate(pom_text)
+    chain_ok, chain_why = check_gate_on_chain(yml_text)
     rows = [
         ("T1a 测试文件数", len(st["files"]) >= FILE_FLOOR,
          "%d 件（下限 %d，余量 %d）" % (len(st["files"]), FILE_FLOOR, len(st["files"]) - FILE_FLOOR)),
@@ -107,6 +147,8 @@ def evaluate(test_root, main_root, pom_text, yml_text):
         ("T3 surefire workingDirectory", has_workdir, "须指向 ${project.basedir}/.. （词表 SSOT 前提）"),
         ("T4 CI 接线未断", wired, why),
         ("T5 分母非空", st["main_classes"] > 0, "main 侧 java 类 %d 个" % st["main_classes"]),
+        ("T6 覆盖率门（jacoco check + 阈值）", gate_ok, gate_why),
+        ("T7 覆盖率门在链上（CI 跑 verify）", chain_ok, chain_why),
     ]
     return rows, all(r[1] for r in rows), st
 
@@ -128,8 +170,12 @@ def main():
         print("  %-26s %s  %s" % (name, "OK  " if passed else "FAIL", val))
     detail = "；".join("%s=%s" % (r[0].split()[0], r[2]) for r in rows)
     if ok:
-        print("JAVA-TEST-GUARD-PASS（in-build 单测 %d 件 / %d 用例，CI java-build 构建步未跳测）"
-              % (len(st["files"]), st["methods"]))
+        t6 = next((r for r in rows if r[0].startswith("T6")), ("T6", False, "未取到"))
+        t7 = next((r for r in rows if r[0].startswith("T7")), ("T7", False, "未取到"))
+        print("JAVA-TEST-GUARD-PASS（in-build 单测 %d 件 / %d 用例，CI java-build 构建步未跳测，"
+              "覆盖率门 %s｜%s｜链上 %s）" % (len(st["files"]), st["methods"],
+                                        "在位" if t6[1] else "缺", t6[2],
+                                        "是" if t7[1] else "否"))
         if a.json:
             print(json.dumps({"files": st["files"], "methods": st["methods"]}, ensure_ascii=False))
         return 0
@@ -141,13 +187,35 @@ def main():
 # ---------------- 双向自证（正反例都必须在夹具里成立） ----------------
 GOOD_POM = ("<dependency><artifactId>spring-boot-starter-test</artifactId>"
             "<scope>test</scope></dependency>"
-            "<workingDirectory>${project.basedir}/..</workingDirectory>")
-BAD_POM_NODEP = "<workingDirectory>${project.basedir}/..</workingDirectory>"
-BAD_POM_NOWD = "<artifactId>spring-boot-starter-test</artifactId><scope>test</scope>"
-GOOD_CI = "  java-build:\n    steps:\n      - run: mvn -B -ntp -f server/pom.xml package\n  live-sync:\n"
-BAD_CI_SKIP = ("  java-build:\n    steps:\n      - run: mvn -B -ntp -f server/pom.xml package"
+            "<workingDirectory>${project.basedir}/..</workingDirectory>"
+            "<plugin><artifactId>jacoco-maven-plugin</artifactId>"
+            "<execution><phase>verify</phase><goals><goal>check</goal></goals>"
+            "<configuration><rules><rule><limits><limit>"
+            "<counter>LINE</counter><minimum>0.35</minimum>"
+            "</limit></limits></rule></rules></configuration></execution></plugin>")
+BAD_POM_NODEP = ("<workingDirectory>${project.basedir}/..</workingDirectory>"
+                 "<artifactId>jacoco-maven-plugin</artifactId><goal>check</goal><minimum>0.35</minimum>")
+BAD_POM_NOWD = ("<artifactId>spring-boot-starter-test</artifactId><scope>test</scope>"
+                "<artifactId>jacoco-maven-plugin</artifactId><goal>check</goal><minimum>0.35</minimum>")
+# r75 新增三条反例：它们都长得像"装了覆盖率门"，缺一件就让这道门永远不会拦人
+BAD_POM_NOJACOCO = ("<dependency><artifactId>spring-boot-starter-test</artifactId>"
+                    "<scope>test</scope></dependency>"
+                    "<workingDirectory>${project.basedir}/..</workingDirectory>")
+BAD_POM_REPORTONLY = ("<dependency><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>"
+                      "<workingDirectory>${project.basedir}/..</workingDirectory>"
+                      "<artifactId>jacoco-maven-plugin</artifactId>"
+                      "<goals><goal>prepare-agent</goal><goal>report</goal></goals>")
+BAD_POM_NOTHRESH = ("<artifactId>spring-boot-starter-test</artifactId><scope>test</scope>"
+                    "<workingDirectory>${project.basedir}/..</workingDirectory>"
+                    "<artifactId>jacoco-maven-plugin</artifactId>"
+                    "<phase>verify</phase><goals><goal>check</goal></goals>")
+GOOD_CI = ("  java-build:\n    steps:\n      - run: mvn -B -ntp -f server/pom.xml verify\n  live-sync:\n")
+BAD_CI_SKIP = ("  java-build:\n    steps:\n      - run: mvn -B -ntp -f server/pom.xml verify"
                " -DskipTests\n  live-sync:\n")
 BAD_CI_NOJOB = "  other:\n    steps: []\n"
+# 相位陷阱（r75 一手）：CI 仍跑 package ⇒ jacoco 的 check（绑 verify）一次也不会执行，
+# 而 pom 里那道门看着齐全、本地 `mvn test` 也全绿。这条反例专门钉"门禁在不在链上"。
+BAD_CI_PACKAGE = ("  java-build:\n    steps:\n      - run: mvn -B -ntp -f server/pom.xml package\n  live-sync:\n")
 
 
 def _fixture(tmp, n_files, n_methods_each, main_classes=8, pom=None, ci=None):
@@ -186,6 +254,22 @@ def run_selftest():
         cases.append(("反例⑥：CI 里没有 java-build job", evaluate(tr4, mr4, pom, BAD_CI_NOJOB)[1], False))
         cases.append(("反例⑦：main 侧扫空（分母为 0）",
                       evaluate(tr4, Path(str(Path(tmp) / "f4")) / "nomine", pom, ci)[1], False))
+        # r75 覆盖率门：四形反例 + 两条单独点名（防"整体绿但这两行本来就恒真"）
+        cases.append(("反例⑧：pom 根本没有 jacoco", evaluate(tr4, mr4, BAD_POM_NOJACOCO, ci)[1], False))
+        cases.append(("反例⑨：jacoco 只有 prepare-agent/report（量得到、不拦人）",
+                      evaluate(tr4, mr4, BAD_POM_REPORTONLY, ci)[1], False))
+        cases.append(("反例⑩：有 check 目标但没有 <minimum> 阈值",
+                      evaluate(tr4, mr4, BAD_POM_NOTHRESH, ci)[1], False))
+        cases.append(("反例⑪：CI 仍跑 package ⇒ verify 相位的 check 永不执行",
+                      evaluate(tr4, mr4, pom, BAD_CI_PACKAGE)[1], False))
+        ok_gate, why_gate = check_coverage_gate(pom)
+        ok_chain, why_chain = check_gate_on_chain(ci)
+        cases.append(("点名A：合规 pom 的 T6 必须真过（值=%s）" % why_gate, ok_gate, True))
+        cases.append(("点名B：合规 CI 的 T7 必须真过（值=%s）" % why_chain, ok_chain, True))
+        cases.append(("点名C：package-only CI 的 T7 必须单独为假（不许靠别的行凑绿）",
+                      check_gate_on_chain(BAD_CI_PACKAGE)[0], False))
+        cases.append(("点名D：report-only pom 的 T6 必须单独为假",
+                      check_coverage_gate(BAD_POM_REPORTONLY)[0], False))
 
         # 边界：命名约定必须与 surefire 一致，否则"看起来有用例"是假的
         bad = Path(tmp) / "naming" / "com"

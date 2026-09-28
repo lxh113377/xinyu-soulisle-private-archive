@@ -74,6 +74,52 @@
           <workingDirectory>${project.basedir}/..</workingDirectory>
         </configuration>
       </plugin>
+      <!-- r75：覆盖率门（jacoco）。**阈值与余量见下方 <minimum> 旁的注释，随实测更新，禁手抄**。
+           check 绑在 verify 相位 ⇒ CI 必须跑 `mvn verify`，否则这道门根本不会被执行
+           （与 r41 的「CI 不得 -DskipTests」同族：门禁在不在链上，比门禁存在更关键）。 -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.12</version>
+        <executions>
+          <execution>
+            <id>jacoco-prepare-agent</id>
+            <goals><goal>prepare-agent</goal></goals>
+          </execution>
+          <execution>
+            <id>jacoco-report</id>
+            <phase>test</phase>
+            <goals><goal>report</goal></goals>
+          </execution>
+          <execution>
+            <id>jacoco-check-line-coverage</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+            <configuration>
+              <haltOnFailure>true</haltOnFailure>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <!-- 阈值＝2026-09-28 实测 LINE 覆盖率 268/669 = 40.06% **再下探一档**取 0.35。
+                           为什么不取 0.40：40.06% 距 0.40 只有 0.06 个点＝"零余量地板"，
+                           任何一处未覆盖的改动都会把构建判红，逼人抬阈值而不是补测试（在册教训）。
+                           0.35 留 5.06 个点余量；**抬阈值的前置条件是先补测试再改这一行**，
+                           复算：`mvn -B -f server/pom.xml test` 后读 server/target/site/jacoco/jacoco.xml 的 LINE counter。
+                           绑在 verify 相位 ⇒ CI 必须跑 `mvn verify`（java-build job 已从 package 改过来），
+                           否则这道门根本不会被执行（与 r41「CI 不得 -DskipTests」同族）。 -->
+                      <minimum>0.35</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>

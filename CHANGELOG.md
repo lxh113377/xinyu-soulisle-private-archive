@@ -9,6 +9,46 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Added（r75 · 质量门同址尺「能不能让构建失败」＋ Java 覆盖率门（jacoco，阈值 0.35 带余量））
+- **换尺到没人量的那一半**：`_test/peer_quality_tooling_probe.py`（r58）自己写明天花板是
+  「覆盖率与缺陷率都不在本轮取数面内」——它量的是**配置在不在、CI 有没有执行位**；
+  本轮问的是**这道检查能不能拦人**。两侧同一函数 `qg_classify()`：peers 走 tree + 候选文件正文 + workflow，
+  self 走 `git ls-tree HEAD` + `git show HEAD:...`（r71 的取数面纪律）。新增 CLI `--quality-gates`。
+- **首跑就把两处假阴抓在自己头上**（这一节的全部价值来自先否证自己）：
+  ① 执行型类我最初拿**文件名正则**去搜 CI 正文 ⇒ 本仓 CI 的步骤名是中文「密钥零入库扫描」，
+     英文工具词一条都不认，把我方**已有的门**读成「无」。改成按类配工具词表 `QG_EXEC_TOKENS`（含中文），
+     并加专属腿：`没有标准配置文件却判出 secret_scan_gate` 必须红（尺在测不在猜）、
+     `ci_steps_homegrown` 必须把自写门列出来（天花板要说出口，否则下一轮读成"我方无门"）。
+  ② peers 侧我只取 **3 个 workflow**，而 lobehub 有 31 个 ⇒ 把整面读成「peers 一律无门」。
+     改成上限 12 并**取不全时该类记 `unverified`**，绝不塌缩成 False；
+     复采后 `lint_gate peers 有门=1/16 未验=1（lobehub 点名）`——未验与无**分列**。
+- **现采读数（10:0x UTC 那次）**：`coverage_gate 0/16`｜`mutation_gate 0/16`｜`lint_gate 1/16`（SillyTavern）
+  ｜`typecheck_gate 0/16`（+1 未验）｜`secret_scan_gate 1/16`（opensoul）。
+  ⇒ 这 16 家里**没有一家**用 jacoco/pytest-cov/vitest thresholds 这类阈值拦构建；
+  我方此前也没有。所以这一格不是"落后"，而是**可以往前站一格**的位置。
+- **本轮把它装上**：`server/pom.xml` 加 jacoco 0.8.12（prepare-agent + report@test + **check@verify**，
+  `haltOnFailure=true`）。阈值**不手抄**：实测 `mvn -B -f server/pom.xml test` → `jacoco.xml` LINE
+  **268/669 = 40.06%**，取下探一档 **0.35**（余量 5.06 个点）——
+  为什么不取 0.40：40.06 距 0.40 只差 0.06 个点＝零余量地板，任何未覆盖改动都判红，
+  逼人抬阈值而不是补测试（在册教训「Ratchet floors need headroom」）。
+- **正反两面都验过**（不是"装上就算"）：
+  正例 `mvn ... test jacoco:check@jacoco-check-line-coverage` ⇒ `BUILD SUCCESS` rc=0；
+  反例把阈值改成 0.45（**改副本 `server/pom_r75_mutation.xml`，真 pom 的 sha 前后 `aa1d4886…` 未变**）
+  ⇒ `Rule violated for bundle soulisle-server: lines covered ratio is 0.40, but expected minimum is 0.45`
+  ＋ `BUILD FAILURE` rc=1。⇒ 这道门确实会拦人，且拦的是覆盖率而不是别的东西。
+- **门禁必须在链上**（`ci.yml` java job 从 `package` 改 `verify`）：`check` 绑 verify 相位，
+  CI 若仍跑 `package`，这行 pom 就是一辈子不执行的装饰——与 r41「CI 不得 -DskipTests」同族
+  （那次是被跳过，这次是相位不触发，两者都能让"本地绿 + CI 绿 + 门没装"同时成立）。
+- **常驻守卫**：`_test/java_test_guard.py` 新增 **T6**（jacoco 在位 ∧ 有 `check` 目标 ∧ 有合法 `<minimum>`；
+  只配 `prepare-agent/report` 的"量得到但不拦"判红）与 **T7**（CI 必须出现 `mvn ... verify`），
+  配套反例 ⑧⑨⑩⑪（无 jacoco / 仅 report / 无阈值 / CI 仍 package）＋点名腿 A–D（不许靠别的行凑绿），
+  `--selftest` **10/10 → 18/18**；收口行现在带值：
+  `JAVA-TEST-GUARD-PASS（in-build 单测 4 件 / 32 用例，… 覆盖率门 在位｜LINE 阈值 0.35｜链上 是）`。
+- 覆盖率现状（同一份 `jacoco.xml` 现算，23 个类）：LINE **40.06%**（268/669），**10 个类 0%**；
+  缺口高度集中——`EmotionController` 0/117、`MemoryController` 0/63、`ChatController` 0/50、
+  `MemoryService` 0/47 四个类就占全部未覆盖 401 行里的 **277 行（69%）**，`LlmProxy` 已有 55.6%。
+  登记为 R75-02：**补这四类的 MockMvc/单元用例**，抬阈值的前置条件是先补测试再改那一行。
+
 ### Added（r74 · 文档维/性能维的**同址尺**：把"不同源的对照"换成同一把尺）
 - **问题（读自己上一轮报告抓到的，不是猜的）**：r73 报告 §1 的「文档」行 self 侧印 `docs 9/9`（官方九项覆盖），
   peers 侧印 `api_spec 1/16`（另一格能力）⇒ 两个**不同判据**的数字并排当对照，等于没有对照；「性能」行更直接——
