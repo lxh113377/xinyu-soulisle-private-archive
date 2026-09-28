@@ -4,6 +4,15 @@ import com.xinyu.soulisle.llm.LlmProxy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -63,5 +72,82 @@ class EmotionClassifierTest {
         EmotionClassifier.Outcome o = offline().classify("");
         assertEquals("仅词典（离线）", o.path());
         assertEquals("calm", o.fin().emotion());
+    }
+
+    /**
+     * r70：分类腿的超时预算必须真的生效 —— 上游「accept 后一个字节都不回」时，
+     * 整条 classify 要在**短预算**内回落词典，而不是占着线程等满 60s。
+     *
+     * <p>用 2s 预算跑，判据取「&lt;6s」而不是「≈2s」：本机调度抖动不该把守卫跑成 flake，
+     * 但 60s 那条旧路径一定越不过 6s ⇒ 这一档足以区分修前/修后。
+     */
+    @Test
+    @DisplayName("挂起上游：classify 在超时预算内回落词典（path=LLM 精判失败 → 词典兜底）")
+    void hangingUpstreamDegradesWithinBudget() throws Exception {
+        try (ServerSocket blackHole = new ServerSocket(0, 16, InetAddress.getLoopbackAddress())) {
+            AtomicInteger accepted = new AtomicInteger();
+            List<Socket> held = Collections.synchronizedList(new ArrayList<>());
+            Thread sink = new Thread(() -> {
+                while (!blackHole.isClosed()) {
+                    try {
+                        Socket s = blackHole.accept();
+                        held.add(s);
+                        accepted.incrementAndGet();
+                    } catch (IOException e) {
+                        return;
+                    }
+                }
+            });
+            sink.setDaemon(true);
+            sink.start();
+
+            String base = "http://127.0.0.1:" + blackHole.getLocalPort() + "/v1";
+            LlmProxy proxy = new LlmProxy(base, "deepseek-chat", "test-key-not-a-real-secret");
+            EmotionClassifier clf = new EmotionClassifier(proxy, 2000);
+
+            long t0 = System.nanoTime();
+            EmotionClassifier.Outcome o = clf.classify("论文被拒了三次，心里特别难过");
+            double elapsed = (System.nanoTime() - t0) / 1e9;
+
+            assertEquals("LLM 精判失败 → 词典兜底", o.path(), "挂起必须走兜底，而不是把异常抛给调用方");
+            assertEquals("sadness", o.fin().emotion(), "兜底结果仍须是词典读数");
+            assertNull(o.llm());
+            assertTrue(accepted.get() >= 1, "对端确实接了这条连接（否则测的是拒连而不是挂起）");
+            assertTrue(elapsed < 6.0, "超时预算未生效：实测 " + elapsed + "s");
+            held.forEach(s -> {
+                try {
+                    s.close();
+                } catch (IOException ignored) {
+                    // 回收失败不影响判据
+                }
+            });
+        }
+    }
+
+    @Test
+    @DisplayName("危机词在任何配置下都不碰上游（连 socket 都不该建）")
+    void crisisNeverTouchesNetworkEvenWithKey() throws Exception {
+        try (ServerSocket blackHole = new ServerSocket(0, 16, InetAddress.getLoopbackAddress())) {
+            AtomicInteger accepted = new AtomicInteger();
+            Thread sink = new Thread(() -> {
+                while (!blackHole.isClosed()) {
+                    try {
+                        Socket s = blackHole.accept();
+                        accepted.incrementAndGet();
+                        s.close();
+                    } catch (IOException e) {
+                        return;
+                    }
+                }
+            });
+            sink.setDaemon(true);
+            sink.start();
+            String base = "http://127.0.0.1:" + blackHole.getLocalPort() + "/v1";
+            EmotionClassifier clf = new EmotionClassifier(
+                    new LlmProxy(base, "deepseek-chat", "test-key-not-a-real-secret"), 2000);
+            EmotionClassifier.Outcome o = clf.classify("感觉活着好累，不想活了");
+            assertEquals("词典·危机拦截", o.path());
+            assertEquals(0, accepted.get(), "危机路径不得建任何连接");
+        }
     }
 }

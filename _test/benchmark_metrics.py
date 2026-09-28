@@ -52,6 +52,15 @@ PEERS = [
 DOC_FILES = ["README.md", "docs", "tests", "test", "CHANGELOG.md", "CONTRIBUTING.md",
              "SECURITY.md", ".env.example", ".env.example.txt", "ROADMAP.md", ".github"]
 DOC_FILES_SET = set(DOC_FILES)
+# r70 修（同族：判据只能断言事实，不能断言事实的名字）：`"rag" in path` 是**裸子串**，
+# 会被 `storage` / `coverage` / `average` / `barrier` 这类词白送一分。一手现场是本项目自己：
+# self 的 `vector_memory=YES` 全部由 `_test/storage_resilience_check.py` 与
+# `_test/plan_pdf_coverage_check.py` 两个文件名撑起来（`git ls-files` 里零个真 vector/embedding/独立 rag），
+# 也就是总览表里被抄了十几轮的那格「同类标配＝向量记忆，我们也有」是**尺子造出来的**。
+# 同一条规则也跑在 16 个参照仓的整树路径上 ⇒ 对手侧的 `vector_memory=9/16` 同样被抬高。
+# 修法：`rag` 必须是**独立词元**（前后非字母数字）；`vector`/`embedding` 保持子串（无此类误伤词）。
+RAG_TOKEN_RE = re.compile(r"(^|[^A-Za-z0-9])rag([^A-Za-z0-9]|$)")
+
 # 能力探测：按**整树递归**的文件名/后缀匹配（根目录一层探测无判别力——
 # 实测 14 仓的 sw.js / locales 全部落在子目录里，只看根目录会一律报"无"，
 # 把"没测到"当成"没有"即 M4 判据失效，故此处必须 recursive）
@@ -61,7 +70,8 @@ CAP_RULES = {
     "pwa_manifest": lambda p: p.rsplit("/", 1)[-1] in ("manifest.webmanifest", "manifest.json"),
     "i18n_locale": lambda p: "/locales/" in f"/{p}" or "/i18n/" in f"/{p}" or "/languages/" in f"/{p}",
     "streaming": lambda p: p.rsplit("/", 1)[-1] in ("sse.ts", "sse.js", "use-sse.ts") or "/sse/" in f"/{p}",
-    "vector_memory": lambda p: "vector" in p.lower() or "embedding" in p.lower() or "rag" in p.lower(),
+    "vector_memory": lambda p: ("vector" in p.lower() or "embedding" in p.lower()
+                                or RAG_TOKEN_RE.search(p.lower()) is not None),
     "container": lambda p: p.rsplit("/", 1)[-1] in ("Dockerfile", "docker-compose.yml",
                                                     "docker-compose.yaml"),
     "e2e_browser": lambda p: "/e2e/" in f"/{p}" or "playwright" in p.lower() or "cypress" in p.lower(),
@@ -459,11 +469,31 @@ def selftest():
     if offline_signal_class("")[0] != "none" or offline_signal_class(None)[0] != "none":
         print("SELFTEST-FAIL: 零输入被判成有能力 ⇒ 违反「零输入不得记 PASS」")
         return 1
+    # 能力匹配器本体（r70）：`rag` 裸子串会把 storage/coverage 白送成一格能力 ⇒ 两向都验
+    _vm = CAP_RULES["vector_memory"]
+    _must_red = ["src/storage/db.js", "test/coverage.py", "_test/plan_pdf_coverage_check.py",
+                 "src/fragment/pool.py", "docs/average-note.md", "docs/drag-drop.md"]
+    _must_green = ["src/rag/store.py", "src/vector-index.ts", "app/embeddings/client.py",
+                   "src/RAG/retrieve.ts", "lib/rag-client.js"]
+    # 前置条件自证：假阳清单必须**在旧裸子串规则下真的会命中**，否则这条控制只是在打一个不存在的靶子
+    _old_rag = lambda p: "rag" in p.lower()
+    _bogus = [p for p in _must_red if not _old_rag(p)]
+    if _bogus:
+        print("SELFTEST-FAIL: 假阳用例不成立（旧规则本就不会命中，白测）：" + " ; ".join(_bogus))
+        return 1
+    _bad = [p for p in _must_red if _vm(p)] + [p for p in _must_green if not _vm(p)]
+    if _bad:
+        print("SELFTEST-FAIL: vector_memory 匹配器失真（假阳/假阴）：" + " ; ".join(_bad[:6]))
+        return 1
+    if _vm("src/storage/db.js") is _vm("src/rag/store.py"):
+        print("SELFTEST-FAIL: 两条相反用例同判 ⇒ 这条控制是恒真的摆设")
+        return 1
     print("SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（"
           f"{len(got)} 条）；分档正确（实质 {len(sub)} / 抖动 {len(noise)}）且纯抖动场景零实质；"
           "分母证明正确（1 有效 / 2 盲区点名，健康仓不误踢）；"
           "r30 盲区点名三侧正确（有证据→点名、无证据→空、已看见→不重复）；"
-          "r31 离线四分类各判对 + 训练语境不冒充离线壳 + 摘掉归因正则即翻判（变异体）+ 零输入判 none")
+          "r31 离线四分类各判对 + 训练语境不冒充离线壳 + 摘掉归因正则即翻判（变异体）+ 零输入判 none；"
+          f"r70 vector_memory 匹配器 {len(_must_red)} 条假阳全拒 + {len(_must_green)} 条真阳全收")
     return 0
 
 

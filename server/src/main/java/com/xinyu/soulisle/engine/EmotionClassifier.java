@@ -3,8 +3,11 @@ package com.xinyu.soulisle.engine;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xinyu.soulisle.llm.LlmProxy;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,10 +44,25 @@ public class EmotionClassifier {
                     + "输入「今天天气不错」输出 {\"emotion\":\"calm\",\"intensity\":0.2}。";
 
     private final LlmProxy llm;
+    private final Duration llmTimeout;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public EmotionClassifier(LlmProxy llm) {
+        this(llm, 8000L);
+    }
+
+    /**
+     * r70：双路里「LLM 精判」这一腿的请求级超时可配。此前它复用聊天链路的 60s ——
+     * 上游挂起时一条 {@code POST /api/emotion} 会占住一个工作线程整整一分钟才回落词典，
+     * 而同一条链的前端侧在 r51/r65 已被压到 15s 与整轮看门狗。危机词仍不调上游（优先级不变）。
+     *
+     * <p>标 @Autowired 是让容器在两个 public 构造器里认准这条（否则启动即消歧失败）。
+     */
+    @Autowired
+    public EmotionClassifier(LlmProxy llm,
+                             @Value("${xinyu.emotion.llm-timeout-ms:8000}") long llmTimeoutMs) {
         this.llm = llm;
+        this.llmTimeout = Duration.ofMillis(llmTimeoutMs);
     }
 
     public Outcome classify(String text) {
@@ -75,7 +93,7 @@ public class EmotionClassifier {
         usr.put("role", "user");
         usr.put("content", text.substring(0, Math.min(200, text.length())));
 
-        LlmProxy.Result r = llm.call(mapper.valueToTree(List.of(sys, usr)), 0.0, 40);
+        LlmProxy.Result r = llm.call(mapper.valueToTree(List.of(sys, usr)), 0.0, 40, llmTimeout);
         if (r.status() != 200) {
             throw new IllegalStateException("upstream " + r.status());
         }

@@ -2,6 +2,7 @@ package com.xinyu.soulisle.llm;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -47,13 +48,29 @@ public class LlmProxy {
     public LlmProxy(@Value("${xinyu.llm.base}") String base,
                     @Value("${xinyu.llm.model}") String model,
                     @Value("${xinyu.llm.key:}") String key) {
+        this(base, model, key, 10);
+    }
+
+    /**
+     * r70 加：连接超时可按实例配置。分类腿用的是「有界时延」语义 —— 挂起时必须连 accept 带
+     * 建连整条路都在预算内，所以挂起注入测的是「预算 × 次数」而不是「预算 × 2」。
+     * 标 @Autowired 是为了让容器在两个 public 构造器里认准这条（否则 Spring 无法消歧，启动即失败）。
+     */
+    @Autowired
+    public LlmProxy(@Value("${xinyu.llm.base}") String base,
+                    @Value("${xinyu.llm.model}") String model,
+                    @Value("${xinyu.llm.key:}") String key,
+                    @Value("${xinyu.emotion.connect-timeout-s:10}") int connectTimeoutSeconds) {
         this.base = base;
         this.model = model;
         this.key = key == null ? "" : key.trim();
+        this.connectTimeout = Duration.ofSeconds(connectTimeoutSeconds);
         this.http = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
+                .connectTimeout(this.connectTimeout)
                 .build();
     }
+
+    private final Duration connectTimeout;
 
     public boolean hasKey() {
         return !this.key.isEmpty();
@@ -65,11 +82,19 @@ public class LlmProxy {
      * @param maxTokens   缺失时 220（与 v1 `payload.max_tokens ?? 220` 一致）
      */
     public Result call(JsonNode messages, Double temperature, Integer maxTokens) {
+        return call(messages, temperature, maxTokens, Duration.ofSeconds(60));
+    }
+
+    /**
+     * r70：带请求超时的调用。**只给分类腿用短超时**，聊天链路仍走上面那条 60s 默认值
+     * （上游响应模型可以很长，那是 r51 刻意留下的行为，不在本轮动）。
+     */
+    public Result call(JsonNode messages, Double temperature, Integer maxTokens, Duration requestTimeout) {
         String payload = buildPayload(messages, temperature, maxTokens, false);
         if (payload == null) {
             return new Result(500, "{\"error\":\"bad-json\"}");
         }
-        HttpRequest req = newRequest(payload);
+        HttpRequest req = newRequest(payload, requestTimeout);
 
         try {
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(
@@ -100,7 +125,7 @@ public class LlmProxy {
         if (payload == null) {
             return new StreamResult(500, null, null, "{\"error\":\"bad-json\"}");
         }
-        HttpRequest req = newRequest(payload);
+        HttpRequest req = newRequest(payload, Duration.ofSeconds(60));
         try {
             HttpResponse<java.io.InputStream> resp = http.send(req, HttpResponse.BodyHandlers.ofInputStream());
             String ct = resp.headers().firstValue("content-type").orElse("");
@@ -143,10 +168,10 @@ public class LlmProxy {
         }
     }
 
-    private HttpRequest newRequest(String payload) {
+    private HttpRequest newRequest(String payload, Duration requestTimeout) {
         String url = base.replaceAll("/$", "") + "/chat/completions";
         return HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(60))
+                .timeout(requestTimeout)
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream, application/json")
                 .header("Authorization", "Bearer " + key)

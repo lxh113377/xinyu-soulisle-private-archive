@@ -46,6 +46,13 @@ xinyu:
     base: ${LLM_BASE:${DEEPSEEK_BASE:https://api.deepseek.com/v1}}
     model: ${LLM_MODEL:${DEEPSEEK_MODEL:deepseek-chat}}
     key: ${LLM_KEY:${DEEPSEEK_KEY:}}
+  emotion:
+    # r70：双路里「LLM 精判」这一腿的请求级超时。聊天链路仍用 60s（长回答要留给它），
+    # 但分类只是六选一，8s 拿不到结果就该回落词典 —— 上游挂起时不再占住工作线程一分钟。
+    llm-timeout-ms: ${XINYU_EMOTION_LLM_TIMEOUT_MS:8000}
+    # 建连超时保持与聊天链路同一个值（10s）——本轮只收紧「分类腿的请求级超时」，
+    # 不动任何既有建连预算，避免把 chat 的行为一起改掉。
+    connect-timeout-s: ${XINYU_EMOTION_CONNECT_TIMEOUT_S:10}
   eval:
     # 评测集权威源在项目 _test/ 下（不复制进 jar，避免造第二份副本）
     dataset: ${XINYU_EVAL_DATASET:./_test/emotion-eval-dataset.json}
