@@ -106,10 +106,6 @@ public class ChatController {
     }
 
     /** 以 UTF-8 字节直写，绕开 StringHttpMessageConverter 的默认字符集坑（中文回复必须原样回传） */
-    private ResponseEntity<StreamingResponseBody> bytes(int status, MediaType type, String body) {
-        return bytes(status, type, body, null);
-    }
-
     private ResponseEntity<StreamingResponseBody> bytes(int status, MediaType type, String body, String safety) {
         byte[] data = body.getBytes(StandardCharsets.UTF_8);
         ResponseEntity.BodyBuilder b = ResponseEntity.status(status).contentType(type);

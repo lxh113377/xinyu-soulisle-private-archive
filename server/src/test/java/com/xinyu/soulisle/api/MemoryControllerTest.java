@@ -142,4 +142,31 @@ class MemoryControllerTest {
         JsonNode cleared = M.readTree(text(c.clear("s1")));
         assertEquals(11, cleared.path("removed").asInt());
     }
+
+    @Test
+    @DisplayName("r77 边界补形：顶层是 null/数组也判 bad-json；createdAt 有值时给 ISO 串而不是对象")
+    void parseShapeAndCreatedAtString() throws Exception {
+        MemoryService svc = mock(MemoryService.class);
+        MemoryController c = new MemoryController(svc);
+
+        assertEquals(400, c.addEmotion("null").getStatusCode().value(), "JSON 字面量 null 不是对象");
+        assertEquals(400, c.addEmotion("[{\"sessionId\":\"s1\"}]").getStatusCode().value());
+        assertEquals(400, c.addMessage("null").getStatusCode().value());
+        verify(svc, never()).addEmotion(anyString(), anyString(), anyDouble(), any(), any());
+
+        ChatMessage stamped = new ChatMessage();
+        stamped.setId(9L);
+        stamped.setRole("user");
+        stamped.setContent("你好");
+        stamped.setCreatedAt(LocalDateTime.of(2026, 9, 29, 1, 2, 3));
+        when(svc.messages("s1", 40)).thenReturn(List.of(stamped));
+        JsonNode list = M.readTree(text(c.messages("s1", 40)));
+        assertEquals("2026-09-29T01:02:03", list.get(0).path("createdAt").asText(),
+                "前端直接把这个字符串画进时间线 ⇒ 形态不能随驱动侧漂移");
+
+        // intensity 给了但不是数字：与「没给」同义，取 0.5 中值，不得把字符串塞进 double
+        assertEquals(200, c.addEmotion("{\"sessionId\":\"s1\",\"emotion\":\"joy\",\"intensity\":\"很高\"}")
+                .getStatusCode().value());
+        verify(svc).addEmotion("s1", "joy", 0.5, null, null);
+    }
 }

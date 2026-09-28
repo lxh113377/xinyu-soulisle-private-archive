@@ -96,6 +96,70 @@ class EmotionLexiconTest {
                 "colorOf 必须给副本：改返回值不得污染 LEX 常量");
     }
 
+    /**
+     * r77：路径解析的三条优先级此前只有真起进程才验得到，而 fat jar（工作目录=项目根）
+     * 与 Docker（XINYU_WEB_ROOT=/app/web）走的正好是不同腿。
+     */
+    @Test
+    @DisplayName("resolvePath 三态：显式路径 > web root（剥尾斜杠）> 默认 ./src/，空白串按「没设」处理")
+    void resolvePathPriority() {
+        assertEquals("/etc/my-lex.js", EmotionLexicon.resolvePath("/etc/my-lex.js", "/app/web"));
+        assertEquals("./src/data/emotion-lexicon.js", EmotionLexicon.resolvePath(null, null),
+                "两个环境变量都没设 ⇒ 默认命中前端权威源");
+        assertEquals("./src/data/emotion-lexicon.js", EmotionLexicon.resolvePath("   ", "  "),
+                "空串/纯空白等于没设（否则启动会去找一个不存在的路径）");
+        assertEquals("/app/web/data/emotion-lexicon.js", EmotionLexicon.resolvePath("", "/app/web/"));
+        assertEquals("src/data/emotion-lexicon.js", EmotionLexicon.resolvePath(null, "src///"),
+                "多重尾斜杠一次剥干净");
+    }
+
+    @Test
+    @DisplayName("SSOT 定位的四种坏形态都要 fail-fast，且报错点名文件（不许静默回退到旧词表）")
+    void readLexiconFailFast() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("xinyu-lex-fixture");
+        assertTrue(EmotionLexicon.readLexicon(EmotionLexicon.LEXICON_PATH).path("lex").size() >= 6,
+                "真源先自证读得动（否则下面的坏形态红因会分不清）");
+
+        assertLoadFails(dir.resolve("no-marker.js"), "window.__NOTHING__ = {\"lex\":{}};", "没有标记");
+        assertLoadFails(dir.resolve("no-brace.js"), "window.__XINYU_LEXICON__ = 42;", "标记后面没有 JSON 左括号");
+        assertLoadFails(dir.resolve("unbalanced.js"), "window.__XINYU_LEXICON__ = {\"lex\":{}", "只有左括号没有右括号");
+        assertLoadFails(dir.resolve("missing-file.js"), null, "文件根本不存在");
+    }
+
+    private static void assertLoadFails(java.nio.file.Path p, String content, String why) throws Exception {
+        if (content != null) {
+            java.nio.file.Files.writeString(p, content, java.nio.charset.StandardCharsets.UTF_8);
+        }
+        IllegalStateException ex = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> EmotionLexicon.readLexicon(p.toString()), why + " 时必须抛，实际静默通过");
+        assertTrue(ex.getMessage().contains(p.getFileName().toString()),
+                why + " ⇒ 报错要点名是哪个文件坏了，实际=" + ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("注释里的花括号与标记都不得带偏定位（真源里两种坑都写过的回归锁）")
+    void readLexiconIgnoresComments() throws Exception {
+        java.nio.file.Path p = java.nio.file.Files.createTempDirectory("xinyu-lex-ok").resolve("lex.js");
+        java.nio.file.Files.writeString(p, "/* 见 ${XINYU_LEXICON} 与（经 window.__XINYU_LEXICON__）*/\n"
+                + "// window.__XINYU_LEXICON__ 也出现在行注释里 {\"bogus\":true}\n"
+                + "window.__XINYU_LEXICON__ = {\"lex\":{\"joy\":{\"weight\":0.9,\"color\":[0,1,0],\"words\":[\"哈\"]}}};\n",
+                java.nio.charset.StandardCharsets.UTF_8);
+        com.fasterxml.jackson.databind.JsonNode root = EmotionLexicon.readLexicon(p.toString());
+        assertEquals(1, root.size(), "只许取到那条真语句的字面量");
+        assertEquals(1, root.path("lex").size());
+        assertFalse(root.has("bogus"), "行注释里的假 JSON 不得被当成词表");
+    }
+
+    @Test
+    @DisplayName("toStringList：null 给空表（SSOT 少一个键不得 NPE），非 null 逐项转文本")
+    void toStringListShapes() {
+        assertTrue(EmotionLexicon.toStringList(null).isEmpty());
+        assertEquals(List.of("活不下去", "想不开"),
+                EmotionLexicon.toStringList(
+                        new com.fasterxml.jackson.databind.ObjectMapper().createArrayNode()
+                                .add("活不下去").add("想不开")));
+    }
+
     /** 小工具：避免为本类引入额外断言依赖。 */
     private static void assertArrayEqualsInline(double[] want, double[] got) {
         assertEquals(want.length, got.length);

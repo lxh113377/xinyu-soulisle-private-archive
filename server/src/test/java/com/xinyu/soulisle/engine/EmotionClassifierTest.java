@@ -150,4 +150,51 @@ class EmotionClassifierTest {
             assertEquals(0, accepted.get(), "危机路径不得建任何连接");
         }
     }
+
+    /** 上游回体的最小形状：只有 content 是我们在意的 */
+    private static String upstreamContent(String content) {
+        return "{\"choices\":[{\"message\":{\"content\":"
+                + com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(content) + "}}]}";
+    }
+
+    @Test
+    @DisplayName("r77 LLM 精判的三形坏回复：没 JSON / 情绪名不在枚举 / intensity 不是数字，前两者整腿回落词典")
+    void malformedLlmReplies() {
+        com.xinyu.soulisle.llm.LlmProxy llm =
+                org.mockito.Mockito.mock(com.xinyu.soulisle.llm.LlmProxy.class);
+        org.mockito.Mockito.when(llm.hasKey()).thenReturn(true);
+        org.mockito.Mockito.when(llm.call(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new LlmProxy.Result(200, upstreamContent("我看不太懂你在说什么")));
+        EmotionClassifier clf = new EmotionClassifier(llm, 2000);
+
+        EmotionClassifier.Outcome noJson = clf.classify("论文被拒了三次，心里特别难过");
+        assertEquals("LLM 精判失败 → 词典兜底", noJson.path(), "回复里没有花括号 ⇒ 整腿作废");
+        org.junit.jupiter.api.Assertions.assertNull(noJson.llm());
+        assertEquals("sadness", noJson.fin().emotion());
+
+        org.mockito.Mockito.when(llm.call(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new LlmProxy.Result(200, upstreamContent("{\"emotion\":\"狂喜\",\"intensity\":0.9}")));
+        EmotionClassifier.Outcome badEmotion = clf.classify("论文被拒了三次，心里特别难过");
+        assertEquals("LLM 精判失败 → 词典兜底", badEmotion.path(), "情绪名不在六类枚举内不得采信");
+        assertEquals("sadness", badEmotion.fin().emotion());
+
+        // intensity 非数字 / 缺失：这一腿**仍算成功**（情绪名有效），只是强度按 0.5 中值，不许拿词典分数冒充 LLM 分数
+        org.mockito.Mockito.when(llm.call(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new LlmProxy.Result(200, upstreamContent("{\"emotion\":\"joy\",\"intensity\":\"很高\"}")));
+        EmotionClassifier.Outcome strIntensity = clf.classify("论文被拒了三次，心里特别难过");
+        assertEquals("joy", strIntensity.fin().emotion(), "词典与 LLM 分歧时仍采信 LLM");
+        assertEquals(0.5, strIntensity.fin().intensity(), 1e-9, "intensity 不是数字 ⇒ 取 0.5 中值");
+
+        org.mockito.Mockito.when(llm.call(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new LlmProxy.Result(200, upstreamContent("{\"emotion\":\"calm\"}")));
+        assertEquals(0.5, clf.classify("今天天气不错").fin().intensity(), 1e-9, "intensity 缺失同样取 0.5");
+    }
 }

@@ -106,19 +106,35 @@
                       <value>COVEREDRATIO</value>
                       <!-- 阈值沿革（每轮随实测更新，禁手抄上一轮）：
                            · 2026-09-28 r75 立门：实测 LINE 268/669 = 40.06%，下探一档取 0.35（余量 5.06 点）。
-                           · 2026-09-29 r76 抬门：补齐四个 0% 类（EmotionController / MemoryController /
-                             ChatController / MemoryService）+ HealthController + ApiTokenFilter 后，
-                             实测 LINE **615/669 = 91.93%**，取 **0.85**（余量 6.93 点）。
-                           为什么不取 0.90：91.93 距 0.90 只剩 1.93 点＝零余量地板，任何一处未覆盖的新代码
-                           都会把构建判红，逼人抬阈值而不是补测试（r75 在册教训，同一把尺同一算法）。
-                           抬阈值的前提「先补测试再改这一行」本轮成立：本轮就是先补的测试，
-                           且 0.35 那一格从未被用来掩盖缺口（10 个 0% 类里 6 个本轮清零，剩 SoulIsleApplication 3 行）。
-                           复算：`mvn -B -f server/pom.xml test` 后读 server/target/site/jacoco/jacoco.xml 的 LINE counter；
-                           验牙：把上面 `<minimum>` 临时改成 0.99 跑 `mvn -B -ntp -f server/pom.xml test jacoco:check@jacoco-check-line-coverage`
-                           ⇒ 必须 rc=1 且红因带实测比值（**改完务必按字节还原**）。
+                           · 2026-09-29 r76 抬门：补齐四个 0% 类后 LINE 615/669 = 91.93%，取 0.85（余量 6.93 点）。
+                             当时不取 0.90 的理由是"零余量地板会逼人抬阈值而不是补测试"——本轮补完测试后该理由消失。
+                           · 2026-09-29 r77 换尺 + 抬门：r76 的门只量 LINE，而 LINE 91.93% 时**分支只有 83.11%**
+                             ——行数覆盖会骗人（一行三元表达式只算 1 行，却有 2 个分支）。本轮补 LlmProxyTest
+                             （JDK HttpServer 回环桩，零新依赖/零公网/零密钥）+ 词表加载器 seam + 五个控制器的
+                             坏形态用例，实测 **LINE 651/666 = 97.75%**、**BRANCH 285/296 = 96.28%**
+                             ⇒ LINE 取 **0.90**（余量 7.75 点）、新挂 BRANCH 取 **0.90**（余量 6.28 点）。
+                           ⚠️ 分母本轮变过：删掉 ChatController 里实测零调用点的 2 参 bytes() 重载 ⇒ LINE 669→666。
+                             这是**分母缩水**不是覆盖提升，两侧数字都在上面，复算时别把两者混成一句"涨到 97.75%"。
+                           剩 11 支未覆盖分支的口径（逐条核过，不是"再补点测试"）：readTree 永不返回 null 的
+                             `node == null` 3 支、buildPayload 结构上不可达的 `payload == null` 2 支、
+                             ofString 永不返回 null 的 `body == null` 1 支、harden() 被上游守卫挡住的
+                             `!messages.isArray()` 1 支、`||`/`&&` 短路后取不到的 2 支、删重载后永久不可达的
+                             `safety != null` false 侧 1 支、MemoryController 三元组合 1 支 ⇒ 均为**不可达或短路边**，
+                             不再为凑数写反射或假输入（那会把门禁变成自证）。
+                           复算：`mvn -B -f server/pom.xml test` 后读 server/target/site/jacoco/jacoco.xml 里
+                             `<report>` 自带的 `counter type=LINE|BRANCH` 两个属性（**分母取 counter 属性，
+                             不得由逐类求和反推**——r77 就是这么产出一个假 drift 的）；
+                           验牙：把下面任一 `<minimum>` 临时改成 0.99 跑
+                             `mvn -B -ntp -f server/pom.xml test jacoco:check@jacoco-check-line-coverage`
+                             ⇒ 必须 rc=1 且红因点名是哪一路 counter（**改完务必按字节还原**）。
                            绑在 verify 相位 ⇒ CI 必须跑 `mvn verify`（java-build job 已从 package 改过来），
                            否则这道门根本不会被执行（与 r41「CI 不得 -DskipTests」同族）。 -->
-                      <minimum>0.85</minimum>
+                      <minimum>0.90</minimum>
+                    </limit>
+                    <limit>
+                      <counter>BRANCH</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.90</minimum>
                     </limit>
                   </limits>
                 </rule>

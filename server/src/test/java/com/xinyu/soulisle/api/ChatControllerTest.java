@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -158,5 +159,32 @@ class ChatControllerTest {
         assertEquals(2, dirtyCap.getValue().size(), "被点名时上行要追加一条系统重申");
         assertEquals("system", dirtyCap.getValue().get(1).get("role").asText());
         assertEquals(upstream, render(dirty), "护栏只改上行，响应体仍逐字透传（AC-OBS-08 不破）");
+    }
+
+    @Test
+    @DisplayName("r77 请求体形状：顶层非对象一律 400；temperature/max_tokens 类型不对按「没给」传 null；stream 只认布尔")
+    void malformedFieldShapes() throws Exception {
+        LlmProxy p = withKey();
+        when(p.call(any(), any(), any())).thenReturn(new LlmProxy.Result(200, "{\"ok\":1}"));
+        ChatController c = new ChatController(p);
+
+        assertEquals(400, c.chat("null").getStatusCode().value(), "JSON 字面量 null 不是对象");
+        assertEquals(400, c.chat("[1,2]").getStatusCode().value());
+        assertEquals(400, c.chat("\"只是一句话\"").getStatusCode().value());
+        verify(p, never()).call(any(), any(), any());
+
+        // 字段类型不对 ≠ 字段没给：v1 的 `?? 0.85` 语义要求这里传 null 给代理，由代理取默认值
+        ResponseEntity<StreamingResponseBody> wrongTypes = c.chat("{\"messages\":[{\"role\":\"user\",\"content\":\"x\"}],"
+                + "\"temperature\":\"很热\",\"max_tokens\":\"很多\",\"stream\":false}");
+        assertEquals(200, wrongTypes.getStatusCode().value());
+        ArgumentCaptor<Double> t = ArgumentCaptor.forClass(Double.class);
+        ArgumentCaptor<Integer> m = ArgumentCaptor.forClass(Integer.class);
+        verify(p).call(any(), t.capture(), m.capture());
+        assertNull(t.getValue(), "非数字 temperature 必须折成 null（不得把字符串上行）");
+        assertNull(m.getValue(), "非数字 max_tokens 必须折成 null");
+        verify(p, never()).openStream(any(), any(), any());   // stream:false ⇒ 走整包 JSON
+
+        c.chat("{\"messages\":[],\"stream\":\"true\"}");
+        verify(p, never()).openStream(any(), any(), any());   // 字符串 "true" 不是布尔 ⇒ 不升流式（v1 同口径）
     }
 }

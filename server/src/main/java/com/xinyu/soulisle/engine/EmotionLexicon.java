@@ -93,15 +93,20 @@ public final class EmotionLexicon {
         EMOTIONS = List.copyOf(LEX.keySet());
     }
 
+    /**
+     * r77：把「读环境变量」与「按环境变量定路径」拆开 —— 前者只有启动期一条出口，后者是纯函数。
+     * 拆开前这三条回落优先级（显式路径 → web root → ./src/）只有真起进程才验得到，
+     * 而它恰好是 fat jar 与 Docker 两种工作目录都在用的那两条腿。
+     */
     private static String resolvePath() {
-        String p = System.getenv("XINYU_LEXICON");
-        if (p != null && !p.isBlank()) {
-            return p;
+        return resolvePath(System.getenv("XINYU_LEXICON"), System.getenv("XINYU_WEB_ROOT"));
+    }
+
+    static String resolvePath(String lexiconEnv, String webRootEnv) {
+        if (lexiconEnv != null && !lexiconEnv.isBlank()) {
+            return lexiconEnv;
         }
-        String root = System.getenv("XINYU_WEB_ROOT");
-        if (root == null || root.isBlank()) {
-            root = "./src/";
-        }
+        String root = webRootEnv == null || webRootEnv.isBlank() ? "./src/" : webRootEnv;
         return root.replaceAll("/+$", "") + "/data/emotion-lexicon.js";
     }
 
@@ -109,7 +114,7 @@ public final class EmotionLexicon {
      * 读取 SSOT：文件体是 {@code window.__XINYU_LEXICON__ = { ... };}
      * （做成 .js 是让零构建的前端能同步加载），这里只取首尾花括号之间的纯 JSON。
      */
-    private static JsonNode readLexicon(String path) {
+    static JsonNode readLexicon(String path) {
         Path p = Path.of(path);
         try {
             String raw = Files.readString(p, StandardCharsets.UTF_8);
@@ -132,7 +137,7 @@ public final class EmotionLexicon {
         }
     }
 
-    private static List<String> toStringList(JsonNode n) {
+    static List<String> toStringList(JsonNode n) {
         List<String> out = new ArrayList<>();
         if (n != null) {
             for (JsonNode x : n) {

@@ -154,4 +154,21 @@ class EmotionEngineTest {
         assertNull(EmotionEngine.secondaryOf(null, "sadness"), "null 不得抛");
         assertNull(EmotionEngine.secondaryOf(ok, "nope"), "主情绪不在列时按单一情绪处理");
     }
+
+    /**
+     * r77：否定词是否生效，判据是「否定词字符区间与程度副词区间**是否重叠**」——
+     * 重叠条件有两个子句，此前只测过其中一侧。两侧都取一遍才咬得住
+     * 「把区间重叠写成起点比较」这类回退（2026-09-23 那条缺陷的另一种再犯形态）。
+     */
+    @Test
+    @DisplayName("否定窗两侧：被程度副词覆盖则不生效（太不开心=sadness），落在副词之前则生效（不太开心=calm）")
+    void negationWindowBothSides() {
+        EmotionEngine.ScanResult swallowed = EmotionEngine.scan("太不开心");
+        assertEquals("sadness", swallowed.emotion(), "「太」覆盖了「不」⇒ 否定不生效");
+        assertEquals(0.65, swallowed.intensity(), 1e-9);
+
+        EmotionEngine.ScanResult active = EmotionEngine.scan("不太开心");
+        assertEquals("calm", active.emotion(), "「不」落在程度副词之前 ⇒ 否定生效，情绪被抵消");
+        assertEquals(0.25, active.intensity(), 1e-9, "回落值必须等于 SSOT 里 calm 的权重，不是 0");
+    }
 }

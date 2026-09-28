@@ -213,6 +213,15 @@ class EmotionControllerTest {
         Files.write(empty, "{\"items\":[]}".getBytes(StandardCharsets.UTF_8));
         assertEquals(500, new EmotionController(new EmotionClassifier(mock(LlmProxy.class), 8000L),
                 empty.toString()).eval(0).getStatusCode().value());
+
+        // items 根本不是数组（写成对象）：与空数组同一出口，不许当成「零条样本」跑出 accuracy=NaN
+        Path shaped = tmp.resolve("items-object.json");
+        Files.write(shaped, "{\"items\":{\"1\":\"x\"}}".getBytes(StandardCharsets.UTF_8));
+        ResponseEntity<byte[]> objResp = new EmotionController(
+                new EmotionClassifier(mock(LlmProxy.class), 8000L), shaped.toString()).eval(0);
+        assertEquals(500, objResp.getStatusCode().value());
+        assertEquals("dataset-empty", M.readTree(text(objResp)).path("error").asText(),
+                "items 写成对象要与空数组同出口，不许跑出 accuracy=NaN");
     }
 
     @Test
@@ -231,5 +240,31 @@ class EmotionControllerTest {
         assertEquals("0/1", b.path("per_class").path("www").asText());
         assertEquals(3, b.path("misses").size());
         assertEquals("0/0", b.path("crisis_recall").asText());
+    }
+
+    @Test
+    @DisplayName("r77 危机召回要能记「漏」：同批里命中与未命中各一条 ⇒ 1/2，不许只统计命中")
+    void crisisRecallCountsMissesToo(@TempDir Path tmp) throws Exception {
+        Path ds = tmp.resolve("crisis-mixed.json");
+        Files.write(ds, ("{\"items\":["
+                + "{\"text\":\"感觉活着好累，不想活了\",\"expect\":\"crisis\"},"
+                + "{\"text\":\"今天天气不错\",\"expect\":\"crisis\"}"
+                + "]}").getBytes(StandardCharsets.UTF_8));
+        JsonNode b = M.readTree(text(controllerAt(ds.toString()).eval(0)));
+        assertEquals("1/2", b.path("crisis_recall").asText(),
+                "危机漏报必须进分母：只报命中数会把安全边界读成满分");
+        assertEquals(1, b.path("misses").size());
+    }
+
+    @Test
+    @DisplayName("r77 emotion 入参形状：text 为 null 与顶层非对象都是 400（不得拿空串走词典）")
+    void emotionRejectsNonTextShapes() throws Exception {
+        assertEquals(400, offline().emotion("{\"text\":null}").getStatusCode().value());
+        assertEquals(400, offline().emotion("[{\"text\":\"难过\"}]").getStatusCode().value());
+        assertEquals(400, offline().emotion("null").getStatusCode().value());
+    }
+
+    private static EmotionController controllerAt(String dataset) {
+        return new EmotionController(new EmotionClassifier(mock(LlmProxy.class), 8000L), dataset);
     }
 }

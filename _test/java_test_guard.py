@@ -8,7 +8,8 @@
 
 本件**不**跑 mvn（腾讯云镜像实测会 514 Frequency Capped，把第三方限速接进阻断链=天天假红），
 也**不**复刻跨端对账（那是 engine_consistency_check 的活，复刻就长成 M5⑥「同一判断两处实现」）。
-它盯的是四件**会让 in-build 门禁静默失效**的事：
+它盯的是下面这些**会让 in-build 门禁静默失效**的事（条数以本列表为准，标题不抄数字——
+在别处抄过一次"四件"，加到 T7 时这行就没人回来改，成了文档自己的假账）：
   T1 用例真的存在：surefire 命名约定下的测试文件数与 @Test 数各达下限（零输入绝不判绿）
   T2 依赖真的在位：pom 声明 spring-boot-starter-test 且 scope=test
   T3 前提真的成立：surefire workingDirectory 指到仓库根（词表 SSOT 按 ./src/ 解析，
@@ -16,6 +17,9 @@
   T4 接线真的没断：ci.yml 的 java-build job 里 `mvn ... package` 那一步**不得带 -DskipTests**
      （带了这个 in-build 门禁就在受理面上静默消失，而本地看还是"CI 全绿"）
   T5 分母非空：main 侧类数 > 0（扫错目录会让 T1 的"0 用例"看起来完全正常）
+  T6 覆盖率门本体在位：jacoco + check 目标 + **LINE 与 BRANCH 两路阈值**（r77 起缺一路即判红；
+     只守 LINE 会放行"三元表达式另一半从没走过"——r76 的门就是 91.93% 行覆盖配 83.11% 分支覆盖）
+  T7 门在链上：check 绑 verify 相位且 CI 真的跑 `mvn verify`（写成 package 则这道门一次也不会执行）
 
 退出码：0=JAVA-TEST-GUARD-PASS 1=判红 2=环境不可达（无 pom/无 ci.yml ⇒ 记 UNVERIFIED，不判绿）
 用法：python _test/java_test_guard.py [--selftest] [--json]
@@ -34,8 +38,10 @@ POM = ROOT / "server" / "pom.xml"
 CIYML = ROOT / ".github" / "workflows" / "ci.yml"
 
 # 下限 = 09-27 实测值向下取整留出余量（无余量的地板等于冻结增长：加用例不会红，删用例会红）
-FILE_FLOOR = 3
-METHOD_FLOOR = 24
+# r77 随实测抬尺：现测 11 件 / 82 用例 ⇒ 取 8 / 70（余量 3 件 / 12 用例）。
+# 抬之前是 3 / 24 —— 那是"反空不反缩"的下限，删掉一半用例也不会红，起不到棘轮作用。
+FILE_FLOOR = 8
+METHOD_FLOOR = 70
 
 # surefire 默认命名约定：Test* / *Test / *Tests / *TestCase（与 maven-surefire 文档一致）
 SUREFIRE_NAME = re.compile(r"(?:^|/)(?:Test[^/]*|[^/]*(?:Test|Tests|TestCase))\.java$")
@@ -94,25 +100,38 @@ def check_ci_wiring(yml_text):
 
 JACOCO_PLUGIN = re.compile(r"<artifactId>jacoco-maven-plugin</artifactId>")
 JACOCO_CHECK_GOAL = re.compile(r"<goal>check</goal>")
-JACOCO_MINIMUM = re.compile(r"<minimum>\s*(0?\.\d+|1(?:\.0+)?)\s*</minimum>")
 JACOCO_CHECK_AT_VERIFY = re.compile(r"<phase>verify</phase>[\s\S]{0,240}?<goal>check</goal>")
 MVN_VERIFY = re.compile(r"mvn[^\n]*\bverify\b")
 
 
+JACOCO_LIMIT = re.compile(r"<limit>\s*<counter>(\w+)</counter>.*?"
+                          r"<minimum>\s*(0?\.\d+|1(?:\.0+)?)\s*</minimum>.*?</limit>", re.S | re.M)
+
+
 def check_coverage_gate(pom_text):
-    """T6 覆盖率门本体：jacoco 在位 ∧ 有 check 目标 ∧ 有合法 <minimum> 数值。
+    """T6 覆盖率门本体：jacoco 在位 ∧ 有 check 目标 ∧ **LINE 与 BRANCH 两路阈值都在**。
 
     只写 `prepare-agent`/`report` 的仓**量得到但不会拦** ⇒ 不算门（与 r75 同址尺同一口径：
     "存在性 ≠ 行为"，必须能让构建失败）。
+
+    r77 补 BRANCH 这一路的理由（一手）：r76 的门只量 LINE，报的是 91.93%，
+    而同一批代码的分支覆盖只有 **83.11%** —— 一行 `a ? b : c` 在 LINE 里是 1 行，
+    在行为上是 2 个分支。只守 LINE 的门会放行"整段三元表达式从没走过另一半"这种洞，
+    而本项目最要命的那几处（危机短路、上游回落、鉴权放行/拦截）恰好全是三元与 `&&` 短路。
     """
-    if not JACOCO_PLUGIN.search(pom_text or ""):
+    text = pom_text or ""
+    if not JACOCO_PLUGIN.search(text):
         return False, "pom 里没有 jacoco-maven-plugin"
-    if not JACOCO_CHECK_GOAL.search(pom_text):
+    if not JACOCO_CHECK_GOAL.search(text):
         return False, "jacoco 只有 report（量得到、不拦人）⇒ 缺 check 目标"
-    m = JACOCO_MINIMUM.search(pom_text)
-    if not m:
+    limits = {counter: minimum for counter, minimum in JACOCO_LIMIT.findall(text)}
+    if not limits:
         return False, "check 目标在但没有 <minimum> 数值"
-    return True, "LINE 阈值 %s" % m.group(1)
+    missing = [c for c in ("LINE", "BRANCH") if c not in limits]
+    if missing:
+        return False, "覆盖率门缺 %s 阈值（只有 LINE 不构成门：一行三元算 1 行却有 2 个分支，r77）" \
+            % "/".join(missing)
+    return True, "LINE %s / BRANCH %s" % (limits["LINE"], limits["BRANCH"])
 
 
 def check_gate_on_chain(yml_text):
@@ -190,13 +209,28 @@ GOOD_POM = ("<dependency><artifactId>spring-boot-starter-test</artifactId>"
             "<workingDirectory>${project.basedir}/..</workingDirectory>"
             "<plugin><artifactId>jacoco-maven-plugin</artifactId>"
             "<execution><phase>verify</phase><goals><goal>check</goal></goals>"
-            "<configuration><rules><rule><limits><limit>"
-            "<counter>LINE</counter><minimum>0.35</minimum>"
-            "</limit></limits></rule></rules></configuration></execution></plugin>")
+            "<configuration><rules><rule><limits>"
+            "<limit><counter>LINE</counter><minimum>0.35</minimum></limit>"
+            "<limit><counter>BRANCH</counter><minimum>0.35</minimum></limit>"
+            "</limits></rule></rules></configuration></execution></plugin>")
+# r77：只守 LINE 的门是"半个门"——夹具里单独造一个 LINE-only 的 pom，用来证明 T6 真的在看 BRANCH 那一路
+BAD_POM_LINEONLY = GOOD_POM.replace(
+    "<limit><counter>BRANCH</counter><minimum>0.35</minimum></limit>", "")
 BAD_POM_NODEP = ("<workingDirectory>${project.basedir}/..</workingDirectory>"
-                 "<artifactId>jacoco-maven-plugin</artifactId><goal>check</goal><minimum>0.35</minimum>")
-BAD_POM_NOWD = ("<artifactId>spring-boot-starter-test</artifactId><scope>test</scope>"
-                "<artifactId>jacoco-maven-plugin</artifactId><goal>check</goal><minimum>0.35</minimum>")
+                 "<plugin><artifactId>jacoco-maven-plugin</artifactId>"
+                 "<execution><phase>verify</phase><goals><goal>check</goal></goals>"
+                 "<configuration><rules><rule><limits>"
+                 "<limit><counter>LINE</counter><minimum>0.35</minimum></limit>"
+                 "<limit><counter>BRANCH</counter><minimum>0.35</minimum></limit>"
+                 "</limits></rule></rules></configuration></execution></plugin>")
+BAD_POM_NOWD = ("<dependency><artifactId>spring-boot-starter-test</artifactId>"
+                "<scope>test</scope></dependency>"
+                "<plugin><artifactId>jacoco-maven-plugin</artifactId>"
+                "<execution><phase>verify</phase><goals><goal>check</goal></goals>"
+                "<configuration><rules><rule><limits>"
+                "<limit><counter>LINE</counter><minimum>0.35</minimum></limit>"
+                "<limit><counter>BRANCH</counter><minimum>0.35</minimum></limit>"
+                "</limits></rule></rules></configuration></execution></plugin>")
 # r75 新增三条反例：它们都长得像"装了覆盖率门"，缺一件就让这道门永远不会拦人
 BAD_POM_NOJACOCO = ("<dependency><artifactId>spring-boot-starter-test</artifactId>"
                     "<scope>test</scope></dependency>"
@@ -237,17 +271,21 @@ def _fixture(tmp, n_files, n_methods_each, main_classes=8, pom=None, ci=None):
 def run_selftest():
     cases = []
     with tempfile.TemporaryDirectory() as tmp:
-        tr, mr, pom, ci = _fixture(tmp, FILE_FLOOR + 1, 8)  # 4 件 x 8 = 32 > 下限 24
+        tr, mr, pom, ci = _fixture(tmp, FILE_FLOOR + 1, 12)  # 9 件 x 12 = 108 ≥ 下限 70（且件数也过）
         cases.append(("正例：下限齐 + 依赖在位 + 未跳测", evaluate(tr, mr, pom, ci)[1], True))
 
         tr2, mr2, _, _ = _fixture(str(Path(tmp) / "f2"), 0, 0)
         Path(tr2).mkdir(parents=True, exist_ok=True)
         cases.append(("反例①：零用例不得判绿", evaluate(tr2, mr2, pom, ci)[1], False))
 
-        tr3, mr3, _, _ = _fixture(str(Path(tmp) / "f3"), FILE_FLOOR + 1, 1)   # 4 文件 x 1 @Test = 4 < 25
+        tr3, mr3, _, _ = _fixture(str(Path(tmp) / "f3"), FILE_FLOOR + 1, 1)   # 9 件 x 1 @Test = 9 < 下限 70
         cases.append(("反例②：文件够但用例数不足", evaluate(tr3, mr3, pom, ci)[1], False))
 
-        tr4, mr4, _, _ = _fixture(str(Path(tmp) / "f4"), FILE_FLOOR, 7)
+        # tr4 是"其余维度反例"的共用夹具：它自己必须是**全绿对照**，否则下面每一条的红
+        # 都可能来自用例数不足而不是被审那一维（r77 抬下限后这条尤其重要，见点名E）
+        tr4, mr4, _, _ = _fixture(str(Path(tmp) / "f4"), FILE_FLOOR, 10)
+        cases.append(("点名E：tr4 共用夹具配合规 pom/CI 必须为真（不真则下方反例的红无法归因）",
+                      evaluate(tr4, mr4, GOOD_POM, GOOD_CI)[1], True))
         cases.append(("反例③：pom 缺 starter-test", evaluate(tr4, mr4, BAD_POM_NODEP, ci)[1], False))
         cases.append(("反例④：pom 缺 workingDirectory", evaluate(tr4, mr4, BAD_POM_NOWD, ci)[1], False))
         cases.append(("反例⑤：CI 构建步带 -DskipTests", evaluate(tr4, mr4, pom, BAD_CI_SKIP)[1], False))
@@ -262,6 +300,9 @@ def run_selftest():
                       evaluate(tr4, mr4, BAD_POM_NOTHRESH, ci)[1], False))
         cases.append(("反例⑪：CI 仍跑 package ⇒ verify 相位的 check 永不执行",
                       evaluate(tr4, mr4, pom, BAD_CI_PACKAGE)[1], False))
+        # r77：只守 LINE 的门放行"三元表达式另一半从没走过"，所以缺 BRANCH 必须单独判红
+        cases.append(("反例⑫：pom 只有 LINE 阈值（缺 BRANCH 那一路）",
+                      evaluate(tr4, mr4, BAD_POM_LINEONLY, ci)[1], False))
         ok_gate, why_gate = check_coverage_gate(pom)
         ok_chain, why_chain = check_gate_on_chain(ci)
         cases.append(("点名A：合规 pom 的 T6 必须真过（值=%s）" % why_gate, ok_gate, True))
@@ -270,6 +311,13 @@ def run_selftest():
                       check_gate_on_chain(BAD_CI_PACKAGE)[0], False))
         cases.append(("点名D：report-only pom 的 T6 必须单独为假",
                       check_coverage_gate(BAD_POM_REPORTONLY)[0], False))
+        # 红因点名：缺 BRANCH 的那条必须**因为 BRANCH** 而红，不能只是"整体为假"
+        lineonly_ok, lineonly_why = check_coverage_gate(BAD_POM_LINEONLY)
+        cases.append(("点名F：LINE-only pom 的 T6 为假且红因点名 BRANCH（实际=%s）" % lineonly_why,
+                      (not lineonly_ok) and ("BRANCH" in lineonly_why), True))
+        good_ok, good_why = check_coverage_gate(GOOD_POM)
+        cases.append(("点名G：合规 pom 的 T6 回执必须同时带两路阈值（实际=%s）" % good_why,
+                      good_ok and ("LINE" in good_why and "BRANCH" in good_why), True))
 
         # 边界：命名约定必须与 surefire 一致，否则"看起来有用例"是假的
         bad = Path(tmp) / "naming" / "com"
