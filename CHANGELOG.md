@@ -9,6 +9,33 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Fixed（r78 · 两把尺各修一半：质量门认出「自写门禁」，覆盖率读数带上具名缺口清单）
+- **假缺口撤回落水（口径翻转，附证据）**：`_test/benchmark_metrics.py` 的质量门同址尺对执行型三类
+  （lint / typecheck / secret）第一句是 `if not files: out=False`，`files` 只来自**标准工具文件名**清单
+  （`.gitleaks.toml`/`eslint.config.*`/`mypy.ini`…）⇒ 本仓 CI 每一步真跑着 `python _test/tracked_secret_scan.py`
+  却被读成 `self=❌无`，r77 总览表因此带了一条**我方并不存在的缺口**。r75 当年还把这份天花板固化成断言
+  （"没有标准配置却判出 secret_scan_gate ⇒ FAIL"）⇒ 错误口径被锁进回归网，谁修对谁红。
+  现在新增第二路由 `qg_invoked_line()`：**只认执行行**（`run:` 之后或以解释器/构建工具开头的行），
+  要求被调用目标带着该类工具词，证据点名那一行；两侧同一函数 ⇒ 同法不破。
+  三形反例齐：描述性文字（步骤名「起 fat jar（无密钥…）」+ 执行行 `java -jar`）必须 False；
+  无候选 ∧ CI 面未取全 ⇒ `None`（不塌缩成 False）；摘掉该路由正例即回 False、还原即回 True（变异腿）。
+  **真面读数**：`secret_scan_gate self = True ｜ 自写门禁 ∧ CI 真调用：python _test/tracked_secret_scan.py --selftest`。
+- **覆盖率读数接进阻断链（报告 §3 建议 7 落地）**：`_test/java_test_guard.py` 新增 T8——
+  LINE/BRANCH/METHOD 三路现算下限各 **0.90**（实测 97.75% / 96.28% / 96.43%，余量 ≥6 点），
+  并打印"还带缺口的类"**具名清单**（本轮真面：`LlmProxy(分支漏3/36·行漏4)；MemoryController(分支漏3/30·行漏2)；
+  ChatController(分支漏2/30)`）——没有名单的缺口指标等于没有指标。T8 已在链上：`java_test_guard` 是电池在册套件。
+- **分母口径回归锁**：`read_counters()` 只取 `<report>` 直属 counter；`TRAP_JACOCO` 夹具故意让类内 counter
+  与总 counter 不一致，把 r77 那条"逐类求和 + 再加一次 missed"（246/296 被算成 296/346）的假 drift 钉成不可复发。
+- **取不到读数既不红也不绿**：jacoco.xml 缺失或**产物比源码旧** ⇒ 守卫整体 `rc=2 UNVERIFIED`
+  （旧行为是压根不看读数就印 PASS）。`_test/build_jar.py` 那条"陈旧产物不得当现状"的纪律首次进入 Java 面。
+- **失败面（同条登记）**：T8 第一版把 XML 硬化写成"拒 DOCTYPE + 拒 ENTITY"，而真件首行就是
+  `<!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd">` ⇒ 守卫把**真读数**判成未验、
+  整条 `REAL-RC=2`。修＝只拒 `<!ENTITY`，并把"真件必须读得动"写成夹具腿（边界①正例 + 边界②反例）。
+  这是 [[gate-shape-must-admit-the-honest-value]] 的第二次实发：只有反例没有正例的拒绝式判据，
+  等于把"我不认识"实现成"你不合法"。
+- **复算**：`python _test/java_test_guard.py [--selftest]`（自证 **33/33**）；
+  `python _test/benchmark_metrics.py --selftest`（含 r78 新腿）；peers 侧五类分子随口径修正重采。
+
 ### Added（r77 · 换尺：只量 LINE 的覆盖率门会放行「三元表达式从没走过另一半」）
 - **本轮做的是 r76 §4 的第 3 条**（"覆盖率下一步不是抬阈值，而是补分支"）。落点：
   ① 新增 `LlmProxyTest`(9) —— 上游换成 JDK 内置 `com.sun.net.httpserver.HttpServer`（127.0.0.1 + 端口 0），
