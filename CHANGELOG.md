@@ -9,6 +9,39 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Added（r81 · 补上「本地看不见的那类破坏」：标记层内联样式守卫 + 接线；并代 r79 补记台账）
+- **新判据 `_test/inline_style_check.py`（13 条夹具腿 + 端到端演习）**：扫 `src/index.html`、`src/js/*.js`
+  与 `deploy/xinyu/` 同两面，四类写法各一条反例（模板串 `style="…"` / HTML `style="…"` / `<style>` 元素 /
+  `setAttribute("style")` / `.cssText=`），**不判** CSSOM 逐属性赋值（`el.style.color=` 不受 `style-src` 约束，
+  是本仓唯一可行的动态着色路子）。真面读数 `扫描=30 文件｜命中=14｜欠账基线=14（未修）｜新增=0` rc=0。
+- **为什么必须有个静态闸（一手代价）**：本地服务不发 CSP 头 ⇒ `browser_check.py` 对这类破坏**全盲**，
+  而线上 `_headers:28` 是 `style-src 'self'` 无 `unsafe-inline` ⇒ `public_check.py` 抓到 8 条
+  `Applying inline style violates`（去重 5 个 sha256）。后果不是控制台噪声：情绪强度条的
+  `width:${pct}%` 就写在同一条内联样式里，**线上那条读数实际是失效的**。
+  探针取调用位置时还量到一个反直觉事实：纯加载 + 单次滚动 = **0 命中**，触发面在交互路径（第二幕读数/危机条/一键点亮），
+  所以「打开首页看一眼没红」不构成反证。
+- **存量按行指纹登记为欠账，不按行号**（r81 现读 7 个唯一行 × src/deploy 两面 = 14）：
+  行号锚法会让「上方插入一行」这种正常提交变不了绿；指纹锚法下修好即报 `已清偿` 且只降格为提示，
+  所以闸是**可自愈**的（判据自己不留死锁）。夹具腿含「基线不得锚空面」（防抄错指纹成永久豁免）与
+  「gate 阻断分支必须真 FAIL」两向。演习：隔离 HEAD 副本注入一条 `style="color:red"` ⇒ `rc=1` 且点名到行，
+  演习件已删除并 `ls` 复验不存在。
+- **接线**：`.github/workflows/ci.yml` 前端 job 新增一步（真判据 + `--selftest`，紧挨 `deploy_sync_check` 之后）。
+  **不进** `_test/run_all_suites.py` —— 该文件本轮实测被他方 r70 在途持有（两次读数间 README/quality-gates 同步漂改），
+  插队会把别人的半成品卷进我的提交。
+- **本轮两次同族自证（值得记，因为它证明这类缺陷不是抽象风险）**：他方在途的 `_test/benchmark_metrics.py`
+  在 selftest 新增腿里写了 `blind_cur[0]["tree_error"] "boom"`（少一个比较符）⇒ 整文件 SyntaxError ⇒
+  本地对标尺 rc=1 起不来；我给自己的 selftest 夹具写嵌套转义时**当场又踩一次同族**（`"...\\"..."`）。
+  两侧同族缺陷**本仓确有闸能抓**（受理面 `python -m compileall -q _test` + 本地 `repo_config_check` 的 **G9**，
+  G9 实跑回显 `79 个脚本已扫；违规：benchmark_metrics.py → SyntaxError 第 1074 行`；HEAD 面 rc=0 / 主树面 rc=1，
+  归属复算证红在他方在途而非已入库面）。所以问题不是「没有闸」，是**闸不在取数入口之前**：
+  本地拿尺的人直接跑尺，第一次撞到的是 SyntaxError，而不是「哪条判据红、红在谁身上」。
+- **代 r79 补记**（R2c 在 CI 点名 `r79 有 feat/fix 级提交却没进 [Unreleased]`，台账由本轮按提交与受理面回执回填）：
+  R78-04 闭环——`java_test_guard` 挂进 **java-build 作业**（jacoco 产物所在侧），受理面 step
+  「覆盖率读数门（jacoco 现算 + 具名缺口清单）」= success ⇒ 读数门从此在 CI 被强制，不再靠电池侧的
+  `rc=2 未验`；T8 缺口名单下钻到**方法名**（现读 `LlmProxy.openStream` 漏 8 指令、`LlmProxy.call` 漏 6 指令，
+  另有 `SafetyGuard$Named` 构造器、`SoulIsleApplication` 的 main 与构造器未触达）；`fault_injection` 的 F5 同法分离环境档
+  （上游 502 不再冒充「必须修的代码缺陷」）。
+
 ### Fixed（r78 · 两把尺各修一半：质量门认出「自写门禁」，覆盖率读数带上具名缺口清单）
 - **假缺口撤回落水（口径翻转，附证据）**：`_test/benchmark_metrics.py` 的质量门同址尺对执行型三类
   （lint / typecheck / secret）第一句是 `if not files: out=False`，`files` 只来自**标准工具文件名**清单

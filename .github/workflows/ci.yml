@@ -26,6 +26,12 @@ jobs:
         run: python -m compileall -q _test
       - name: src → deploy/xinyu SHA256 三类归零
         run: python _test/deploy_sync_check.py
+      # 本地无 CSP 头，browser_check 看不见「标记层内联样式被 style-src 拦」这类破坏（r81 一手：
+      # 线上 8 条 Applying inline style，强度条 width 实际失效）。故在受理面补静态面。
+      - name: 标记层内联样式守卫（CSP style-src 'self' 前提；存量 14 处已登记欠账，新增即红）
+        run: |
+          python _test/inline_style_check.py
+          python _test/inline_style_check.py --selftest
       - name: 静态资源体积预算守卫（首屏优势不回涨，含 --selftest 防恒真）
         run: |
           python _test/size_budget_check.py
