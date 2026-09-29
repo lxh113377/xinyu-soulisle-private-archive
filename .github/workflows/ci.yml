@@ -83,6 +83,12 @@ jobs:
           node-version: "20"
       - name: mvn verify（覆盖率门绑在 verify 相位；写成 package 就等于没装这道门，r75）
         run: mvn -B -ntp -f server/pom.xml verify
+      # r79：把**读数门**挂到产物存在的那个作业上。r78 装 T8（LINE/BRANCH/METHOD 三路现算 + 具名缺口清单）后，
+      # 它在受理面的真实结论是 `rc=2 未验`——因为电池跑在另一个 job，那里没有 `jacoco.xml`。
+      # 「未验」是**正确判定**（确实没量到），但一道只在本地生效的门等于没门 ⇒ 正解是把它挪到有产物的作业，
+      # **不是**把判定改成"跳过"求绿（那会把'没测'伪装成'不需要测'）。
+      - name: 覆盖率读数门（jacoco 现算 + 具名缺口清单；产物在本作业才量得到）
+        run: python _test/java_test_guard.py
       # 产物自证（2026-09-25 r20 实证补）：本机曾在 **jar 进程存活时**跑 package —— Windows 文件锁让
       # spring-boot:repackage 无法把 soulisle-server.jar 改名为 .original，BUILD FAILURE 且磁盘上留下
       # 48,920B 的**瘦 jar**，而旧进程仍在内存里跑、/api/health 照常 200 ⇒ **假健康**。

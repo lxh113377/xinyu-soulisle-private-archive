@@ -185,9 +185,34 @@ def read_counters(xml_text):
     return out
 
 
-def top_gaps(xml_text, k=3):
-    """具名清单：还带着未覆盖分支/行的类，按 missed 分支降序，最多 k 条。"""
+def top_gaps(xml_text, k=3, level="class"):
+    """具名清单：还带着未覆盖分支/行的类（level="class"），或未触达/带漏指令的**方法**（level="method"）。
+
+    方法级口径说明（先看清再写断言，免得把两档混成一句话）：jacoco 的 `<method>` 只带
+    INSTRUCTION/LINE/COMPLEXITY/METHOD 四个 counter，**没有 BRANCH** ⇒ 方法级按"未触达 + 漏指令数"排，
+    不得假造方法级分支数。`<method>` 整段缺失时回落类级并显式标注，**不得静默变空**
+    （空名单会被下一轮读成"没有缺口"）。
+    """
     root = _parse_jacoco(xml_text)
+    if level == "method":
+        methods = [m for cls in root.iter("class") for m in cls.findall("method")]
+        if not methods:
+            return ["<方法级 counter 缺失 ⇒ 回落类级>"] + top_gaps(xml_text, k=k)
+        rows = []
+        for cls in root.iter("class"):
+            cname = cls.get("name").split("/")[-1]
+            for m in cls.findall("method"):
+                mi = mcov = 0
+                for c in m.findall("counter"):
+                    if c.get("type") == "INSTRUCTION":
+                        mi = int(c.get("missed"))
+                    elif c.get("type") == "METHOD":
+                        mcov = int(c.get("covered"))
+                if mi or not mcov:
+                    rows.append((mi, 0 if mcov else 1, "%s.%s" % (cname, m.get("name"))))
+        rows.sort(reverse=True)
+        return ["%s(%s)" % (name, "未触达" if zero else "漏%d指令" % mi)
+                for mi, zero, name in rows[:k]]
     rows = []
     for cls in root.iter("class"):
         mb = mc = ml = 0
@@ -260,11 +285,13 @@ def evaluate(test_root, main_root, pom_text, yml_text, jacoco_text=None, jacoco_
     try:
         counters = read_counters(jacoco_text) if jacoco_text else {}
         gap_txt = "；".join(top_gaps(jacoco_text)) if counters else ""
+        method_txt = "；".join(top_gaps(jacoco_text, k=5, level="method")) if counters else ""
         cov_state, cov_red, cov_val = check_coverage_counters(counters, jacoco_fresh_flag)
     except Exception as e:                      # 畸形读数不许静默变成"未验"再变成绿
         cov_state, cov_red, cov_val = "unverified", False, "jacoco 读数失败：%s" % str(e)[:70]
     rows.append(("T8 覆盖率读数 + 具名缺口", not cov_red,
-                 cov_val + ("｜还带缺口的类：" + gap_txt if gap_txt else "")))
+                 cov_val + ("｜带缺口的类：" + gap_txt if gap_txt else "")
+                 + ("｜方法级：" + method_txt if method_txt else "")))
     return rows, all(r[1] for r in rows), st, cov_state
 
 
@@ -381,6 +408,20 @@ TRAP_JACOCO = ('<report>'
                '<class name="com/x/Trap"><counter type="BRANCH" missed="40" covered="40"/></class>'
                '<class name="com/x/Trap2"><counter type="BRANCH" missed="9" covered="81"/></class>'
                '</report>')
+# r79 方法级夹具：一个全覆盖方法、一个未触达方法、一个部分覆盖（漏 7 条指令）
+METHOD_JACOCO = ('<report>'
+                 '<counter type="LINE" missed="5" covered="95"/>'
+                 '<counter type="BRANCH" missed="10" covered="90"/>'
+                 '<counter type="METHOD" missed="1" covered="2"/>'
+                 '<class name="com/x/Big">'
+                 '<counter type="BRANCH" missed="10" covered="90"/><counter type="LINE" missed="5" covered="95"/>'
+                 '<method name="used" desc="()V" line="3"><counter type="INSTRUCTION" missed="0" covered="9"/>'
+                 '<counter type="METHOD" missed="0" covered="1"/></method>'
+                 '<method name="unused" desc="()V" line="7"><counter type="INSTRUCTION" missed="0" covered="0"/>'
+                 '<counter type="METHOD" missed="1" covered="0"/></method>'
+                 '<method name="partial" desc="()V" line="9"><counter type="INSTRUCTION" missed="7" covered="3"/>'
+                 '<counter type="METHOD" missed="0" covered="1"/></method>'
+                 '</class></report>')
 
 
 def _fixture(tmp, n_files, n_methods_each, main_classes=8, pom=None, ci=None):
@@ -479,6 +520,16 @@ def run_selftest():
         cases.append(("T8 具名缺口：必须点出带缺口的类名（按 missed 分支降序）",
                       top_gaps(GOOD_JACOCO),
                       ["Big(分支漏6/100·行漏5)", "Small(分支漏4/44·行漏0)"]))
+        # r79 方法级下钻（R78-01）：未触达与部分覆盖都要点名，且不得与类级互相冒充
+        m_gaps = top_gaps(METHOD_JACOCO, k=5, level="method")
+        cases.append(("方法级正例：未触达方法必须标「未触达」", "Big.unused(未触达)" in m_gaps, True))
+        cases.append(("方法级正例：部分覆盖必须带漏指令数", "Big.partial(漏7指令)" in m_gaps, True))
+        cases.append(("方法级反例：全覆盖方法不得进名单（名单不是类名复读机）",
+                      any("Big.used" in g for g in m_gaps), False))
+        cases.append(("两档不互冒充：类级名单里不得出现方法名",
+                      any("." in g and "Big(" not in g for g in top_gaps(METHOD_JACOCO, level="class")), False))
+        cases.append(("回落自证：<method> 缺失时不得静默变空，须显式标注并回落类级",
+                      top_gaps(GOOD_JACOCO, k=3, level="method")[0].startswith("<方法级 counter 缺失"), True))
         # 分母口径回归锁（r77 一手：逐类求和再加一次 missed ⇒ 246/296 被算成 296/346）
         cases.append(("T8 口径锁：分母只取 <report> 直属 counter，类内 counter 不得混进总分母",
                       read_counters(TRAP_JACOCO)["BRANCH"], (10, 90)))

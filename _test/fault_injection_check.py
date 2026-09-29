@@ -235,6 +235,49 @@ def assess(cases):
                       "errors": errs}, **extra)
 
 
+def upstream_state(status, body):
+    """探活分档：与 `safety_guard_check.status_expectation` 同一口径，但**故意不 import 那个模块**——
+    它在 import 期用 `sys.argv` 决定 SELFTEST，跨模块 import 会把本件的参数当成它的开关（r26 同族坑）。"""
+    body = body or ""
+    if status == 500 and "no-key" in body:
+        return "key-free"
+    if status == 502 and "upstream-error" in body:
+        return "unreachable"
+    if status == 402 or "Insufficient Balance" in body:
+        return "quota"
+    return "ok"
+
+
+def recover_disposition(badge_ok, state):
+    """recover（F5）用例的处置：徽章没翻回在线时，先问"上游此刻到底可达吗"。
+
+    r78 一手：整跑窗口里上游返回 502，F5 于是判红——可"恢复"这一步客观上没法发生，
+    红等于"必须修"，会把人支使去改一条没坏的代码。
+    但也不能一律降成未验：`state == "ok"` 时徽章仍不翻，那**就是**真缺陷（开关被焊死在降级方向）。
+    """
+    if badge_ok:
+        return "pass"
+    return "fail" if state == "ok" else "unverified"
+
+
+def probe_upstream_state(base):
+    """一次最小探活：问的是"这台服务器此刻能不能把请求送到上游"，不是"上游健不健康"。"""
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(base.rstrip("/") + "/api/chat",
+                                 data=json.dumps({"messages": [{"role": "user", "content": "在吗"}]},
+                                                 ensure_ascii=False).encode("utf-8"),
+                                 headers={"Content-Type": "application/json",
+                                          "User-Agent": "xinyu-fault-probe"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return upstream_state(r.status, r.read(400).decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        return upstream_state(e.code, (e.read(400) or b"").decode("utf-8", "replace"))
+    except Exception:
+        return "server-down"
+
+
 def llm_timeout_s():
     """从**权威源**取单腿熔断预算（不抄常量：抄了就会和 chat-agent.js 漂移）。
     取不到 → 0，assess 的 F4b 分支随即跳过（宁可不判，也不拿猜想的预算去判红）。"""
@@ -420,7 +463,32 @@ def selftest():
         ok += 1
     else:
         fail.append("边界B 未打到注入通道却判通过：%s" % bad)
-    total = len(cases) + 2
+    # r79：F5 的环境档分类（上游不可达 ⇒ 未验；上游可达仍不翻徽章 ⇒ 真缺陷；两者不得混成一档）
+    extra = 0
+    for st_in, want in ((200, "ok"), (500, "key-free"), (502, "unreachable"), (402, "quota"), (503, "ok")):
+        got = upstream_state(st_in, {"500": '{"error":"no-key"}', "502": '{"error":"upstream-error"}',
+                                     "402": '{"error":"Insufficient Balance"}'}.get(str(st_in), "{}"))
+        extra += 1
+        if got != want:
+            fail.append("探活分档 %s → 期望 %s 实得 %s" % (st_in, want, got))
+        else:
+            ok += 1
+    for badge_ok, state, want in ((True, "ok", "pass"), (True, "unreachable", "pass"),
+                                  (False, "ok", "fail"), (False, "unreachable", "unverified"),
+                                  (False, "key-free", "unverified"), (False, "quota", "unverified")):
+        extra += 1
+        if recover_disposition(badge_ok, state) != want:
+            fail.append("recover 处置 badge_ok=%s state=%s → 期望 %s 实得 %s"
+                        % (badge_ok, state, want, recover_disposition(badge_ok, state)))
+        else:
+            ok += 1
+    # 反向自证：环境档**不得**吞掉真缺陷——上游可达（ok）时徽章不翻，必须仍是 fail
+    extra += 1
+    if recover_disposition(False, "ok") != "fail":
+        fail.append("反向自证失败：上游可达仍不翻徽章被降级成未验 ⇒ 真缺陷被洗白")
+    else:
+        ok += 1
+    total = len(cases) + 2 + extra
     for x in fail:
         print("  SELFTEST-FAIL " + x)
     print("FAULT-SELFTEST: %d/%d" % (ok, total))
@@ -444,18 +512,29 @@ def main():
         print("FAULT-UNVERIFIED: 全部用例取数失败（%s）" % recs[0]["env_err"][:100])
         return 2
     bad, st = assess(recs)
+    # r79：F5「恢复方向」在上游不可达时客观上验不了 ⇒ 记未验而不是记代码缺陷；
+    # 上游可达却仍不翻徽章才继续判红（不许把环境档一律降为未验来洗白真缺陷）。
+    f5_note = ""
+    if any(x.startswith("F5") for x in bad):
+        state = probe_upstream_state(a.base)
+        if recover_disposition(False, state) == "unverified":
+            bad = [x for x in bad if not x.startswith("F5")]
+            f5_note = "（F5 记未验：上游此刻 %s）" % state
+            print("ℹ️ F5 recover 记**未验**（上游 %s）⇒ 恢复未发生不构成功能缺陷；"
+                  "F1-F4 降级方向与 hang 兜底预算仍全量实测" % state)
     for x in bad:
         print("  · FAIL " + x)
     if a.json:
-        print(json.dumps({"stats": st, "cases": recs, "problems": bad}, ensure_ascii=False)[:1800])
+        print(json.dumps({"stats": st, "cases": recs, "problems": bad, "f5_note": f5_note},
+                         ensure_ascii=False)[:1800])
     if bad:
         print("FAULT-FAIL: %d 项（用例 %d，有效 %d）" % (len(bad), st["cases"], st["valid"]))
         return 1
     h = next((r for r in recs if r["kind"] == "hang"), {})
-    print("FAULT-PASS: 注入 %d 类故障全部如实降级且徽章同帧（hang 兜底 %.1fs ≤ %.0fs 预算；"
+    print("FAULT-PASS: 注入 %d 类故障如实降级且徽章同帧%s（hang 兜底 %.1fs ≤ %.0fs 预算；"
           "分相：fetch %s 腿、两腿间隔 %ss、已归因 %.1fs／实测 %.1fs）｜"
           "输入框未卡死｜未捕获异常 %d 条｜hit_count 全非零（证明注入真打到通道）"
-          % (st["cases"], h.get("settled_s") or -1, HANG_BUDGET_S,
+          % (st["cases"], f5_note, h.get("settled_s") or -1, HANG_BUDGET_S,
              st.get("hang_legs", len(h.get("phases") or [])), st.get("hang_gap_s", "-"),
              st.get("hang_explained_s", -1), h.get("settled_s") or -1, st["errors"]))
     return 0
