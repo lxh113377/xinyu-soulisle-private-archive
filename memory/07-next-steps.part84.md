@@ -9,3 +9,5 @@
       已实取：`Java 服务端构建` success 携 `Tests run: 82` + `All coverage checks have been met`（双路门在受理面生效）、
       `同步守卫` success、`线上↔权威源新鲜度` failure（软步骤，R1 既存）。
       复看 `gh api repos/lxh113377/xinyu-soulisle-private-archive/actions/runs/36475295265/jobs`。
+
+> **r78 复跑回执**：`handoff.py savepoint` 仍 `rc=1`，`handoff.py noise` 现读 `violation: 1` 且明细仍是`VIOL …\wflow.toml -> …\_trash\wflow.toml` ⇒ 判定未变，仍不代迁（该件属他方会话）。`前提=git status --short wflow.toml` 不再出现 `??`。
