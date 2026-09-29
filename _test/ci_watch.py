@@ -27,25 +27,32 @@ VERDICT_LINES = 40
 
 
 def sh(args, timeout=60):
+    """返回 (rc, stdout, stderr)。
+
+    ⚠️ stderr 必须带回来：r83 两次真推送后本工具都报「宽限 180s 后仍无 run 记录（）」，
+    括号里那个空串就是被丢掉的 stderr —— 实际远端**有** run（`gh run list` 现读 216/217 两条），
+    坏的是取数那一步。把「我没取到」印成「没有 run」= R247/⑤-b 那一族（读不动不得写成结论为否）。
+    """
     try:
         r = subprocess.run(args, capture_output=True, text=True, encoding="utf-8",
                            errors="replace", timeout=timeout)
-        return r.returncode, (r.stdout or "")
+        return r.returncode, (r.stdout or ""), (r.stderr or "")
     except Exception as e:                                  # gh 缺失/网络异常都走这里
-        return 127, "%s: %s" % (type(e).__name__, e)
+        return 127, "", "%s: %s" % (type(e).__name__, e)
 
 
 def runs_for(sha):
-    rc, out = sh(["gh", "run", "list", "--limit", "10", "--json",
-                  "databaseId,headSha,status,conclusion"])
+    """返回 (rows|None, 说明, 取数是否失败)。第三项是分叉点：失败 ≠ 无 run。"""
+    rc, out, err = sh(["gh", "run", "list", "--limit", "20", "--json",
+                       "databaseId,headSha,status,conclusion"])
     if rc != 0:
-        return None, out.strip()[:160]
+        return None, "gh run list 取数失败 rc=%d｜stderr=%s" % (rc, (err or out).strip()[:200]), True
     try:
         rows = json.loads(out or "[]")
     except Exception as e:
-        return None, "回执不是 JSON（%s）：%s" % (type(e).__name__, out[:120])
+        return None, "回执不是 JSON（%s）：%s" % (type(e).__name__, out[:120]), True
     hit = [r for r in rows if str(r.get("headSha", "")).startswith(sha)]
-    return (hit or None), ("" if hit else "该 sha 无 run 记录")
+    return (hit or None), ("" if hit else "远端 list 取到 %d 条，没有该 sha 的 run" % len(rows)), False
 
 
 def classify(rows):
@@ -62,11 +69,11 @@ def classify(rows):
 
 
 def red_detail(run_id):
-    _rc, out = sh(["gh", "run", "view", str(run_id), "--json", "jobs",
+    _rc, out, _err = sh(["gh", "run", "view", str(run_id), "--json", "jobs",
                    "--jq", '[.jobs[] | select(.conclusion != "success") | .name + " => " + .conclusion] | join("\\n")'],
                   timeout=90)
     jobs = out.strip() or "(取不到 job 明细)"
-    _rc2, log = sh(["gh", "run", "view", str(run_id), "--log-failed"], timeout=180)
+    _rc2, log, _e2 = sh(["gh", "run", "view", str(run_id), "--log-failed"], timeout=180)
     tail = "\n".join((log or "").splitlines()[-VERDICT_LINES:])
     return jobs, (tail or "(--log-failed 无输出)")
 
@@ -86,7 +93,13 @@ def judge(sha, timeout, grace=180):
     deadline = t0 + timeout
     last = ""
     while time.time() < deadline:
-        rows, why = runs_for(sha)
+        rows, why, failed = runs_for(sha)
+        if failed:
+            # 取数坏了就立刻如实报未验证：等宽限期只会把「我的 gh 不通」伪装成「GitHub 还没登记」，
+            # 而后者会把人引去重推（无效动作），前者才是要修的那一半。
+            print("CI-WATCH-UNVERIFIED | %s | %s ⇒ 取数失败不等于「没有 run」，更不得当通过"
+                  % (sha[:8], why))
+            return 2
         state, note = classify(rows)
         if state == "PENDING":
             last = note
@@ -144,7 +157,37 @@ def selftest():
         bad.append("宽限期内就结案 ⇒ 刚 push 的正常空窗被当成终态")
     if not no_run_expired(200.0, 60.0, 90):
         bad.append("宽限期外仍不结案 ⇒ NO_RUN 永不报警（run 一直不出现时静默）")
-    print("CI-WATCH-SELFTEST-%s（%d 态判定 + NO_RUN 宽限双向 + 恒红守卫）"
+    # r83：`sh` 带回 stderr，且「取数失败」与「没有 run」必须是两条通道（两次真推都被报成后者）
+    triple = sh([sys.executable, "-c", "import sys; sys.stderr.write('boom'); sys.exit(3)"])
+    bad.append("sh 元数变了就必须同步改全部调用点") if len(triple) != 3 else None
+    _rc3, _out3, _err3 = triple
+    if not (_rc3 == 3 and "boom" in _err3):
+        bad.append("stderr 没被带回来 ⇒ 失败原因仍会印成空括号")
+    _rc4, _o4, _e4 = sh(["__definitely-not-a-command-xyz__"])
+    if _rc4 != 127 or not _e4:
+        bad.append("命令缺失一侧应给 127 且带原因（实得 rc=%s err=%r）" % (_rc4, _e4[:40]))
+    _orig = globals()["runs_for"]
+    try:
+        globals()["runs_for"] = lambda s: (None, "gh run list 取数失败 rc=1｜stderr=boom", True)
+        import io as _io
+        import contextlib as _cl
+        buf = _io.StringIO()
+        with _cl.redirect_stdout(buf):
+            rc_fail = judge("deadbeef", 5, grace=180)
+        globals()["runs_for"] = lambda s: (None, "远端 list 取到 20 条，没有该 sha 的 run", False)
+        buf2 = _io.StringIO()
+        with _cl.redirect_stdout(buf2):
+            # grace 给 -1 而不是 0：0 时同一 tick 可能 `now-t0 > 0` 为假 ⇒ 走 sleep(15) 撞穿 timeout，
+            # 于是量到的是「超时」那条文案，测的就不是 NO_RUN 这一档了（本条第一次上线就是这么失配的）。
+            rc_norun = judge("deadbeef", 5, grace=-1)
+        got = buf.getvalue() + buf2.getvalue()
+    finally:
+        globals()["runs_for"] = _orig
+    if rc_fail != 2 or "取数失败" not in got or "仍无 run 记录" in got.split("取数失败")[0]:
+        bad.append("取数失败被并进「无 run」那一档（rc=%s）" % rc_fail)
+    if rc_norun != 2 or "无 run 记录" not in got:
+        bad.append("真「无 run」那一档反而不结案或文案错位（rc=%s）" % rc_norun)
+    print("CI-WATCH-SELFTEST-%s（%d 态判定 + NO_RUN 宽限双向 + 恒红守卫 + 取数失败/无 run 分档 + stderr 带回）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(cases)))
     return 1 if bad else 0
 
@@ -161,7 +204,7 @@ def main():
         return selftest()
     sha = a.sha
     if not sha:
-        rc, out = sh(["git", "rev-parse", "HEAD"])
+        rc, out, _err = sh(["git", "rev-parse", "HEAD"])
         if rc != 0:
             print("CI-WATCH-UNVERIFIED | 取不到 HEAD ⇒ 不判绿")
             return 2
