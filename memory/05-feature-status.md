@@ -8,6 +8,13 @@
 
 - [ ] ⏳ 仅剩：fat jar 部署到国内可达机器（摆脱 CloudBase 首访中间页）
 
+## ✅ 已实现（r80，2026-09-29 · 一键点亮默认打开）
+
+- [x] **一键点亮默认打开**：每次加载自动播一次「清屏→六色逐颗点亮」（`src/js/app.js` 4.6 节 `startOpeningShow()`）。
+      与手动演示态两处差异：不加 `body.showtime`（叙事/对话坞全程可点）、播完自动回到「我的记忆」；
+      `prefers-reduced-motion: reduce` 下不自动播（判据 `a11y_check` A5b）。手动那条路行为逐字未变。
+      验收 = `AC-OBS-24` + `_test/lightshow_check.py` 判据⑧（四态同步点 `window.__XINYU__.opening`）。
+
 ## ✅ 已实现（对标轮第二轮 2026-09-24：把首轮"赛后再做"直接落地）
 
 > 详见 `交付物/对标分析报告-2026-09-24-v2.md`（14 仓 gh api 实测指标）与 `03-tech-stack.md` 决策 #6–#9。
