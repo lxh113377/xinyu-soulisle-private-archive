@@ -163,6 +163,11 @@ def probe_case(browser, case, fault, click_clear):
     try:
         page.add_init_script(FAULT[fault])
         page.goto(BASE + "/index.html", wait_until="networkidle", timeout=45000)
+        # r80：一键点亮默认打开 ⇒ 加载后有一段开场演示，其间的 lit 是演示星不是本机记忆。
+        # 取样前先等它落位；注错用例里 app.js 可能压根没起来，settle 到点返回假值不抛 ⇒
+        # 记进 res 由行报告如实呈现，禁把"没等到"读成"没问题"。
+        res["opening"] = bool(settle(
+            page, "() => window.__XINYU__ && window.__XINYU__.opening === 'done'"))
         res["arm_error"] = page.evaluate("() => window.__armError || ''")
         res["dock"] = page.is_visible("#chat-dock")
         page.fill("#chat-input", "今天被导师批评了，心情很低落")

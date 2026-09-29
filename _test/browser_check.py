@@ -30,6 +30,9 @@ with sync_playwright() as p:
       JSON.stringify({base:'http://127.0.0.1:18123/v1', key:'x', model:'x'}));
       localStorage.removeItem('peiliao.emotions.v1'); }""")
     page.reload(wait_until="networkidle")
+    # r80：一键点亮默认打开 ⇒ 每次加载都有一段开场演示。星图取样前必须等它落回「我的记忆」，
+    # 否则读到的是演示星（等待取被等对象的完成态，不猜时长）。
+    page.wait_for_function("() => window.__XINYU__ && window.__XINYU__.opening === 'done'", timeout=15000)
     page.wait_for_timeout(800)
 
     # 1) 基础断言
@@ -59,6 +62,7 @@ with sync_playwright() as p:
 
     # 4) 持久化：刷新后按本机记忆把星图重建出来（点亮数应保持一致）
     page.reload(wait_until="networkidle")
+    page.wait_for_function("() => window.__XINYU__ && window.__XINYU__.opening === 'done'", timeout=15000)
     page.wait_for_timeout(1500)
     lit_reload = lit(page)
 

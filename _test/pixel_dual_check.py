@@ -101,6 +101,12 @@ with sync_playwright() as p:
       JSON.stringify({base, key:'x', model:'x'}));
       localStorage.removeItem('peiliao.emotions.v1'); }""", OFFLINE_LLM)
     page.reload(wait_until="networkidle")
+    # r80：一键点亮默认打开 = 每次加载有 3.74s 点亮 + 1.5s 停留的开场演示。本套件跑在假时钟下，
+    # 那些定时器不会自己走完 ⇒ 显式把钟点拨过整段开场，让星图落回「我的记忆」再取样；
+    # 并当场自证默认打开真的在跑（读数缺失或卡在半路一律判红，不许闷着取样）。
+    page.clock.run_for(7000)
+    opening_now = page.evaluate("() => window.__XINYU__ && window.__XINYU__.opening")
+    assert opening_now == "done", f"开场自动播放没落到 done 态（实际 {opening_now!r}）⇒ 取样会混入演示星"
     page.wait_for_timeout(800)
     shots = "c:/Users/37533/Desktop/workspace/项目/陪聊/_test/_shots"
     os.makedirs(shots, exist_ok=True)
@@ -124,6 +130,7 @@ with sync_playwright() as p:
         # 清空历史，保证每个用例从干净星图开始
         page.evaluate("() => localStorage.removeItem('peiliao.emotions.v1')")
         page.reload(wait_until="networkidle")
+        page.clock.run_for(7000)   # 同上：把开场演示拨完再开始本用例的交互，避免演示星混进双色簇
         page.wait_for_timeout(700)
         overlay(False)
         for t in texts:

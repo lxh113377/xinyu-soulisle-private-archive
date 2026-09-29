@@ -41,6 +41,9 @@ def boot(page, cfg, sid):
       localStorage.removeItem('peiliao.history.v1');
     }""", [cfg, sid])
     page.reload(wait_until="networkidle")
+    # r80：一键点亮默认打开 ⇒ 每次加载有约 5.2s 开场演示。本套件的「刷新后星图仍点亮」读的是
+    # 演示星还是真实记忆，取决于取样时刻，必须等被等对象的完成态（不是固定 sleep）。
+    page.wait_for_function("() => window.__XINYU__ && window.__XINYU__.opening === 'done'", timeout=15000)
     page.wait_for_timeout(800)
 
 
@@ -83,6 +86,7 @@ with sync_playwright() as p:
       localStorage.removeItem('peiliao.history.v1');
     }""")
     page.reload(wait_until="networkidle")
+    page.wait_for_function("() => window.__XINYU__ && window.__XINYU__.opening === 'done'", timeout=15000)
     page.wait_for_timeout(3500)
     lit_after_wipe = lit(page)
     page.close()

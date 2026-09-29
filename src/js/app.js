@@ -110,6 +110,7 @@
   };
   $("#btn-lightshow").addEventListener("click", () => {
     if (!gl) return;
+    openingStop();                             // 开场在跑时先收尾，禁两套定时器交错点亮
     showMode = !showMode;
     if (showMode) {
       const { palette, duration } = window.ThreeScene.lightShow(180);
@@ -144,6 +145,26 @@
   $("#btn-exit-show").addEventListener("click", () => {
     document.body.classList.remove("showtime");
   });
+
+  // 4.6) r80 默认打开：每次加载自动播一次一键点亮，播完回到「我的记忆」。
+  //      与手动演示态两处差异：不遮 UI（叙事与坞全程可点）、播完自动归位。
+  //      `__XINYU__.opening` 四态（playing→lit→done）= `_test/` 按像素取样的同步点，固定 sleep 会采到演示星。
+  let openingT = [];
+  const openingStop = () => { openingT.forEach(clearTimeout); openingT = []; window.__XINYU__.opening = "done"; };
+  function startOpeningShow() {
+    window.__XINYU__ = { opening: "done" };
+    // 离线降级（CSS 渐变）不排定时器；`prefers-reduced-motion: reduce` 同样不自动播 ——
+    // 自动播放的动画必须由该偏好关掉（判据 `_test/a11y_check.py` A5b：reduce 态动效须显著降档，
+    // r80 实测未加这道门时动效比 0.796 ≈ 没降，判红；手动点 ✨ 是用户主动发起，不受此门限制）。
+    if (!gl || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    window.__XINYU__.opening = "playing";
+    let d = 0;
+    try { d = window.ThreeScene.lightShow(180).duration; } catch (e) { d = 0; }
+    if (!(d > 0)) return;
+    openingT = [
+      setTimeout(() => { window.__XINYU__.opening = "lit"; }, d),
+      setTimeout(() => { openingT = []; replayStars(); window.__XINYU__.opening = "done"; }, d + 1500)];
+  }
 
   // 底部对话坞折叠：点标题按钮切换；点叙事区自动收起（避免坞长期遮住幕内按钮）
   const dockOpen = () => $("#chat-dock").classList.contains("open");
@@ -241,6 +262,7 @@
       .catch(() => { /* 服务端不可达 → 保持本地记忆 */ });
   }
   replayStars(); // 进页面先按本机记忆把星图重建出来
+  startOpeningShow(); // r80：一键点亮默认打开 —— 每次加载播一次开场演示，播完回到上面这行的状态
 
   // 7) 设置面板（provider 预设 / 密钥录入 / 流式开关）
   //    r27 外提到 `src/js/settings.js`：行为零改动，判据 = `_test/settings_panel_check.py` S1–S8（含五类注入反例）。

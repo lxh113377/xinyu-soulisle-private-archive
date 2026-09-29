@@ -7,7 +7,11 @@
       ④ 4×4 网格覆盖 ≥12 格（够散），未点亮对照为 0 格；
       ⑤ **播完仍停在清屏画面**（不自动跳回），且滚动 / Esc 都不会中断它；
       ⑥ 右下角返回按钮 → UI 回来且**保留**点亮的星雾；坞里的「↺ 回到我的记忆」才清空；
-      ⑦ 一键点亮**不写入**本机记忆。
+      ⑦ 一键点亮**不写入**本机记忆；
+      ⑧ **r80 默认打开**：加载即自动播一次 —— 六色 + 够散 + **全程不遮 UI** +
+         按钮标签不翻转 + 播完自动回到「我的记忆」（done 后 lit 归位）。
+         同步点 = `window.__XINYU__.opening` 四态（idle→playing→lit→done），
+         等待取被等对象的完成态；①-⑥ 走的是**手动点击**那条路，两路各自独立断言。
 用法：先起静态服务器（python -m http.server 8123 --directory src），再跑本脚本。
 """
 import sys, io, math, os
@@ -107,6 +111,34 @@ with sync_playwright() as p:
 
     palette = page.evaluate("() => window.EmotionEngine.palette().map(p => ({label:p.label, color:p.color}))")
     targets = [(p["label"], rgb2hue(*p["color"])) for p in palette]
+
+    # --- r80 新增：开场自动播放（一键点亮**默认打开**，每次加载都播）---
+    # 四条判据：① 加载即播且六色都在屏上；② 全程不遮 UI —— 开场那几秒叙事与对话坞也必须可点，
+    # 这是它与手动演示态的**唯一**行为差异，不测就等于没锁；③ 按钮标签不翻转（退出语义仍归那一次点击）；
+    # ④ 播完自动回到「我的记忆」—— 由紧随其后的「未点亮对照」当场复核（本套件已清空本机记忆 ⇒ done 后必须归零）。
+    # 等待取被等对象自己的完成态（opening 四态读数），不猜时长。
+    def wait_opening(state, ms=15000):
+        try:
+            page.wait_for_function(
+                "() => window.__XINYU__ && window.__XINYU__.opening === '%s'" % state, timeout=ms)
+        except Exception:
+            raise AssertionError(
+                "开场自动播放没有进入 %r 态（app.js 的 startOpeningShow 没跑？__XINYU__ 读数缺失也判此项失败）" % state)
+
+    wait_opening("lit")
+    auto_ui = ui_state()
+    auto_label = page.evaluate("() => document.querySelector('#btn-lightshow .ls-word').textContent")
+    auto_lit = page.evaluate("() => window.ThreeScene.litInfo().lit")
+    overlay(True)
+    shot_a = f"{shots}/lightshow_auto.png"
+    page.locator("#gl").screenshot(path=shot_a)
+    pts_a, wa, ha = sample(shot_a)
+    auto_share = {lab: round(share_near(pts_a, h), 4) for lab, h in targets}
+    cov_a = coverage(pts_a, wa, ha)
+    overlay(False)
+    wait_opening("done")
+    auto_back = page.evaluate("() => window.ThreeScene.litInfo().lit")
+
     mem_before = page.evaluate("() => window.MemoryStore.all().length")
     lit_before = page.evaluate("() => window.ThreeScene.litInfo().lit")
 
@@ -166,6 +198,8 @@ with sync_playwright() as p:
     browser.close()
 
 print("TARGET_HUES:", {l: round(h, 1) for l, h in targets})
+print("开场自动播放: 覆盖 %d/16 格｜lit %d → done 后 %d｜UI %s｜按钮 %r" % (cov_a, auto_lit, auto_back, auto_ui, auto_label))
+print("开场各色占比:", auto_share)
 print("有效像素/覆盖格: 对照 %d/%d | 黑屏帧 %d | 点亮后 %d/%d" % (len(pts0), cov0, len(pts_b), len(pts1), cov1))
 print("对照(未点亮) 各色占比:", before)
 print("点亮后 各色占比:", after)
@@ -175,6 +209,15 @@ print("LIT: %d → %d → 返回后 %d → 回到记忆 %d | MEM: %d → %d" % (
 print("CONSOLE_ERRORS:", len(errors), errors[:3])
 
 assert len(targets) == 6, f"应为六种情绪，实际 {len(targets)}"
+# --- r80：开场自动播放（一键点亮默认打开）---
+auto_missing = [l for l, v in auto_share.items() if v < MIN_SHARE]
+assert not auto_missing, f"开场自动播放缺这些情绪色: {auto_missing}（各色占比 {auto_share}）"
+assert cov_a >= MIN_CELLS, f"开场自动播放铺得不够散：只覆盖 {cov_a}/16 格"
+assert auto_lit > 0, f"开场自动播放没有点亮任何星（lit={auto_lit}）"
+assert not auto_ui["showtime"] and auto_ui["dockOpacity"] > 0.9, \
+    f"开场把 UI 遮住了 —— 默认打开不得让叙事与对话坞在开场那几秒不可点: {auto_ui}"
+assert auto_label == "一键点亮", f"开场把按钮翻成了退出态，退出语义应只归那一次手动点击: {auto_label!r}"
+assert auto_back == 0, f"开场播完没回到「我的记忆」（本套件已清空本机记忆，done 后 lit 应为 0，实际 {auto_back}）"
 assert len(pts1) > 800, f"点亮后有效像素过少（截图可能空白）: {len(pts1)}"
 missing = [l for l, v in after.items() if v < MIN_SHARE]
 assert not missing, f"这些情绪在屏幕上找不到对应颜色: {missing}"
