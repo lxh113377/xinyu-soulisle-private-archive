@@ -83,6 +83,25 @@ def post(text, stream=False):
         return e.code, dict(e.headers or {}), e.read().decode("utf-8", "replace")
 
 
+def status_expectation(probe_st, probe_body):
+    """纯函数（r78）：探活结果 → (状态码期望值, 是否环境降级, 原因)。
+
+    一手代价：本轮整跑窗口里上游返回 `502 {"error":"upstream-error"}`，6 条注入用例因此判红——
+    而"判红"的语义是**必须修**，于是把人支使去修一条没有坏的代码。
+    护栏判定看的是响应头 `X-Xinyu-Safety`（`ChatController` 在调用上游**之前**就定好并随各分支一并下发），
+    与状态码无关 ⇒ 环境不可达时把"响应体契约"那一子项降为 skipped，状态码期望值随探活结果改，
+    六类双向判定照常实测。r54 只处理了"没有密钥"（500 no-key），本轮补"有密钥但上游不可达/欠费"。
+    """
+    body = probe_body or ""
+    if probe_st == 500 and "no-key" in body:
+        return 500, True, "上游无密钥（CI runner 条件）"
+    if probe_st == 502 and "upstream-error" in body:
+        return 502, True, "上游此刻不可达（502 upstream-error）"
+    if probe_st == 402 or "Insufficient Balance" in body:
+        return 500, True, "上游余额/计费不可用（402 / Insufficient Balance）"
+    return 200, False, ""
+
+
 def run_http():
     bad, skipped = [], 0
     # 先探一次"上游有没有密钥"：没有的话 /api/chat 必然 500 no-key（这是契约内的响应，不是缺陷），
@@ -90,13 +109,12 @@ def run_http():
     # 这一档是本地按 CI 条件复现出来的：无密钥实例 :8124 上首跑就是被"要求 200"误判 6 条红。
     try:
         probe_st, _, probe_body = post("在吗")
-        key_free = (probe_st == 500 and "no-key" in probe_body)
+        want_status, env_down, env_reason = status_expectation(probe_st, probe_body)
     except Exception as e:
         print("SAFETY-CHECK-ENV: 服务不可达 %s（%s）⇒ 记为未验证，不判绿" % (BASE, type(e).__name__))
         return 2
-    want_status = 500 if key_free else 200
-    if key_free:
-        print("ℹ️ 上游无密钥（CI runner 条件）⇒ 响应体契约子项记 skipped，护栏判定仍全量实测")
+    if env_down:
+        print("ℹ️ 环境降级：%s ⇒ 响应体契约子项记 skipped，护栏判定仍全量实测（不判红也不判绿）" % env_reason)
     try:
         for want, text in INJECTION_CASES:
             st, hdr, body = post(text)
@@ -116,7 +134,7 @@ def run_http():
             # 契约：响应体逐字透传 ⇒ 正常调用必须仍是带 choices 的 OpenAI 形态。
             # runner 没有上游密钥时这一项**客观上验不了**（响应就是 500 no-key）⇒ 记 skipped，
             # 不记 PASS；护栏判定本身（响应头）照样实测，所以整条套件不因缺密钥而降级成未验。
-            if key_free:
+            if env_down:
                 skipped += 1
             else:
                 try:
@@ -172,7 +190,20 @@ def selftest():
     fake = parse_header("suspect=1;signals=override-zh;capped=0;risk=none")
     if fake.get("suspect") != "1":
         bad.append("⑤反例未成形：模拟误报的 header 解析不出 suspect=1 ⇒ 这条变异是假反例")
-    print("SELFTEST-%s" % ("PASS: header 解析四向正确，且误报反例成形" if not bad
+    # r78：状态码分档（环境类失败不得判红）。四形各一，缺任一侧这条判据就是恒真。
+    for probe, want_st, want_down in (
+            ((500, '{"error":"no-key"}'), 500, True),
+            ((502, '{"error":"upstream-error"}'), 502, True),
+            ((402, '{"error":"Insufficient Balance"}'), 500, True),
+            ((200, '{"choices":[]}'), 200, False)):
+        got_st, got_down, _ = status_expectation(probe[0], probe[1])
+        if (got_st, got_down) != (want_st, want_down):
+            bad.append("⑥状态分档错：探活 %s → 期望 (%s,%s) 实得 (%s,%s)"
+                       % (probe[0], want_st, want_down, got_st, got_down))
+    # 反向自证：上游 502 若被当成"照常要求 200"，注入用例就会集体假红（本轮整跑的实际红因）
+    if status_expectation(502, '{"error":"upstream-error"}')[0] == 200:
+        bad.append("⑦502 仍要求 200 ⇒ 环境不可达会被判成'必须修'的代码缺陷")
+    print("SELFTEST-%s" % ("PASS: header 解析四向正确、误报反例成形，且状态码四形分档含 502 反向自证" if not bad
                            else "FAIL: " + "; ".join(bad)))
     return 1 if bad else 0
 

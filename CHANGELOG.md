@@ -33,6 +33,14 @@
   整条 `REAL-RC=2`。修＝只拒 `<!ENTITY`，并把"真件必须读得动"写成夹具腿（边界①正例 + 边界②反例）。
   这是 [[gate-shape-must-admit-the-honest-value]] 的第二次实发：只有反例没有正例的拒绝式判据，
   等于把"我不认识"实现成"你不合法"。
+- **R78-03 半边（环境类失败不再冒充代码缺陷）**：`_test/safety_guard_check.py` 把状态码分档抽成纯函数
+  `status_expectation()`（no-key 500／upstream-error 502／欠费 402／正常 200 四形）；环境不可达时
+  "响应体契约"子项记 skipped，**护栏判定仍按 `X-Xinyu-Safety` 响应头全量实测**（r54 只处理了"没有密钥"，
+  本轮补"有密钥但上游 502/欠费"）。一手代价：r78 整跑窗口里上游 502 让 6 条注入用例判红，
+  而"判红"的语义是必须修 ⇒ 会把人支使去修一条没有坏的代码。自证新增 ⑥ 四形分档 + ⑦「502 仍要求 200 即 FAIL」反向腿。
+  不对称处如实写：修前一侧取自电池原文 `FAIL 注入样本 override-zh 返回 http=502（期望 200）`，
+  修后一侧只能靠夹具——真面 502 在套件跑起来前已恢复 200（`chat_http=200 t=0.796616`），**未冒充现场对照**。
+  余半：`fault_injection` F5 同法待做。
 - **复算**：`python _test/java_test_guard.py [--selftest]`（自证 **33/33**）；
   `python _test/benchmark_metrics.py --selftest`（含 r78 新腿）；peers 侧五类分子随口径修正重采。
 
