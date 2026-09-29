@@ -9,6 +9,57 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Fixed（r82 · 交付面静默删除第二次复发 + CSP 从静态闸升成行为闸 + 电池去单点）
+- **交付面复原 7 件**：入场实测 `git status --porcelain` 有 **7 条 ` D`**（含 22,954,501 B 的参赛成片
+  `demo_video_out/心屿SoulIsle-演示视频.mp4`、`render-pdf.ps1`、`演示视频脚本.md`、`application-plan.html` 等），
+  距 iCAN 硬截止不足 24 小时。取证：`git ls-tree -r HEAD` 21 项全在、全盘 `find` 无副本、
+  当天 15:50 生成的 `提交包.zip`（19 条目）**也不含这 7 件** ⇒ 不是搬移是丢。`git checkout HEAD -- 逐路径` 复原，
+  逐件 `git hash-object` 前后同值（如 `application-plan.html` = `fe77beaa…`）。
+- **`deliverable_inventory_check` 补第 4 条取数面**：原三条分母全来自「清单声明」⇒ **没写进清单的入库件消失了永不红**
+  （本轮 7 件只抓到 2 件）。新腿分母取 `git ls-tree -r -l HEAD -- 交付物`（被检对象写不进去的量），
+  逐条对磁盘在位性与 0 B。真面 `入库件在位 89｜缺失 0` rc=0；**演习**删一件未声明的入库件 ⇒
+  `rc=1 · 入库件从工作树消失: …（HEAD blob 37194 B 在，磁盘没有 ⇒ 无人声明也丢）`，随后按字节还原。
+- **peers 尺的收口崩（`benchmark_metrics.py:1752`）**：`classify_drift` 自 r79-D 起返回四档，9 处调用点改了 8 处，
+  **漏的正是唯一会被真面走到的那处** ⇒ 每次真跑把 16 仓采完印完才 `ValueError: too many values to unpack`，
+  漂移一条都没落进台账，而 `--selftest` 全绿（R238「用单测掩盖接线错误」的又一形态）。
+  修解包 + 新增 **A9 静态腿**（枚举本文件所有 `classify_drift(` 解包赋值，LHS 不为 4 个即红；命中 <2 判「这条腿恒真」）。
+  复跑 `BENCHMARK-METRICS-PASS` rc=0，漂移 11 = 实质 3 / 抖动 8 / 补录 0 / 取数失败 0。
+- **`eol_parity` 本轮由我自己判红一次**：用 `Path.write_text()` 打补丁 3 处，Windows 下 `newline=None`
+  把 `\n` 译成 `\r\n` ⇒ `_test/run_all_suites.py` 工作树 785 条 CRLF、HEAD blob 0 条 ⇒ 他人 clone 字节不可复算。
+  按字节归一后 `EOL-PARITY-PASS（text=405 binary=20 total=425）` rc=0。
+- **`inline_style_check` 的 ⑫ 腿被「修好了」照出实现缺陷**：它拿「命中集合」当「扫到的文件集合」
+  ⇒ 欠账一旦清零（命中=0）就反过来说基线锚空面。取数面改由 `gather_files()` 给，并补 ⑬ 死豁免反例 + ⑭ 分母非空两腿（15/15）。
+
+### Added（r82 · CSP 行为闸 H6 + 电池自管服务 + 取数入口前置自证）
+- **H6：CSP 下的「被拦对象真的渲染出来了吗」**（`_test/headers_csp_check.py`）。一手 A/B：把 HEAD 未修版
+  （7 处内联样式）放回 `deploy/xinyu/js/app.js`，当时整套 H1..H5 仍回 `HEADSEC-PASS … 异常=0`
+  ⇒ r81 说的「本地全盲」不止 `browser_check`，**连这道本该管 CSP 的闸也全盲**。两条根因：
+  `probe["app"]` 从不读 `vios`（内联样式被拦只写 console violation、不抛 pageerror），且 H2 探针不驱动
+  第二幕读数/危机条。现断言 `csp_vios=0`、色点背景非 transparent、`.crisis-chip` 边框 == `rgb(255,122,122)`、
+  **且强度条宽度与 `data-w × 轨道宽` 成比例（±2.5px）**。最后一条是自纠出来的：第一版只断言「宽度>0」，
+  而 B 面**没红** —— 被拦时 `<i>` 靠 `display:block` 把轨道撑成**满格**，「有宽度」根本不等于「宽度对」。
+  `--selftest` 8→**13 腿**（`expected` 由 `ok+len(fail)==expected` 双向钉）；violation 现在带**出处**
+  （B 面实测 `@./js/app.js:94`），夹具自己注入的那条 `<style>` 探针单独计数 `harness_vios` 再清，不静默丢。
+- **G2 本体（r81 建议 4）修完**：`src/js/app.js` 7 处 markup 内联样式（src+deploy 共 14 指纹）改为静态进类
+  （`.crisis-chip`/`.readout-line`/`.readout-lead`）+ 动态走 `data-fg`/`data-bg`/`data-w` 由 `paint()` 一趟 CSSOM 落属性；
+  **没有放宽 CSP**。代价如实登记：`style.css` 13,813→14,081 超原 13,888 预算 ⇒ 按 r47/r80 先例上调并写明理由
+  （登记前已把 CSS 注释 106B 压到 60B）；`app.js` 17,405 仍在 17,524 内；TOTAL 848,879 / 858,752 未动。
+- **电池去单点（r81 建议 6）**：`run_all_suites.py` 自管 8123 —— `serve_plan` 纯决策（复用/自管/如实跳过）
+  + `ensure_server`（fat 且新于源码由 `jar_shape_check.inspect` 判；解释器顺序 `XINYU_JAVA→PATH→实测 JDK17→JAVA_HOME`
+  且**必过 `java_major>=17`**，本机 `JAVA_HOME` 默认 JDK 8）+ `atexit` 收进程。实测：停服务后 `--only preflight`
+  ⇒ `SELF-HOST: start ｜ 已起并等到 status=UP` rc=0，跑完 `tasklist` 无 java.exe、端口只剩 TIME_WAIT；
+  CI 侧走 `reuse`（job 自己起了 jar），**不会去停别人的进程**。
+- **`_test/measure_entry.py`（新，落地 r81 建议 5）**：跑尺之前先跑「尺的尺」——`ast` 解析 + **归属面**
+  （同一件再解析 `git show HEAD:<path>`：工作树坏而 HEAD 好 ⇒ 判「未入库改动把它写坏了」；两边都坏 ⇒ 判「已入库的坏尺，
+  此前任何跑在树上的读数不可信」）+ 口径面原样并 `repo_config_check` 的 rc。真面 rc=0（15 件）；演习注入 r81 那一形
+  ⇒ rc=1 报 `401:28 invalid syntax` 并点名归属。已进 SUITES（101→**103**）与 `docs/quality-gates.md` 名册
+  （`repo_config_check` G4/G16 双向对账 PASS）。
+- **`LlmProxyTest` 新增一形（建议 8 的归因落地）**：T8 具名的 `call`(漏 6 指令)/`openStream`(漏 8 指令) 逐行复算后
+  全落在 `payload == null → bad-json` 两支，而 `toMessageList` 把任何入参都归一成 `Map<String,String>`
+  ⇒ `writeValueAsString` 的 catch **结构不可达**。沿用 r77「不为凑数写反射」，**本轮 BRANCH 仍 96.28%（不虚报覆盖提升）**，
+  改为把这条原本只有散文的不变量钉成用例（畸形四类入参走两条公开出口，断言字段皆字符串且状态码仍是上游的）。
+  `mvn test` 82→**83 用例** BUILD SUCCESS。
+
 ### Added（r80 · 一键点亮默认打开 + 团队五人署进方案封面）
 - **默认打开（老大 2026-09-29 指令，裁决=每次加载都播）**：`src/js/app.js` boot 末 `replayStars()` 之后自动播一次
   「清屏→六色逐颗点亮」。与手动演示态两处刻意差异：**不加 `body.showtime`**（叙事与对话坞全程可点 —— 开场若遮 UI，

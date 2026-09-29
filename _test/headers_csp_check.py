@@ -10,14 +10,17 @@
 且 r28 只给 `/index.html` 写了 `Cache-Control: no-cache`，而 Pages 把 `/index.html` **308 跳到 `/`**
 ⇒ 用户真正访问的入口拿的是 `public, max-age=0, must-revalidate`。声明与生效路径不一致。
 
-四条阻断 + 一条控制：
+五条阻断 + 一条控制：
   H1 逐路径对账：`_headers` 里每条声明，本地按同一份规则回放后，响应里必须真在（且值逐字相同）
   H2 套上 CSP 后应用仍可用：WebGL 画布活跃 / 五幕齐 / 对话链路通 / console 0 报错 / pageerror 0
   H3 严格性棘轮：script-src 与 style-src 不得含 'unsafe-inline' / 'unsafe-eval'（放宽须改判据留名）
   H4 前置不变量：`src/index.html` 的内联 <script> 计数必须为 0（有人加回内联块，就该 here 红，
      而不是被"顺手给 CSP 补个 'unsafe-inline'" 悄悄绕开）
+  H6（r82 新增）**交互路径真渲染**：第二幕读数/强度条/危机色点在 CSP 下 0 violation，
+     且宽度与背景色**量得到**（拦样式不抛 pageerror、页面照样可用 ⇒ 旧 H2 对 G2 全盲，实测放回
+     HEAD 版 7 处内联 style 仍整条 PASS ⇒ 补这条才咬得住这一类缺陷）
   H5 **反自欺控制**：用一个必须被 CSP 挡下的内联脚本探针证明这套回放真的在拦截 ——
-     挡不住就说明 H1/H2 的绿色来自夹具没生效，全套读数作废（判夹具不判产品）
+     挡不住就说明 H1/H2/H6 的绿色来自夹具没生效，全套读数作废（判夹具不判产品）
 用法：python _test/headers_csp_check.py [--local] [--live URL] [--selftest]
 退出码：0=全过 1=判红 2=环境未验证（无 Playwright / 端口起不来 / live 不可达 ⇒ 不判绿）
 """
@@ -111,6 +114,43 @@ def assess(probe):
         got = app.get(k)
         if got != want:
             bad.append("H2 套上 CSP 后应用断言失败：%s=%r（应为 %r）" % (k, got, want))
+    # H6（r82 新增）交互路径在 CSP 下**真的渲染出来了**吗
+    # 立此腿的一手：内联 style 被拦时不抛 pageerror、页面照样可用 ⇒ 旧 H2 的 `errors=0` 对 G2 全盲
+    # （实测把 HEAD 版 7 处内联 style 放回去，H1..H5 仍整条 PASS）。
+    # 所以这里断言的不是「没报错」，而是「被 CSP 拦掉的那几样东西，宽度/颜色量得到」——
+    # 读不到对象（-1 / none / 危机分支没驱动到）一律判红，绝不折成「通过」。
+    # 每个计数配**各自时刻**的样本：violation 是异步落的，只取前一次的样本会印成空串
+    # （本轮 B 面实测：`csp_vios_after_crisis=8（样本='')` —— 数字对、出处空，等于没证据）
+    for k in ("csp_vios", "csp_vios_after_crisis"):
+        got = app.get(k)
+        if got != 0:
+            sp = app.get("vios_sample_late") if k.endswith("after_crisis") else app.get("vios_sample")
+            bad.append("H6 交互路径出现 CSP violation：%s=%r（样本=%s）"
+                       % (k, got, "｜".join(sp or ["<该时刻未取样本>"])[:220]))
+    bw = app.get("bar_w")
+    if not isinstance(bw, (int, float)) or bw <= 0:
+        bad.append("H6 情绪强度条实测宽度=%r ⇒ CSSOM 没落地，或选择器打空（-1=面板里根本没这条）"
+                   "｜面板结构=%s｜等到色点=%s" % (bw, app.get("readout_shape"), app.get("readout_wait")))
+    # 只断言「宽度>0」不够：内联 style 被拦时 `<i>` 靠 `display:block` 把轨道**撑成满格**（B 面实测 90px），
+    # 看上去是好的 —— 所以必须按 data-w 与轨道宽度**成比例**判，这才是产品承诺的那件事。
+    dw_raw = app.get("data_w")
+    tw = app.get("track_w")
+    try:
+        dw = float(dw_raw)
+    except (TypeError, ValueError):
+        bad.append("H6 强度条取不到 data-w 读数（实测=%r）⇒ 宽度仍写在内联 style 上，被 CSP 拦后恒满格" % (dw_raw,))
+    else:
+        if isinstance(bw, (int, float)) and isinstance(tw, (int, float)) and tw > 0:
+            want = tw * dw / 100.0
+            if abs(bw - want) > 2.5:
+                bad.append("H6 强度条宽度与 data-w 不成比例：实测=%.2fpx｜轨道=%.2fpx｜data-w=%s ⇒ 应≈%.2fpx"
+                           % (bw, tw, dw_raw, want))
+    if str(app.get("dot_bg") or "") in ("", "none", "rgba(0, 0, 0, 0)", "transparent"):
+        bad.append("H6 情绪色点背景色=%r ⇒ data-bg 那趟赋值没生效" % app.get("dot_bg"))
+    if app.get("crisis_chip") is not True:
+        bad.append("H6 危机分支未被驱动（crisis_chip=%r）⇒ 该落点未验，不得读成通过" % app.get("crisis_chip"))
+    if app.get("crisis_w") != "rgb(255, 122, 122)":
+        bad.append("H6 危机条边框色实测=%r ≠ .crisis-chip 声明的 rgb(255, 122, 122)" % app.get("crisis_w"))
     # H3 严格性棘轮
     csp = (probe.get("strict") or {})
     for d in SAFE_RATCHET:
@@ -218,8 +258,16 @@ def run_local():
                 b = pw.chromium.launch(channel="msedge")
             pg = b.new_page(viewport={"width": 1200, "height": 860})
             pg.on("pageerror", lambda e: errs.append(str(e)[:110]))
-            pg.on("console", lambda m: vios.append(m.text[:140])
-                  if m.type == "error" and "Content Security Policy" in m.text else None)
+            def on_console(m):
+                # violation 必须带**出处**（url:行号）：只印文本无法区分「产品里真写了内联样式」
+                # 和「H5 控制页的样本迟到」——本轮就是靠这个字段才没把误报写成缺陷。
+                if m.type == "error" and "Content Security Policy" in m.text:
+                    loc = m.location or {}
+                    vios.append("%s @%s:%s" % (
+                        m.text[:120], str(loc.get("url", "-")).replace(base, "."),
+                        loc.get("lineNumber", "-")))
+
+            pg.on("console", on_console)
 
             def stub(route):
                 route.fulfill(status=200, content_type="application/json",
@@ -246,6 +294,12 @@ def run_local():
                     try { s.textContent = 'body{}'; document.head.appendChild(s); return false; }
                     catch (e) { return true; } })(),
               })""")
+            # `inline_blocked` 是**夹具自己**注入一段会被拦的 `<style>`（它本身就是拦截探针）⇒ 它产生的
+            # 那条 console violation 属于探针，不属于产品。本轮 H6 第一条判红的出处就是它
+            # （一手：样本 url 为空、行号 5 ⇒ 落在 `pg.evaluate` 上下文，不在页面资源上）。
+            # 计数如实带出（harness_vios）再清 —— 静默丢等于把自己的噪声洗成产品清白。
+            app["harness_vios"] = len(vios)
+            vios.clear()
             pg.fill("#chat-input", "今天有点累，想被陪一会儿")
             pg.press("#chat-input", "Enter")
             t0 = __import__("time").monotonic()
@@ -258,11 +312,79 @@ def run_local():
                 pg.wait_for_timeout(250)
             app["errors"] = len(errs)
             app["chat_ok"] = chat_ok
+            # ---- H6（r82 新增）交互路径的 CSP violation 与「被拦对象的渲染」----
+            # 为什么 H2 不够：内联 style 被拦时浏览器只写一条 **console violation**，
+            # 不抛 pageerror、页面照常可用 ⇒ `errors=0` 与「应用可用」都是绿的，而强度条实际是 0 宽。
+            # 一手反证：本轮把 HEAD 版（7 处内联 style）放回 `deploy/xinyu/js/app.js`，
+            # 整套 H1..H5 仍回 `HEADSEC-PASS … 异常=0` ⇒ 这道闸当时对 G2 全盲。
+            app["csp_vios"] = len(vios)
+            app["vios_sample"] = vios[:2]
+            # 读数面板是**异步**落的（chat_ok 只看 #chat-log 的子节点数），先等它出现再量宽度，
+            # 否则量到的是「还没渲染」而不是「被 CSP 拦了」——两者必须分得开，红因才有意义。
+            t2 = __import__("time").monotonic()
+            got_chips = False
+            while __import__("time").monotonic() - t2 < 20:
+                if pg.evaluate("() => !!document.querySelector('#probe-result .emotion-chip .dot')"):
+                    got_chips = True
+                    break
+                pg.wait_for_timeout(200)
+            app["readout_wait"] = got_chips
+            bar = pg.evaluate("""() => {
+                const i = document.querySelector('#probe-result .intensity-bar i');
+                const d = document.querySelector('#probe-result .emotion-chip .dot');
+                const t = i ? i.parentElement : null;
+                return {bar_w: i ? i.getBoundingClientRect().width : -1,
+                        track_w: t ? t.getBoundingClientRect().width : -1,
+                        data_w: i ? i.getAttribute('data-w') : null,
+                        dot_bg: d ? getComputedStyle(d).backgroundColor : 'none'};
+            }""")
+            app["bar_w"] = bar.get("bar_w")
+            app["track_w"] = bar.get("track_w")
+            app["data_w"] = bar.get("data_w")
+            app["dot_bg"] = bar.get("dot_bg")
+            # 诊断面（不断言，只随判红一起印）：红因是「面板里没这条」还是「有但没宽度」，必须能分开
+            app["readout_shape"] = pg.evaluate("""() => {
+                const b = document.querySelector('#probe-result');
+                if (!b) return 'NO-PANEL';
+                return 'chips=' + b.querySelectorAll('.emotion-chip').length
+                     + ' bars=' + b.querySelectorAll('.intensity-bar').length
+                     + ' dots=' + b.querySelectorAll('.dot').length
+                     + ' crisis=' + b.querySelectorAll('.crisis-chip').length
+                     + ' html-len=' + b.innerHTML.length;
+            }""")
+            # 危机条走的是另一支（.crisis-chip），必须单独打一遍才盖住 96 行那个落点
+            # 词面取自 `src/data/emotion-lexicon.js` 的 crisis 词表（实测「跳楼」**不在**该表内，
+            # 它是 SafetyGuard 的输出高危词 —— 拿输出词当输入探针会让这条腿永远打不到分支）
+            pg.fill("#chat-input", "我撑不住了，我不想活了")
+            pg.press("#chat-input", "Enter")
+            t1 = __import__("time").monotonic()
+            crisis_seen = False
+            while __import__("time").monotonic() - t1 < 40:
+                if pg.evaluate("() => !!document.querySelector('#probe-result .crisis-chip')"):
+                    crisis_seen = True
+                    break
+                pg.wait_for_timeout(250)
+            app["crisis_chip"] = crisis_seen
+            app["crisis_w"] = pg.evaluate("""() => {
+                const c = document.querySelector('#probe-result .crisis-chip');
+                return c ? getComputedStyle(c).borderTopColor : 'none';
+            }""")
+            app["csp_vios_after_crisis"] = len(vios)
+            app["vios_sample_late"] = vios[:2]
             app["acts"] = max(app.get("acts") or 0, pg.evaluate(
                 "() => document.querySelectorAll('[data-act]').length"))
             app["gl_ok"] = bool(app["gl_ok"] and app["has_app"])
             probe["app"] = {"gl_ok": app["gl_ok"], "acts": app["acts"],
-                            "chat_ok": app["chat_ok"], "errors": app["errors"]}
+                            "chat_ok": app["chat_ok"], "errors": app["errors"],
+                            "csp_vios": app["csp_vios"], "bar_w": app["bar_w"],
+                            "track_w": app["track_w"], "data_w": app["data_w"],
+                            "vios_sample": app["vios_sample"],
+                            "vios_sample_late": app["vios_sample_late"],
+                            "dot_bg": app["dot_bg"], "crisis_chip": app["crisis_chip"],
+                            "readout_shape": app.get("readout_shape"),
+                            "readout_wait": app.get("readout_wait"),
+                            "crisis_w": app["crisis_w"],
+                            "csp_vios_after_crisis": app["csp_vios_after_crisis"]}
             probe["strict"] = csp_map(observed["/"].get("content-security-policy", ""))
             b.close()
     finally:
@@ -301,7 +423,10 @@ def selftest():
         "block_probe": {"blocked": True, "violated": True, "violations": ["Refused to execute"]},
         "declared": dec,
         "observed": {"/": {"content-security-policy": CSP_OK}},
-        "app": {"gl_ok": True, "acts": 5, "chat_ok": True, "errors": 0},
+        "app": {"gl_ok": True, "acts": 5, "chat_ok": True, "errors": 0,
+                "csp_vios": 0, "vios_sample": [], "bar_w": 64.8, "track_w": 90.0, "data_w": "72",
+                "dot_bg": "rgb(142, 168, 255)", "crisis_chip": True, "crisis_w": "rgb(255, 122, 122)",
+                "csp_vios_after_crisis": 0, "readout_wait": True},
         "strict": csp_map("default-src 'none'; script-src 'self'; style-src 'self'"),
         "inline_scripts": 0}
     if not assess(base_probe)[0]:
@@ -333,6 +458,34 @@ def selftest():
         ok += 1
     else:
         fail.append("反例③ unsafe-inline 未被棘轮拦住：%s" % assess(m3)[0])
+    # 反例④⑤⑥⑦ H6 的四形：有 violation / 宽度取不到 / 分支没驱动 / 字段整个没了
+    # （④ 就是本轮修掉的那个真实缺陷形 —— 旧 H2 对它全盲，这条腿存在的唯一理由就是它会红一次）
+    m4 = json.loads(json.dumps(base_probe))
+    m4["app"]["csp_vios"] = 8
+    m4["app"]["vios_sample"] = ["Applying inline style violates CSP 'style-src 'self''"]
+    m5 = json.loads(json.dumps(base_probe))
+    m5["app"]["bar_w"] = -1
+    m6 = json.loads(json.dumps(base_probe))
+    m6["app"]["crisis_chip"] = False
+    m7 = json.loads(json.dumps(base_probe))
+    for k in ("csp_vios", "bar_w", "dot_bg", "crisis_chip", "crisis_w", "csp_vios_after_crisis"):
+        m7["app"].pop(k, None)
+    # 反例⑧ 本轮 B 面实测出的那一形：内联 style 被拦时 `<i>` 靠 display:block **撑满轨道**，
+    # 宽度 >0 看着正常 ⇒ 只断言「有宽度」会把缺陷读成合规，必须按比例判。
+    m8 = json.loads(json.dumps(base_probe))
+    m8["app"]["bar_w"] = 90.0
+    m8["app"]["data_w"] = None
+    for label, mut, want in (
+            ("反例④ 交互路径有 CSP violation", m4, "H6"),
+            ("反例⑤ 强度条宽度取不到（-1）", m5, "H6"),
+            ("反例⑥ 危机分支未驱动", m6, "H6"),
+            ("反例⑦ H6 字段整个缺失", m7, "H6"),
+            ("反例⑧ 强度条恒满格（宽度>0 但比例/来源不对）", m8, "H6")):
+        got = assess(mut)[0]
+        if any(want in x for x in got):
+            ok += 1
+        else:
+            fail.append("%s 却判通过（或没归到 H6）：%s" % (label, got))
     # 反例④：CSP 挡掉了应用（WebGL 起不来 / 报错）
     m4 = json.loads(json.dumps(base_probe))
     m4["app"] = {"gl_ok": False, "acts": 5, "chat_ok": True, "errors": 3}
@@ -364,7 +517,9 @@ def selftest():
         ok += 1
     else:
         fail.append("边界 空取数面判绿")
-    expected = 8
+    # 8 → 13：r82 加 H6 的五形（violation / 宽度取不到 / 危机分支未驱动 / 字段整个缺失 / 恒满格但比例错）。
+    # 这个数由下方 `ok + len(fail) == expected` 双向钉：多加一条不计数会红，静默少跑一条也会红。
+    expected = 13
     for x in fail:
         print("  SELFTEST-FAIL " + x)
     print("HEADSEC-SELFTEST: %d/%d%s" % (ok, expected,

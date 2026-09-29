@@ -51,14 +51,20 @@
   function rgbHex(c) {
     return "#" + c.map(v => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
   }
+  // 动态色/宽度走 data-* + CSSOM：markup 内联 style 会被线上 CSP（style-src 'self'）拦成失效
+  function paint(root) {
+    root.querySelectorAll("[data-fg]").forEach(n => { n.style.color = n.dataset.fg; });
+    root.querySelectorAll("[data-bg]").forEach(n => { n.style.background = n.dataset.bg; });
+    root.querySelectorAll("[data-w]").forEach(n => { n.style.width = n.dataset.w + "%"; });
+  }
   /** 星雾配色说明文案：有次情绪时标注「双色星雾」。secondRGB 必须是渲染实际采用的颜色
    *  （ThreeScene 为保证两色可分辨，可能已把次色沿色相环旋开），否则色点与星雾对不上。 */
   function mistText(main, second, secondRGB) {
     const L = window.EmotionEngine.labelOf;
     const rgbSec = secondRGB || (second ? window.EmotionEngine.colorOf(second) : null);
     return second
-      ? `星雾配色：<b style="color:${rgbHex(window.EmotionEngine.colorOf(main))}">${L(main)}</b> 主 ＋ <b style="color:${rgbHex(rgbSec)}">${L(second)}</b> 辅（双色星雾）`
-      : `星雾配色：<b style="color:${rgbHex(window.EmotionEngine.colorOf(main))}">${L(main)}</b> 单色`;
+      ? `星雾配色：<b data-fg="${rgbHex(window.EmotionEngine.colorOf(main))}">${L(main)}</b> 主 ＋ <b data-fg="${rgbHex(rgbSec)}">${L(second)}</b> 辅（双色星雾）`
+      : `星雾配色：<b data-fg="${rgbHex(window.EmotionEngine.colorOf(main))}">${L(main)}</b> 单色`;
   }
 
   // 4) 星图点亮：刷新履历 —— 从本机情绪记忆逐条重放（持久化），之后新对话继续点亮
@@ -90,13 +96,15 @@
       const c = E.colorOf(x.emotion);
       const hex = rgbHex(c);
       const pct = Math.round(Math.min(1, x.score) * 100);
-      return `<span class="emotion-chip"><i class="dot" style="background:${hex}"></i>${E.labelOf(x.emotion)}<span class="intensity-bar"><i style="width:${pct}%;background:${hex}"></i></span></span>`;
+      return `<span class="emotion-chip"><i class="dot" data-bg="${hex}"></i>${E.labelOf(x.emotion)}<span class="intensity-bar"><i data-w="${pct}" data-bg="${hex}"></i></span></span>`;
     }).join("") || `<span class="emotion-chip">未检测到明显情绪词，按平静处理</span>`;
-    $("#probe-result").innerHTML =
-      (crisis ? `<div class="emotion-chip" style="border-color:#ff7a7a;color:#ff9a9a"><i class="dot" style="background:#ff5566"></i>检测到危机信号 — 已启用安全转介策略</div>` : "") +
+    const box = $("#probe-result");
+    box.innerHTML =
+      (crisis ? `<div class="emotion-chip crisis-chip"><i class="dot"></i>检测到危机信号 — 已启用安全转介策略</div>` : "") +
       chips +
-      `<p class="muted" style="margin-top:8px">${view.path || "词典快判"}：${E.labelOf(view.emotion)}（强度 ${Math.round((view.intensity || 0) * 100)}%）</p>` +
+      `<p class="muted readout-line">${view.path || "词典快判"}：${E.labelOf(view.emotion)}（强度 ${Math.round((view.intensity || 0) * 100)}%）</p>` +
       `<p class="muted" id="probe-mist">${mistText(view.emotion, view.secondary, view.appliedSecondary)}</p>`;
+    paint(box);
   }
 
   // 4.5) 一键点亮：六种情绪各点一簇（仅演示，不写入记忆）；再点一次回到「我的记忆」
@@ -120,8 +128,9 @@
       // 播放结束**不跳回**：继续停在清屏画面欣赏，唯一退出口是右下角按钮
       showTimer = setTimeout(() => {
         $("#probe-result").innerHTML =
-          `<p class="muted" style="margin-bottom:8px">六种情绪已由内向外点亮成六圈（仅演示，不会写进你的记忆；想清空再点「↺ 回到我的记忆」）：</p>` +
-          palette.map(p => `<span class="emotion-chip"><i class="dot" style="background:${rgbHex(p.color)}"></i>${p.label}</span>`).join("");
+          `<p class="muted readout-lead">六种情绪已由内向外点亮成六圈（仅演示，不会写进你的记忆；想清空再点「↺ 回到我的记忆」）：</p>` +
+          palette.map(p => `<span class="emotion-chip"><i class="dot" data-bg="${rgbHex(p.color)}"></i>${p.label}</span>`).join("");
+        paint($("#probe-result"));
         syncStars();
         showTimer = null;
       }, duration + 500);

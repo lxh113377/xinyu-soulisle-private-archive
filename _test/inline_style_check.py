@@ -41,18 +41,11 @@ PATTERNS = [
 ]
 
 # 欠账基线（r81 现读 14 处 = 7 个唯一行 × src 与 deploy 两面）。
-# 状态：未修。修法见 交付物/对标分析报告-2026-09-29-r81.md §4 第 1 条（改 CSSOM，不放宽 CSP）。
-DEBT = {
-    "src/js/app.js": {
-        "51f8335fd152", "974941e13f90", "f80da40bcabf", "70b7a6c60ab1",
-        "05f4f400b320", "8feb64653ac4", "e0c681fc7b2b",
-    },
-    "deploy/xinyu/js/app.js": {
-        "51f8335fd152", "974941e13f90", "f80da40bcabf", "70b7a6c60ab1",
-        "05f4f400b320", "8feb64653ac4", "e0c681fc7b2b",
-    },
-}
-
+# 状态：**r82 已清偿**（真面 `扫描=30｜命中=0｜新增=0`，14 个指纹全部不再出现）。
+# 修法照 r81 §4 第 1 条：静态部分进 style.css 的 .crisis-chip/.readout-line/.readout-lead，
+# 动态部分写 data-fg/data-bg/data-w 再由 app.js 的 paint() 一趟 CSSOM 落属性；**没有**放宽 CSP。
+# 基线清空后本判据即「纯网」：任何新写的 markup 内联 style 当场判红（selftest ⑬ 钉住这条腿仍会咬人）。
+DEBT = {}
 DEBT_FACES = ("src/js/app.js", "deploy/xinyu/js/app.js")
 
 
@@ -66,33 +59,56 @@ def fingerprint(line):
     return hashlib.sha256(norm(line).encode("utf-8")).hexdigest()[:12]
 
 
+def rel_key(p):
+    try:
+        rel = Path(p).resolve().relative_to(ROOT)
+    except ValueError:
+        rel = Path(Path(p).name)
+    return str(rel).replace("\\", "/")
+
+
+def gather_files(rel_root=None):
+    """取数面的文件清单（与 collect 同源，避免两处各数一遍）。"""
+    base = ROOT if rel_root is None else Path(rel_root)
+    files = []
+    for entry, kind in FACES:
+        p = base / entry
+        if kind == "file":
+            if p.is_file():
+                files.append(p)
+        elif p.is_dir():
+            files.extend(sorted(x for x in p.glob("*.js") if x.is_file()))
+    return files
+
+
 def collect(rel_root=None, files=None):
-    """返回 [(relpath, lineno, kind, raw_line)]；files=None 走真实取数面。"""
+    """返回 ([(relpath, lineno, kind, raw_line)], 扫描文件数)；files=None 走真实取数面。"""
     hits = []
     if files is None:
-        base = ROOT if rel_root is None else Path(rel_root)
-        files = []
-        for entry, kind in FACES:
-            p = base / entry
-            if kind == "file":
-                if p.is_file():
-                    files.append(p)
-            elif p.is_dir():
-                files.extend(sorted(x for x in p.glob("*.js") if x.is_file()))
+        files = gather_files(rel_root)
     for p in files:
-        try:
-            rel = p.resolve().relative_to(ROOT)
-        except ValueError:
-            rel = Path(p.name)
-        if any(part in EXCLUDE_PARTS for part in rel.parts):
+        rel = rel_key(p)
+        if any(part in EXCLUDE_PARTS for part in Path(rel).parts):
             continue
         text = p.read_bytes().decode("utf-8", errors="replace")
         for i, line in enumerate(text.replace("\r", "").split("\n"), 1):
             for kind, pat in PATTERNS:
                 if pat.search(line):
-                    hits.append((str(rel).replace("\\", "/"), i, kind, line))
+                    hits.append((rel, i, kind, line))
                     break
     return hits, len(files)
+
+
+def dead_debt_faces(scanned, root=None, debt=None):
+    """基线锚定的文件必须真实存在且被扫到（锚到已改名/已删的文件＝死豁免，永远不会有人来清偿）。
+
+    ⚠️ r82 一手修正：本腿首版写成 `scanned = {命中里的 rel}` ⇒ **欠账一旦清零（命中=0）就反过来说
+    「基线锚空面」**，13 腿里红 1 条。红因不是代码变坏了，是判据把「没命中」当成了「没扫到」——
+    取数面要由 `gather_files()` 给，与命中与否无关。按 R263 修判据，不为了让腿绿而回滚修复。
+    """
+    root = Path(root) if root else ROOT
+    return [rel for rel in (DEBT if debt is None else debt)
+            if rel not in scanned or not (root / rel).is_file()]
 
 
 def measure(hits):
@@ -116,9 +132,11 @@ def gate(hits, n_files):
         return "UNVERIFIED", "INLINE-STYLE-UNVERIFIED: 取数面一个文件都没扫到（面配置失效不等于合规）"
     new, known, gone = measure(hits)
     kinds = sorted({k for _, _, k, _ in hits})
-    readout = ("扫描=%d 文件｜命中=%d（类型 %d 种：%s）｜欠账基线=%d 处（未修，线上 CSP 仍拦）"
-               "｜新增=%d｜已清偿=%d" % (n_files, len(hits), len(kinds), ",".join(kinds) or "-",
-                                        len(known), len(new), len(gone)))
+    # 读数行不得在基线已清空时仍写「未修，线上 CSP 仍拦」——那是判据替别人做的未成立判断
+    debt_note = "%d 处（未修，线上 CSP 仍拦）" % len(known) if known else "0 处（已清偿，本判据现为纯网）"
+    readout = ("扫描=%d 文件｜命中=%d（类型 %d 种：%s）｜欠账基线=%s"
+               "｜新增=%d｜本次清偿=%d" % (n_files, len(hits), len(kinds), ",".join(kinds) or "-",
+                                         debt_note, len(new), len(gone)))
     if new:
         return "FAIL", readout
     return "PASS", readout
@@ -183,11 +201,16 @@ def selftest():
     # ⑪ 阻断分支端到端：基线外的一条命中必须让 gate 判 FAIL（否则闸门只会印数字不会拦）
     st2, _ = gate([("src/js/x.js", 1, "markup-style-attr", '<i style="color:red"></i>')], 5)
     case("gate 阻断分支：基线外命中判 FAIL", st2 == "FAIL", st2)
-    # ⑫ 基线不得锚空面：DEBT 的每个文件都须真实存在且被扫到（锚到已改名/已删的文件＝死豁免，
-    #     永远不会有人来清偿它）。注意本腿**不**要求指纹仍在盘上——修好了就该报清偿，那正是出口。
-    scanned = {rel for rel, _, _, _ in real}
-    dead_face = [rel for rel in DEBT if rel not in scanned or not (ROOT / rel).is_file()]
-    case("基线不得锚空面（死豁免）", dead_face == [], str(dead_face))
+    # ⑫ 基线不得锚空面：DEBT 的每个文件都须真实存在且**在取数面里**（锚到已改名/已删的文件＝死豁免）。
+    #     r82 修正：取数面取自 gather_files()，不是取自命中 —— 欠账清零后命中为空，
+    #     旧写法会把「我没扫到」误报成「基线锚空面」（一手：本轮 13 腿红 1 条就是这么来的）。
+    scanned = {rel_key(p) for p in gather_files()}
+    case("基线不得锚空面（死豁免）", dead_debt_faces(scanned) == [], str(dead_debt_faces(scanned)))
+    # ⑬ 反例：基线指向不存在的文件必须被抓到，否则 ⑫ 是一条恒真腿（清空的基线尤其需要它）
+    hit_ghost = dead_debt_faces(scanned, debt={"src/js/gone-r82-ghost.js": {"x" * 12}})
+    case("⑬死豁免反例必须判红", hit_ghost == ["src/js/gone-r82-ghost.js"], str(hit_ghost))
+    # ⑭ 命中清零不得被读成「尺瞎了」：取数面分母仍须 >0
+    case("⑭真面命中=0 时分母仍非空（%d 文件）" % n, n > 0 and st == "PASS", "%s %s" % (st, n))
     print("INLINE-STYLE-READOUT: %s" % readout)
 
     print("INLINE-STYLE-SELFTEST: %d/%d%s" % (ok, ok + bad, "" if bad == 0 else "（%d 条失败）" % bad))

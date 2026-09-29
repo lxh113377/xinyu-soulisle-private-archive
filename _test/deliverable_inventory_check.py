@@ -14,18 +14,21 @@ tier-A 普遍带 assets 数），而 `make distcheck` 一系的做法就是「�
 （文本层泄露）两条**读 PDF** 的判据 ⇒ PDF 一旦消失它们会红，但**清单自己消失**、
 **成片消失**、**渲染脚本消失** 三件事无人守。
 
-取数面（三处声明，缺一即本判据自证不成立）
+取数面（四处，缺一即本判据自证不成立）
 ------------------------------------------------
 1. 路径分母 = 从 `提交清单与验收状态.md` 的表格行里**现读** `交付物/...` 前缀 token
    （不手抄清单；字符集 `[^\s` + 反引号 + 竖线 + 半/全角右括号 + 中文句读]，
    排除尾随标点，`--selftest` 的⑦类夹具专门钉「路径后紧跟中文句号不得吞进 token」）。
 2. 官方硬约束 = 同一行的「官方硬约束」列现读：`≤N页` → 页数上限、`≤N分钟` → 时长上限。
 3. 成片指纹 = 行内 `sha256=<64hex>` 若在册即与实测比对（登记值不是装饰）。
+4. **入库面（r82 补，第二次复发才补上的一条腿）** = `git ls-tree -r -l HEAD -- 交付物` 现读
+   (路径, blob 字节)，逐条对磁盘在位性。前 3 条分母都来自「清单声明」⇒ **没写进清单的件消失了永远不红**；
+   第 4 条把分母换成被检对象**写不进去**的量（HEAD 树），才盖住「5 件未声明的入库件静默消失」那一半。
 
 三态（沿用本仓 GREEN/RED/UNVERIFIED 口径，禁止把未验并入通过）
 ------------------------------------------------
-- rc=0 `...-PASS`：声明面全部在位非空 + 类型断言全过 + 口径零分叉
-- rc=1 `...-FAIL`：任一条**违规**（缺失/空文件/页数越界/时长越界/指纹不符/在册件品牌分叉）
+- rc=0 `...-PASS`：声明面全部在位非空 + 类型断言全过 + 口径零分叉 + 入库件全在位
+- rc=1 `...-FAIL`：任一条**违规**（缺失/空文件/页数越界/时长越界/指纹不符/在册件品牌分叉/**入库件从工作树消失**）
 - rc=2 `...-UNVERIFIED`：分母为 0、清单不可读、依赖库缺失 ⇒ 只报未验，**绝不判绿**
 
 一条设计取舍（有意为之，写下来免得下轮当成漏洞"修掉"）
@@ -195,6 +198,117 @@ def tracked_by_git(rel: str) -> bool:
     return None
 
 
+def parse_ls_tree(out: str):
+    """`git ls-tree -r -l -z` 原文 → ([(rel, blob_size)], skipped)。
+
+    实测字段序（2026-09-29 `od -c` 逐字节取，**不是**「sha\\tsize\\tpath」）：
+    `100644 blob <40hex>` + 空格填充 + `<size>` + `\\t` + `<path>` + `\\0`
+    ⇒ 整条只有 **一个 TAB**（紧贴 path 前），sha 与 size 之间是空格。
+    ⚠️ 首版解析按「两个 TAB」写，夹具照同一个假设造 ⇒ `--selftest` 全绿而真面 89 条全判形状不符。
+    教训：**夹具的输入必须来自被测数据面的逐字节取数**，不能由解析器的假设反推，否则两边同错、什么都测不出。
+    非 blob 条目（tree/commit 的 size 位是 `-`）与残行计入 skipped 交调用方判未验 ——
+    静默丢弃等于把「没解析出来」写成「没有这个件」。
+    """
+    entries, skipped = [], 0
+    for rec in out.split("\0"):
+        if not rec:
+            continue
+        head, sep, path = rec.partition("\t")
+        if not sep or not path:
+            skipped += 1
+            continue
+        bits = head.rsplit(None, 1)
+        if len(bits) != 2:
+            skipped += 1
+            continue
+        try:
+            size = int(bits[1])
+        except ValueError:
+            skipped += 1
+            continue
+        entries.append((path, size))
+    return entries, skipped
+
+
+def committed_blobs(prefix: str = "交付物", root=None):
+    """HEAD 树里 prefix 下的 ([(rel, blob_size)], skipped)；git 不可用/取不到 ⇒ (**None**, 0)。
+
+    分母为什么取 HEAD 树而不是磁盘目录：本腿判的就是「磁盘比提交面少」，
+    用磁盘当分母会让被检对象自己写分母（漏检的那件同时消失于分子与分母 ⇒ 永绿）。
+    `-z` + `-c core.quotepath=false`：CJK 路径默认会被转成八进制转义串，那条串拿去 `is_file()` 必假 ⇒ 假红。
+    ⚠️ `-l` 与 `--name-only` **互斥**（实测 `error: options '--name-only' and '-l' cannot be used together`）；
+    首版就是这么写的，真面退成 UNVERIFIED 才暴露 —— 这也是本腿「未验不判绿」第一次生效的实证。
+    """
+    root = Path(root) if root else ROOT
+    try:
+        r = subprocess.run(
+            ["git", "-c", "core.quotepath=false", "ls-tree", "-r", "-l", "-z", "HEAD", "--", prefix],
+            cwd=str(root), capture_output=True, timeout=30)
+    except Exception:
+        return None, 0
+    if r.returncode != 0:
+        return None, 0
+    return parse_ls_tree(r.stdout.decode("utf-8", "replace"))
+
+
+def parse_crosscheck():
+    """⑫ 独立取数通道对账：同一 HEAD 用**另一条命令**再数一遍条目数。
+
+    为什么需要这条腿（本轮一手）：解析器与它的夹具当时按同一个错误假设写 ⇒ `--selftest` 全绿、
+    真面 89/89 判废。夹具自证不了自己，只有**换一条命令**才可能暴露字段序假设错。
+    返回 (True=两通道相等 / False=不等 / None=未验, 说明)。
+    """
+    try:
+        r = subprocess.run(
+            ["git", "-c", "core.quotepath=false", "ls-tree", "-r", "--name-only", "-z",
+             "HEAD", "--", "交付物"],
+            cwd=str(ROOT), capture_output=True, timeout=30)
+    except Exception as exc:
+        return None, "独立通道不可调用（%s）" % type(exc).__name__
+    if r.returncode != 0:
+        return None, "独立通道 rc=%d" % r.returncode
+    indep = [x for x in r.stdout.decode("utf-8", "replace").split("\0") if x]
+    got, skipped = committed_blobs()
+    if got is None:
+        return None, "-l 通道不可用"
+    if skipped:
+        return False, "-l 通道丢条 %d" % skipped
+    if len(got) != len(indep):
+        return False, "-l 解析 %d 条 ≠ name-only %d 条" % (len(got), len(indep))
+    return True, "%d 条两通道一致" % len(indep)
+
+
+def tracked_missing_check(entries, root=None, prefix: str = "交付物"):
+    """入库交付件 ⇄ 工作树 对账。返回 (violations, unverified, n_checked)。
+
+    立此腿的一手证据（第二次复发）：2026-09-29 17:4x 实测 `git status --porcelain` 打出
+    **7 条 ` D`**（含 22,954,501 B 的参赛成片 `demo_video_out/心屿SoulIsle-演示视频.mp4`、
+    `render-pdf.ps1`、`演示视频脚本.md`、`演示视频-录制执行清单.md`、`application-plan.html`、
+    `demo_video_out/subtitle.ass`、`timeline.json`），距 iCAN 硬截止 2026-09-30 剩 1 天，
+    而本判据当时只报出其中 **2 条**（`render-pdf.ps1`、成片）—— 因为只有清单声明过的那 2 条
+    才进分子。**5 条「没写进清单但已入库」的件是零告警的** —— 这正是 r59 立此判据时要治的形态，
+    当时只治了「声明面」那一半，漏了「提交面」。
+    """
+    root = Path(root) if root else ROOT
+    if entries is None:
+        return [], ["git HEAD 树取不到 ⇒ 入库件在位性未验（不得读成「都在」）"], 0
+    if not entries:
+        return [], ["HEAD 树该前缀零条目 ⇒ 分母为 0，本腿不判绿（R247）"], 0
+    bad = []
+    n = 0
+    for rel, size in entries:
+        if not rel.startswith(prefix + "/"):
+            continue
+        n += 1
+        p = root / rel
+        if not p.is_file():
+            bad.append("入库件从工作树消失: %s（HEAD blob %d B 在，磁盘没有 ⇒ 无人声明也丢）"
+                       % (rel, size))
+        elif size > 0 and p.stat().st_size == 0:
+            bad.append("入库件被清成 0 B: %s（HEAD blob %d B，磁盘 0 B）" % (rel, size))
+    return bad, [], n
+
+
 def evaluate(rows, paths, root=None, tracked=None):
     """纯判定：输入清单行与声明路径，返回 (violations, unverified, notes, counters)。
 
@@ -337,14 +451,20 @@ def real_run() -> int:
     rows = table_rows(text)
     paths = declared_paths(rows)
     bad, unver, notes, c = evaluate(rows, paths)
+    entries, skipped = committed_blobs()
+    t_bad, t_unver, t_n = tracked_missing_check(entries)
+    bad += t_bad
+    unver += t_unver
+    if skipped:
+        unver.append("HEAD 树有 %d 条记录取不到尺寸 ⇒ 入库面分母不完整，本腿不判绿" % skipped)
     for n in notes:
         print("  · " + n)
     for b in bad:
         print("  ✗ " + b)
     for u in unver:
         print("  ? " + u)
-    tail = ("声明 %d 条｜受检 %d｜品牌在册比对 %d｜未登记交付物 %d｜未验 %d"
-            % (c["declared"], c["checked"], c["brand_checked"], c["undeclared"], len(unver)))
+    tail = ("声明 %d 条｜受检 %d｜品牌在册比对 %d｜未登记交付物 %d｜入库件在位 %d｜未验 %d"
+            % (c["declared"], c["checked"], c["brand_checked"], c["undeclared"], t_n, len(unver)))
     if bad:
         print("DELIVERABLE-INVENTORY-FAIL: %d 条违规（%s）" % (len(bad), tail))
         return 1
@@ -354,7 +474,7 @@ def real_run() -> int:
     if unver:
         print("DELIVERABLE-INVENTORY-UNVERIFIED: 零违规但 %d 项未验（%s）" % (len(unver), tail))
         return 2
-    print("DELIVERABLE-INVENTORY-PASS: 清单声明⇄磁盘⇄口径三方对账全等（%s）" % tail)
+    print("DELIVERABLE-INVENTORY-PASS: 清单声明⇄磁盘⇄口径⇄入库面四方对账全等（%s）" % tail)
     return 0
 
 
@@ -400,8 +520,26 @@ def selftest() -> int:
         p.write_bytes(b"not-a-mp4")
         ck("⑨无 mvhd ⇒ None（交未验，不猜）", mp4_seconds(p) is None)
 
+    # ⑩⑪ 取数解析层：字段序按 2026-09-29 `od -c` 逐字节实测构造（**不是**按解析器假设构造）
+    hex_a, hex_b, hex_c = "a" * 40, "b" * 40, "c" * 40
+    ok_out = ("100644 blob " + hex_a + "    8437\t交付物/提交包/a.md\x00"
+              "100644 blob " + hex_b + "  22954501\t交付物/提交包/b.mp4\x00")
+    e10, m10 = parse_ls_tree(ok_out)
+    ck("⑩两条合法记录全解析出来: %s/%d" % (e10, m10),
+       len(e10) == 2 and m10 == 0 and e10[1] == ("交付物/提交包/b.mp4", 22954501))
+    e11, m11 = parse_ls_tree(ok_out + "no-tab-record\x00"
+                             + "100644 blob " + hex_c + " -\t交付物/子目录\x00")
+    ck("⑪残行与 tree 记录(size 位为 -)必须计入 skipped 而非静默丢: %s/%d" % (e11, m11),
+       len(e11) == 2 and m11 == 2)
+
+    # ⑫ 独立通道交叉核对：同一 HEAD 用另一条命令数一遍条目数，防「夹具与解析器同错」
+    x12 = parse_crosscheck()
+    ck("⑫解析条目数与独立取数通道不等: %s" % (x12,), x12[0] is True)
+    if x12[0] is None:
+        print("  ! ⑫独立通道交叉核对未执行（%s）⇒ 该腿本轮未验，不算过" % x12[1])
+
     bad += fixture_legs()
-    print("DELIVERABLE-INVENTORY-SELFTEST-%s（9 类纯函数夹具 + 9 条端到端反向腿）"
+    print("DELIVERABLE-INVENTORY-SELFTEST-%s（9 类纯函数夹具 + 3 条取数解析腿含独立通道对账 + 14 条端到端反向腿）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad)))
     for x in bad:
         print("  ✗ " + x)
@@ -491,6 +629,27 @@ def fixture_legs() -> list:
         ck("Ⓘ未登记草稿不误伤在途件 ⇒ 不红但计数 %s" % c8["undeclared"],
            not any("品牌" in x for x in b8) and c8["undeclared"] == 2
            and any("入库即拦" in x for x in n8))
+
+        # Ⓙ-Ⓝ r82 新腿：入库面（分母 = HEAD 树，被检对象写不进去）
+        ghost = "交付物/提交包/demo_video_out/gone.mp4"
+        tb1, tu1, tn1 = tracked_missing_check(
+            [(ghost, 22954501), ("交付物/提交包/plan.pdf", 1000)], root=root)
+        ck("Ⓙ入库件消失⇒必红（且它**不在声明面**，旧腿抓不到）%s" % tb1,
+           ghost not in good_paths and len(tb1) == 1 and "入库件从工作树消失" in tb1[0]
+           and tn1 == 2 and not tu1)
+        tb2, tu2, tn2 = tracked_missing_check(
+            [("交付物/提交包/plan.pdf", 1000), ("交付物/提交包/notes.md", 50)], root=root)
+        ck("Ⓚ入库件都在位 ⇒ 不红且不虚报未验 %s/%s" % (tb2, tu2),
+           not tb2 and not tu2 and tn2 == 2)
+        (pkg / "zeroed.md").write_text("", encoding="utf-8")
+        tb3, _, _ = tracked_missing_check([("交付物/提交包/zeroed.md", 512)], root=root)
+        ck("Ⓦ入库件被清成 0 B ⇒ 必红", tb3 and "0 B" in tb3[0])
+        (pkg / "zeroed.md").unlink()
+        tb4, tu4, tn4 = tracked_missing_check(None, root=root)
+        ck("Ⓜgit 取不到 ⇒ UNVERIFIED 而非判绿 %s" % tu4,
+           not tb4 and len(tu4) == 1 and tn4 == 0)
+        tb5, tu5, _ = tracked_missing_check([], root=root)
+        ck("ⓃHEAD 该前缀零条目 ⇒ 分母为 0 不判绿", not tb5 and len(tu5) == 1)
     return bad
 
 

@@ -261,4 +261,54 @@ class LlmProxyTest {
         assertEquals(502, s.status());
         assertEquals("{\"error\":\"upstream-error\"}", s.body());
     }
+
+    /**
+     * r82（建议8 的归因落地）：T8 点名的 {@code LlmProxy.call}(漏 6 指令) / {@code openStream}(漏 8 指令)
+     * 逐行复算后全部落在同两支上 —— {@code LlmProxy.java:95} 与 {@code :126} 的 {@code payload == null}
+     * → {@code bad-json}，而它们唯一的来源是 {@code :166-167} 的 {@code writeValueAsString} catch。
+     *
+     * <p>{@code toMessageList} 把每个入参形状都归一成 {@code Map<String, String>}（非对象跳过、
+     * {@code hasNonNull} 挡掉 null、其余一律 {@code asText()}），所以那个 catch **结构上不可能被触发**。
+     * 沿用 r77 的原则：不为凑覆盖率写反射。
+     *
+     * <p>但这条不变量此前只有散文在说，没有东西钉着 —— 本用例就是那颗钉：拿四类畸形入参走两条公开出口，
+     * 断言上行的每条消息字段都是字符串、且状态码仍是上游的而不是 500。下一次有人让 {@code toMessageList}
+     * 漏掉某种归一（比如原样塞回 JsonNode），这条会当场红，而不是等下一个人重新做一遍不可达性归因。
+     */
+    @Test
+    @DisplayName("畸形 messages 一律归一成字符串：bad-json 那两支是结构不可达，用它做不变量而非反射")
+    void hostileMessagesNormalizeInsteadOfCollapsingToBadJson() throws Exception {
+        var arr = M.createArrayNode();
+        arr.add("裸字符串不是对象");
+        var weird = arr.addObject();
+        weird.putPOJO("role", new int[] {1, 2});
+        weird.putArray("content").add("a").add("b");
+        var hollow = arr.addObject();
+        hollow.put("name", "小屿");
+        var nulled = arr.addObject();
+        nulled.putNull("role");
+        nulled.put("content", "在的");
+
+        LlmProxy p = new LlmProxy(base, "m", "sk-fake", 5);
+
+        script(200, "application/json", "{\"choices\":[{\"message\":{\"content\":\"好\"}}]}");
+        LlmProxy.Result r = p.call(arr, null, null);
+        assertEquals(200, r.status(), "若走了 bad-json 那支会是 500，这里必须仍是上游状态码");
+        JsonNode sent = upstreamPayloadOf(0).path("messages");
+        assertTrue(sent.isArray(), "上行必须仍是 messages 数组");
+        assertEquals(3, sent.size(), "非对象元素应被跳过，对象即使畸形也要留下");
+        for (JsonNode m : sent) {
+            for (String field : new String[] {"role", "content"}) {
+                if (m.has(field)) {
+                    assertTrue(m.get(field).isTextual(),
+                            field + " 必须已被 asText() 归一成字符串，实为 " + m.get(field));
+                }
+            }
+        }
+        assertTrue(sent.get(2).hasNonNull("content"), "putNull(role) 只该丢掉 role，不该连 content 一起丢");
+
+        script(200, "application/json", "{\"choices\":[{\"message\":{\"content\":\"好\"}}]}");
+        LlmProxy.StreamResult s = p.openStream(arr, null, null);
+        assertEquals(200, s.status(), "流式腿同样不得走 bad-json");
+    }
 }

@@ -1557,6 +1557,24 @@ def selftest():
             return 1
     finally:
         _g95["git_ls_tree"], _g95["git_blob"] = _orig_ls75, _orig_blob75
+    # ---- A9（r82 新增，静态接线腿）：`classify_drift` 的**每一个**调用点都必须按四档解包 ----
+    # 立此腿的一手：r79-D 把返回从 3 值加到 4 值，9 处调用点改了 8 处，**唯独生产路径 main() 那一处漏了**
+    # ⇒ `--selftest` 全绿而真面每次跑到收口就 `ValueError: too many values to unpack`（本轮实测 rc=1，
+    #   采数全部印完才崩，漂移一条都没落进台账）。这是 R238「用单测掩盖接线错误」的又一形态：
+    #   签名变更的爆炸半径只在**没人跑的那条路**上显形。数一下有几个 `=` 是结构判定，不靠人记得改了几处。
+    _src_self = Path(__file__).read_text(encoding="utf-8", errors="replace")
+    _call_sites = re.findall(r"^(\s*)([A-Za-z_,\s]*?)=\s*classify_drift\(", _src_self, re.M)
+    if len(_call_sites) < 2:
+        print("SELFTEST-FAIL: A9 没找到 ≥2 处 classify_drift 解包赋值 ⇒ 正则失效或调用点被改写，"
+              "这条腿会恒真：%r" % (_call_sites,))
+        return 1
+    _bad_arity = [(lhs.strip(), len([x for x in lhs.split(",") if x.strip()]))
+                  for _ind, lhs in _call_sites
+                  if len([x for x in lhs.split(",") if x.strip()]) != 4]
+    if _bad_arity:
+        print("SELFTEST-FAIL: A9 有调用点不按四档解包（签名演进时漏改的那一处就是真面会崩的那一处）："
+              "%r ｜ 已扫 %d 处调用点" % (_bad_arity, len(_call_sites)))
+        return 1
     print("SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（"
           f"{len(got)} 条）；分档正确（实质 {len(sub)} / 抖动 {len(noise)}）且纯抖动场景零实质；"
           "分母证明正确（1 有效 / 2 盲区点名，健康仓不误踢）；"
@@ -1749,10 +1767,16 @@ def main():
         print(f"  ⚠️ 盲区点名（这些仓的 caps 不计入分母，全零不可解读为「对手没有」）: " + " ; ".join(blind))
     if prev_repos:
         if drift:
-            sub, noise, roster = classify_drift(drift)
+            # r82 修：`classify_drift` 自 r79-D 起返回**四档**（实质/抖动/补录/取数失败），
+            # 而生产路径这一处仍按三值解包 ⇒ 每次真跑到这里就 `ValueError: too many values to unpack`，
+            # 采数全部印完才崩（rc=1），漂移一条都没落进台账。9 处调用点里 8 处已跟上新签名，
+            # 唯独这条**唯一会被真面走到**的那处漏了 —— `--selftest` 全绿而真面崩，正是 R238 说的
+            # 「用单测掩盖接线错误」。下面 A9 那条静态腿就是为堵这一族：调用点解包数!=4 当场红。
+            sub, noise, roster, blind = classify_drift(drift)
             print(f"漂移: {len(drift)} 处 = 实质 {len(sub)} 处（可行动）+ 抖动 {len(noise)} 处"
                   f"（★ 单点差值含倒退，不作趋势证据）+ 补录 {len(roster)} 处"
-                  f"（基线上轮没数到 ⇒ 是我补齐了覆盖，不是对手变化）"
+                  f"（基线上轮没数到 ⇒ 是我补齐了覆盖，不是对手变化）+ 取数失败 {len(blind)} 处"
+                  f"（本轮树没取到 ⇒ 这把尺瞎，不得读成对手退化）"
                   f"｜与上一次快照逐字段比对，禁止沿用旧数字")
             for repo, k, o, n in sub:
                 print(f"  ▶ 实质 {repo} {k}: {o} -> {n}")
@@ -1760,6 +1784,8 @@ def main():
                 print(f"    抖动 {repo} {k}: {o} -> {n}")
             for repo, k, o, n in roster:
                 print(f"      ▷ 补录 {repo} {k}: {o} -> {n}")
+            for repo, k, o, n in blind:
+                print(f"      ✗ 取数失败 {repo} {k}: {o} -> {n}")
         else:
             print("漂移: 0 处（与上一次快照完全一致）")
     else:

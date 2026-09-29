@@ -8,7 +8,7 @@
     `rc=2 未验`——不给绿，也不产出一条无法归因的红。两者均由 `--selftest` 双向自证（11 类桩）。
 """
 import os
-import subprocess, sys, io, re, time
+import subprocess, sys, io, re, time, json, shutil, atexit
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from pathlib import Path
 
@@ -53,6 +53,10 @@ SUITES = [
     ("vendor_freshness", [sys.executable, "_test/vendor_freshness_check.py"]),
     ("vendor_freshness_selftest", [sys.executable, "_test/vendor_freshness_check.py", "--selftest"]),
     ("benchmark_selftest", [sys.executable, "_test/benchmark_metrics.py", "--selftest"]),
+    # r82 建议5（取数入口前置自证）：peers 尺全集必须「解析得动 + 归属清楚」，
+    # 否则 r81 那一形（坏尺起不来 ⇒ 拿尺的人先撞到 SyntaxError 而不是「红在谁身上」）会复发。
+    ("measure_entry", [sys.executable, "_test/measure_entry.py"]),
+    ("measure_entry_selftest", [sys.executable, "_test/measure_entry.py", "--selftest"]),
     # r41：对标测试资产面量出 in-build 单测 0/16 vs peers 9/16；探针本体不入电池（16 仓 API 不划算，
     # 承 r37 口径），但它的**匹配器自证**纯本地零网络，进阻断链盯住"把依赖目录当用例"这类灌水。
     ("testasset_selftest", [sys.executable, "_test/peer_test_asset_probe.py", "--selftest"]),
@@ -219,7 +223,12 @@ USAGE = """run_all_suites.py — 全量回归电池（SUITES 是条数唯一真�
   --selftest         只验并发锁判定桩（零网络、零套件）
   -h, --help         本说明
 未知开关一律拒（rc=2）：开关打错字若被静默忽略，会把"子集全绿"印成"全量全绿"。
-整跑不可重入：并发的第二条一律 rc=2 未验（r41 实测并跑会互踩出无法归因的红）。"""
+整跑不可重入：并发的第二条一律 rc=2 未验（r41 实测并跑会互踩出无法归因的红）。
+自管服务（r82）：8123 没人起时自己起 fat jar、等到 /api/health=UP 再跑，退出经 atexit 收掉；
+  已有健康服务则**复用且不停它**（CI 就是这样，它在 job 里自己起了 jar）；jar 非 fat 或没有 JDK17
+  则如实 SELF-HOST: skip 并交 preflight 判未验——宁可未验，也不拿一个来路不明的进程当被测对象。
+  解释器顺序：XINYU_JAVA → PATH 的 java → 本机实测 JDK17 → JAVA_HOME（本机 JAVA_HOME 是 **JDK 8**，
+  必须过 java_major>=17 这一关，否则会拿 8 去起 Spring Boot 3）。"""
 
 KNOWN_FLAGS = {"--list", "--exclude-llm", "--only", "--slice", "--selftest", "--help", "-h"}
 
@@ -435,6 +444,174 @@ def write_timing_ledger(times, results, coverage):
         hashlib.sha256(back).hexdigest()[:16], len(back))
 
 
+def serve_plan(up, jar_ok, java_ok):
+    """纯决策：已有健康服务→复用；否则 jar 是 fat 且找得到 JDK17→自管起；都不成立→如实报不自管。
+
+    为什么 21 条套件过去只能靠人工起进程（r81 G4）：`server_preflight` 会把「服务没起」如实判成
+    rc=2 未验（对，它不该假装绿），但**没人负责把它起来** ⇒ 每一轮都得先手工 `java -jar`，
+    忘了就是 21 格成排未验。本函数把「起不起、归谁」收到一处，纯函数因此可离线自证（见 serve_selftest）。
+    """
+    if up:
+        return ("reuse", "8123 已有健康服务 ⇒ 复用，**不会**停掉不是我起的进程")
+    if not jar_ok:
+        return ("skip", "jar 非 fat 或比源码旧 ⇒ 不自管（先跑 python _test/build_jar.py 或用 mvn）")
+    if not java_ok:
+        return ("skip", "找不到 JDK17 的 java ⇒ 不自管（设 XINYU_JAVA 指向 java.exe 可覆盖）")
+    return ("start", "自管起 jar@8123，跑完由本进程收掉")
+
+
+def http_health(base=BASE, budget=2.0):
+    """探 `/api/health` 且要求 `status=UP`——只看 200 不够（旧 jar 也会回 200）。"""
+    import urllib.error
+    import urllib.request
+    try:
+        with urllib.request.urlopen(base.rstrip("/") + "/api/health", timeout=budget) as r:
+            if r.status != 200:
+                return False
+            return json.loads(r.read().decode("utf-8", "replace")).get("status") == "UP"
+    except Exception:
+        return False
+
+
+def java_exe(env=None, which=shutil.which, exists=Path.exists):
+    """按 XINYU_JAVA → PATH 的 java → 本机实测 JDK17 路径 → JAVA_HOME 的顺序找一个可用解释器。
+
+    ⚠️ 本机 `JAVA_HOME` 默认指向 **JDK 8**（AGENTS.md 工具链表实测），而 Spring Boot 3.2.5 要 17；
+    直接拿 `java` 或 `$JAVA_HOME/bin/java` 会起不来或以晦涩错误收口，所以顺序里必须带版本核验。
+    """
+    env = os.environ if env is None else env
+    cand = []
+    if env.get("XINYU_JAVA"):
+        cand.append(env["XINYU_JAVA"])
+    w = which("java")
+    if w:
+        cand.append(w)
+    cand.append(r"C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot\bin\java.exe")
+    if env.get("JAVA_HOME"):
+        cand.append(str(Path(env["JAVA_HOME"]) / "bin" / ("java.exe" if os.name == "nt" else "java")))
+    for c in cand:
+        if c and exists(Path(c)):
+            return c
+    return None
+
+
+def java_major(exe, run=subprocess.run):
+    """`java -version` 取主版本号；JDK 8 报 `1.8.0_504` ⇒ 主版本按 8 算，不写成 1。"""
+    try:
+        p = run([exe, "-version"], capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=25)
+    except Exception:
+        return None
+    text = (p.stderr or "") + (p.stdout or "")
+    m = re.search(r'version "(\d+)(?:\.(\d+))?', text)
+    if not m:
+        return None
+    first = int(m.group(1))
+    return 8 if first == 1 and m.group(2) else first
+
+
+def jar_is_fat_and_fresh():
+    """复用 `jar_shape_check.inspect` 的判定，不在这里另写一套 fat 标准（derive, not duplicate）。"""
+    sys.path.insert(0, str(ROOT / "_test"))
+    try:
+        import jar_shape_check as J
+        newest, ts = J.newest_source()
+        r = J.inspect(J.JAR, ts, newest)
+        return r["verdict"] == "PASS", "%s｜%s" % (r["verdict"], r.get("reason") or newest)
+    except Exception as exc:
+        return False, "jar_shape_check 不可调用（%s）" % type(exc).__name__
+    finally:
+        while str(ROOT / "_test") in sys.path:
+            sys.path.remove(str(ROOT / "_test"))
+
+
+def ensure_server():
+    """返回 (状态词, 说明)。状态：reuse / start / skip。
+
+    自管子进程的收口靠 `atexit`（电池全程是 `sys.exit(main())` 正常退出，异常退出也会触发），
+    不在 main() 里为它套一层 try/finally —— 那要把 25 行循环整体重缩进，改动面比收益大。
+    """
+    up = http_health()
+    jar_ok, jar_why = (False, "未取数") if up else jar_is_fat_and_fresh()
+    exe = None if up else java_exe()
+    java_ok = bool(exe) and (java_major(exe) or 0) >= 17
+    act, why = serve_plan(up, jar_ok, java_ok)
+    if act != "start":
+        return ("reuse" if act == "reuse" else "skip"), "%s｜jar=%s" % (why, jar_why)
+    log = (Path(os.environ.get("TEMP") or "/tmp") / "xinyu-selfhost-8123.log")
+    handle = log.open("wb")
+    try:
+        p = subprocess.Popen([exe, "-jar", str(ROOT / "server" / "target" / "soulisle-server.jar"),
+                              "--server.port=8123"], cwd=str(ROOT), stdout=handle,
+                             stderr=subprocess.STDOUT)
+    except Exception as exc:
+        handle.close()
+        return "skip", "Popen 失败（%s）｜日志=%s" % (type(exc).__name__, log)
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        if p.poll() is not None:
+            handle.close()
+            tail = ""
+            try:
+                tail = log.read_text("utf-8", errors="replace").strip().splitlines()[-3:]
+            except Exception:
+                pass
+            return "skip", "子进程 rc=%s 已退出｜日志尾=%s" % (p.returncode, " / ".join(tail))
+        if http_health():
+            atexit.register(stop_server, p, handle)
+            return "start", "已起并等到 status=UP｜日志=%s" % log
+        time.sleep(1.0)
+    stop_server(p, handle)
+    return "skip", "120s 内 /api/health 没到 UP ⇒ 已收掉自管子进程（不留孤儿）"
+
+
+def stop_server(p, handle):
+    """只收自己起的那个；terminate 后必须 wait，否则 JVM 还在退就把端口让给下一轮。"""
+    try:
+        if p.poll() is None:
+            p.terminate()
+            p.wait(timeout=25)
+    except Exception:
+        try:
+            p.kill()
+            p.wait(timeout=10)
+        except Exception:
+            pass
+    try:
+        handle.close()
+    except Exception:
+        pass
+
+
+def serve_selftest():
+    """决策表离线自证（不起真进程）：四形各判其所，含「复用优先于自管」这一条。"""
+    fails = []
+    cases = (
+        ((True, False, False), "reuse", "外部服务健康时必须复用，哪怕 jar 是坏的也不许起第二个"),
+        ((False, True, True), "start", "无服务+fat jar+JDK17 ⇒ 自管"),
+        ((False, False, True), "skip", "jar 不是 fat ⇒ 不许自管（宁可交未验）"),
+        ((False, True, False), "skip", "没有 JDK17 ⇒ 不许自管"),
+    )
+    for args, want, why in cases:
+        got = serve_plan(*args)[0]
+        if got != want:
+            fails.append("serve_plan%s 应=%s 实=%s（%s）" % (args, want, got, why))
+    # JDK 8 的 `-version` 串必须算成 8（本机 JAVA_HOME 实测指向 8，算成 1 会把它当可用解释器）
+    class _P:
+        def __init__(self, s):
+            self.stderr, self.stdout = s, ""
+    got8 = java_major("x", run=lambda *a, **k: _P('openjdk version "1.8.0_504"'))
+    if got8 != 8:
+        fails.append("JDK8 版本串应解析成主版本 8，实=%r" % (got8,))
+    got17 = java_major("x", run=lambda *a, **k: _P('openjdk version "17.0.20.1"'))
+    if got17 != 17:
+        fails.append("JDK17 版本串应解析成 17，实=%r" % (got17,))
+    gotbad = java_major("x", run=lambda *a, **k: (_ for _ in ()).throw(OSError("boom")))
+    if gotbad is not None:
+        fails.append("java 不可调用时必须返回 None（交 skip），实=%r" % (gotbad,))
+    return 1 if fails else 0, fails
+
+
 def acquire_lock():
     """整跑电池不是可重入的：两条链同时打同一个 jar + 同一个上游会互相踩出假红
     （r41 实测两次：`emotion_wiring` 与 `live_sync` 在并发窗口里判红，单独复跑均 PASS）。
@@ -476,11 +653,15 @@ def main():
         rc2 = fold_selftest()
         rc3 = quota_selftest()
         rc4 = timing_selftest()
-        print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s ＋ 计费分档 %s ＋ 台账写入 %s）"
-              % ("PASS" if not (rc1 | rc2 | rc3 | rc4) else "FAIL",
+        rc5, serve_fails = serve_selftest()
+        print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s ＋ 计费分档 %s ＋ 台账写入 %s ＋ 自管决策 %s）"
+              % ("PASS" if not (rc1 | rc2 | rc3 | rc4 | rc5) else "FAIL",
                  "ok" if not rc1 else "红", "ok" if not rc2 else "红",
-                 "ok" if not rc3 else "红", "ok" if not rc4 else "红"))
-        return 1 if (rc1 | rc2 | rc3 | rc4) else 0
+                 "ok" if not rc3 else "红", "ok" if not rc4 else "红",
+                 "ok" if not rc5 else "红"))
+        for f in serve_fails:
+            print("  · SELF-HOST-FAIL " + f)
+        return 1 if (rc1 | rc2 | rc3 | rc4 | rc5) else 0
     if "--list" in argv:
         print("SUITES:", len(SUITES))
         return 0
@@ -525,6 +706,10 @@ def main():
         # 2 = 未验，不是 1：并发不是"代码坏了"，但也绝不是一块没跑完的绿
         print(why)
         return 2
+
+    # r82 去单点：8123 没人起时自己起、跑完自己收；已有健康服务则**复用且绝不停它**
+    srv_state, srv_note = ensure_server()
+    print("SELF-HOST: %s ｜ %s" % (srv_state, srv_note))
 
     results = []
     blurbs = {}

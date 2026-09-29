@@ -40,6 +40,7 @@ python _test/ux_guards_check.py          # TTS 朗读 / 对话窗口化 / 响应
 python _test/size_budget_check.py        # 首屏体积预算 + 「新文件必须登记」覆盖判据（漏登记即红）
 python _test/vendor_freshness_check.py   # vendor 完整性哈希 + 版本对账；--check-upstream 报上游漂移
 python _test/benchmark_metrics.py        # 对标源数据台账（16 仓指标 + 与上次快照逐字段漂移）；联网采集，人工轮次跑
+python _test/measure_entry.py            # r82 取数入口前置自证：peers 尺全集 ast 解析 + HEAD 归属（坏在未入库改动/坏在已入库 两种红因分开报）+ 并跑 repo_config_check
 python _test/live_sync_check.py          # 线上 `/` 与 deploy/xinyu 逐字节比对（部署未跟进即红）
 python _test/safety_guard_check.py        # 输入侧护栏行为验证：注入 6 例必须点名 + 正常 6 例不得误伤（含 --selftest）
 python _test/eol_parity_check.py         # 行尾确定性：工作树字节 == 仓库 blob 字节 + binary 形状（E1–E4，8 类 --selftest）
