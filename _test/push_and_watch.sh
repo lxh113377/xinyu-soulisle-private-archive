@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 # push 后必取 CI 回执的一条命令（把"记得去查"从人身上挪到脚本上）。
 # 用法：bash _test/push_and_watch.sh [remote] [branch]     默认 origin main
+#        XINYU_PUSH_REFS="v1.7.0" 可带上 tag（切版那一轮必须同推分支与 tag，否则 G12 在 CI 上判红）
 # 退出码 = ci_watch 的退出码：0 全绿 / 1 有红 / 2 未验证（无 run、超时、gh 不可用）
 set -u
 REMOTE="${1:-origin}"; BRANCH="${2:-main}"
-git push "$REMOTE" "$BRANCH" || { echo "PUSH-FAILED ⇒ 不进入 CI 判定"; exit 1; }
+EXTRA=()
+[ -n "${XINYU_PUSH_REFS:-}" ] && EXTRA=($XINYU_PUSH_REFS)
+if ! git push "$REMOTE" "$BRANCH" "${EXTRA[@]}"; then
+    # r82/r83 两次实测：共享 `.gitconfig` 里 `http.proxy=http://127.0.0.1:7897`，而该代理时常没起
+    # ⇒ push 报 `Failed to connect to github.com port 443 via 127.0.0.1`，同一时刻 curl 直连全 200。
+    # 处置只对这**一条命令**内联关掉代理——改共享配置属他人可见状态，不在这里做。
+    # 首推仍正常优先：真需要代理的网络里第二试也会失败，不会把「必须走代理」这件事掩盖掉。
+    echo "[push_and_watch] 首推失败 ⇒ 试一次内联关代理（仅本条命令，不动 ~/.gitconfig）"
+    git push -c http.proxy= -c https.proxy= "$REMOTE" "$BRANCH" "${EXTRA[@]}" \
+      || { echo "PUSH-FAILED ⇒ 不进入 CI 判定（先按「域名×时刻」测直连再判是谁的锅）"; exit 1; }
+fi
 SHA="$(git rev-parse HEAD)"
 echo "[push_and_watch] 已推 $SHA，等 CI 结论…"
 LOG="$(mktemp)"; trap 'rm -f "$LOG"' EXIT
