@@ -1,0 +1,58 @@
+#!/bin/sh
+# 心屿 SoulIsle · 交付面在位闸（r83）
+#
+# 装法（唯一入口，别手抄）：python _test/hook_wiring_check.py --install
+# 本文件是被 git 跟踪的源，.git/hooks/pre-commit 是它的副本；两处不一致由
+# _test/hook_wiring_check.py 判红（副本不在跟踪面里，漂了没人看得见）。
+#
+# 拦什么：已入库交付件从工作树消失（本仓 09-28 / 09-29 两次实测：7 件含参赛成片
+# 无声消失，全部判据零告警，因为旧分母只来自「清单声明」）。
+# 不拦什么：判据自己取不到数（rc=2 UNVERIFIED）与找不到解释器 ⇒ 放行并如实报警。
+#   工具故障没有资格拦下别人的提交（共享工作树里他人会被迫为一个不属于他的红收口）。
+
+set -u
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$ROOT" || exit 0
+
+if [ "${XINYU_SKIP_DELIV_HOOK:-}" = "1" ]; then
+    LEDGER="$ROOT/.git/xinyu-hook-skip.log"
+    printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(git rev-parse HEAD 2>/dev/null)" >>"$LEDGER"
+    N=$(wc -l <"$LEDGER" 2>/dev/null | tr -d ' ')
+    echo "pre-commit: 交付面在位检查被跳过（累计第 ${N:-?} 次，台账 .git/xinyu-hook-skip.log）。跳过只对本机有效，电池/CI 照判。" >&2
+    exit 0
+fi
+
+PY=${XINYU_PYTHON:-}
+if [ -z "$PY" ]; then
+    for c in python python3 py; do
+        if command -v "$c" >/dev/null 2>&1; then
+            PY=$c
+            break
+        fi
+    done
+fi
+if [ -z "$PY" ]; then
+    echo "pre-commit: UNVERIFIED 找不到 python ⇒ 交付面在位没量到（放行；请手工跑 _test/deliverable_inventory_check.py）" >&2
+    exit 0
+fi
+
+OUT=$("$PY" _test/deliverable_inventory_check.py 2>&1)
+RC=$?
+
+if [ "$RC" -eq 1 ]; then
+    echo "$OUT"
+    echo "pre-commit: 拦下本次提交。被删的是**已入库交付件**，复原（逐路径，禁 git checkout .）：" >&2
+    echo "  git checkout HEAD -- <上面点名的路径>" >&2
+    echo "  复原后复算：python _test/deliverable_inventory_check.py" >&2
+    echo "  确认是有意搬迁而非丢失，才用：XINYU_SKIP_DELIV_HOOK=1 git commit ..." >&2
+    exit 1
+fi
+
+if [ "$RC" -eq 2 ]; then
+    echo "$OUT" | tail -3
+    echo "pre-commit: 判据回 UNVERIFIED ⇒ 不拦提交，但这一面本轮没被量到（别当成通过）" >&2
+    exit 0
+fi
+
+exit 0

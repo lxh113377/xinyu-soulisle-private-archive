@@ -200,6 +200,10 @@ SUITES = [
     # 否则新加一条套件忘了登记就会被判成"可并行"——那比没有普查更坏。
     ("suite_census", [sys.executable, "_test/suite_resource_census.py"]),
     ("suite_census_selftest", [sys.executable, "_test/suite_resource_census.py", "--selftest"]),
+    # r83：交付面在位闸的接线回执。入库件在位那条腿 r82 就补上了，但它只在电池/CI 跑，
+    # 而丢失发生在两次提交之间 ⇒ 本轮把 `_test/hooks/pre-commit` 装上，本件盯「装没装、装的是不是源」。
+    ("hook_wiring", [sys.executable, "_test/hook_wiring_check.py"]),
+    ("hook_wiring_selftest", [sys.executable, "_test/hook_wiring_check.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），

@@ -311,4 +311,30 @@ class LlmProxyTest {
         LlmProxy.StreamResult s = p.openStream(arr, null, null);
         assertEquals(200, s.status(), "流式腿同样不得走 bad-json");
     }
+
+    @Test
+    @DisplayName("r83 不可达腿留证：上游零字节响应经 BodyHandlers.ofString 到手是空串而非 null")
+    void emptyUpstreamBodyArrivesAsBlankNotNull() throws Exception {
+        // LlmProxy 里 `body == null` 那一支常年报 missed。这里不打桩、走真 socket 复现同一条 JDK 承诺：
+        // 零字节响应体读出来必须是空串。哪天这条先红，那一支就不再是死代码，归类要跟着改。
+        // 桩脚本是**队列**：一次请求消费一条。裸探针和 p.call 各要一条空体，
+        // 只 script 一条时第二条请求会掉进桩的默认响应（本轮第一次就是这么被测出「兜底」的）。
+        script(200, "application/json", "");
+        script(200, "application/json", "");
+        java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+        java.net.http.HttpRequest req = java.net.http.HttpRequest
+                .newBuilder(java.net.URI.create(base + "/chat/completions"))
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString("{}", StandardCharsets.UTF_8))
+                .build();
+        java.net.http.HttpResponse<String> raw = client.send(req,
+                java.net.http.HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        org.junit.jupiter.api.Assertions.assertNotNull(raw.body(),
+                "ofString 不得返回 null，否则 LlmProxy 的 body==null 那一支是活的");
+        assertTrue(raw.body().isEmpty(), "零字节响应体应是空串，实得长度=" + raw.body().length());
+
+        LlmProxy p = new LlmProxy(base, "m", "sk-fake", 5);
+        LlmProxy.Result folded = p.call(msgs("user", "x"), null, null);
+        assertEquals(200, folded.status(), "折成 upstream-nonjson 时状态码仍归上游");
+        assertEquals("{\"error\":\"upstream-nonjson\"}", folded.body());
+    }
 }

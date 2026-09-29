@@ -126,6 +126,19 @@ class EmotionLexiconTest {
         assertLoadFails(dir.resolve("missing-file.js"), null, "文件根本不存在");
     }
 
+    @Test
+    @DisplayName("r83 补形：右括号在左括号之前才算「定位失败」，旧用例那条其实走的是解析异常")
+    void readLexiconBraceOrderReversed() throws Exception {
+        // 逐行复算发现的形态差：`{ 与 }` 都存在且 } 在 { 之后时，e<=s 为假，
+        // 旧 unbalanced.js 的 `{"lex":{}` 末尾自带 } ⇒ 它其实是被 Jackson 解析失败抓住的，
+        // guard 的 e<=s 那一支从未真取过 ⇒ 定位守卫的失败面长期没人走。
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("xinyu-lex-order");
+        assertLoadFails(dir.resolve("reversed.js"), "{\"a\":1} window.__XINYU_LEXICON__ = {\"lex\":{\"joy\":[]",
+                "最后一个右括号落在第一个左括号之前");
+        assertLoadFails(dir.resolve("no-close.js"), "window.__XINYU_LEXICON__ = {\"lex\":{\"joy\":[]",
+                "全文没有任何右括号（e=-1 同样该落进 e<=s）");
+    }
+
     private static void assertLoadFails(java.nio.file.Path p, String content, String why) throws Exception {
         if (content != null) {
             java.nio.file.Files.writeString(p, content, java.nio.charset.StandardCharsets.UTF_8);

@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
@@ -168,5 +170,38 @@ class MemoryControllerTest {
         assertEquals(200, c.addEmotion("{\"sessionId\":\"s1\",\"emotion\":\"joy\",\"intensity\":\"很高\"}")
                 .getStatusCode().value());
         verify(svc).addEmotion("s1", "joy", 0.5, null, null);
+    }
+
+    @Test
+    @DisplayName("r83 补形：intensity 键不存在 与 ChatMessage 落库时间为空 是两个真分支，不靠缺省值蒙绿")
+    void absentIntensityKeyAndStaleMessageTimestamp() throws Exception {
+        MemoryService svc = mock(MemoryService.class);
+        MemoryController c = new MemoryController(svc);
+
+        // 「has(intensity)==false」与「has 但不是数字」走不同短路，结果必须同为 0.5
+        assertEquals(200, c.addEmotion("{\"sessionId\":\"s1\",\"emotion\":\"joy\"}").getStatusCode().value());
+        verify(svc).addEmotion("s1", "joy", 0.5, null, null);
+
+        ChatMessage stale = new ChatMessage();
+        stale.setId(11L);
+        stale.setRole("user");
+        stale.setContent("你好");
+        when(svc.messages("s9", 40)).thenReturn(List.of(stale));
+        JsonNode list = M.readTree(text(c.messages("s9", 40)));
+        assertTrue(list.get(0).has("createdAt"), "字段必须在，否则前端时间线读成 undefined");
+        assertTrue(list.get(0).path("createdAt").isNull(), "落库时间缺失时不得伪造当前时间");
+    }
+
+    @Test
+    @DisplayName("r83 不可达腿留证：readTree 对空串/空白只给 MissingNode，永不返回 null")
+    void parseNeverReturnsJavaNullSoThatSideIsUnreachable() throws Exception {
+        // MemoryController.parse / ChatController / EmotionController 三处都有 `node == null` 这一侧，
+        // jacoco 常年报它 missed。这里把「为什么不可达」钉成用例而不是散文：
+        // 只要 Jackson 哪天让 readTree 真返回 null，这条先红，三处的「不可达」归类随即失效。
+        assertNotNull(M.readTree(""),
+                "空串必须是 MissingNode（非 null），否则三处控制器的 null 侧不再是死代码");
+        assertNotNull(M.readTree("   "));
+        assertFalse(M.readTree("").isObject(), "非对象侧仍然可达，缺省判断才有意义");
+        assertTrue(M.readTree("{}").isObject());
     }
 }

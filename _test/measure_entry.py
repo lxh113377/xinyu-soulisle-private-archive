@@ -19,6 +19,9 @@ r81 那轮开局直接调 `_test/benchmark_metrics.py` 取 peers 七维读数，
    这一层是分叉点：只看第 1 步会写出「去修它」，而正确处置可能是「去找持有在途 hunk 的那一路」。
 3. **口径面**：跑本仓既有的全量尺体检 `repo_config_check.py`（G9 import-safe + 解析得动），
    它的 rc 原样并进来 —— 不另写一套「什么算好尺」的标准（derive, not duplicate）。
+4. **管道吞 rc 面**（r83 加）：扫全部已跟踪 `*.sh`，凡「命令替换里接了管道、随后又用 `$?` 取退出码」
+   即判红 —— 那个 `rc` 是管道末端的，不是命令的。立此腿的代价：同一形制在本仓第三次复发，
+   一次让 25 次远端删除失败全部隐形（`out=$(cmd 2>&1 | tail -1); rc=$?`）。
 
 三态
 ------------------------------------------------
@@ -35,6 +38,7 @@ r81 那轮开局直接调 `_test/benchmark_metrics.py` 取 peers 七维读数，
 from __future__ import annotations
 
 import ast
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -42,6 +46,35 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ROOT = Path(__file__).resolve().parents[1]
 FULL_FACE = "_test/repo_config_check.py"
+
+# 形如 `out=$(cmd | tail -1)` 的命令替换赋值：括号内允许一层嵌套括号，够用且不吞分号
+CAP_ASSIGN = re.compile(r"\w+=\$\((?:[^()]|\([^()]*\))*\)")
+
+
+def pipe_rc_defects(text):
+    """纯函数：找出「命令替换里接了管道，随后又用 `$?` 取退出码」的行。
+
+    为什么算取数入口的前置缺陷：`out=$(cmd 2>&1 | tail -1); rc=$?` 里的 `rc` 是 **tail** 的，
+    命令本身的退出码死在管道里 ⇒ 25 次远端删除全部失败而账面报「0 失败」（r83 本仓第三次同族复发）。
+    返回 [(行号, 原文片段)]；单行形与跨行形（下一行才是 `rc=$?`）都算。
+    """
+    hits = []
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        m = CAP_ASSIGN.search(ln)
+        if not m or "|" not in m.group(0):
+            continue
+        if "$?" in ln or (i + 1 < len(lines) and "$?" in lines[i + 1]):
+            hits.append((i + 1, ln.strip()[:90]))
+    return hits
+
+
+def shell_faces():
+    """取数面 = 已跟踪的 `*.sh`（分母由 git 现读，不手抄名单）；取不到给 (None, 原因)。"""
+    r = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--", "*.sh"], capture_output=True)
+    if r.returncode != 0:
+        return None, "git ls-files rc=%d" % r.returncode
+    return sorted(p for p in r.stdout.decode("utf-8", "replace").split("\0") if p), None
 
 
 def default_faces():
@@ -128,7 +161,27 @@ def run_face(paths, with_full=True):
                                      encoding="utf-8", errors="replace", timeout=300).returncode
         except Exception as exc:
             unver.append("全量体检不可调用（%s）⇒ 口径面未验" % type(exc).__name__)
-    return bad, unver, rows, full_rc
+    # 第 4 步（r83）：管道吞 rc 静态腿 —— 退出码一旦经过管道就不是命令自己的。
+    # 立此腿的一手代价见 交付物/对标分析报告-2026-09-30-r83.md §2 G7。
+    shs, sh_err = shell_faces()
+    shell_stat = "未验"
+    if sh_err:
+        unver.append("管道吞rc 腿取数面失明（%s）⇒ 不得读成「没有这种写法」" % sh_err)
+    elif not shs:
+        unver.append("管道吞rc 腿取到 0 个 .sh ⇒ 零输入不判绿")
+    else:
+        n_hit = 0
+        for rel in shs:
+            try:
+                body = (ROOT / rel).read_text(encoding="utf-8", errors="replace")
+            except Exception as exc:
+                unver.append("%s 读不到（%s）⇒ 该件未验" % (rel, type(exc).__name__))
+                continue
+            for ln, snip in pipe_rc_defects(body):
+                n_hit += 1
+                bad.append("%s:%d 退出码死在管道里（`rc=$?` 取到的是管道末端的）：%s" % (rel, ln, snip))
+        shell_stat = "扫 %d 件命中 %d" % (len(shs), n_hit)
+    return bad, unver, rows, full_rc, shell_stat
 
 
 def selftest():
@@ -153,12 +206,23 @@ def selftest():
     ck("④新文件且坏 ⇒ 提交前必须修 %s" % st3, st3 == "broken-new-file")
     ck("⑤r81 原形必须被 parse_error 点名行号", parse_error(missing_op).startswith("1:"))
     ck("⑥正例不得被误报", parse_error(good) is None)
+    # r83 第 4 步的腿：管道吞 rc 静态判据（正例 + 本轮真形 + 跨行形 + 零输入不判绿）
+    clean_sh = "set -e\nOUT=$(git status --porcelain)\nrc=$?\necho \"$OUT rc=$rc\"\n"
+    ck("⑧合规脚本不得误报（`$()` 里没有管道）", pipe_rc_defects(clean_sh) == [])
+    real_sh = 'out=$(tcb hosting delete "$k" 2>&1 | tail -1); rc=$?\nif [ $rc -ne 0 ]; then :; fi\n'
+    hits = pipe_rc_defects(real_sh)
+    ck("⑨本轮真形必须被点名（含行号）%s" % hits, len(hits) == 1 and hits[0][0] == 1)
+    ck("⑩跨行形也要抓到", len(pipe_rc_defects("o=$(a | b)\nrc=$?\n")) == 1)
+    ck("⑪有管道但不取 `$?` 不算（它没在拿退出码下结论）",
+       pipe_rc_defects("n=$(git ls-files | wc -l)\necho $n\n") == [])
     # 真面自证：默认清单里的每一件此刻必须解析得动（否则这条判据自己是坏的尺）
-    real_bad, real_unver, _rows, _rc = run_face(default_faces(), with_full=False)
-    ck("⑦真面默认清单全绿（坏 %d｜未验 %d）" % (len(real_bad), len(real_unver)),
+    real = run_face(default_faces(), with_full=False)
+    ck("⑫run_face 的返回元数变了就必须同步改调用点（r82 A9 同族）", len(real) == 5)
+    real_bad, real_unver, _rows, _rc, _stat = real
+    ck("⑬真面默认清单全绿（坏 %d｜未验 %d）" % (len(real_bad), len(real_unver)),
        not real_bad and not real_unver)
-    print("MEASURE-ENTRY-SELFTEST-%s（6 类文本桩 + 1 条真面自证）"
-          % ("PASS" if not fails else "FAIL: " + "; ".join(fails)))
+    print("MEASURE-ENTRY-SELFTEST-%s（10 类文本桩 + 1 条元数钉 + 1 条真面自证｜管道腿=%s）"
+          % ("PASS" if not fails else "FAIL: " + "; ".join(fails), _stat))
     return 1 if fails else 0
 
 
@@ -166,15 +230,15 @@ def main(argv):
     if "--selftest" in argv:
         return selftest()
     paths = [a for a in argv if not a.startswith("-")] or default_faces()
-    bad, unver, rows, full_rc = run_face(paths)
+    bad, unver, rows, full_rc, shell_stat = run_face(paths)
     for r in rows:
         print(r)
     for b in bad:
         print("  ✗ " + b)
     for u in unver:
         print("  ? " + u)
-    tail = "点名 %d 件｜解析坏 %d｜归属失明 %d｜全量体检 rc=%s" % (
-        len(paths), len(bad), len(unver), "未跑" if full_rc is None else full_rc)
+    tail = "点名 %d 件｜解析坏 %d｜归属失明 %d｜管道吞rc %s｜全量体检 rc=%s" % (
+        len(paths), len(bad), len(unver), shell_stat, "未跑" if full_rc is None else full_rc)
     if bad or (full_rc not in (None, 0)):
         print("MEASURE-ENTRY-FAIL: 尺没验过，禁止拿它的读数下结论（%s）" % tail)
         return 1

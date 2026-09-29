@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 103,
+ "suites": 105,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
@@ -49,7 +49,7 @@
    ]
   },
   "free": {
-   "n": 64,
+   "n": 66,
    "seconds": 164.1,
    "members": [
     "disclaimer_forensics",
@@ -115,7 +115,9 @@
     "api_egress_headers",
     "api_egress_headers_selftest",
     "js_syntax",
-    "js_syntax_selftest"
+    "js_syntax_selftest",
+    "hook_wiring",
+    "hook_wiring_selftest"
    ]
   },
   "jar8123+port:18123": {
@@ -1134,6 +1136,20 @@
     "jar8123",
     "port:18123"
    ]
+  },
+  {
+   "suite": "hook_wiring",
+   "target": "_test/hook_wiring_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "hook_wiring_selftest",
+   "target": "_test/hook_wiring_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
   }
  ]
 }
