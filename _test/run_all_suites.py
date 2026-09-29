@@ -20,6 +20,10 @@ VERDICT_RE = re.compile(r"(?:PASS|FAIL|CLEAN|UNVERIFIED|OK)\b")
 # 并发锁 TTL（秒）：整跑一遍实测约 10 分钟，留 3 倍余量；被 kill 掉的运行靠它自愈。
 LOCK_TTL = 1800
 
+# r70：每套件耗时的**全量**台账。动因是 r69 自己踩的形状 —— 它记了耗时却只把 top5 印到收口行，
+# 一轮结束就只剩"mobile=123.5 / 合计 549s"两个数，「该按什么分桶并行」这个问题依旧没有读数。
+TIMING_LEDGER = ROOT / "交付物" / "对标数据" / "battery-timing.json"
+
 SUITES = [
     # 前置探针放第一条：r35 实测 jar 中途掉线一次报 5 条红，逐条归因花了三轮命令。
     ("preflight", [sys.executable, "_test/server_preflight.py"]),
@@ -187,6 +191,11 @@ SUITES = [
     ("js_syntax_selftest", [sys.executable, "_test/js_syntax_check.py", "--selftest"]),
     ("storage_resilience", [sys.executable, "_test/storage_resilience_check.py"]),
     ("storage_resilience_selftest", [sys.executable, "_test/storage_resilience_check.py", "--selftest"]),
+    # r70 资源普查：把"该按什么分桶并行"从报告里的一句话变成有分母有恒等式的在册读数。
+    # 分类按目标脚本**源码证据**判（碰 8123 / 自绑端口 / 起浏览器 / 出公网），不维护名字登记表，
+    # 否则新加一条套件忘了登记就会被判成"可并行"——那比没有普查更坏。
+    ("suite_census", [sys.executable, "_test/suite_resource_census.py"]),
+    ("suite_census_selftest", [sys.executable, "_test/suite_resource_census.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），
@@ -366,6 +375,66 @@ def quota_selftest():
     return 1 if bad else 0
 
 
+def ledger_should_write(n_suites, total_suites, rc_hist):
+    """纯函数：这一次运行有没有资格改写耗时台账。返回 (写?, 覆盖率标签, 原因)。
+
+    只有**跑满了 SUITES** 的运行才算全量读数。`--only`／`--slice` 跑出来的子集若也落盘，
+    下一轮就会拿"3 条的分布"当 99 条的现状做并行决策 —— 那正是 r69 要治的错（读数缺失）
+    的反面：读数存在但**是子集冒充全量**，比缺失更坏。
+    rc_hist 里没有 -1 之外的含义：本函数只看条数，不看红绿（红运行的耗时照样是真耗时）。
+    """
+    if total_suites <= 0:
+        return False, "none", "零套件 ⇒ 无分母，不写台账"
+    if n_suites < total_suites:
+        return False, "subset", "实跑 %d/%d ⇒ 子集读数不得覆盖全量台账（会被下一轮当成现状）" % (n_suites, total_suites)
+    return True, "full", "实跑==总数 ⇒ 全量分布"
+
+
+def timing_selftest():
+    """台账写入门的双向自证：全量必须写、子集/零分母绝不写。"""
+    cases = [
+        ("正例 全量运行该写", ledger_should_write(99, 99, 0)[0], True),
+        ("反例 --only 子集不该写", ledger_should_write(3, 99, 0)[0], False),
+        ("反例 slice 子集不该写", ledger_should_write(98, 99, 0)[0], False),
+        ("边界 零分母不该写", ledger_should_write(0, 0, 0)[0], False),
+        ("边界 覆盖率标签须与判定同向",
+         all((ledger_should_write(a, b, 0)[1] == "full") == (a >= b and b > 0) for a, b in
+             [(99, 99), (3, 99), (0, 0), (95, 95)]), True),
+    ]
+    bad = ["%s got=%r want=%r" % (n, g, w) for n, g, w in cases if g != w]
+    print("TIMING-SELFTEST-%s（%d/%d 类桩）"
+          % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(cases) - len(bad), len(cases)))
+    return 1 if bad else 0
+
+
+def write_timing_ledger(times, results, coverage):
+    """把本轮**全量**耗时分布落盘并按字节自证读回（r66 立的规矩：写了不算，要证明是这个字节）。
+
+    为什么带 rc：只有耗时没有红绿的台账会被下一轮读成"这些套件都是绿的、花这么多时间"，
+    而红套件（尤其长期挂红的 ci_status/live_sync）的时间是**白花的时间**，必须能区分。
+    """
+    import hashlib
+    import json
+    from datetime import datetime
+    payload = {"generated_by": "_test/run_all_suites.py",
+               "written_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+               "coverage": coverage, "suites": len(times),
+               "total_s": round(sum(times.values()), 1),
+               "rows": [{"suite": n, "seconds": times[n], "rc": rc} for n, rc, _ in results]}
+    blob = json.dumps(payload, ensure_ascii=False, indent=1).encode("utf-8")
+    TIMING_LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    tmp = TIMING_LEDGER.with_suffix(".json.tmp")
+    # write_bytes：文本模式在 Windows 会把 \n 翻成 \r\n，带 CRLF 的台账别人 clone 上复算不出 SHA
+    tmp.write_bytes(blob)
+    os.replace(tmp, TIMING_LEDGER)
+    back = TIMING_LEDGER.read_bytes()
+    if back != blob:
+        return "LEDGER-FAIL: 台账读回字节与写入不一致（被别的运行改了？）"
+    return "LEDGER-OK %s ｜ 台账 %s ｜ 指纹 sha256=%s bytes=%d" % (
+        coverage, TIMING_LEDGER.relative_to(ROOT).as_posix(),
+        hashlib.sha256(back).hexdigest()[:16], len(back))
+
+
 def acquire_lock():
     """整跑电池不是可重入的：两条链同时打同一个 jar + 同一个上游会互相踩出假红
     （r41 实测两次：`emotion_wiring` 与 `live_sync` 在并发窗口里判红，单独复跑均 PASS）。
@@ -391,6 +460,7 @@ def acquire_lock():
 def main():
     global SUITES
     argv = sys.argv[1:]
+    total_suites = len(SUITES)   # r70：过滤前的分母，台账靠它区分"全量分布"与"子集冒充全量"
     if "--help" in argv or "-h" in argv:
         print(USAGE)
         return 0
@@ -405,10 +475,12 @@ def main():
         rc1 = lock_selftest()
         rc2 = fold_selftest()
         rc3 = quota_selftest()
-        print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s ＋ 计费分档 %s）"
-              % ("PASS" if not (rc1 | rc2 | rc3) else "FAIL", "ok" if not rc1 else "红",
-                 "ok" if not rc2 else "红", "ok" if not rc3 else "红"))
-        return 1 if (rc1 | rc2 | rc3) else 0
+        rc4 = timing_selftest()
+        print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s ＋ 计费分档 %s ＋ 台账写入 %s）"
+              % ("PASS" if not (rc1 | rc2 | rc3 | rc4) else "FAIL",
+                 "ok" if not rc1 else "红", "ok" if not rc2 else "红",
+                 "ok" if not rc3 else "红", "ok" if not rc4 else "红"))
+        return 1 if (rc1 | rc2 | rc3 | rc4) else 0
     if "--list" in argv:
         print("SUITES:", len(SUITES))
         return 0
@@ -503,9 +575,12 @@ def main():
                      + ",".join(quota))
     tail_msg = "ALL-GREEN" if not parts else "  |  ".join(parts)
     print("=" * 60)
+    ok, coverage, why = ledger_should_write(len(SUITES), total_suites, 0)
+    ledger_line = write_timing_ledger(times, results, coverage) if ok else "LEDGER-SKIP: " + why
+    print(ledger_line)
     top = sorted(times.items(), key=lambda kv: -kv[1])[:5]
-    print("耗时 top5(秒): %s ｜ 合计 %.0fs ⇒ 并行方案只能在这个读数存在之后才提"
-          % (", ".join("%s=%s" % (k, v) for k, v in top), sum(times.values())))
+    print("耗时 top5(秒): %s ｜ 合计 %.0fs ｜ 全量分布在台账里（%d 条，并行方案只能在这个读数存在之后才提）"
+          % (", ".join("%s=%s" % (k, v) for k, v in top), sum(times.values()), len(times)))
     # rc 必须由真退出码算出来再印：**本行此前长期硬印 `rc=0`**（r74 两面实测：本地整跑 rc=1、
     # 同 SHA 的 CI job 也判 failure，而摘要行照旧印 "rc=0"）——这条摘要是人和机器共同的收口读数，
     # 印错等于伪造回执（台账里"94/98 rc=0"那类句子全部来自它）。

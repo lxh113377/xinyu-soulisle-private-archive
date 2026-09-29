@@ -9,6 +9,41 @@
  本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
  而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
 
+### Added（r80 · 一键点亮默认打开 + 团队五人署进方案封面）
+- **默认打开（老大 2026-09-29 指令，裁决=每次加载都播）**：`src/js/app.js` boot 末 `replayStars()` 之后自动播一次
+  「清屏→六色逐颗点亮」。与手动演示态两处刻意差异：**不加 `body.showtime`**（叙事与对话坞全程可点 —— 开场若遮 UI，
+  评委一进来就落在一个不可交互的页面上）、**播完自动回到「我的记忆」**。手动那条路（AC-OBS-04 的 ①-⑦，含"播完不自动跳回"）
+  行为逐字未变，两路各自独立断言 ⇒ 立 **AC-OBS-24**（不能用 AC-OBS-13：13-19 每个早挂两条命题，G15 基线只放行 7 条重复）。
+- **取样同步点 `window.__XINYU__.opening`（playing→lit→done）**：动因是既有 4 个套件在 reload 后 700-1500ms 就按像素/星数取样，
+  会采到演示星 ⇒ 一律改成等被等对象的完成态；`pixel_dual_check.py` 跑在 `page.clock` 假时钟下（定时器不会自己走完），
+  改用 `clock.run_for(7000)` 拨过整段开场并当场断言 `done`。
+- **`prefers-reduced-motion: reduce` 下不自动播**（一手代价）：未加这道门时 `a11y_check.py` A5b 判红
+  （正常 0.6365 / reduce 0.50687 ⇒ 比值 0.796 ≈ 没降档），同一条判据在无此功能的 HEAD 的 CI 上是「动效降档=0.0倍」PASS
+  ⇒ 红因归本方，不是既存。加门后 reduce 态读数 0.000 回绿；手动点 ✨ 是用户主动发起，不受此门限制。
+- **牙**：注释掉自动播放那一行 ⇒ `lightshow rc=1`，红因点名「开场自动播放没有进入 'lit' 态」；按字节还原
+  （sha256 前缀 `2ba761a5c20a147a` 前后相同）⇒ `rc=0 LIGHTSHOW-CHECK-PASS`。
+- **团队名单**：老大给定官网顺序 伍昊宇(队长)/姜智文/江文斌/叶书阳/吴涵 署进 `application-plan.html` 封面并重渲染 PDF
+  （20 页 ≤20、`PLAN-PDF-COVERAGE-PASS 9/9`、`PDF-LEAK-CLEAN` 五类零命中）；09-24 旧序以覆盖注记留痕。
+  「指导教师」仍留白，五人学号/手机号/邮箱仍缺 ⇒ 官网报名这一项**只有老大能给**。
+- **代价（如实记，不折叠）**：每次加载新建 1080 个 `setTimeout`，低端机首屏 5s 内的负载**本轮未量化**；
+  `src/js/app.js` 15,418→17,036B —— 先把注释 10 行压到 3 行、并去掉「hydrate 排队」那套 queue/flush（初版实测 18,484B），
+  再按 r32/r51 既有口径登记「实测+5%」；评估过 r45 式外提成独立 js（只在脑内比过方案，没落文件），判定不取：
+  拆文件要在 `index.html` 与 `sw.js` 各加一条首屏请求，本判据守的正是首屏字节与请求数。TOTAL 复核 847,896 仍在 858,752 限内。
+
+### Fixed（r80 · 代 r70 修好「接线从没被跑过」的台账写入器 + 两处语法手误）
+- `_test/run_all_suites.py:423`：`write_timing_ledger` 把 `results` 按 **2 元组**解包，而 `:550` 装进去的是
+  `(name, rc, blurb)` **3 元组** ⇒ **每次全量整跑都在收口行之前崩**（`ValueError: too many values to unpack`）：
+  耗时台账写不出，`BATTERY:` 那行也一并没了。他们新加的 `battery_lock_selftest` 只测纯函数 `ledger_should_write`，
+  **从没调用过 `write_timing_ledger`** ⇒ 自测全绿而接线是断的（同族：「验证必须覆盖接线而不只是函数」）。
+  对照两侧都留了：修前整跑 traceback 停在 `:579`；修后整跑 **94/101** 且印
+  `LEDGER-OK full ｜ 台账 交付物/对标数据/battery-timing.json ｜ 指纹 sha256=659cbfd61d12ecc1 bytes=7447`。
+- `_test/benchmark_metrics.py`：两处让**整文件 SyntaxError** 的手误 —— `:1074` 少一个 `=`（r81 段落里已登记为"他方在途"）、
+  `:1081` f-string 里嵌了未转义的 ASCII 双引号。修后 `benchmark_selftest rc=0`（r30-r78 全腿）＋`repo_config rc=0`（16 项含 G9）。
+- **同批一并入库的 r70 在途件**：README 与 `docs/quality-gates.md` 的 99→101 套件、`_test/suite_resource_census.py` +
+  普查台账 json、耗时台账件、`07` 卷86。依据 = `repo_config` G2/G4/G14 当场等值对账 PASS + `CENSUS-PASS 证据面 101/101`。
+  **没带**的两件：`wflow.toml`（他方工具的配置，本仓无判据认它，且 3f4eca5/fbf86dd 两轮已立「不代迁他方在途件」）、
+  `心屿MindIsle_参赛方案.pptx`（品牌分叉未裁决，`deliverable_inventory_check` 明写"入库即拦"）。
+
 ### Added（r81 · 补上「本地看不见的那类破坏」：标记层内联样式守卫 + 接线；并代 r79 补记台账）
 - **新判据 `_test/inline_style_check.py`（13 条夹具腿 + 端到端演习）**：扫 `src/index.html`、`src/js/*.js`
   与 `deploy/xinyu/` 同两面，四类写法各一条反例（模板串 `style="…"` / HTML `style="…"` / `<style>` 元素 /

@@ -1,0 +1,514 @@
+{
+ "generated_by": "_test/run_all_suites.py",
+ "written_at": "2026-09-29 14:35:44",
+ "coverage": "full",
+ "suites": 101,
+ "total_s": 695.4,
+ "rows": [
+  {
+   "suite": "preflight",
+   "seconds": 0.2,
+   "rc": 0
+  },
+  {
+   "suite": "perf_baseline",
+   "seconds": 1.3,
+   "rc": 0
+  },
+  {
+   "suite": "perf_baseline_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "disclaimer_forensics",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "disclaimer_forensics_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "ci_watch_selftest",
+   "seconds": 0.0,
+   "rc": 0
+  },
+  {
+   "suite": "battery_lock_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "plan_pdf_coverage",
+   "seconds": 0.5,
+   "rc": 0
+  },
+  {
+   "suite": "plan_pdf_coverage_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "deploy_sync",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "eol_parity",
+   "seconds": 21.1,
+   "rc": 1
+  },
+  {
+   "suite": "eol_parity_selftest",
+   "seconds": 0.0,
+   "rc": 0
+  },
+  {
+   "suite": "size_budget",
+   "seconds": 0.0,
+   "rc": 0
+  },
+  {
+   "suite": "size_budget_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "emotion_wiring",
+   "seconds": 4.1,
+   "rc": 0
+  },
+  {
+   "suite": "emotion_wiring_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "vendor_freshness",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "vendor_freshness_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "benchmark_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "testasset_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "a11y_probe_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "repro_probe_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "api_contract",
+   "seconds": 0.3,
+   "rc": 0
+  },
+  {
+   "suite": "api_contract_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "patch_apply_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "settings_panel",
+   "seconds": 1.7,
+   "rc": 0
+  },
+  {
+   "suite": "settings_panel_selftest",
+   "seconds": 6.5,
+   "rc": 0
+  },
+  {
+   "suite": "offline_shell",
+   "seconds": 13.3,
+   "rc": 0
+  },
+  {
+   "suite": "offline_shell_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "pdf_leak_scan",
+   "seconds": 1.6,
+   "rc": 0
+  },
+  {
+   "suite": "pdf_leak_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "tracked_secret",
+   "seconds": 0.6,
+   "rc": 0
+  },
+  {
+   "suite": "tracked_secret_selftest",
+   "seconds": 0.0,
+   "rc": 0
+  },
+  {
+   "suite": "remote_tree",
+   "seconds": 7.2,
+   "rc": 0
+  },
+  {
+   "suite": "remote_tree_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "ci_status",
+   "seconds": 26.5,
+   "rc": 1
+  },
+  {
+   "suite": "ci_status_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "repo_config",
+   "seconds": 0.8,
+   "rc": 0
+  },
+  {
+   "suite": "repo_config_selftest",
+   "seconds": 0.4,
+   "rc": 0
+  },
+  {
+   "suite": "engine_consistency",
+   "seconds": 0.3,
+   "rc": 0
+  },
+  {
+   "suite": "java_test_guard",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "java_test_guard_selftest",
+   "seconds": 0.3,
+   "rc": 0
+  },
+  {
+   "suite": "strategy",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "strategy_selftest",
+   "seconds": 0.0,
+   "rc": 0
+  },
+  {
+   "suite": "ux_guards",
+   "seconds": 27.5,
+   "rc": 0
+  },
+  {
+   "suite": "a11y",
+   "seconds": 38.9,
+   "rc": 0
+  },
+  {
+   "suite": "a11y_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "data_rights",
+   "seconds": 6.7,
+   "rc": 0
+  },
+  {
+   "suite": "data_rights_selftest",
+   "seconds": 0.0,
+   "rc": 0
+  },
+  {
+   "suite": "data_rights_probe_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "mobile",
+   "seconds": 124.1,
+   "rc": 0
+  },
+  {
+   "suite": "mobile_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "mobile_peer_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "community_probe_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "fault_injection",
+   "seconds": 64.6,
+   "rc": 0
+  },
+  {
+   "suite": "fault_injection_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "fault_peer_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "memory_recall",
+   "seconds": 12.0,
+   "rc": 0
+  },
+  {
+   "suite": "memory_recall_selftest",
+   "seconds": 0.0,
+   "rc": 0
+  },
+  {
+   "suite": "memory_peer_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "readme_troubleshooting",
+   "seconds": 0.0,
+   "rc": 0
+  },
+  {
+   "suite": "readme_troubleshooting_selftest",
+   "seconds": 0.0,
+   "rc": 0
+  },
+  {
+   "suite": "context_budget",
+   "seconds": 8.3,
+   "rc": 0
+  },
+  {
+   "suite": "context_budget_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "headers_csp",
+   "seconds": 5.2,
+   "rc": 0
+  },
+  {
+   "suite": "headers_csp_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "sec_headers_peer_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "release_probe_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "license_probe_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "release_governance",
+   "seconds": 0.2,
+   "rc": 1
+  },
+  {
+   "suite": "release_governance_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "clean_clone",
+   "seconds": 11.1,
+   "rc": 0
+  },
+  {
+   "suite": "clean_clone_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "j2_chat_contract",
+   "seconds": 24.8,
+   "rc": 0
+  },
+  {
+   "suite": "j4_memory",
+   "seconds": 39.7,
+   "rc": 0
+  },
+  {
+   "suite": "j4_remote_down",
+   "seconds": 13.4,
+   "rc": 0
+  },
+  {
+   "suite": "stream_contract",
+   "seconds": 0.1,
+   "rc": 1
+  },
+  {
+   "suite": "safety_guard",
+   "seconds": 0.3,
+   "rc": 0
+  },
+  {
+   "suite": "safety_guard_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "voice",
+   "seconds": 4.7,
+   "rc": 0
+  },
+  {
+   "suite": "voice_selftest",
+   "seconds": 0.2,
+   "rc": 0
+  },
+  {
+   "suite": "browser_check",
+   "seconds": 32.2,
+   "rc": 0
+  },
+  {
+   "suite": "pixel_dual",
+   "seconds": 60.1,
+   "rc": 0
+  },
+  {
+   "suite": "lightshow",
+   "seconds": 18.8,
+   "rc": 0
+  },
+  {
+   "suite": "online_check",
+   "seconds": 4.6,
+   "rc": 1
+  },
+  {
+   "suite": "public_check",
+   "seconds": 36.9,
+   "rc": 1
+  },
+  {
+   "suite": "live_sync",
+   "seconds": 27.3,
+   "rc": 1
+  },
+  {
+   "suite": "emotion_eval_js",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "js_unit",
+   "seconds": 0.2,
+   "rc": 0
+  },
+  {
+   "suite": "js_unit_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "quality_peer_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "deliverable_inventory",
+   "seconds": 0.7,
+   "rc": 0
+  },
+  {
+   "suite": "deliverable_inventory_selftest",
+   "seconds": 0.3,
+   "rc": 0
+  },
+  {
+   "suite": "api_egress_headers",
+   "seconds": 0.2,
+   "rc": 0
+  },
+  {
+   "suite": "api_egress_headers_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "js_syntax",
+   "seconds": 1.2,
+   "rc": 0
+  },
+  {
+   "suite": "js_syntax_selftest",
+   "seconds": 0.3,
+   "rc": 0
+  },
+  {
+   "suite": "storage_resilience",
+   "seconds": 38.6,
+   "rc": 0
+  },
+  {
+   "suite": "storage_resilience_selftest",
+   "seconds": 1.0,
+   "rc": 0
+  },
+  {
+   "suite": "suite_census",
+   "seconds": 0.2,
+   "rc": 0
+  },
+  {
+   "suite": "suite_census_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  }
+ ]
+}

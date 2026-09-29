@@ -886,12 +886,52 @@ def self_metrics():
             "battery_parse_error": battery_err or None}
 
 
+TREE_FIELDS = ("caps", "docs")
+BLIND_SEP = "#"
+
+
+def split_field(field):
+    """`caps#本轮树取数失败` → `("caps", "本轮树取数失败")`；无标记 → `(field, None)`。"""
+    if BLIND_SEP in field:
+        k, reason = field.split(BLIND_SEP, 1)
+        return k, reason
+    return field, None
+
+
+def tree_blind_reason(row):
+    """这一行的**树派生读数**（caps/docs/file_count）有没有取到。
+
+    判据只认取数状态，不认"清单为空"——树真取到了、里面真没匹配文件，那是对手的实况，
+    必须留在「实质」档（否则这把尺从此看不见任何能力退化）。
+    `file_count` 用 `in row` 而非 `.get()`：历史快照与 selftest 合成行没这个键，
+    按 `.get()` 判会让所有旧行都变成"瞎"，把实质差整批吞进盲区档。
+    """
+    if row.get("tree_error"):
+        return "树取数失败"
+    if row.get("tree_truncated"):
+        return "树截断"
+    if "file_count" in row and row["file_count"] is None:
+        return "树读数缺失"
+    return None
+
+
 def diff_snap(prev_repos, cur_repos,
               keys=("stars", "pushed_at", "latest_release", "ci_workflows", "caps", "docs")):
     """逐仓逐字段差值。返回 [(repo, field, old, new)]；全等快照必须返回空列表。
 
     r21 补：`caps` / `docs` 也纳入比对。根因是本轮第二次采集实测抓到 sapphire 的 `container`
     能力**从清单里消失却零漂移报告** —— 只比 4 个数字字段的"漂移守卫"对能力矩阵变化是瞎的。
+
+    r79-D 补「取数失败差」：字段名带 `#原因` ⇔ 这一格的变化来自**我这把尺瞎**，不是对手动了。
+    一手代价：14/16 降级采集报出 `▶ 实质 morettt/my-neuro caps: ['i18n_locale','vector_memory'] -> []`
+    —— 读起来像"对手把记忆能力删了"，实际是那 2 仓之一的 git 树没取到，`probe_repo` 的
+    `except` 支把 caps/docs 置了空。三类字段的取数失败形态不同，规则也不同：
+      · `caps`/`docs` —— 看**该侧行**的树状态（tree_error / tree_truncated / file_count is None）；
+      · `ci_workflows` —— probe_repo 里唯一带 try/except 的字段，None ⟺ 那次调用失败
+        （零工作流的仓回 `total_count=0`），所以**两个方向**都算取数失败；
+      · `stars`/`pushed_at`/`latest_release` —— 取数失败会让整行缺席（`gh()` 直接抛 → hard_fail），
+        能出现在这里的都是真差，`latest_release None -> v2` 是真发了一版，不得并入本档。
+    元组长度保持 4：下游按 4 值解包的点很多，加一位要么当场崩、要么静默错位。
     """
     drift = []
     prev = {r["repo"]: r for r in prev_repos}
@@ -900,14 +940,24 @@ def diff_snap(prev_repos, cur_repos,
         if not old:
             drift.append((cur["repo"], "repo_added", None, cur.get("stars")))
             continue
+        cur_blind = tree_blind_reason(cur)
+        prev_blind = tree_blind_reason(old)
         for k in keys:
-            if old.get(k) != cur.get(k):
-                drift.append((cur["repo"], k, old.get(k), cur.get(k)))
+            o, n = old.get(k), cur.get(k)
+            if o == n:
+                continue
+            if k in TREE_FIELDS and cur_blind:
+                k = f"{k}{BLIND_SEP}本轮{cur_blind}：空清单是没看到，不是对手删了"
+            elif k in TREE_FIELDS and prev_blind:
+                k = f"{k}{BLIND_SEP}基线{prev_blind}：本轮补上，不是对手新增"
+            elif k == "ci_workflows" and (o is None or n is None):
+                k = f"{k}{BLIND_SEP}工作流清单没取到（None=调用失败，不是没有 CI）"
+            drift.append((cur["repo"], k, o, n))
     return drift
 
 
 def classify_drift(drift):
-    """把漂移分成「实质 / 抖动 / 补录」三档 ⇒ (substantive, noise, roster)。
+    """把漂移分成「实质 / 抖动 / 补录 / 取数失败」四档 ⇒ (substantive, noise, roster, blind)。
 
     r26 加：本轮 6 处漂移里 4 处是 ★ 数 ±1（含 lobehub 82,808→82,807 的**倒退**，
     平台清虚假账号所致），单点 star 差值不构成趋势证据；若与"对手发布 v2.5.0→v2.13.1"
@@ -919,11 +969,21 @@ def classify_drift(drift):
     但它已经把残缺快照**覆写进台账**，下一次采集于是报出 5 处「实质（可行动）」
     （opensoul/succhia/ryza/MoodChat 全是 `None -> 值`）。把"我补齐了覆盖"记成
     "对手发生了变化"，会把人支去做一件不存在的动作。
+
+    r79-D 加第四档：与补录档同一族、粒度不同——补录是**整仓**上轮没数到，本档是**单字段**
+    这轮或上轮没数到（见 diff_snap 的标记规则）。两档都不许进「实质」，共同的判据是一句话：
+    **「实质」= 对手动了；这三档 = 我的尺动了。** 四档求和必须等于总漂移，
+    由调用处断言（分档器悄悄吞一格，比误分更坏——它会让你以为世界很安静）。
     """
-    roster = [d for d in drift if d[1] == "repo_added"]
-    sub = [d for d in drift if d[1] not in ("stars", "repo_added")]
-    noise = [d for d in drift if d[1] == "stars"]
-    return sub, noise, roster
+    def key_of(d):
+        return split_field(d[1])[0]
+
+    blind = [d for d in drift if BLIND_SEP in d[1]]
+    named = [d for d in drift if BLIND_SEP not in d[1]]
+    roster = [d for d in named if key_of(d) == "repo_added"]
+    noise = [d for d in named if key_of(d) == "stars"]
+    sub = [d for d in named if key_of(d) not in ("stars", "repo_added")]
+    return sub, noise, roster, blind
 
 
 def pick_snapshot_path(path, fetched, expected):
@@ -979,27 +1039,80 @@ def selftest():
         print(f"SELFTEST-FAIL: 期望抓到 {sorted(want)}，实际 {[(g[0], g[1]) for g in got]}")
         return 1
     # 分档判据（r26）：两侧都要验，否则"分类器"只是把漂移换个名字再报一遍
-    sub, noise, roster = classify_drift(got)
+    sub, noise, roster, blind = classify_drift(got)
     if [(s[0], s[1]) for s in noise] != [("lobehub/lobehub", "stars")]:
         print(f"SELFTEST-FAIL: 抖动档应只有 stars，实际 {[(n[0], n[1]) for n in noise]}")
         return 1
     if len(sub) != 3 or any(s[1] == "stars" for s in sub):
         print(f"SELFTEST-FAIL: 实质档应含 pushed_at/caps/docs 三条且不含 stars，实际 {[(s[0], s[1]) for s in sub]}")
         return 1
-    if roster:
-        print(f"SELFTEST-FAIL: 基线未缺仓却判出补录档（判据过敏）：{roster}")
+    if roster or blind:
+        print(f"SELFTEST-FAIL: 基线未缺仓、树也取到了，却判出补录/取数失败档（判据过敏）："
+              f"roster={roster} blind={blind}")
+        return 1
+    if len(sub) + len(noise) + len(roster) + len(blind) != len(got):
+        print(f"SELFTEST-FAIL: 四档求和 {len(sub)+len(noise)+len(roster)+len(blind)} != 总漂移 {len(got)}"
+              "（分档器吞格 ⇒ 世界看起来比实际安静）")
         return 1
     only_stars = [d for d in got if d[1] == "stars"]
-    s2, n2, r2 = classify_drift(only_stars)
-    if s2 or len(n2) != 1 or r2:
+    s2, n2, r2, b2 = classify_drift(only_stars)
+    if s2 or len(n2) != 1 or r2 or b2:
         print(f"SELFTEST-FAIL: 纯 ★ 抖动被误判为实质（分类器恒真）：sub={s2}")
         return 1
     # r77 反例：基线缺仓（上一轮取数失败留下的残缺快照）必须落「补录」档，不得算成对手的变化
     degraded_prev = [r for r in base if r["repo"] != "s-nagaev/chibi"]
-    s3, n3, r3 = classify_drift(diff_snap(degraded_prev, base))
-    if s3 or n3 or len(r3) != 1 or r3[0][0] != "s-nagaev/chibi" or r3[0][1] != "repo_added":
+    s3, n3, r3, b3 = classify_drift(diff_snap(degraded_prev, base))
+    if s3 or n3 or b3 or len(r3) != 1 or r3[0][0] != "s-nagaev/chibi" or split_field(r3[0][1])[0] != "repo_added":
         print(f"SELFTEST-FAIL: 基线缺仓应只进补录档，实际 sub={[(x[0], x[1]) for x in s3]} "
-              f"noise={[(x[0], x[1]) for x in n3]} roster={[(x[0], x[1]) for x in r3]}")
+              f"noise={[(x[0], x[1]) for x in n3]} roster={[(x[0], x[1]) for x in r3]} blind={b3}")
+        return 1
+    # r79-D 正例：本轮树没取到 ⇒ caps/docs 从有到空是**我这把尺瞎**，不得读成"对手删了能力"
+    blind_cur = json.loads(json.dumps(base))
+    blind_cur[0]["caps"] = []
+    blind_cur[0]["docs"] = []
+    blind_cur[0]["file_count"] = None
+    blind_cur[0]["tree_error"] = "boom"
+    s4, n4, r4, b4 = classify_drift(diff_snap(base, blind_cur))
+    if s4 or n4 or r4 or sorted(split_field(x[1])[0] for x in b4) != ["caps", "docs"]:
+        print(f"SELFTEST-FAIL: 树取数失败的 caps/docs 空清单仍进了实质档（把瞎读成退化）："
+              f"sub={[(x[0], x[1]) for x in s4]} blind={[(x[0], x[1]) for x in b4]}")
+        return 1
+    if not any("树取数失败" in x[1] for x in b4):
+        print(f"SELFTEST-FAIL: 取数失败档没点名原因（只说「这格不算」却不说为什么 = 第二条盲区账）："
+              f"{[x[1] for x in b4]}")
+        return 1
+    # r79-D 变异腿（反向自证）：摘掉 tree_error 那一行，同一份 caps/docs 空清单**必须**回落实质档
+    _mangled = json.loads(json.dumps(blind_cur))
+    del _mangled[0]["tree_error"]
+    _mangled[0]["file_count"] = 1234
+    s5, n5, r5, b5 = classify_drift(diff_snap(base, _mangled))
+    if len(s5) != 2 or b5:
+        print(f"SELFTEST-FAIL: 摘掉取数失败标记后实质档仍为 {len(s5)} 条 ⇒ 这条腿没作用在被审对象上，"
+              f"分档器在无条件吞掉 caps/docs（blind={[(x[0], x[1]) for x in b5]}）")
+        return 1
+    # r79-D 第三、四态：基线侧瞎（本轮补上）与 ci_workflows 的 None 双向
+    blind_prev = json.loads(json.dumps(base))
+    blind_prev[1]["caps"] = []
+    blind_prev[1]["file_count"] = None
+    blind_prev[1]["tree_error"] = "boom"
+    cur_full = json.loads(json.dumps(base))
+    cur_full[1]["caps"] = ["vector_memory", "container"]
+    s6, n6, r6, b6 = classify_drift(diff_snap(blind_prev, cur_full))
+    if s6 or len(b6) != 1 or "基线树取数失败" not in b6[0][1]:
+        print(f"SELFTEST-FAIL: 基线侧树瞎、本轮补上，应进取数失败档并写明「基线」："
+              f"sub={[(x[0], x[1]) for x in s6]} blind={[(x[0], x[1]) for x in b6]}")
+        return 1
+    wf_drift = diff_snap(base, [dict(base[0], ci_workflows=None), base[1]])
+    s7, n7, r7, b7 = classify_drift(wf_drift)
+    if s7 or len(b7) != 1 or split_field(b7[0][1])[0] != "ci_workflows":
+        print(f"SELFTEST-FAIL: ci_workflows 5→None（该字段唯一带 try/except，None=调用失败）"
+              f"应进取数失败档：sub={[(x[0], x[1]) for x in s7]} blind={b7}")
+        return 1
+    # 反面对照：latest_release None→v2 是**真发布**（取数失败会让整行缺席），不得并入本档
+    s8, n8, r8, b8 = classify_drift(diff_snap(base, [dict(base[0], latest_release=None), base[1]]))
+    if len(s8) != 1 or b8:
+        print(f"SELFTEST-FAIL: v1→None 这类无 try/except 字段的差被误判成取数失败 ⇒ 实质档会漏报退化："
+              f"sub={[(x[0], x[1]) for x in s8]} blind={b8}")
         return 1
     # r77 写盘守卫：降级采集另写 .partial，完整采集才覆写权威台账（两侧都验）
     from pathlib import Path as _P

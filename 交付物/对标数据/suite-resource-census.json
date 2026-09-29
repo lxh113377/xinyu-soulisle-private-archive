@@ -1,0 +1,1122 @@
+{
+ "generated_by": "_test/suite_resource_census.py",
+ "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
+ "suites": 101,
+ "blind": [],
+ "timings_from": null,
+ "buckets": {
+  "jar8123": {
+   "n": 37,
+   "seconds": 0.0,
+   "members": [
+    "preflight",
+    "perf_baseline",
+    "perf_baseline_selftest",
+    "battery_lock_selftest",
+    "emotion_wiring",
+    "emotion_wiring_selftest",
+    "api_contract",
+    "api_contract_selftest",
+    "settings_panel",
+    "settings_panel_selftest",
+    "offline_shell",
+    "offline_shell_selftest",
+    "engine_consistency",
+    "ux_guards",
+    "a11y",
+    "a11y_selftest",
+    "data_rights",
+    "data_rights_selftest",
+    "mobile",
+    "mobile_selftest",
+    "fault_injection",
+    "fault_injection_selftest",
+    "memory_recall",
+    "memory_recall_selftest",
+    "context_budget",
+    "context_budget_selftest",
+    "j2_chat_contract",
+    "j4_memory",
+    "stream_contract",
+    "safety_guard",
+    "safety_guard_selftest",
+    "browser_check",
+    "pixel_dual",
+    "lightshow",
+    "online_check",
+    "storage_resilience",
+    "storage_resilience_selftest"
+   ]
+  },
+  "free": {
+   "n": 62,
+   "seconds": 0.0,
+   "members": [
+    "disclaimer_forensics",
+    "disclaimer_forensics_selftest",
+    "ci_watch_selftest",
+    "plan_pdf_coverage",
+    "plan_pdf_coverage_selftest",
+    "deploy_sync",
+    "eol_parity",
+    "eol_parity_selftest",
+    "size_budget",
+    "size_budget_selftest",
+    "vendor_freshness",
+    "vendor_freshness_selftest",
+    "benchmark_selftest",
+    "testasset_selftest",
+    "a11y_probe_selftest",
+    "repro_probe_selftest",
+    "patch_apply_selftest",
+    "pdf_leak_scan",
+    "pdf_leak_selftest",
+    "tracked_secret",
+    "tracked_secret_selftest",
+    "remote_tree",
+    "remote_tree_selftest",
+    "ci_status",
+    "ci_status_selftest",
+    "repo_config",
+    "repo_config_selftest",
+    "java_test_guard",
+    "java_test_guard_selftest",
+    "strategy",
+    "strategy_selftest",
+    "data_rights_probe_selftest",
+    "mobile_peer_selftest",
+    "community_probe_selftest",
+    "fault_peer_selftest",
+    "memory_peer_selftest",
+    "readme_troubleshooting",
+    "readme_troubleshooting_selftest",
+    "headers_csp",
+    "headers_csp_selftest",
+    "sec_headers_peer_selftest",
+    "release_probe_selftest",
+    "license_probe_selftest",
+    "release_governance",
+    "release_governance_selftest",
+    "clean_clone",
+    "clean_clone_selftest",
+    "j4_remote_down",
+    "voice",
+    "voice_selftest",
+    "public_check",
+    "live_sync",
+    "emotion_eval_js",
+    "js_unit",
+    "js_unit_selftest",
+    "quality_peer_selftest",
+    "deliverable_inventory",
+    "deliverable_inventory_selftest",
+    "api_egress_headers",
+    "api_egress_headers_selftest",
+    "js_syntax",
+    "js_syntax_selftest"
+   ]
+  },
+  "jar8123+port:18123": {
+   "n": 2,
+   "seconds": 0.0,
+   "members": [
+    "suite_census",
+    "suite_census_selftest"
+   ]
+  }
+ },
+ "rows": [
+  {
+   "suite": "preflight",
+   "target": "_test/server_preflight.py",
+   "mode": "real",
+   "facets": [
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "perf_baseline",
+   "target": "_test/perf_baseline_check.py",
+   "mode": "real",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "perf_baseline_selftest",
+   "target": "_test/perf_baseline_check.py",
+   "mode": "stub",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "disclaimer_forensics",
+   "target": "_test/disclaimer_forensics_lint.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "disclaimer_forensics_selftest",
+   "target": "_test/disclaimer_forensics_lint.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "ci_watch_selftest",
+   "target": "_test/ci_watch.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "battery_lock_selftest",
+   "target": "_test/run_all_suites.py",
+   "mode": "stub",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "plan_pdf_coverage",
+   "target": "_test/plan_pdf_coverage_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "plan_pdf_coverage_selftest",
+   "target": "_test/plan_pdf_coverage_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "deploy_sync",
+   "target": "_test/deploy_sync_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "eol_parity",
+   "target": "_test/eol_parity_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "eol_parity_selftest",
+   "target": "_test/eol_parity_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "size_budget",
+   "target": "_test/size_budget_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "size_budget_selftest",
+   "target": "_test/size_budget_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "emotion_wiring",
+   "target": "_test/emotion_wiring_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "emotion_wiring_selftest",
+   "target": "_test/emotion_wiring_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "vendor_freshness",
+   "target": "_test/vendor_freshness_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "vendor_freshness_selftest",
+   "target": "_test/vendor_freshness_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "benchmark_selftest",
+   "target": "_test/benchmark_metrics.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "build",
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "testasset_selftest",
+   "target": "_test/peer_test_asset_probe.py",
+   "mode": "stub",
+   "facets": [
+    "build",
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "a11y_probe_selftest",
+   "target": "_test/peer_a11y_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "repro_probe_selftest",
+   "target": "_test/peer_repro_probe.py",
+   "mode": "stub",
+   "facets": [
+    "build",
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "api_contract",
+   "target": "_test/api_contract_check.py",
+   "mode": "real",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "api_contract_selftest",
+   "target": "_test/api_contract_check.py",
+   "mode": "stub",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "patch_apply_selftest",
+   "target": "_test/patch_apply.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "settings_panel",
+   "target": "_test/settings_panel_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123",
+    "public_net"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "settings_panel_selftest",
+   "target": "_test/settings_panel_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123",
+    "public_net"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "offline_shell",
+   "target": "_test/offline_shell_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123",
+    "own_server",
+    "public_net"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "offline_shell_selftest",
+   "target": "_test/offline_shell_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123",
+    "own_server",
+    "public_net"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "pdf_leak_scan",
+   "target": "_test/pdf_leak_scan.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "pdf_leak_selftest",
+   "target": "_test/pdf_leak_scan.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "tracked_secret",
+   "target": "_test/tracked_secret_scan.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "tracked_secret_selftest",
+   "target": "_test/tracked_secret_scan.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "remote_tree",
+   "target": "_test/remote_tree_audit.py",
+   "mode": "real",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "remote_tree_selftest",
+   "target": "_test/remote_tree_audit.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "ci_status",
+   "target": "_test/ci_status_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "ci_status_selftest",
+   "target": "_test/ci_status_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "repo_config",
+   "target": "_test/repo_config_check.py",
+   "mode": "real",
+   "facets": [
+    "build"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "repo_config_selftest",
+   "target": "_test/repo_config_check.py",
+   "mode": "stub",
+   "facets": [
+    "build"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "engine_consistency",
+   "target": "_test/engine_consistency_check.py",
+   "mode": "real",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "java_test_guard",
+   "target": "_test/java_test_guard.py",
+   "mode": "real",
+   "facets": [
+    "build"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "java_test_guard_selftest",
+   "target": "_test/java_test_guard.py",
+   "mode": "stub",
+   "facets": [
+    "build"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "strategy",
+   "target": "_test/strategy_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "strategy_selftest",
+   "target": "_test/strategy_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "ux_guards",
+   "target": "_test/ux_guards_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "a11y",
+   "target": "_test/a11y_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "a11y_selftest",
+   "target": "_test/a11y_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "data_rights",
+   "target": "_test/data_rights_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "data_rights_selftest",
+   "target": "_test/data_rights_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "data_rights_probe_selftest",
+   "target": "_test/peer_data_rights_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "mobile",
+   "target": "_test/mobile_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "mobile_selftest",
+   "target": "_test/mobile_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "mobile_peer_selftest",
+   "target": "_test/peer_mobile_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "community_probe_selftest",
+   "target": "_test/peer_community_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "fault_injection",
+   "target": "_test/fault_injection_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "fault_injection_selftest",
+   "target": "_test/fault_injection_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "fault_peer_selftest",
+   "target": "_test/peer_fault_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "memory_recall",
+   "target": "_test/memory_recall_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "memory_recall_selftest",
+   "target": "_test/memory_recall_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "memory_peer_selftest",
+   "target": "_test/peer_memory_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "readme_troubleshooting",
+   "target": "_test/readme_troubleshooting_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "readme_troubleshooting_selftest",
+   "target": "_test/readme_troubleshooting_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "context_budget",
+   "target": "_test/context_budget_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "context_budget_selftest",
+   "target": "_test/context_budget_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "headers_csp",
+   "target": "_test/headers_csp_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "own_server"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "headers_csp_selftest",
+   "target": "_test/headers_csp_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "own_server"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "sec_headers_peer_selftest",
+   "target": "_test/peer_sec_headers_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "release_probe_selftest",
+   "target": "_test/peer_release_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "license_probe_selftest",
+   "target": "_test/peer_license_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "release_governance",
+   "target": "_test/release_governance_check.py",
+   "mode": "real",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "release_governance_selftest",
+   "target": "_test/release_governance_check.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "clean_clone",
+   "target": "_test/clean_clone_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "own_server",
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "clean_clone_selftest",
+   "target": "_test/clean_clone_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "own_server",
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "j2_chat_contract",
+   "target": "_test/j2_chat_contract.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "j4_memory",
+   "target": "_test/j4_memory_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "j4_remote_down",
+   "target": "_test/j4_remote_down_check.py",
+   "mode": "real",
+   "facets": [
+    "browser"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "stream_contract",
+   "target": "_test/stream_contract.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "safety_guard",
+   "target": "_test/safety_guard_check.py",
+   "mode": "real",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "safety_guard_selftest",
+   "target": "_test/safety_guard_check.py",
+   "mode": "stub",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "voice",
+   "target": "_test/voice_check.py",
+   "mode": "real",
+   "facets": [
+    "browser"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "voice_selftest",
+   "target": "_test/voice_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "browser_check",
+   "target": "_test/browser_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "pixel_dual",
+   "target": "_test/pixel_dual_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "lightshow",
+   "target": "_test/lightshow_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "online_check",
+   "target": "_test/online_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "public_check",
+   "target": "_test/public_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "live_sync",
+   "target": "_test/live_sync_check.py",
+   "mode": "real",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "emotion_eval_js",
+   "target": "_test/emotion_eval.js",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "js_unit",
+   "target": "_test/js_unit_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "js_unit_selftest",
+   "target": "_test/js_unit_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "quality_peer_selftest",
+   "target": "_test/peer_quality_tooling_probe.py",
+   "mode": "stub",
+   "facets": [
+    "build",
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "deliverable_inventory",
+   "target": "_test/deliverable_inventory_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "deliverable_inventory_selftest",
+   "target": "_test/deliverable_inventory_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "api_egress_headers",
+   "target": "_test/api_egress_headers_check.py",
+   "mode": "real",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "api_egress_headers_selftest",
+   "target": "_test/api_egress_headers_check.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "js_syntax",
+   "target": "_test/js_syntax_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "js_syntax_selftest",
+   "target": "_test/js_syntax_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "storage_resilience",
+   "target": "_test/storage_resilience_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "storage_resilience_selftest",
+   "target": "_test/storage_resilience_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "suite_census",
+   "target": "_test/suite_resource_census.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "build",
+    "fixed_port",
+    "jar8123",
+    "own_server",
+    "public_net"
+   ],
+   "exclusive": [
+    "jar8123",
+    "port:18123"
+   ]
+  },
+  {
+   "suite": "suite_census_selftest",
+   "target": "_test/suite_resource_census.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "build",
+    "fixed_port",
+    "jar8123",
+    "own_server",
+    "public_net"
+   ],
+   "exclusive": [
+    "jar8123",
+    "port:18123"
+   ]
+  }
+ ]
+}
