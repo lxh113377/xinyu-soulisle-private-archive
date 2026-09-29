@@ -28,6 +28,8 @@ JAVA_HOME=JDK8 的坑）全文 `part17`。
       （一退整跑 93/98→73/98；r77 又量到同一持有者让 `mvn verify` 卡在 `repackage`）。`part82`/`part83`
 - [ ] 🔴 **R76-01 注入面还有抄来的数字**：`docs/quality-gates.md` 与 README 的覆盖率读数已过期（r77 02:53 复测仍 `M`
       ＝他方 r70 在途：电池 99→101 套件 + 资源普查，不插队）。`前提=git status --short docs/quality-gates.md README.md` 为空。`part79`
+- [ ] 🔴 **R78-04 T8 在受理面没被强制**：CI 电池作业无 jacoco.xml ⇒ `java_test_guard rc=2 未验`（判得对）。
+      正解＝把 `python _test/java_test_guard.py` 挂进 java-build 作业（产物存在处）；**禁**改成"跳过"求绿。`part85`
 - [x] ✅ **r78 两把尺各修一半**：撤掉一条**假缺口**（`secret_scan self=❌无`——CI 每步真跑的自写密钥守卫，
       尺只认 `.gitleaks.toml` 这类名牌货，看不见；且 r75 把该天花板固化成了断言）；
       T8 把 LINE/BRANCH/METHOD 读数接进阻断链＋出**具名缺口清单**（下一步 R78-01 下钻到方法名）。全文 `part85`
