@@ -86,3 +86,7 @@
   in-仓闸保留。改名提交按钩子官方通道 `XINYU_SKIP_DELIV_HOOK=1`（台账 .git/xinyu-hook-skip.log）。
 - **demo_video_pipeline 两修**：requestSubmit（同截图脚本的视口外点击坑）；ffmpeg/ffprobe 不在机 ⇒
   imageio-ffmpeg 解析 + `_media_seconds`（ffmpeg stderr Duration 行），不再依赖未登记二进制。
+- **受理面回执**：电池 r86 定版读数 `101/105`（3 红：2 项为 HEAD 未更新暂态已随提交消失、
+  eol_parity 的 pptx 裸 CRLF 由 `.gitattributes` 补 `*.pptx/*.docx/*.mov binary` 修掉 ⇒ `EOL-PARITY-PASS`）；
+  CI：`b363e6c` **RED**（eol_parity，即被修那两条）⇒ `da033ad` **GREEN**（4/4 job success）——
+  红被自己的下一笔修掉，时序回执以此为准。改名提交按钩子官方通道跳过在位闸一次（台账 .git/xinyu-hook-skip.log）。
