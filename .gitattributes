@@ -30,6 +30,9 @@
 *.mp4  binary
 *.webm binary
 *.pdf  binary
+*.pptx binary
+*.docx binary
+*.mov  binary
 *.jar  binary
 *.db   binary
 *.zip  binary

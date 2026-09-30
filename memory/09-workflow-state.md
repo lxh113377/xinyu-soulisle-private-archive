@@ -5,7 +5,7 @@
 > ——匹配到同一条目则改勾选位，匹配不到则在对应章节**追加**一行；若 07 已标完成而 09 不是 done，
 > 它打印冲突并交人工裁决，**不覆盖 07**。任务表为空时 `--sync` 直接返回，此时 07 完全由人工维护。
 > 因此：07 仍是项目台账的权威叙述面（可手工写）；09 只是引擎的任务视图，二者靠 sync 对齐勾选位。
-> 状态枚举：`todo` / `doing` / `done` / `blocked`；批次：`P0` / `P1` / `P2`（`--next` 按 P0 → P1 → P2 顺序取批）。
+> 状态枚举：`todo` / `doing` / `done` / `blocked`；批次：`P0` / `P1` / `P2`（`--next` **只在当前批次内取**：本批全 done 才进下一批；本批有 doing/blocked 而无可启动 todo 时**不跨批**，只列未完结项）。
 > 用法：`handoff.py flow <项目路径> --status | --next | --start --id X | --done --id X [--evidence P] | --block --id X --reason R | --sync | --check | --add ...`
 
 ## 任务表
