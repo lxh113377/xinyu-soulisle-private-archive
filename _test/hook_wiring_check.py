@@ -21,6 +21,7 @@ CI（新克隆）里 W2 记 `未验` 而不是红：那面上没有任何人有�
 """
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -86,8 +87,47 @@ def read_bytes(p):
         return None
 
 
+GIT_BASH_CANDIDATES = (r"C:\Program Files\Git\usr\bin\bash.exe",
+                       r"C:\Program Files\Git\bin\bash.exe")
+WSL_LAUNCHER_MARKS = ("\\system32\\bash.exe", "\\windowsapps\\bash.exe")
+
+
 def sh_exe():
+    """挑一个能把 POSIX 脚本跑起来的解释器（r85 修复：原实现会把 WSL 启动器当选）。
+
+    实测根因（2026-09-30 23:xx 电池当场红出来的，不是推断）：本机 `shutil.which("sh")` = **None**，
+    于是回退到 `shutil.which("bash")` = `C:\\Windows\\system32\\bash.EXE` —— 那是 **WSL 启动器**，
+    它不吃 `C:\\...` 形态的路径（反斜杠被当转义吃掉 ⇒ 实参变成 `C:Users37533...` ⇒ rc=127），
+    于是 W1（源解析不过）与 selftest 的 ⑪⑫（端到端删件腿 / 复原腿）**三条一起红**。
+    红因不是钩子坏了 —— 钩子源与副本 W2 仍逐字节相等 —— 是**喂给解释器的路径形态不对**。
+
+    处置两条，都不放宽判据：① 优先 Git 自带 bash（吃 Windows 路径，本机两处均在位）；
+    ② 只剩 WSL 启动器时才把路径转成 `/mnt/<盘符>/...`（见 `path_for_sh`）。解析不过仍旧判红。
+    """
+    for p in GIT_BASH_CANDIDATES:
+        if os.path.isfile(p):
+            return p
     return shutil.which("sh") or shutil.which("bash")
+
+
+def is_wsl_launcher(exe):
+    low = (exe or "").lower()
+    return any(m in low for m in WSL_LAUNCHER_MARKS)
+
+
+def path_for_sh(exe, p):
+    """把路径转成该解释器吃得下的形态：WSL 启动器要 `/mnt/c/...`，其余照原样（Git bash 吃 `C:\\...`）。
+
+    刻意做成纯函数并可注入 —— 判据自己得先证明"路径形态"这件事被真的处理过，
+    否则它和 r84 那条「看 CI 的眼瞎了」同族：把环境形态问题报成被检对象坏了。
+    """
+    s = str(p)
+    if not is_wsl_launcher(exe):
+        return s
+    m = re.match(r"^([A-Za-z]):[\\/](.*)$", s)
+    if not m:
+        return s
+    return "/mnt/%s/%s" % (m.group(1).lower(), m.group(2).replace("\\", "/"))
 
 
 def check() -> int:
@@ -103,7 +143,7 @@ def check() -> int:
         if exe is None:
             unver.append("W1 本机没有 sh/bash ⇒ 没验证钩子能不能解析（未验）")
         else:
-            r = subprocess.run([exe, "-n", str(SRC_HOOK)], capture_output=True, text=True,
+            r = subprocess.run([exe, "-n", path_for_sh(exe, SRC_HOOK)], capture_output=True, text=True,
                                encoding="utf-8", errors="replace")
             if r.returncode != 0:
                 bad.append("W1 钩子源解析不过（sh -n rc=%d）：%s" % (r.returncode, (r.stderr or "").strip()[:200]))
@@ -223,7 +263,7 @@ def drill() -> int:
     print("HOOK-DRILL: 靶=%s（%d B，未写进声明面）" % (victim, len(before)))
     try:
         (ROOT / victim).unlink()
-        p = subprocess.run([exe, str(hook)], capture_output=True, text=True,
+        p = subprocess.run([exe, path_for_sh(exe, hook)], capture_output=True, text=True,
                            encoding="utf-8", errors="replace", cwd=str(ROOT))
         out = (p.stdout or "") + (p.stderr or "")
         if p.returncode == 0:
@@ -242,7 +282,7 @@ def drill() -> int:
     if (ROOT / victim).read_bytes() != before:
         print("HOOK-DRILL-FAIL: 复原后字节不等 ⇒ 演习动了真件")
         return 1
-    p2 = subprocess.run([exe, str(hook)], capture_output=True, text=True,
+    p2 = subprocess.run([exe, path_for_sh(exe, hook)], capture_output=True, text=True,
                         encoding="utf-8", errors="replace", cwd=str(ROOT))
     if p2.returncode != 0:
         print("HOOK-DRILL-FAIL: 复原后钩子仍不绿 ⇒ 判据或钩子有存量红：%s" % ((p2.stdout or "") + (p2.stderr or ""))[-400:])
@@ -303,18 +343,29 @@ def selftest() -> int:
             os.chmod(installed, 0o755)
             ghost = tmp / "交付物" / "提交包" / "ghost.txt"
             ghost.unlink()
-            hit = subprocess.run([exe, str(installed)], cwd=str(tmp),
+            hit = subprocess.run([exe, path_for_sh(exe, installed)], cwd=str(tmp),
                                  capture_output=True, text=True, encoding="utf-8", errors="replace")
             ck("⑪端到端反向腿：删掉入库件 ⇒ 钩子 rc=1（真跑出来的，不是推断的）",
                hit.returncode == 1 and "ghost.txt" in (hit.stdout + hit.stderr))
             ghost.write_text("在位证明\n", encoding="utf-8")
-            ok = subprocess.run([exe, str(installed)], cwd=str(tmp),
+            ok = subprocess.run([exe, path_for_sh(exe, installed)], cwd=str(tmp),
                                 capture_output=True, text=True, encoding="utf-8", errors="replace")
             ck("⑫复原后台闸必须自证取到数（rc=0 或 2，不许 1）", ok.returncode in (0, 2))
         finally:
             shutil.rmtree(tmp.parent, ignore_errors=True)
 
-    n = 12 if exe else 10
+    # ⑬–⑮：r85 修的那条「解释器吃哪种路径形态」必须自己被钉住，否则下次环境再漂一次
+    #        它又会回来，而红因仍然会写成像"钩子坏了"（本仓已有三次同族：CSP 闸看不见 CSP /
+    #        ci_watch 分不清取数失败与没有 run / 清单路径被当成声明件）。
+    ck("⑬WSL 启动器必须收 /mnt/<盘符>/ 形态（反斜杠不得被当转义吃掉）",
+       path_for_sh(r"C:\Windows\System32\bash.EXE", r"C:\repo\_test\hooks\pre-commit")
+       == "/mnt/c/repo/_test/hooks/pre-commit")
+    ck("⑭Git bash 照原样收 Windows 路径（不得画蛇添足地转换）",
+       path_for_sh(r"C:\Program Files\Git\usr\bin\bash.exe", r"C:\repo\x") == r"C:\repo\x")
+    ck("⑮只有真 WSL 启动器才转换（`bash` 这串不得误命中）",
+       (not is_wsl_launcher(r"C:\tools\bash.exe")) and is_wsl_launcher(r"C:\Windows\system32\bash.EXE"))
+
+    n = (12 + 3) if exe else (10 + 3)
     if bad:
         print("HOOK-WIRING-SELFTEST-FAIL: %d/%d 未过（%s）" % (len(bad), n, "；".join(bad)))
         return 1
