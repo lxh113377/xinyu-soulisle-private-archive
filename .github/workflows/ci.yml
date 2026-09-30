@@ -208,8 +208,26 @@ jobs:
       # ⇒ 与同行踩过的「CodeQL 只挂 PR、main 零分析」同族：装了不等于在用。现改为整跑电池。
       # runner 没有上游密钥（密钥不落仓）⇒ 用 --exclude-llm 显式豁免三条在线链路套件，
       # 且豁免数与总数由脚本自证恒等式；CI 覆盖面本身另有 repo_config 的 G10 常驻判据盯着。
+      # r85：本步按**电池自己的退出码口径**对齐 —— 0=全绿 / 1=判红（RED/CRASH，必须修）/ 2=环境未验
+      #   （ENV-UNVERIFIED，电池原话「不是判红，但不得声称已验」）。
+      # 本 job 里两条面在**结构上**取不到数：① `java_test_guard` 的 T8 要 `jacoco.xml`，而本 job 只跑
+      #   `mvn package -DskipTests`，读数门 r79 已挪到 java-build 作业（那里才是它被量到的受理面）；
+      #   ② `hook_wiring` 在全新 clone 上没人有权装钩子，其头注原文即「CI（新克隆）里 W2 记未验而不是红」。
+      # 此前 workflow 把 rc=2 也当作业失败 ⇒ 本 job 自 09-29 起连续 20 次全红，而红因与代码无关 ——
+      # 等于用作业级红把「未验」升格成「判红」，与电池自己的三态判定互相矛盾（且掩掉了真红的消息）。
+      # 现改为：**只有 rc=2 不判红**，且必须在日志里把未验名单喊出来（::notice 金标，不得静默）；
+      #   rc=1（判红/崩溃）与非零其它码照旧判红 —— 这条改动不把任何「判红」改成绿。
       - name: 全量回归电池（实跑/豁免条数由脚本自证恒等式，步骤名不抄数字）
-        run: python _test/run_all_suites.py --exclude-llm
+        run: |
+          set +e
+          python _test/run_all_suites.py --exclude-llm
+          rc=$?
+          set -e
+          if [ "$rc" -eq 2 ]; then
+            echo "::notice title=BATTERY ENV-UNVERIFIED::rc=2=环境未验（非判红）。上面那行的 ENV-UNVERIFIED 名单即本轮在本作业未量到的面：java_test_guard 的读数门在 java-build 作业、hook_wiring 在本地 --install 后量。rc=1（判红/崩溃）照旧判红。"
+            exit 0
+          fi
+          exit "$rc"
 
   live-sync:
     name: 线上↔权威源逐字节新鲜度（仅 main push，漂移告警不阻塞）
