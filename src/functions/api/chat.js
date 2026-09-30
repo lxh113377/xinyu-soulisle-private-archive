@@ -27,16 +27,49 @@ const SEC_HEADERS = {
 };
 const SEC_JSON = { ...SEC_HEADERS, "Cache-Control": "no-store" };
 
+/* CORS（r86）：备用线（CloudBase 静态托管域名）的界面无法拿到云函数路由（该 env 三项目共用、
+ * HTTP 访问服务证书与路由属控制台动作），改为让备用线前端直接调用本函数。密钥仍在服务端 env，
+ * 跨域面只放行**白名单内的自家来源**（主推线 / 备用线 / 本机演示），不开放 `*` ——
+ * 这是把"谁能白嫖这把 Key 的代理"钉死在三个已知的自己人上。只加头，不动 status/body：
+ * AC-OBS-08 的"上游逐字透传"契约与 j2_chat_contract / api_contract 仍原样成立。*/
+const CORS_ALLOW = new Set([
+  "https://xinyu-soulisle.pages.dev",
+  "https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com",
+  "http://localhost:8123",
+  "http://127.0.0.1:8123"
+]);
+
+function corsHeaders(request) {
+  // 判据夹具会用**字符串**当 request 廉价驱动 bad-json 腿（api_egress_headers），
+  // 真实 Pages 运行时恒是 Request ⇒ 这里按"有 .headers 才取 Origin"加固，字符串形状一律无 CORS 头。
+  const origin = request && request.headers ? request.headers.get("Origin") || "" : "";
+  if (!CORS_ALLOW.has(origin)) return {};
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "content-type",
+    "Access-Control-Max-Age": "600",
+    "Vary": "Origin"
+  };
+}
+
+export async function onRequestOptions({ request }) {
+  const h = corsHeaders(request);
+  if (!h["Access-Control-Allow-Origin"]) return new Response(null, { status: 403 });
+  return new Response(null, { status: 204, headers: { ...SEC_HEADERS, ...h } });
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
+  const cors = corsHeaders(request);
   const key = env.LLM_KEY || env.DEEPSEEK_KEY;
   const base = env.LLM_BASE || env.DEEPSEEK_BASE || "https://api.deepseek.com/v1";
   const model = env.LLM_MODEL || env.DEEPSEEK_MODEL || "deepseek-chat";
-  if (!key) return Response.json({ error: "no-key" }, { status: 500, headers: SEC_JSON });
+  if (!key) return Response.json({ error: "no-key" }, { status: 500, headers: { ...SEC_JSON, ...cors } });
 
   let payload;
   try { payload = await request.json(); }
-  catch { return Response.json({ error: "bad-json" }, { status: 400, headers: SEC_JSON }); }
+  catch { return Response.json({ error: "bad-json" }, { status: 400, headers: { ...SEC_JSON, ...cors } }); }
 
   const wantStream = payload.stream === true;
   const upstreamBody = {
@@ -61,6 +94,7 @@ export async function onRequestPost(context) {
       // SEC_HEADERS 放**前面**：本分支自己的 Cache-Control / Content-Type 必须赢过它
       headers: {
         ...SEC_HEADERS,
+        ...cors,
         "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         "Connection": "keep-alive",
@@ -70,5 +104,5 @@ export async function onRequestPost(context) {
   }
 
   const data = await upstream.json().catch(() => ({ error: "upstream-nonjson" }));
-  return Response.json(data, { status: upstream.status, headers: SEC_JSON });
+  return Response.json(data, { status: upstream.status, headers: { ...SEC_JSON, ...cors } });
 }

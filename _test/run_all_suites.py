@@ -179,6 +179,10 @@ SUITES = [
     # 复用同一条尺（BASE 由 argv[1] 传入），不另写第二份对账逻辑。
     ("live_sync_alt", [sys.executable, "_test/live_sync_check.py",
                        "https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com/xinyu/"]),
+    # r86：备用线从「如实标注的离线降级」改判**真实在线**（前端跨域调 pages.dev 函数，
+    # 函数侧 CORS 白名单只放行自家来源）。这条尺真开浏览器发一条消息，标签含
+    # 「在线大模型生成」才算过——防止 stub 被改回已死的 service 域名而无人知晓。
+    ("backup_online", [sys.executable, "_test/backup_online_check.py"]),
     ("emotion_eval_js", ["node", "_test/emotion_eval.js"]),
     # r58 质量工程面：JS 侧从"0 个单元测试"变成有常驻执行位（node --test + 跨 realm 归一）
     ("js_unit", [sys.executable, "_test/js_unit_check.py"]),

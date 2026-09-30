@@ -1,4 +1,4 @@
-# 心屿 SoulIsle · 应用方案 PDF 重新渲染
+# 心屿 MindIsle · 应用方案 PDF 重新渲染（r86 品牌改版；SoulIsle 版已随 2026-09-30 提交留档）
 #
 # 用途：改完 application-plan.html 或替换 img/ 下的截图后，重新出 PDF。
 # 用法（在本目录执行）：
@@ -11,7 +11,7 @@
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $html = Join-Path $here "application-plan.html"
-$out  = Join-Path $here "心屿SoulIsle-应用方案.pdf"
+$out  = Join-Path $here "心屿MindIsle-应用方案.pdf"
 
 $edge = @(
   "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",

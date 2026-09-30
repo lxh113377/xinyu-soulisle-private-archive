@@ -350,7 +350,7 @@ def main():
     st = probe_self()
     rows["__self__"] = st
     print("[self] %-36s 命名件=%-2d README=%-22s 清单=%d 依赖命中=%s (%s)"
-          % ("心屿 SoulIsle", st["tree"]["a11y_named"], ",".join(sorted(st["readme"])) or "none",
+          % ("心屿 MindIsle", st["tree"]["a11y_named"], ",".join(sorted(st["readme"])) or "none",
              st["manifest_count"],
              ";".join(",".join(d["libs"]) for d in st["deps"]) or "none", st["dep_status"]))
     print("-" * 124)

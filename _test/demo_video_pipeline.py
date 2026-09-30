@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""心屿 SoulIsle · 演示视频录制流水线（官方口径：MP4 ≤5min，突出智能体运行过程）
+"""心屿 MindIsle · 演示视频录制流水线（r86 品牌改版后重录）（官方口径：MP4 ≤5min，突出智能体运行过程）
 
 分镜照抄 交付物/提交包/演示视频脚本.md（8 幕），对齐当前 HEAD 真实能力（SSE 逐字流式、
 双路路径标注、离线回落、一键清除）。零造假保证：
@@ -11,9 +11,9 @@
 前置：python -m http.server 8123 --directory src（或 fat jar，工作目录=仓库根）
 用法：python _test/demo_video_pipeline.py          # 录制+字幕烧录（无旁白）
       python _test/demo_video_pipeline.py --tts    # 追加 edge-tts 旁白，失败自动降级无旁白
-产物：交付物/提交包/demo_video_out/心屿SoulIsle-演示视频.mp4
+产物：交付物/提交包/demo_video_out/心屿MindIsle-演示视频.mp4
 """
-import sys, io, os, json, time, subprocess
+import re, shutil, sys, io, os, json, time, subprocess
 from pathlib import Path
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
@@ -30,12 +30,54 @@ SCENES = [  # (幕名, 字幕旁白, _)
     ("S5", "危机信号出现时，系统跳过全部生成逻辑，优先转介求助热线 12356", "s5"),
     ("S6", "上游不可达？逐条明示\u201c离线共情模板\u201d，绝不伪装在线", "s6"),
     ("S7", "所有情绪默认只存这台设备。一键清除，星图与曲线即刻归零", "s7"),
-    ("S8", "心屿 SoulIsle｜免登录在线演示 xinyu-soulisle.pages.dev｜2026 iCAN 软件赛道", "s8"),
+    ("S8", "心屿 MindIsle｜免登录在线演示 xinyu-soulisle.pages.dev｜2026 iCAN 软件赛道", "s8"),
 ]
 
 def log(*a): print(*a, flush=True)
 
 LAUNCH_ARGS = [a for a in os.environ.get("XINYU_BROWSER_ARGS", "").split() if a]
+
+
+def _ffmpeg_exe():
+    """r86 本机实测：ffmpeg/ffprobe 都不在 PATH（上一轮录制后临时安装已被清理——
+    就是「产物落工作区外被清」那一族）。本机 imageio-ffmpeg 自带完整 ffmpeg 二进制；
+    ffprobe 没有对应物 ⇒ 时长改走零依赖 mp4 mvhd 读法（同 deliverable_inventory_check）。"""
+    exe = shutil.which("ffmpeg")
+    if exe:
+        return exe
+    import imageio_ffmpeg
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
+def _mp4_seconds(path):
+    """零依赖读 MP4 `moov>mvhd` 取时长（头/尾各 1 MB 找盒子，不整读）。读不到返回 None。"""
+    import struct
+    p = Path(path)
+    size = p.stat().st_size
+    chunks = []
+    with p.open("rb") as f:
+        chunks.append(f.read(1 << 20))
+        if size > (1 << 20):
+            f.seek(max(size - (1 << 20), 1 << 20))
+            chunks.append(f.read(1 << 20))
+    for data in chunks:
+        i = data.find(b"mvhd")
+        if i < 0:
+            continue
+        ver = data[i + 4]
+        q = i + 8
+        try:
+            if ver == 1:
+                q += 16
+                ts, dur = struct.unpack(">IQ", data[q:q + 12])
+            else:
+                q += 8
+                ts, dur = struct.unpack(">II", data[q:q + 8])
+        except struct.error:
+            return None
+        if ts:
+            return dur / ts
+    return None
 
 def run_recording():
     from playwright.sync_api import sync_playwright
@@ -72,7 +114,7 @@ def run_recording():
         def send(text):
             pg.fill("#chat-input", text)
             n0 = pg.eval_on_selector_all(".msg.ai", "e => e.length")  # 基线必须在点击前取：
-            pg.click("#chat-form button[type=submit]")                # jar+flash <1s 即回，点后取基线会把
+            pg.evaluate("(el => el.requestSubmit())", pg.locator("#chat-form").element_handle())                # jar+flash <1s 即回，点后取基线会把
             assert wait_ai_reply(n0), f"{text[:8]}… 回复 {timeout_hint}s 未返回（禁录半成品）"  # 回复算进基线→恒假（run4/5 根因）
             return pg.eval_on_selector_all(".msg.ai", "e => e[e.length-1].textContent")
         timeout_hint = 25
@@ -110,7 +152,7 @@ def run_recording():
         dock(True)
         pg.locator("#chat-input").press_sequentially("今天被导师批评了，心情很低落", delay=110)
         n0 = pg.eval_on_selector_all(".msg.ai", "e => e.length")  # 基线先于点击（同 send 修复）
-        pg.click("#chat-form button[type=submit]")
+        pg.evaluate("(el => el.requestSubmit())", pg.locator("#chat-form").element_handle())
         assert wait_ai_reply(n0), "S3 在线回复 40s 未返回（在线链路异常，禁降级冒充）"
         # 流式场景：先出现的是「逐字生成中…」气泡，resolve 后才换成带 data-emotion+tag 的终稿
         deadline = time.time() + 15
@@ -206,7 +248,7 @@ def synth_tts(ts, final):
             filters.append(f"[{k}:a]adelay={int(off*1000)}|{int(off*1000)}[a{k}]"); gmix.append(f"[a{k}]")
         fc = ";".join(filters) + ";" + "".join(gmix) + f"amix=inputs={len(clips)}:normalize=0[aout]"
         tmp = OUTDIR / "with_vo.mp4"
-        subprocess.run(["ffmpeg", "-y"] + inputs + ["-i", final.name, "-filter_complex", fc,
+        subprocess.run([ff, "-y"] + inputs + ["-i", final.name, "-filter_complex", fc,
                        "-map", "[aout]", "-map", f"{len(clips)}:v", "-c:a", "aac", "-c:v", "copy", tmp.name],
                        check=True, capture_output=True, cwd=str(OUTDIR))
         tmp.replace(final)
@@ -214,26 +256,37 @@ def synth_tts(ts, final):
     except Exception as e:
         log("TTS-FAIL", str(e)[:100], "→ 保持无旁白版"); return False
 
+def _media_seconds(path):
+    """ffprobe 缺席时的时长读取：ffmpeg -i 的 stderr 自带 `Duration: HH:MM:SS.ms`（任何容器都打）。"""
+    r = subprocess.run([_ffmpeg_exe(), "-i", str(path)], capture_output=True,
+                       text=True, errors="replace")
+    m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", r.stderr)
+    if not m:
+        return None
+    h, mn, s = m.groups()
+    return int(h) * 3600 + int(mn) * 60 + float(s)
+
+
 def assemble():
+    ff = _ffmpeg_exe()
     raw = OUTDIR / "demo_video_raw.webm"
-    dur_s = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                                  "-of", "csv=p=0", str(raw)], capture_output=True, text=True).stdout.strip())
+    dur_s = _media_seconds(raw)
+    assert dur_s, "raw.webm 读不到时长（ffmpeg stderr 无 Duration 行）"
     log("raw duration:", dur_s)
     assert 200 <= dur_s <= 300, f"时长 {dur_s:.0f}s 不在 200~300s（官方 ≤5min；过短=有幕没录上）"
     ts = build_ass(dur_s)
-    final = OUTDIR / "心屿SoulIsle-演示视频.mp4"
+    final = OUTDIR / "心屿MindIsle-演示视频.mp4"
     # ⚠️ subtitles= 滤镜参数含中文目录会被 ffmpeg 判坏（绝对路径 exit 4294967274，相对路径实测可过）
     #    → 全部改在 OUTDIR 内以相对文件名执行
-    subprocess.run(["ffmpeg", "-y", "-i", "demo_video_raw.webm", "-vf", "subtitles=subtitle.ass",
+    subprocess.run([ff, "-y", "-i", "demo_video_raw.webm", "-vf", "subtitles=subtitle.ass",
                     "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p",
-                    "心屿SoulIsle-演示视频.mp4"], check=True, capture_output=True, cwd=str(OUTDIR))
+                    "心屿MindIsle-演示视频.mp4"], check=True, capture_output=True, cwd=str(OUTDIR))
     if "--tts" in sys.argv:
         synth_tts(ts, final)
-    fdur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                                 "-of", "csv=p=0", str(final)], capture_output=True, text=True).stdout.strip())
+    fdur = _media_seconds(final) or 0.0
     assert fdur <= 300, "终片超 5 分钟"
     png = OUTDIR / "qa_s3.png"
-    subprocess.run(["ffmpeg", "-y", "-ss", str((ts[2] + ts[3]) / 2), "-i", final.name,
+    subprocess.run([ff, "-y", "-ss", str((ts[2] + ts[3]) / 2), "-i", final.name,
                     "-frames:v", "1", png.name], check=True, capture_output=True, cwd=str(OUTDIR))
     assert png.exists() and png.stat().st_size > 50000, "抽帧失败/黑帧（字幕验证需人工目检此帧）"
     log(f"VIDEO-PIPELINE-PASS dur={fdur:.1f}s size={final.stat().st_size/1e6:.1f}MB")

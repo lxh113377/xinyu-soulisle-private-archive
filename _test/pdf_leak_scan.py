@@ -16,7 +16,7 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_PDF = ROOT / "交付物" / "提交包" / "心屿SoulIsle-应用方案.pdf"
+DEFAULT_PDF = ROOT / "交付物" / "提交包" / "心屿MindIsle-应用方案.pdf"
 
 PATTERNS = {
     "本机绝对路径 file://": r"file://",

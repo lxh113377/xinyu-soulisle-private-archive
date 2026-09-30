@@ -5,9 +5,33 @@
 
 ## [Unreleased]
 
-（空 · v1.7.0 切版后重新起账，r84 起的新增功能登记到这里。
- 本行故意不带 bullet：R2b 会把「段内有 bullet 而 tag..HEAD 零 commit」判成文案先行，
- 而刚切完版正是零 commit 状态 —— 占位符不得伪装成一条增量。）
+### Added（r86 · 作品更名「心屿 MindIsle」全线执行 + 备用线改判真实在线）
+- **品牌改版（老大 2026-10-01 拍板）**：作品名 SoulIsle → **MindIsle** 全线落地 —— `src/index.html`
+  品牌位 / manifest / css 注释 → `deploy/xinyu` 同步副本 →《应用方案》PDF 重渲染
+  （20 页 / 9 图，截图 9 张按当前 UI 全部重截，`pdf_leak_scan` + `plan_pdf_coverage_check` 双过）→
+  演示视频重录（`心屿MindIsle-演示视频.mp4`，221.4s，`RECORD-PASS scenes: 8`）→ 公网双线重发
+  （pages.dev `LIVE-SYNC-PASS` 21 项逐字节等 + `PUBLIC-ONLINE-ALL-PASS` console 0）。
+  **域名 `xinyu-soulisle.pages.dev` 与 Java 包名 `com.xinyu.soulisle` 是技术标识，未随品牌改**。
+  SoulIsle 版提交件移 `_参考资料-非提交/已提交留档-SoulIsle-20260930/` 留档（未删）。
+- **备用线改判真实在线**：原 CloudBase HTTP 访问服务域名实测 TLS 证书不匹配（`SEC_E_WRONG_PRINCIPAL`，
+  浏览器握手即失败，r83–r85 三轮的"离线降级"实为被这一坏域名拖着）⇒ 改为前端跨域调 pages.dev 函数：
+  `chat.js` 加 CORS 白名单（只放行自家 pages.dev / 备用线 / 本机 8123 四个来源，**不开放 `*`**，
+  密钥仍只在 CF 服务端 env）+ 备用线 stub 换指向。`python _test/backup_online_check.py` →
+  `BACKUP-ONLINE-PASS`（真开浏览器过「确定访问」验证页，发消息见「在线大模型生成 · 逐字流式」），
+  已接入电池 ⇒ 套件 107→**108**（README/G4/G16 同步）。
+- 「交付面静默删除」悬案**破案（老大口径）**：元凶是老大本人——AI 曾把文件放工作区外，被正常清理。
+  立规：产物一律落工作区内；in-仓闸保留防真丢失。
+- `demo_video_pipeline` 两处修：发送点击改 `requestSubmit()`（GSAP 滚动位让固定坞按钮的
+  bounding box 落视口外，指针点击挂起 58 次重试——与截图脚本同坑同修）；
+  ffmpeg/ffprobe 不在机（临时安装被清理）⇒ `imageio-ffmpeg` 解析 + 时长改读 ffmpeg stderr
+  的 `Duration:` 行（`_media_seconds`），不再依赖未登记的二进制。
+
+### Fixed（r86 续 · 截图与清单口径对齐）
+- 图 2 图注随 UI 改版重写（旧图注描述的"词典 25% / LLM 85%"探针输入框已不存在，
+  当前 UI 的双路展示面是随回复逐条标注的「情绪双路」标签）——**旧图注是对照已消失的 UI 写的**，
+  r32 只回扫了 s01/s08，这一处漏了三轮。
+
+## [1.7.0] - 2026-09-30 — 对标轮 r53–r83 收口（自 `v1.6.1` 起的全部在制增量随版发布）
 
 ### Fixed（r83 续 · 切版之后那三笔 —— R2c 逐轮点名当场逼出来的补记）
 - `ci_watch` 把「`gh run list` 取数失败」与「该 sha 没有 run」并进同一档，且 `sh()` 丢掉 stderr

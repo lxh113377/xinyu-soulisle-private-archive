@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PDF = ROOT / "交付物" / "提交包" / "心屿SoulIsle-应用方案.pdf"
+PDF = ROOT / "交付物" / "提交包" / "心屿MindIsle-应用方案.pdf"
 OUTLINE = ROOT / "交付物" / "提交包" / "应用方案大纲.md"
 PAGE_CAP = 20
 OFFICIAL_ITEMS = 9

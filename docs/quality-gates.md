@@ -89,6 +89,7 @@ python _test/hook_wiring_check.py                          # r83 交付面在位
 python _test/hook_wiring_check.py --selftest               # r83 判据桩：12 腿（副本漂一个字节必须红／CI 面不得判红／硬崩 rc 不得并入「环境未验」／端到端删一件入库件真被拦）
 python _test/hook_wiring_check.py --install                # 装法唯一入口（写后读回证明装的==声明的；异版先备份）
 python _test/live_sync_check.py https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com/xinyu/   # r84 备用线同尺对账（那条也曾"200 但页面换人"，只盯 pages.dev 看不见）
+python _test/backup_online_check.py                        # r86 备用线真实在线判据：真开浏览器经「确定访问」验证页进 /xinyu/，stub 须指 pages.dev、发一条消息须见「在线大模型生成」、console 零 error（改回已死的 service 域名即红）
 python _test/run_logged.py --selftest                      # r84 后台测量退出码回执桩：8 腿（转发真 rc／stderr 落盘／零输入与落点坏都判未验）
 python _test/run_logged.py --name peers -- python _test/benchmark_metrics.py --cap-channel   # 用法：把测量丢后台时的唯一合法包装，日志尾行 NAME_RC 才是结论
 python _test/hook_wiring_check.py --drill                  # 真注入演习：删一件「已入库但未写进声明面」的交付件 ⇒ 钩子必须 rc=1 且点名它，随后按字节复原并复验 rc=0

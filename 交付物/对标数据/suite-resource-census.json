@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 107,
+ "suites": 108,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
@@ -49,7 +49,7 @@
    ]
   },
   "free": {
-   "n": 68,
+   "n": 69,
    "seconds": 164.1,
    "members": [
     "disclaimer_forensics",
@@ -107,6 +107,7 @@
     "public_check",
     "live_sync",
     "live_sync_alt",
+    "backup_online",
     "emotion_eval_js",
     "js_unit",
     "js_unit_selftest",
@@ -1008,6 +1009,16 @@
    "target": "_test/live_sync_check.py",
    "mode": "real",
    "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "backup_online",
+   "target": "_test/backup_online_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
     "public_net"
    ],
    "exclusive": []

@@ -1,7 +1,17 @@
-# 品牌分叉待裁决：心屿 MindIsle ⇄ 心屿 SoulIsle
+# 品牌分叉裁决记录：心屿 MindIsle ⇄ 心屿 SoulIsle
 
-> 移位时间：2026-09-30（提交当日）｜**两件未删除，只从 `交付物/提交包/` 移出**，逐字节不变。
-> 移位人：AI（默认执行模式）；最终裁决权在老大。
+> ✅ **裁决结果（2026-10-01 老大拍板）：改用 MindIsle** —— r86 轮已全线执行：
+> UI（`src/index.html` 品牌位 + manifest + css 注释）→ `deploy/xinyu` 同步副本 →
+> 《应用方案》PDF 重渲染（20 页、9 图，`心屿MindIsle-应用方案.pdf`）→ 演示视频重录
+> （`心屿MindIsle-演示视频.mp4`，221.4s）→ 公网双线重发（pages.dev + CloudBase /xinyu/）→
+> 判据权威源随之切换（`deliverable_inventory_check` 以 `src/index.html` 为准）。
+> 本目录两件因此从"待裁决的分叉"转为**裁决依据留档**（最早出现 MindIsle 品牌的原件）。
+> SoulIsle 时代的提交版交付件在隔壁 `已提交留档-SoulIsle-20260930/`。
+> 域名 `xinyu-soulisle.pages.dev` 为技术标识，未随品牌改（改域名=换部署项目，风险不对称）。
+
+---
+
+## 以下为 2026-09-30 移位时的原始裁决分析（留痕不改写）
 
 ## 事实（本轮现读）
 
