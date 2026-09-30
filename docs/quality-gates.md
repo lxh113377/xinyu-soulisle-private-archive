@@ -88,6 +88,9 @@ python _test/deliverable_inventory_check.py --selftest    # r59 判据桩：9 �
 python _test/hook_wiring_check.py                          # r83 交付面在位闸的「接线回执」：_test/hooks/pre-commit 源在位 + sh -n 解析得动 + .git 副本按字节==源 + 被拦判据三态在位（CI/无 .git ⇒ 未验不判红）
 python _test/hook_wiring_check.py --selftest               # r83 判据桩：12 腿（副本漂一个字节必须红／CI 面不得判红／硬崩 rc 不得并入「环境未验」／端到端删一件入库件真被拦）
 python _test/hook_wiring_check.py --install                # 装法唯一入口（写后读回证明装的==声明的；异版先备份）
+python _test/live_sync_check.py https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com/xinyu/   # r84 备用线同尺对账（那条也曾"200 但页面换人"，只盯 pages.dev 看不见）
+python _test/run_logged.py --selftest                      # r84 后台测量退出码回执桩：8 腿（转发真 rc／stderr 落盘／零输入与落点坏都判未验）
+python _test/run_logged.py --name peers -- python _test/benchmark_metrics.py --cap-channel   # 用法：把测量丢后台时的唯一合法包装，日志尾行 NAME_RC 才是结论
 python _test/hook_wiring_check.py --drill                  # 真注入演习：删一件「已入库但未写进声明面」的交付件 ⇒ 钩子必须 rc=1 且点名它，随后按字节复原并复验 rc=0
 python _test/api_egress_headers_check.py                  # r59 函数出口面：node 假 fetch 驱动真 chat.js，6 条 return 出口各断 5 类安全头 + 状态码 + 错误体形状
 python _test/api_egress_headers_check.py --selftest       # r59 判据桩：7 腿（正例／摘 CSP／摘 no-store／缺出口／状态码漂移／错误体漂移／SSE 语义被换）；首跑即抓到"没发 stream:true 导致 SSE 腿空转"

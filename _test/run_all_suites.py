@@ -174,6 +174,11 @@ SUITES = [
     ("online_check", [sys.executable, "_test/online_check.py"]),
     ("public_check", [sys.executable, "_test/public_check.py"]),
     ("live_sync", [sys.executable, "_test/live_sync_check.py"]),
+    # r84（R83-01 闭环）：备用线 `/xinyu/` 也要有人看着。r83 那次是**人眼 curl** 发现根 index.html
+    # 被同环境另一项目覆盖掉（200、样式还在、只有标题换人）⇒ 单盯 pages.dev 等于把备用线交给运气。
+    # 复用同一条尺（BASE 由 argv[1] 传入），不另写第二份对账逻辑。
+    ("live_sync_alt", [sys.executable, "_test/live_sync_check.py",
+                       "https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com/xinyu/"]),
     ("emotion_eval_js", ["node", "_test/emotion_eval.js"]),
     # r58 质量工程面：JS 侧从"0 个单元测试"变成有常驻执行位（node --test + 跨 realm 归一）
     ("js_unit", [sys.executable, "_test/js_unit_check.py"]),
@@ -204,6 +209,9 @@ SUITES = [
     # 而丢失发生在两次提交之间 ⇒ 本轮把 `_test/hooks/pre-commit` 装上，本件盯「装没装、装的是不是源」。
     ("hook_wiring", [sys.executable, "_test/hook_wiring_check.py"]),
     ("hook_wiring_selftest", [sys.executable, "_test/hook_wiring_check.py", "--selftest"]),
+    # r84（R77-01 包装器侧）：后台测量的真退出码必须由**被包对象自己**写进日志尾行，
+    # 调度层的 `completed (exit code 0)` 不算数（r82/r83 两次一手代价）。本腿自证它会转发非零。
+    ("run_logged_selftest", [sys.executable, "_test/run_logged.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），

@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 105,
+ "suites": 107,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
@@ -49,7 +49,7 @@
    ]
   },
   "free": {
-   "n": 66,
+   "n": 68,
    "seconds": 164.1,
    "members": [
     "disclaimer_forensics",
@@ -106,6 +106,7 @@
     "voice_selftest",
     "public_check",
     "live_sync",
+    "live_sync_alt",
     "emotion_eval_js",
     "js_unit",
     "js_unit_selftest",
@@ -117,7 +118,8 @@
     "js_syntax",
     "js_syntax_selftest",
     "hook_wiring",
-    "hook_wiring_selftest"
+    "hook_wiring_selftest",
+    "run_logged_selftest"
    ]
   },
   "jar8123+port:18123": {
@@ -191,7 +193,8 @@
    "mode": "stub",
    "facets": [
     "build",
-    "jar8123"
+    "jar8123",
+    "public_net"
    ],
    "exclusive": [
     "jar8123"
@@ -1001,6 +1004,15 @@
    "exclusive": []
   },
   {
+   "suite": "live_sync_alt",
+   "target": "_test/live_sync_check.py",
+   "mode": "real",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
    "suite": "emotion_eval_js",
    "target": "_test/emotion_eval.js",
    "mode": "real",
@@ -1147,6 +1159,13 @@
   {
    "suite": "hook_wiring_selftest",
    "target": "_test/hook_wiring_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "run_logged_selftest",
+   "target": "_test/run_logged.py",
    "mode": "stub",
    "facets": [],
    "exclusive": []

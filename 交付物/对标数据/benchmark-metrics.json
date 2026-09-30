@@ -3,1024 +3,6 @@
  "peers_expected": 16,
  "runs": [
   {
-   "ts": "2026-09-28 19:08 UTC",
-   "repo_count": 13,
-   "self": {
-    "repo": "xinyu-soulisle (私有归档仓，本项目)",
-    "tier": "self",
-    "stars": null,
-    "pushed_at": null,
-    "latest_release": null,
-    "ci_workflows": 4,
-    "language": "JavaScript/Java",
-    "license": null,
-    "default_branch": "main",
-    "docs": [
-     ".env.example",
-     ".github",
-     "CHANGELOG.md",
-     "CONTRIBUTING.md",
-     "README.md",
-     "ROADMAP.md",
-     "SECURITY.md",
-     "docs",
-     "tests"
-    ],
-    "caps": [
-     "api_spec",
-     "container",
-     "deps_autoupdate",
-     "emotion_backend_wired",
-     "pwa_manifest",
-     "pwa_offline"
-    ],
-    "file_count": 19,
-    "caps_blind": [
-     "e2e_browser",
-     "streaming"
-    ],
-    "src_loc_excl_vendor": 2488,
-    "regression_suites": 99,
-    "regression_suites_face": "HEAD",
-    "regression_script_files": 46,
-    "self_face": "HEAD",
-    "self_face_errors": null,
-    "worktree_extra_untracked": 1,
-    "worktree_only_src_files": 1,
-    "ci_yml_error": null,
-    "battery_parse_error": null
-   },
-   "repos": [
-    {
-     "repo": "lobehub/lobehub",
-     "tier": "A",
-     "why": "Web AI 聊天前端工程化最强者（原 lobehub/lobe-chat，2026-09 改名）",
-     "stars": 82873,
-     "pushed_at": "2026-09-28",
-     "language": "TypeScript",
-     "license": "NOASSERTION",
-     "default_branch": "canary",
-     "latest_release": "v2.2.19-canary.32",
-     "ci_workflows": 51,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CHANGELOG.md",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 17653,
-     "caps": [
-      "api_spec",
-      "container",
-      "deps_autoupdate",
-      "e2e_browser",
-      "i18n_locale",
-      "streaming",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "SillyTavern/SillyTavern",
-     "tier": "A",
-     "why": "头部角色扮演聊天前端，persona/扩展生态参照",
-     "stars": 33887,
-     "pushed_at": "2026-09-23",
-     "language": "JavaScript",
-     "license": "AGPL-3.0",
-     "default_branch": "release",
-     "latest_release": "1.19.0",
-     "ci_workflows": 15,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "tests"
-     ],
-     "file_count": 1010,
-     "caps": [
-      "container",
-      "e2e_browser",
-      "i18n_locale",
-      "pwa_manifest",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
-     "tier": "B",
-     "why": "情绪→可视化映射 + 语音陪伴，与心屿同题",
-     "stars": 13938,
-     "pushed_at": "2026-05-15",
-     "language": "Python",
-     "license": "NOASSERTION",
-     "default_branch": "main",
-     "latest_release": "v1.2.1",
-     "ci_workflows": 13,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md"
-     ],
-     "file_count": 253,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "morettt/my-neuro",
-     "tier": "B",
-     "why": "桌宠 + 记忆型陪伴，活跃迭代参照",
-     "stars": 1384,
-     "pushed_at": "2026-09-28",
-     "language": "JavaScript",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v6.7.3",
-     "ci_workflows": 4,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "docs"
-     ],
-     "file_count": 646,
-     "caps": [
-      "i18n_locale",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "letta-ai/letta",
-     "tier": "D",
-     "why": "stateful agent 长期记忆（J4 记忆叙事同构先例）",
-     "stars": 24957,
-     "pushed_at": "2026-09-10",
-     "language": null,
-     "license": "Apache-2.0",
-     "default_branch": "main",
-     "latest_release": "0.16.8",
-     "ci_workflows": 2,
-     "docs": [
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md"
-     ],
-     "file_count": 12,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "hello-diana/MASCOT",
-     "tier": "C",
-     "why": "多智能体社交认知陪伴（EMNLP 2026）",
-     "stars": 651,
-     "pushed_at": "2026-08-24",
-     "language": "Python",
-     "license": "Apache-2.0",
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": 1,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 81,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "ddxfish/sapphire",
-     "tier": "C",
-     "why": "垂类陪伴 agent，Python + Web UI",
-     "stars": 288,
-     "pushed_at": "2026-09-27",
-     "language": "Python",
-     "license": "AGPL-3.0",
-     "default_branch": "main",
-     "latest_release": "v2.13.1",
-     "ci_workflows": 3,
-     "docs": [
-      ".github",
-      "README.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 1230,
-     "caps": [
-      "container",
-      "pwa_manifest",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "v2rockets/Loyal-Elephie",
-     "tier": "C",
-     "why": "带 RAG 记忆的陪伴（停更反面教材）",
-     "stars": 352,
-     "pushed_at": "2025-02-28",
-     "language": "Python",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": 0,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 124,
-     "caps": [
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Rogendo/Mental-health-Chatbot",
-     "tier": "C",
-     "why": "多语心理健康陪伴，有真实部署主页",
-     "stars": 213,
-     "pushed_at": "2026-09-08",
-     "language": "CSS",
-     "license": null,
-     "default_branch": "master",
-     "latest_release": null,
-     "ci_workflows": 1,
-     "docs": [
-      "README.md"
-     ],
-     "file_count": 10,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "Lum1104/MER-Factory",
-     "tier": "D",
-     "why": "多模态情绪识别工厂（标注→评测→训练闭环）",
-     "stars": 119,
-     "pushed_at": "2026-03-13",
-     "language": "Python",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v0.1.2",
-     "ci_workflows": 1,
-     "docs": [
-      ".env.example",
-      ".github",
-      "README.md",
-      "docs",
-      "test"
-     ],
-     "file_count": 158,
-     "caps": [],
-     "tree_truncated": false
-    },
-    {
-     "repo": "CheaperjamRen/leemo",
-     "tier": "C",
-     "why": "本地优先桌面陪伴 agent",
-     "stars": 101,
-     "pushed_at": "2026-08-27",
-     "language": "TypeScript",
-     "license": "Apache-2.0",
-     "default_branch": "main",
-     "latest_release": "v0.1.10",
-     "ci_workflows": 1,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "SECURITY.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 1518,
-     "caps": [
-      "pwa_manifest",
-      "streaming",
-      "vector_memory"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "s-nagaev/chibi",
-     "tier": "C",
-     "why": "小体量高频发布节奏样板",
-     "stars": 56,
-     "pushed_at": "2026-09-28",
-     "language": "Python",
-     "license": "MIT",
-     "default_branch": "main",
-     "latest_release": "v1.16.2.dev202609280821",
-     "ci_workflows": 5,
-     "docs": [
-      ".env.example",
-      ".github",
-      "CONTRIBUTING.md",
-      "README.md",
-      "docs",
-      "tests"
-     ],
-     "file_count": 249,
-     "caps": [
-      "container"
-     ],
-     "tree_truncated": false
-    },
-    {
-     "repo": "29-Cu/succhia",
-     "tier": "C",
-     "why": "中文『陪聊』垂类（BLE 硬件），零工程配套",
-     "stars": 79,
-     "pushed_at": "2026-07-25",
-     "language": "HTML",
-     "license": "NOASSERTION",
-     "default_branch": "main",
-     "latest_release": null,
-     "ci_workflows": null,
-     "docs": [],
-     "caps": [],
-     "file_count": null,
-     "tree_error": "gh api repos/29-Cu/succhia/git/trees/main?recursive=1 -> Get \"https://api.github.com/repos/29-Cu/succhia/git/trees/main?"
-    }
-   ],
-   "cap_channel": {
-    "lobehub/lobehub": {
-     "streaming": "unverified",
-     "e2e_browser": "unverified",
-     "evidence": {},
-     "unverified": "meta:gh api repos/lobehub/lobehub -> Get \"https://api.github.com/repos/lobe; readme:gh api repos/lobehub/lobehub/readme -> Get \"https://api.github.com/rep"
-    },
-    "SillyTavern/SillyTavern": {
-     "streaming": "none",
-     "e2e_browser": "none",
-     "evidence": {},
-     "fetched": true,
-     "partial": true,
-     "partial_errors": "meta:gh api repos/SillyTavern/SillyTavern -> Get \"https://api.github.com/re"
-    },
-    "Open-LLM-VTuber/Open-LLM-VTuber": {
-     "streaming": "unverified",
-     "e2e_browser": "unverified",
-     "evidence": {},
-     "unverified": "meta:gh api repos/Open-LLM-VTuber/Open-LLM-VTuber -> Get \"https://api.githu; readme:gh api repos/Open-LLM-VTuber/Open-LLM-VTuber/readme -> Get \"https://ap"
-    },
-    "morettt/my-neuro": {
-     "streaming": "media_stream",
-     "e2e_browser": "none",
-     "evidence": {
-      "streaming": "ytri53](https://github.com/jonnytri53) 资金赞助开发，特此感谢） - [ ] 国外直播平台的接入 - [x] 直播功能：可在哔哩哔哩平台直播 - [x] AI讲课：选择一个主题，让AI给你讲课。中途可提"
-     },
-     "fetched": true,
-     "partial": false
-    },
-    "letta-ai/letta": {
-     "streaming": "unverified",
-     "e2e_browser": "unverified",
-     "evidence": {},
-     "unverified": "meta:gh api repos/letta-ai/letta -> Get \"https://api.github.com/repos/letta; readme:gh api repos/letta-ai/letta/readme -> Get \"https://api.github.com/repo"
-    },
-    "hello-diana/MASCOT": {
-     "streaming": "none",
-     "e2e_browser": "none",
-     "evidence": {},
-     "fetched": true,
-     "partial": false
-    },
-    "ddxfish/sapphire": {
-     "streaming": "unverified",
-     "e2e_browser": "unverified",
-     "evidence": {},
-     "unverified": "meta:gh api repos/ddxfish/sapphire -> Get \"https://api.github.com/repos/ddx; readme:gh api repos/ddxfish/sapphire/readme -> Get \"https://api.github.com/re"
-    },
-    "v2rockets/Loyal-Elephie": {
-     "streaming": "unverified",
-     "e2e_browser": "unverified",
-     "evidence": {},
-     "unverified": "meta:gh api repos/v2rockets/Loyal-Elephie -> Get \"https://api.github.com/re; readme:gh api repos/v2rockets/Loyal-Elephie/readme -> Get \"https://api.github"
-    },
-    "Rogendo/Mental-health-Chatbot": {
-     "streaming": "none",
-     "e2e_browser": "none",
-     "evidence": {},
-     "fetched": true,
-     "partial": true,
-     "partial_errors": "meta:gh api repos/Rogendo/Mental-health-Chatbot -> Get \"https://api.github."
-    },
-    "Lum1104/MER-Factory": {
-     "streaming": "none",
-     "e2e_browser": "none",
-     "evidence": {},
-     "fetched": true,
-     "partial": false
-    },
-    "CheaperjamRen/leemo": {
-     "streaming": "none",
-     "e2e_browser": "none",
-     "evidence": {},
-     "fetched": true,
-     "partial": false
-    },
-    "s-nagaev/chibi": {
-     "streaming": "none",
-     "e2e_browser": "browser_tool_feature",
-     "evidence": {
-      "e2e_browser": "(or build your own): - GitHub (PRs, issues, code review) - Browser automation - Docker / cloud services - Databases - Cr"
-     },
-     "fetched": true,
-     "partial": false
-    },
-    "29-Cu/succhia": {
-     "streaming": "none",
-     "e2e_browser": "none",
-     "evidence": {},
-     "fetched": true,
-     "partial": false
-    }
-   },
-   "doc_perf_channel": {
-    "peers": {
-     "lobehub/lobehub": {
-      "docs_site": true,
-      "agent_facing_doc": true,
-      "changelog_root": true,
-      "bench_script": true,
-      "ci_perf_step": false,
-      "readme_thorough": true,
-      "published_numbers": false,
-      "classes": [
-       "agent_facing_doc",
-       "bench_script",
-       "changelog_root",
-       "docs_site",
-       "readme_thorough"
-      ],
-      "evidence": {
-       "agent_facing_doc": ".agents/acceptance/PROCESS.md",
-       "docs_site": ".cursor/docs/createStaticStyles_migration_guide.md",
-       "changelog_root": "CHANGELOG.md",
-       "bench_script": "packages/memory-user-memory/benchmarks/locomo/README.md",
-       "readme_thorough": "len=38985 signals=4/4"
-      },
-      "partial": false,
-      "path_count": 17653
-     },
-     "SillyTavern/SillyTavern": {
-      "docs_site": false,
-      "agent_facing_doc": false,
-      "changelog_root": false,
-      "bench_script": false,
-      "ci_perf_step": false,
-      "readme_thorough": false,
-      "published_numbers": false,
-      "classes": [],
-      "evidence": {},
-      "partial": true,
-      "partial_errors": "readme:gh api repos/SillyTavern/SillyTavern/readme -> Get \"https://api.github",
-      "path_count": 1010
-     },
-     "Open-LLM-VTuber/Open-LLM-VTuber": {
-      "classes": [],
-      "evidence": {},
-      "unverified": "tree:gh api repos/Open-LLM-VTuber/Open-LLM-VTuber/git/trees/main?recursive=; readme:gh api repos/Open-LLM-VTuber/Open-LLM-VTuber/readme -> Get \"https://ap"
-     },
-     "morettt/my-neuro": {
-      "classes": [],
-      "evidence": {},
-      "unverified": "tree:gh api repos/morettt/my-neuro/git/trees/main?recursive=1 -> Get \"https; readme:gh api repos/morettt/my-neuro/readme -> Get \"https://api.github.com/re"
-     },
-     "letta-ai/letta": {
-      "docs_site": false,
-      "agent_facing_doc": true,
-      "changelog_root": false,
-      "bench_script": false,
-      "ci_perf_step": false,
-      "readme_thorough": false,
-      "published_numbers": false,
-      "classes": [
-       "agent_facing_doc"
-      ],
-      "evidence": {
-       "agent_facing_doc": "AGENTS.md"
-      },
-      "partial": false,
-      "path_count": 12
-     },
-     "hello-diana/MASCOT": {
-      "docs_site": false,
-      "agent_facing_doc": false,
-      "changelog_root": false,
-      "bench_script": false,
-      "ci_perf_step": false,
-      "readme_thorough": false,
-      "published_numbers": false,
-      "classes": [],
-      "evidence": {},
-      "partial": false,
-      "path_count": 81
-     },
-     "ddxfish/sapphire": {
-      "docs_site": true,
-      "agent_facing_doc": true,
-      "changelog_root": false,
-      "bench_script": true,
-      "ci_perf_step": false,
-      "readme_thorough": true,
-      "published_numbers": false,
-      "classes": [
-       "agent_facing_doc",
-       "bench_script",
-       "docs_site",
-       "readme_thorough"
-      ],
-      "evidence": {
-       "docs_site": "docs/AGENTS.md",
-       "agent_facing_doc": "docs/AGENTS.md",
-       "bench_script": "tools/tts_benchmark.py",
-       "readme_thorough": "len=15320 signals=4/4"
-      },
-      "partial": false,
-      "path_count": 1230
-     },
-     "v2rockets/Loyal-Elephie": {
-      "docs_site": false,
-      "agent_facing_doc": false,
-      "changelog_root": false,
-      "bench_script": false,
-      "ci_perf_step": false,
-      "readme_thorough": true,
-      "published_numbers": false,
-      "classes": [
-       "readme_thorough"
-      ],
-      "evidence": {
-       "readme_thorough": "len=4411 signals=3/4"
-      },
-      "partial": false,
-      "path_count": 124
-     },
-     "Rogendo/Mental-health-Chatbot": {
-      "docs_site": false,
-      "agent_facing_doc": false,
-      "changelog_root": false,
-      "bench_script": false,
-      "ci_perf_step": false,
-      "readme_thorough": false,
-      "published_numbers": false,
-      "classes": [],
-      "evidence": {},
-      "partial": false,
-      "path_count": 10
-     },
-     "Lum1104/MER-Factory": {
-      "docs_site": true,
-      "agent_facing_doc": true,
-      "changelog_root": false,
-      "bench_script": false,
-      "ci_perf_step": false,
-      "readme_thorough": false,
-      "published_numbers": false,
-      "classes": [
-       "agent_facing_doc",
-       "docs_site"
-      ],
-      "evidence": {
-       "agent_facing_doc": "AGENTS.md",
-       "docs_site": "docs/.gitignore"
-      },
-      "partial": false,
-      "path_count": 158
-     },
-     "CheaperjamRen/leemo": {
-      "docs_site": true,
-      "agent_facing_doc": true,
-      "changelog_root": false,
-      "bench_script": false,
-      "ci_perf_step": false,
-      "readme_thorough": false,
-      "published_numbers": false,
-      "classes": [
-       "agent_facing_doc",
-       "docs_site"
-      ],
-      "evidence": {
-       "agent_facing_doc": "AGENTS.md",
-       "docs_site": "docs/README.md"
-      },
-      "partial": false,
-      "path_count": 1518
-     },
-     "s-nagaev/chibi": {
-      "docs_site": true,
-      "agent_facing_doc": false,
-      "changelog_root": true,
-      "bench_script": false,
-      "ci_perf_step": false,
-      "readme_thorough": false,
-      "published_numbers": false,
-      "classes": [
-       "changelog_root",
-       "docs_site"
-      ],
-      "evidence": {
-       "changelog_root": "changelog.md",
-       "docs_site": "docs/DOCKER_HUB_README.md"
-      },
-      "partial": false,
-      "path_count": 249
-     },
-     "29-Cu/succhia": {
-      "docs_site": false,
-      "agent_facing_doc": false,
-      "changelog_root": false,
-      "bench_script": false,
-      "ci_perf_step": false,
-      "readme_thorough": false,
-      "published_numbers": false,
-      "classes": [],
-      "evidence": {},
-      "partial": false,
-      "path_count": 7
-     }
-    },
-    "self": {
-     "docs_site": true,
-     "agent_facing_doc": true,
-     "changelog_root": true,
-     "bench_script": true,
-     "ci_perf_step": false,
-     "readme_thorough": true,
-     "published_numbers": false,
-     "classes": [
-      "agent_facing_doc",
-      "bench_script",
-      "changelog_root",
-      "docs_site",
-      "readme_thorough"
-     ],
-     "evidence": {
-      "agent_facing_doc": "AGENTS.md",
-      "changelog_root": "CHANGELOG.md",
-      "bench_script": "_test/perf_baseline_check.py",
-      "docs_site": "docs/README.md",
-      "readme_thorough": "len=10985 signals=4/4"
-     },
-     "face": "HEAD",
-     "self_paths": 408,
-     "readme_chars": 10985
-    },
-    "rule": "两侧同规则；不参与 caps；两路皆空记 unverified"
-   },
-   "quality_gate_channel": {
-    "peers": {
-     "lobehub/lobehub": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": null,
-       "typecheck_gate": null,
-       "secret_scan_gate": false
-      },
-      "evidence": {
-       "lint_gate": "eslint.config.mjs 在，但 CI 面未取全 ⇒ 不得判「无门」",
-       "typecheck_gate": "apps/auth/tsconfig.json 在，但 CI 面未取全 ⇒ 不得判「无门」"
-      },
-      "unverified": [
-       "lint_gate(CI 面未取全)",
-       "typecheck_gate(CI 面未取全)"
-      ],
-      "ci_face": "12/33",
-      "candidates": {
-       "coverage_gate": [
-        ".agents/scripts/check/vitest.config.mts",
-        ".agents/skills/deep-review/scripts/vitest.config.ts",
-        "apps/cli/vitest.config.mts"
-       ],
-       "mutation_gate": [],
-       "lint_gate": [
-        "eslint.config.mjs"
-       ],
-       "typecheck_gate": [
-        "apps/auth/tsconfig.json",
-        "apps/cli/tsconfig.json",
-        "apps/desktop/tsconfig.json"
-       ],
-       "secret_scan_gate": []
-      },
-      "partial": true,
-      "partial_errors": "ci:gh api repos/lobehub/lobehub/contents/.g; ci:gh api repos/lobehub/lobehub/contents/.g; ci:gh api repos/lobehub/lobehub/contents/.g; ci:gh api repos/lobehub/l"
-     },
-     "SillyTavern/SillyTavern": {
-      "classes": {},
-      "evidence": {},
-      "unverified": [
-       "tree 取不到：gh api repos/SillyTavern/SillyTavern/git/trees/release?recur"
-      ]
-     },
-     "Open-LLM-VTuber/Open-LLM-VTuber": {
-      "classes": {
-       "coverage_gate": null,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {
-       "secret_scan_gate": ".pre-commit-config.yaml 在而 CI 面取全后未见执行位"
-      },
-      "unverified": [
-       "coverage_gate(候选 pyproject.toml 正文未取到)"
-      ],
-      "ci_face": "6/6",
-      "candidates": {
-       "coverage_gate": [
-        "pyproject.toml"
-       ],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [],
-       "secret_scan_gate": [
-        ".pre-commit-config.yaml"
-       ]
-      },
-      "partial": true,
-      "partial_errors": "pyproject.toml:gh api repos/Open-LLM-VTuber/Open-LLM-VT; .pre-commit-config.yaml:gh api repos/Open-LLM-VTuber/Open-LLM-VT; ci:gh api repos/Open-LLM-VTuber/Open-"
-     },
-     "morettt/my-neuro": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {},
-      "unverified": [],
-      "ci_face": "3/3",
-      "candidates": {
-       "coverage_gate": [],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [],
-       "secret_scan_gate": []
-      },
-      "partial": false,
-      "partial_errors": ""
-     },
-     "letta-ai/letta": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {},
-      "unverified": [],
-      "ci_face": "1/1",
-      "candidates": {
-       "coverage_gate": [],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [],
-       "secret_scan_gate": []
-      },
-      "partial": false,
-      "partial_errors": ""
-     },
-     "hello-diana/MASCOT": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {},
-      "unverified": [],
-      "ci_face": "0/0",
-      "candidates": {
-       "coverage_gate": [
-        "pyproject.toml"
-       ],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [],
-       "secret_scan_gate": []
-      },
-      "partial": false,
-      "partial_errors": ""
-     },
-     "ddxfish/sapphire": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {},
-      "unverified": [],
-      "ci_face": "1/1",
-      "candidates": {
-       "coverage_gate": [],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [],
-       "secret_scan_gate": []
-      },
-      "partial": false,
-      "partial_errors": ""
-     },
-     "v2rockets/Loyal-Elephie": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {
-       "typecheck_gate": "frontend/tsconfig.json 在而 CI 面取全后未见执行位"
-      },
-      "unverified": [],
-      "ci_face": "0/0",
-      "candidates": {
-       "coverage_gate": [],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [
-        "frontend/tsconfig.json"
-       ],
-       "secret_scan_gate": []
-      },
-      "partial": false,
-      "partial_errors": ""
-     },
-     "Rogendo/Mental-health-Chatbot": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {},
-      "unverified": [],
-      "ci_face": "0/0",
-      "candidates": {
-       "coverage_gate": [],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [],
-       "secret_scan_gate": []
-      },
-      "partial": false,
-      "partial_errors": ""
-     },
-     "Lum1104/MER-Factory": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {},
-      "unverified": [],
-      "ci_face": "1/1",
-      "candidates": {
-       "coverage_gate": [],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [],
-       "secret_scan_gate": []
-      },
-      "partial": false,
-      "partial_errors": ""
-     },
-     "CheaperjamRen/leemo": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {
-       "typecheck_gate": "tsconfig.json 在而 CI 面取全后未见执行位"
-      },
-      "unverified": [],
-      "ci_face": "1/1",
-      "candidates": {
-       "coverage_gate": [
-        "vitest.config.ts"
-       ],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [
-        "tsconfig.json",
-        "tsconfig.renderer.json",
-        "tsconfig.vendor.json"
-       ],
-       "secret_scan_gate": []
-      },
-      "partial": false,
-      "partial_errors": ""
-     },
-     "s-nagaev/chibi": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {},
-      "unverified": [],
-      "ci_face": "4/4",
-      "candidates": {
-       "coverage_gate": [
-        "pyproject.toml"
-       ],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [],
-       "secret_scan_gate": []
-      },
-      "partial": false,
-      "partial_errors": ""
-     },
-     "29-Cu/succhia": {
-      "classes": {
-       "coverage_gate": false,
-       "mutation_gate": false,
-       "lint_gate": false,
-       "typecheck_gate": false,
-       "secret_scan_gate": false
-      },
-      "evidence": {},
-      "unverified": [],
-      "ci_face": "0/0",
-      "candidates": {
-       "coverage_gate": [],
-       "mutation_gate": [],
-       "lint_gate": [],
-       "typecheck_gate": [],
-       "secret_scan_gate": []
-      },
-      "partial": false,
-      "partial_errors": ""
-     }
-    },
-    "self": {
-     "classes": {
-      "coverage_gate": true,
-      "mutation_gate": false,
-      "lint_gate": false,
-      "typecheck_gate": false,
-      "secret_scan_gate": false
-     },
-     "evidence": {
-      "coverage_gate": "server/pom.xml :: minimum"
-     },
-     "unverified": [],
-     "ci_face": "1/1",
-     "candidates": {
-      "coverage_gate": [
-       "server/pom.xml"
-      ],
-      "mutation_gate": [
-       "server/pom.xml"
-      ],
-      "lint_gate": [],
-      "typecheck_gate": [],
-      "secret_scan_gate": []
-     },
-     "face": "HEAD",
-     "ci_step_count": 22,
-     "ci_steps_homegrown": [
-      "判据脚本语法自检（compileall，锁 CI 的 Python ",
-      "静态资源体积预算守卫（首屏优势不回涨，含 --selftest 防恒",
-      "vendor 供给链守卫（完整性哈希 + 版本声明对账 + 漏登记即",
-      "情绪评测集门禁（accuracy ≥ 95% 且危机全召回）",
-      "共情策略表 ↔ 词表成对性门禁（含 --selftest 防判据恒真",
-      "密钥零入库扫描（判据与本地电池同源，正则不再内联）",
-      "校验 fat jar 产物（防\"瘦 jar 冒充 fat jar\"）",
-      "起 fat jar（无密钥，仅情绪接口）并跑双端一致性对账"
-     ],
-     "partial_errors": ""
-    },
-    "rule": "阈值型须有失败形状、执行型须配置∧CI；不参与 caps；取不到记 unverified"
-   }
-  },
-  {
    "ts": "2026-09-28 19:20 UTC",
    "repo_count": 16,
    "self": {
@@ -7328,6 +6310,1370 @@
       },
       "partial": true,
       "partial_errors": "ci:network: Get \"https://api.github.com/rep"
+     },
+     "morettt/my-neuro": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "3/3",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "letta-ai/letta": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "1/1",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "hello-diana/MASCOT": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [
+        "pyproject.toml"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "ddxfish/sapphire": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "1/1",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "v2rockets/Loyal-Elephie": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "frontend/tsconfig.json 在而 CI 面取全后未见执行位",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [
+        "frontend/tsconfig.json"
+       ],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "Rogendo/Mental-health-Chatbot": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "Lum1104/MER-Factory": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "1/1",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "CheaperjamRen/leemo": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "tsconfig.json 在而 CI 面取全后未见执行位",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "1/1",
+      "candidates": {
+       "coverage_gate": [
+        "vitest.config.ts"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [
+        "tsconfig.json",
+        "tsconfig.renderer.json",
+        "tsconfig.vendor.json"
+       ],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "NJX-njx/opensoul": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": true
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "tsconfig.json 在而 CI 面取全后未见执行位",
+       "secret_scan_gate": ".pre-commit-config.yaml ∧ CI 执行位=detect-secrets"
+      },
+      "unverified": [],
+      "ci_face": "8/8",
+      "candidates": {
+       "coverage_gate": [
+        "apps/android/app/build.gradle.kts",
+        "apps/android/build.gradle.kts",
+        "skills/local-places/pyproject.toml"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [
+        "tsconfig.json",
+        "tsconfig.plugin-sdk.dts.json"
+       ],
+       "secret_scan_gate": [
+        ".pre-commit-config.yaml",
+        ".secrets.baseline"
+       ]
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "s-nagaev/chibi": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "4/4",
+      "candidates": {
+       "coverage_gate": [
+        "pyproject.toml"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "29-Cu/succhia": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "zeroa234/ryza-ai-revive": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [
+        "android/app/build.gradle",
+        "android/build.gradle"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "Bwcx-songyu/MoodChat": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [
+        "pom.xml"
+       ],
+       "mutation_gate": [
+        "pom.xml"
+       ],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     }
+    },
+    "self": {
+     "classes": {
+      "coverage_gate": true,
+      "mutation_gate": false,
+      "lint_gate": false,
+      "typecheck_gate": false,
+      "secret_scan_gate": true
+     },
+     "evidence": {
+      "coverage_gate": "server/pom.xml :: minimum",
+      "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+      "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+      "secret_scan_gate": "自写门禁 ∧ CI 真调用：python _test/tracked_secret_scan.py --selftest"
+     },
+     "unverified": [],
+     "ci_face": "1/1",
+     "candidates": {
+      "coverage_gate": [
+       "server/pom.xml"
+      ],
+      "mutation_gate": [
+       "server/pom.xml"
+      ],
+      "lint_gate": [],
+      "typecheck_gate": [],
+      "secret_scan_gate": []
+     },
+     "face": "HEAD",
+     "ci_step_count": 24,
+     "ci_steps_homegrown": [
+      "判据脚本语法自检（compileall，锁 CI 的 Python ",
+      "标记层内联样式守卫（CSP style-src 'self' 前提；",
+      "静态资源体积预算守卫（首屏优势不回涨，含 --selftest 防恒",
+      "vendor 供给链守卫（完整性哈希 + 版本声明对账 + 漏登记即",
+      "情绪评测集门禁（accuracy ≥ 95% 且危机全召回）",
+      "共情策略表 ↔ 词表成对性门禁（含 --selftest 防判据恒真",
+      "密钥零入库扫描（判据与本地电池同源，正则不再内联）",
+      "校验 fat jar 产物（防\"瘦 jar 冒充 fat jar\"）",
+      "起 fat jar（无密钥，仅情绪接口）并跑双端一致性对账"
+     ],
+     "partial_errors": ""
+    },
+    "rule": "阈值型须有失败形状、执行型须配置∧CI；不参与 caps；取不到记 unverified"
+   }
+  },
+  {
+   "ts": "2026-09-29 18:55 UTC",
+   "repo_count": 16,
+   "self": {
+    "repo": "xinyu-soulisle (私有归档仓，本项目)",
+    "tier": "self",
+    "stars": null,
+    "pushed_at": null,
+    "latest_release": null,
+    "ci_workflows": 4,
+    "language": "JavaScript/Java",
+    "license": null,
+    "default_branch": "main",
+    "docs": [
+     ".env.example",
+     ".github",
+     "CHANGELOG.md",
+     "CONTRIBUTING.md",
+     "README.md",
+     "ROADMAP.md",
+     "SECURITY.md",
+     "docs",
+     "tests"
+    ],
+    "caps": [
+     "api_spec",
+     "container",
+     "deps_autoupdate",
+     "emotion_backend_wired",
+     "pwa_manifest",
+     "pwa_offline"
+    ],
+    "file_count": 19,
+    "caps_blind": [
+     "e2e_browser",
+     "streaming"
+    ],
+    "src_loc_excl_vendor": 2524,
+    "regression_suites": 105,
+    "regression_suites_face": "HEAD",
+    "regression_script_files": 48,
+    "self_face": "HEAD",
+    "self_face_errors": null,
+    "worktree_extra_untracked": 0,
+    "worktree_only_src_files": 1,
+    "ci_yml_error": null,
+    "battery_parse_error": null
+   },
+   "repos": [
+    {
+     "repo": "lobehub/lobehub",
+     "tier": "A",
+     "why": "Web AI 聊天前端工程化最强者（原 lobehub/lobe-chat，2026-09 改名）",
+     "stars": 82903,
+     "pushed_at": "2026-09-29",
+     "language": "TypeScript",
+     "license": "NOASSERTION",
+     "default_branch": "canary",
+     "latest_release": "v2.2.19-canary.34",
+     "ci_workflows": 51,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 17800,
+     "caps": [
+      "api_spec",
+      "container",
+      "deps_autoupdate",
+      "e2e_browser",
+      "i18n_locale",
+      "streaming",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "SillyTavern/SillyTavern",
+     "tier": "A",
+     "why": "头部角色扮演聊天前端，persona/扩展生态参照",
+     "stars": 33931,
+     "pushed_at": "2026-09-23",
+     "language": "JavaScript",
+     "license": "AGPL-3.0",
+     "default_branch": "release",
+     "latest_release": "1.19.0",
+     "ci_workflows": 15,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "tests"
+     ],
+     "file_count": 1010,
+     "caps": [
+      "container",
+      "e2e_browser",
+      "i18n_locale",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
+     "tier": "B",
+     "why": "情绪→可视化映射 + 语音陪伴，与心屿同题",
+     "stars": 13955,
+     "pushed_at": "2026-05-15",
+     "language": "Python",
+     "license": "NOASSERTION",
+     "default_branch": "main",
+     "latest_release": "v1.2.1",
+     "ci_workflows": 13,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md"
+     ],
+     "file_count": 253,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "morettt/my-neuro",
+     "tier": "B",
+     "why": "桌宠 + 记忆型陪伴，活跃迭代参照",
+     "stars": 1385,
+     "pushed_at": "2026-09-28",
+     "language": "JavaScript",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v6.7.4",
+     "ci_workflows": 4,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "docs"
+     ],
+     "file_count": 646,
+     "caps": [
+      "i18n_locale",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "letta-ai/letta",
+     "tier": "D",
+     "why": "stateful agent 长期记忆（J4 记忆叙事同构先例）",
+     "stars": 24973,
+     "pushed_at": "2026-09-10",
+     "language": null,
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": "0.16.8",
+     "ci_workflows": 2,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md"
+     ],
+     "file_count": 12,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "hello-diana/MASCOT",
+     "tier": "C",
+     "why": "多智能体社交认知陪伴（EMNLP 2026）",
+     "stars": 655,
+     "pushed_at": "2026-08-24",
+     "language": "Python",
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 1,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 81,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "ddxfish/sapphire",
+     "tier": "C",
+     "why": "垂类陪伴 agent，Python + Web UI",
+     "stars": 289,
+     "pushed_at": "2026-09-27",
+     "language": "Python",
+     "license": "AGPL-3.0",
+     "default_branch": "main",
+     "latest_release": "v2.13.1",
+     "ci_workflows": 3,
+     "docs": [
+      ".github",
+      "README.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 1230,
+     "caps": [
+      "container",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "v2rockets/Loyal-Elephie",
+     "tier": "C",
+     "why": "带 RAG 记忆的陪伴（停更反面教材）",
+     "stars": 352,
+     "pushed_at": "2025-02-28",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 124,
+     "caps": [
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Rogendo/Mental-health-Chatbot",
+     "tier": "C",
+     "why": "多语心理健康陪伴，有真实部署主页",
+     "stars": 213,
+     "pushed_at": "2026-09-08",
+     "language": "CSS",
+     "license": null,
+     "default_branch": "master",
+     "latest_release": null,
+     "ci_workflows": 1,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 10,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Lum1104/MER-Factory",
+     "tier": "D",
+     "why": "多模态情绪识别工厂（标注→评测→训练闭环）",
+     "stars": 119,
+     "pushed_at": "2026-03-13",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v0.1.2",
+     "ci_workflows": 1,
+     "docs": [
+      ".env.example",
+      ".github",
+      "README.md",
+      "docs",
+      "test"
+     ],
+     "file_count": 158,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "CheaperjamRen/leemo",
+     "tier": "C",
+     "why": "本地优先桌面陪伴 agent",
+     "stars": 101,
+     "pushed_at": "2026-08-27",
+     "language": "TypeScript",
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": "v0.1.10",
+     "ci_workflows": 1,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 1518,
+     "caps": [
+      "pwa_manifest",
+      "streaming",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "NJX-njx/opensoul",
+     "tier": "C",
+     "why": "小体量但工程齐（13 workflow + 全套文档）",
+     "stars": 58,
+     "pushed_at": "2026-06-04",
+     "language": "TypeScript",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v0.2.4",
+     "ci_workflows": 13,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "README.md",
+      "ROADMAP.md",
+      "SECURITY.md",
+      "docs",
+      "test"
+     ],
+     "file_count": 6141,
+     "caps": [
+      "container",
+      "deps_autoupdate",
+      "e2e_browser",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "s-nagaev/chibi",
+     "tier": "C",
+     "why": "小体量高频发布节奏样板",
+     "stars": 56,
+     "pushed_at": "2026-09-29",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v1.17.0.dev202609290800",
+     "ci_workflows": 5,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 256,
+     "caps": [
+      "container"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "29-Cu/succhia",
+     "tier": "C",
+     "why": "中文『陪聊』垂类（BLE 硬件），零工程配套",
+     "stars": 80,
+     "pushed_at": "2026-07-25",
+     "language": "HTML",
+     "license": "NOASSERTION",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 7,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "zeroa234/ryza-ai-revive",
+     "tier": "C",
+     "why": "190★、JS、2026-09-22 仍活跃的同体量陪伴项目",
+     "stars": 197,
+     "pushed_at": "2026-09-22",
+     "language": "JavaScript",
+     "license": "MIT",
+     "default_branch": "master",
+     "latest_release": "v1.2.22",
+     "ci_workflows": 0,
+     "docs": [
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs"
+     ],
+     "file_count": 1762,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Bwcx-songyu/MoodChat",
+     "tier": "C",
+     "why": "Java 同栈情绪陪伴垂类（体量小，作技术栈对照）",
+     "stars": 1,
+     "pushed_at": "2026-09-09",
+     "language": "Java",
+     "license": null,
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 54,
+     "caps": [],
+     "tree_truncated": false
+    }
+   ],
+   "cap_channel": {
+    "lobehub/lobehub": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "SillyTavern/SillyTavern": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "Open-LLM-VTuber/Open-LLM-VTuber": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "morettt/my-neuro": {
+     "streaming": "media_stream",
+     "e2e_browser": "none",
+     "evidence": {
+      "streaming": "ytri53](https://github.com/jonnytri53) 资金赞助开发，特此感谢） - [ ] 国外直播平台的接入 - [x] 直播功能：可在哔哩哔哩平台直播 - [x] AI讲课：选择一个主题，让AI给你讲课。中途可提"
+     },
+     "fetched": true,
+     "partial": false
+    },
+    "letta-ai/letta": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "hello-diana/MASCOT": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "ddxfish/sapphire": {
+     "streaming": "token_stream",
+     "e2e_browser": "none",
+     "evidence": {
+      "streaming": "**Avatar** - 3D animated avatar with environment scenes and SSE-driven reactions. - **Import/Export** - [IMPORT-EXPORT.m"
+     },
+     "fetched": true,
+     "partial": false
+    },
+    "v2rockets/Loyal-Elephie": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "Rogendo/Mental-health-Chatbot": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "Lum1104/MER-Factory": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "CheaperjamRen/leemo": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "NJX-njx/opensoul": {
+     "streaming": "none",
+     "e2e_browser": "test_e2e",
+     "evidence": {
+      "e2e_browser": "npm test` - Additional configs: `vitest.config.ts`, `vitest.e2e.config.ts`, `vitest.gateway.config.ts`, `vitest.extensio"
+     },
+     "fetched": true,
+     "partial": false
+    },
+    "s-nagaev/chibi": {
+     "streaming": "none",
+     "e2e_browser": "browser_tool_feature",
+     "evidence": {
+      "e2e_browser": "(or build your own): - GitHub (PRs, issues, code review) - Browser automation - Docker / cloud services - Databases - Cr"
+     },
+     "fetched": true,
+     "partial": false
+    },
+    "29-Cu/succhia": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "zeroa234/ryza-ai-revive": {
+     "streaming": "none",
+     "e2e_browser": "none",
+     "evidence": {},
+     "fetched": true,
+     "partial": false
+    },
+    "Bwcx-songyu/MoodChat": {
+     "streaming": "token_stream",
+     "e2e_browser": "none",
+     "evidence": {
+      "streaming": "晴对话空间 ## 项目简介 前后端分离AI心理咨询系统，基于Spring AI对接大模型，采用Reactor Flux+SSE实现流式对话，支持AI心理疏导、情绪日记、心理知识库，配套管理后台完成内容运营。 ## 技术栈 后端：Spring"
+     },
+     "fetched": true,
+     "partial": false
+    }
+   },
+   "doc_perf_channel": {
+    "peers": {
+     "lobehub/lobehub": {
+      "docs_site": true,
+      "agent_facing_doc": true,
+      "changelog_root": true,
+      "bench_script": true,
+      "ci_perf_step": false,
+      "readme_thorough": true,
+      "published_numbers": false,
+      "classes": [
+       "agent_facing_doc",
+       "bench_script",
+       "changelog_root",
+       "docs_site",
+       "readme_thorough"
+      ],
+      "evidence": {
+       "agent_facing_doc": ".agents/acceptance/PROCESS.md",
+       "docs_site": ".cursor/docs/createStaticStyles_migration_guide.md",
+       "changelog_root": "CHANGELOG.md",
+       "bench_script": "packages/memory-user-memory/benchmarks/locomo/README.md",
+       "readme_thorough": "len=38985 signals=4/4"
+      },
+      "partial": false,
+      "path_count": 17800
+     },
+     "SillyTavern/SillyTavern": {
+      "docs_site": false,
+      "agent_facing_doc": false,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": true,
+      "published_numbers": false,
+      "classes": [
+       "readme_thorough"
+      ],
+      "evidence": {
+       "readme_thorough": "len=5845 signals=4/4"
+      },
+      "partial": false,
+      "path_count": 1010
+     },
+     "Open-LLM-VTuber/Open-LLM-VTuber": {
+      "docs_site": true,
+      "agent_facing_doc": true,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": true,
+      "published_numbers": false,
+      "classes": [
+       "agent_facing_doc",
+       "docs_site",
+       "readme_thorough"
+      ],
+      "evidence": {
+       "agent_facing_doc": ".cursor/rules/olv-core-rules.mdc",
+       "docs_site": "doc/README.md",
+       "readme_thorough": "len=11383 signals=4/4"
+      },
+      "partial": false,
+      "path_count": 253
+     },
+     "morettt/my-neuro": {
+      "docs_site": true,
+      "agent_facing_doc": false,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": true,
+      "published_numbers": false,
+      "classes": [
+       "docs_site",
+       "readme_thorough"
+      ],
+      "evidence": {
+       "docs_site": "docs/.gitignore",
+       "readme_thorough": "len=3828 signals=4/4"
+      },
+      "partial": false,
+      "path_count": 646
+     },
+     "letta-ai/letta": {
+      "docs_site": false,
+      "agent_facing_doc": true,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": false,
+      "published_numbers": false,
+      "classes": [
+       "agent_facing_doc"
+      ],
+      "evidence": {
+       "agent_facing_doc": "AGENTS.md"
+      },
+      "partial": false,
+      "path_count": 12
+     },
+     "hello-diana/MASCOT": {
+      "docs_site": false,
+      "agent_facing_doc": false,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": false,
+      "published_numbers": false,
+      "classes": [],
+      "evidence": {},
+      "partial": false,
+      "path_count": 81
+     },
+     "ddxfish/sapphire": {
+      "docs_site": true,
+      "agent_facing_doc": true,
+      "changelog_root": false,
+      "bench_script": true,
+      "ci_perf_step": false,
+      "readme_thorough": true,
+      "published_numbers": false,
+      "classes": [
+       "agent_facing_doc",
+       "bench_script",
+       "docs_site",
+       "readme_thorough"
+      ],
+      "evidence": {
+       "docs_site": "docs/AGENTS.md",
+       "agent_facing_doc": "docs/AGENTS.md",
+       "bench_script": "tools/tts_benchmark.py",
+       "readme_thorough": "len=15320 signals=4/4"
+      },
+      "partial": false,
+      "path_count": 1230
+     },
+     "v2rockets/Loyal-Elephie": {
+      "docs_site": false,
+      "agent_facing_doc": false,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": true,
+      "published_numbers": false,
+      "classes": [
+       "readme_thorough"
+      ],
+      "evidence": {
+       "readme_thorough": "len=4411 signals=3/4"
+      },
+      "partial": false,
+      "path_count": 124
+     },
+     "Rogendo/Mental-health-Chatbot": {
+      "docs_site": false,
+      "agent_facing_doc": false,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": false,
+      "published_numbers": false,
+      "classes": [],
+      "evidence": {},
+      "partial": false,
+      "path_count": 10
+     },
+     "Lum1104/MER-Factory": {
+      "docs_site": true,
+      "agent_facing_doc": true,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": false,
+      "published_numbers": false,
+      "classes": [
+       "agent_facing_doc",
+       "docs_site"
+      ],
+      "evidence": {
+       "agent_facing_doc": "AGENTS.md",
+       "docs_site": "docs/.gitignore"
+      },
+      "partial": false,
+      "path_count": 158
+     },
+     "CheaperjamRen/leemo": {
+      "docs_site": true,
+      "agent_facing_doc": true,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": false,
+      "published_numbers": false,
+      "classes": [
+       "agent_facing_doc",
+       "docs_site"
+      ],
+      "evidence": {
+       "agent_facing_doc": "AGENTS.md",
+       "docs_site": "docs/README.md"
+      },
+      "partial": false,
+      "path_count": 1518
+     },
+     "NJX-njx/opensoul": {
+      "docs_site": true,
+      "agent_facing_doc": true,
+      "changelog_root": true,
+      "bench_script": true,
+      "ci_perf_step": false,
+      "readme_thorough": false,
+      "published_numbers": false,
+      "classes": [
+       "agent_facing_doc",
+       "bench_script",
+       "changelog_root",
+       "docs_site"
+      ],
+      "evidence": {
+       "agent_facing_doc": ".agents/README.md",
+       "changelog_root": "CHANGELOG.md",
+       "docs_site": "Swabble/docs/spec.md",
+       "bench_script": "scripts/bench-model.ts"
+      },
+      "partial": false,
+      "path_count": 6141
+     },
+     "s-nagaev/chibi": {
+      "docs_site": true,
+      "agent_facing_doc": false,
+      "changelog_root": true,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": false,
+      "published_numbers": false,
+      "classes": [
+       "changelog_root",
+       "docs_site"
+      ],
+      "evidence": {
+       "changelog_root": "changelog.md",
+       "docs_site": "docs/DOCKER_HUB_README.md"
+      },
+      "partial": false,
+      "path_count": 256
+     },
+     "29-Cu/succhia": {
+      "docs_site": false,
+      "agent_facing_doc": false,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": false,
+      "published_numbers": false,
+      "classes": [],
+      "evidence": {},
+      "partial": false,
+      "path_count": 7
+     },
+     "zeroa234/ryza-ai-revive": {
+      "docs_site": true,
+      "agent_facing_doc": false,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": false,
+      "published_numbers": false,
+      "classes": [
+       "docs_site"
+      ],
+      "evidence": {
+       "docs_site": "docs/PROJECT.md"
+      },
+      "partial": false,
+      "path_count": 1762
+     },
+     "Bwcx-songyu/MoodChat": {
+      "docs_site": false,
+      "agent_facing_doc": false,
+      "changelog_root": false,
+      "bench_script": false,
+      "ci_perf_step": false,
+      "readme_thorough": false,
+      "published_numbers": false,
+      "classes": [],
+      "evidence": {},
+      "partial": false,
+      "path_count": 54
+     }
+    },
+    "self": {
+     "docs_site": true,
+     "agent_facing_doc": true,
+     "changelog_root": true,
+     "bench_script": true,
+     "ci_perf_step": false,
+     "readme_thorough": true,
+     "published_numbers": false,
+     "classes": [
+      "agent_facing_doc",
+      "bench_script",
+      "changelog_root",
+      "docs_site",
+      "readme_thorough"
+     ],
+     "evidence": {
+      "agent_facing_doc": "AGENTS.md",
+      "changelog_root": "CHANGELOG.md",
+      "bench_script": "_test/perf_baseline_check.py",
+      "docs_site": "docs/README.md",
+      "readme_thorough": "len=10986 signals=4/4"
+     },
+     "face": "HEAD",
+     "self_paths": 440,
+     "readme_chars": 10986
+    },
+    "rule": "两侧同规则；不参与 caps；两路皆空记 unverified"
+   },
+   "quality_gate_channel": {
+    "peers": {
+     "lobehub/lobehub": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": null,
+       "typecheck_gate": null,
+       "secret_scan_gate": null
+      },
+      "evidence": {
+       "lint_gate": "eslint.config.mjs 在，但 CI 面未取全 ⇒ 不得判「无门」",
+       "typecheck_gate": "apps/auth/tsconfig.json 在，但 CI 面未取全 ⇒ 不得判「无门」",
+       "secret_scan_gate": " CI 面未取全 ⇒ 不得判「无门」"
+      },
+      "unverified": [
+       "lint_gate(CI 面未取全)",
+       "typecheck_gate(CI 面未取全)",
+       "secret_scan_gate(CI 面未取全)"
+      ],
+      "ci_face": "12/33",
+      "candidates": {
+       "coverage_gate": [
+        ".agents/scripts/check/vitest.config.mts",
+        ".agents/skills/deep-review/scripts/vitest.config.ts",
+        "apps/cli/vitest.config.mts"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [
+        "eslint.config.mjs"
+       ],
+       "typecheck_gate": [
+        "apps/auth/tsconfig.json",
+        "apps/cli/tsconfig.json",
+        "apps/desktop/tsconfig.json"
+       ],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "SillyTavern/SillyTavern": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": true,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": ".eslintrc.cjs ∧ CI 执行位=eslint",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "10/10",
+      "candidates": {
+       "coverage_gate": [
+        "tests/jest.config.json"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [
+        ".eslintrc.cjs",
+        "tests/.eslintrc.cjs"
+       ],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "Open-LLM-VTuber/Open-LLM-VTuber": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": ".pre-commit-config.yaml 在而 CI 面取全后未见执行位"
+      },
+      "unverified": [],
+      "ci_face": "6/6",
+      "candidates": {
+       "coverage_gate": [
+        "pyproject.toml"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": [
+        ".pre-commit-config.yaml"
+       ]
+      },
+      "partial": false,
+      "partial_errors": ""
      },
      "morettt/my-neuro": {
       "classes": {
