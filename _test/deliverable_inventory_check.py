@@ -331,6 +331,14 @@ def evaluate(rows, paths, root=None, tracked=None):
     counters["declared"] = len(paths)
     for rel in paths:
         p = root / rel
+        if p.is_dir():
+            # r85 一手代价：清单里的**目录指针**曾被当成「声明要交的文件」判假缺失
+            # （红因写成"磁盘没有"，实际是取数面把指针形态当文件形态 —— 同族第四例的一部分）。
+            # 处置：在位目录 ⇒ 记 note 跳过（"它是目录"是**取到的事实**，不是没取到数，
+            # 写成未验会让清单里出现一个目录路径就把整条判据压成 rc=2）；**不存在的路径仍照旧判红**，
+            # 指针指丢了也不许静默（清单引用了不存在的位置本身就是信息丢失）。
+            notes.append("声明 token 是目录指针，按指针跳过（不计缺失也不算未验）: %s" % rel)
+            continue
         counters["checked"] += 1
         if not p.is_file():
             bad.append("声明缺失: %s（清单写了要交，磁盘没有）" % rel)
@@ -539,7 +547,7 @@ def selftest() -> int:
         print("  ! ⑫独立通道交叉核对未执行（%s）⇒ 该腿本轮未验，不算过" % x12[1])
 
     bad += fixture_legs()
-    print("DELIVERABLE-INVENTORY-SELFTEST-%s（9 类纯函数夹具 + 3 条取数解析腿含独立通道对账 + 14 条端到端反向腿）"
+    print("DELIVERABLE-INVENTORY-SELFTEST-%s（9 类纯函数夹具 + 3 条取数解析腿含独立通道对账 + 16 条端到端反向腿）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad)))
     for x in bad:
         print("  ✗ " + x)
@@ -603,6 +611,16 @@ def fixture_legs() -> list:
         b1, _, _, _ = evaluate(good, good_paths + ["交付物/提交包/ghost.pdf"], root=root,
                                tracked=lambda r: False)
         ck("Ⓑ声明件从磁盘消失 ⇒ 必红（本轮真实事故形）", any("声明缺失" in x for x in b1))
+
+        # Ⓟ/Ⓠ r85 补：清单里的目录 token 不是交付件（本判据曾把它判成假缺失——
+        #   同族第四例的现场），修复后必须双向钉住：在位 ⇒ 未验跳过；指丢 ⇒ 照旧红。
+        bp, up, np, _ = evaluate(good, good_paths + ["交付物/提交包/demo_video_out"], root=root,
+                                 tracked=lambda r: False)
+        ck("Ⓟ在位目录 token 不得判假缺失也不得压成未验（记 note 跳过）%s" % np,
+           not bp and not up and any("目录指针" in x for x in np))
+        bq, _, _, _ = evaluate(good, good_paths + ["交付物/提交包/no-such-dir/"], root=root,
+                               tracked=lambda r: False)
+        ck("Ⓠ目录 token 指丢了仍须红（指针丢也是信息丢失）", any("声明缺失" in x for x in bq))
 
         (pkg / "empty.pdf").write_bytes(b"")
         b2, _, _, _ = evaluate(good, good_paths + ["交付物/提交包/empty.pdf"], root=root,

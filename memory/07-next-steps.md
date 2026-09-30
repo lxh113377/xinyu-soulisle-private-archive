@@ -19,7 +19,7 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - [x] ✅ **R82-02 闭环（r85 09-30）**：临时目录干净装 wrangler 4.144.0 ⇒ 公网重部署 `a07fee7f` ⇒
       `live_sync`/`public_check` 双转绿 + CSP 0 + **`CI-WATCH-GREEN`（run 36703817161 四 job success）**。`part101`
 - [x] ✅ **r85 收口（09-30）**：定版 zip 入库（内两件逐字节等）+ MindIsle 件移出 `提交包/`
-      + `hook_wiring` 的「WSL 不吃 `C:\` 路径」坑修完（自证 12→15 腿）。`part101`
+      + `hook_wiring` 的「WSL 不吃 `C:\`」坑修完（自证 12→15）+ 同族③假缺失已修。`part101`
 - [ ] 🟠 [推荐:R83-02] **共享环境隔离待老大**：陪聊 / iCAN 门店 / 医 同居一个 CloudBase env（静态根 + 云函数），
       子目录避让只是止血；命名空间或独立 env 属跨项目决定，本轮未擅动。`part92` §②
 - [x] ✅ **R77-01 闭环（r84）**：真退出码由被包对象自己写进日志尾行（`_test/run_logged.py`，`--selftest` 8 腿入电池）；
