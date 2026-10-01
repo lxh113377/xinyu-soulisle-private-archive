@@ -20,6 +20,10 @@
         20 条旧 bullet，**r41(单测)/r42(无障碍)/r43(可复现)/r44(数据权利) 四轮一条没记**却照样"过"。
         计数型判据被存量掩盖 = 恒真风险的又一形态，故改成按轮次集合求差。取数面上只对
         commit 正文里**确实存在**的 `rNN` 求差，无轮次号的提交不新增要求（不误伤）。
+     c′) **登记 ≠ 提及**（r90 一手）：旧口径拿整段文本 `rounds_in(unreleased_section(...))` 当"已登记"，
+        于是**别人散文里提一句 `r91` 就把漏记那一轮喂绿**——本轮真实发生：我在披露 bullet 里
+        写了"红因归 r91"，R2c 当场从红转绿。现按本仓惯例只认**该轮自己的 `### ` 小节标题**为登记，
+        纯正文提及改记 `R2c(口径)` 告警（可见但不冒充判定）。真面实测差集只多咬住确实没写小节的那一轮。
   R3 最新 tag 必须能在 CHANGELOG 里找到对应段（`## [x.y.z]`）⇒ 发出去的版本有说明
   R6 CHANGELOG 的 `### ` 段落标题集对上一版**只增不减**（r71 落地）。
      动因是 r70 我自己的一手代价：拿"既有条目行的前缀"当 Edit 锚点、替换文本里没把原表头回写
@@ -164,6 +168,20 @@ def unreleased_bullets(md_text):
     return None if sec is None else len(re.findall(r"^- ", sec, re.M))
 
 
+def heading_rounds(md_text):
+    """[Unreleased] 段内 **`### ` 小节标题**里出现的轮次号集合（R2c 的"已登记"口径）。
+
+    为什么不能用整段文本（r90 一手实测的假绿）：`rounds_in(unreleased_section(...))` 扫的是全部字符，
+    于是**别人散文里提一句 "r91" 就把 r91 那一轮喂绿了**。本轮真实发生：并行会话提交了 `feat(r91 …)`
+    却尚未写它的 `###` 小节，而我在 CHANGELOG 的披露 bullet 里写了"红因归 r91"⇒ R2c 当场从红转绿。
+    登记 = 为那一轮开一个小节（本仓惯例 `### Added（rNN · 主题）`），不是提到它。
+    实测收窄后的差集只多咬住真正漏记的那一轮（见 selftest 边界 P/Q）。
+    """
+    sec = unreleased_section(md_text) or ""
+    heads = [l for l in sec.splitlines() if l.startswith("### ")]
+    return rounds_in("\n".join(heads))
+
+
 def tag_section_present(md_text, tag):
     v = tag.lstrip("v")
     return bool(re.search(r"^## \[?v?" + re.escape(v) + r"\]?", md_text, re.M))
@@ -220,13 +238,20 @@ def judge(tag, commits, bullets, md_text, ceiling=CEILING, prev_bases=None):
         if bullets > 0 and n == 0:
             bad.append("R2b [Unreleased] 有 %d 条 bullet 而 %s..HEAD 零 commit ⇒ 写了没提交（文案先行）"
                        % (bullets, tag))
-        sec_rounds = rounds_in(unreleased_section(md_text))
         subj = " ".join(s for s, _d in commits if NOTE_WORTHY.match(s))
-        miss = sorted(rounds_in(subj) - sec_rounds, key=int)
+        req_rounds = rounds_in(subj)
+        sec_rounds = rounds_in(unreleased_section(md_text))
+        head_rounds = heading_rounds(md_text)
+        miss = sorted(req_rounds - head_rounds, key=int)
+        only_prose = sorted((head_rounds ^ sec_rounds) & req_rounds, key=int)
+        if only_prose:
+            warn.append("R2c(口径) 这些轮次只在散文/bullet 正文里被提到、没有自己的 `### ` 小节：%s"
+                        " ⇒ 散文提及不算登记（r90 一手：我在披露里写了一句 r91 就把它喂绿了）"
+                        % ",".join("r" + x for x in only_prose))
         if miss:
-            bad.append("R2c 这些轮次有 feat/fix 级提交却没进 [Unreleased]：%s ⇒ 计数非零会被旧轮次"
-                       " bullet 掩盖，只有逐轮点名才看得见漏记的那几轮"
-                       % ",".join("r" + x for x in miss))
+            bad.append("R2c 这些轮次有 feat/fix 级提交却没进 [Unreleased]（按 `### ` 小节标题认登记）：%s"
+                      " ⇒ 计数非零会被旧轮次 bullet 掩盖，只有逐轮点名才看得见漏记的那几轮"
+                      % ",".join("r" + x for x in miss))
     if not tag_section_present(md_text, tag):
         bad.append("R3 已发布的 %s 在 CHANGELOG 里没有对应版本段 ⇒ 发出去的版本无说明" % tag)
     days = lag_days(commits)
@@ -304,11 +329,12 @@ def selftest():
          9, "## [Unreleased]\n- r40 的旧条目\n- 还有一条 r40\n\n## [1.5.0]\n- 历史\n", True),
         ("正例②：逐轮点名全在册", "v1.5.0",
          [("feat(r41): 单测", "x"), ("feat(r42): 无障碍", "x")],
-         2, "## [Unreleased]\n- r41 补单测\n- r42 补无障碍\n\n## [1.5.0]\n- 历史\n", False),
+         # 登记形态按本仓惯例＝**给那一轮开一个 `### ` 小节**（r90 口径收窄后，只有 bullet 正文提一句不算登记）
+         2, "## [Unreleased]\n### Added（r41 · 单测）\n- 补单测\n### Added（r42 · 无障碍）\n- 补无障碍\n\n## [1.5.0]\n- 历史\n", False),
         # 反向守卫 R2c 的分母：docs/chore 尾巴不该被要求登记（首跑就是这条把我自己的口径错抓出来）
         ("正例③：docs/chore 尾巴免登记", "v1.4.3",
          [("feat(r38): 护栏", "x"), ("chore(r38 台账): 刷新", "x"), ("docs(r38 收口): 报告", "x")],
-         3, "## [Unreleased]\n- r38 的说明\n\n## [1.4.3] - r38 续\n- 历史\n", False),
+         3, "## [Unreleased]\n### Added（r38 · 护栏）\n- r38 的说明\n\n## [1.4.3] - r38 续\n- 历史\n", False),
     ]
     for name, tag, commits, bullets, md, want in cases:
         bad, _w, _n = judge(tag, commits, bullets, md)
@@ -416,7 +442,34 @@ def selftest():
         ok += 1
     else:
         fail.append("边界O 正文取不到时把「看不见」当通过（应记 R7(未验) 且不判红）：bad=%s warn=%s" % (_b7, _w7))
-    total = len(cases) + 12 + r7_sites
+    # 边界 P..R：R2c「散文提及不算登记」（r90 一手：我在披露 bullet 里写了 r91 就把他人漏记那一轮喂绿）
+    r2_sites = 0
+    COMMITS_91 = COMMITS + [("feat(r91): 又一件", "2026-10-02T02:00:00+08:00")]
+    r2_sites += 1
+    CUR_PROSE = _NL.join(["## [Unreleased]", "### Added（r71 · 丙）",
+                          "- 本轮披露：红因归 r91（**只是提到，没给它开小节**）",
+                          "### Added（r70 · 甲）", "- 一条", "### Fixed（r69 · 乙）", "- 两条",
+                          "", "## [1.5.0] - 历史", ""])
+    _bp, _wp, _np = judge("v1.5.0", COMMITS_91, 4, CUR_PROSE, prev_bases=[("HEAD", PREV)])
+    _r2c = [x for x in _bp if x.startswith("R2c")]
+    if len(_r2c) == 1 and "r91" in _r2c[0] and any(x.startswith("R2c(口径)") and "r91" in x for x in _wp):
+        ok += 1
+    else:
+        fail.append("边界P 散文提及 r91 仍被当成登记（应 R2c 红 + R2c(口径) 告警）：bad=%s warn=%s" % (_bp, _wp))
+    r2_sites += 1
+    CUR_HEAD = CUR_PROSE.replace("### Added（r71 · 丙）", "### Added（r91 · 丁）\n\n### Added（r71 · 丙）")
+    _bq, _wq, _nq = judge("v1.5.0", COMMITS_91, 5, CUR_HEAD, prev_bases=[("HEAD", PREV)])
+    if not any(x.startswith("R2c") for x in _bq) and not any(x.startswith("R2c(口径)") for x in _wq):
+        ok += 1
+    else:
+        fail.append("边界Q 给 r91 开了 `### ` 小节却仍判红（口径把合法登记当缺失）：%s/%s" % (_bq, _wq))
+    r2_sites += 1
+    _br, _wr, _nr = judge("v1.5.0", COMMITS, 3, CUR_OK, prev_bases=[("HEAD", PREV)])
+    if not any(x.startswith("R2c") for x in _br) and not any(x.startswith("R2c(口径)") for x in _wr):
+        ok += 1
+    else:
+        fail.append("边界R 未涉及新轮次的正例被 R2c 新口径误伤：%s/%s" % (_br, _wr))
+    total = len(cases) + 12 + r7_sites + r2_sites
     for x in fail:
         print("  SELFTEST-FAIL " + x)
     print("RELEASE-GOV-SELFTEST: %d/%d" % (ok, total))
