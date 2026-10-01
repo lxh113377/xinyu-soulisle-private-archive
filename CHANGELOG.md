@@ -42,6 +42,13 @@
   `_test/*.py` 86 文件命中 **0** ⇒ 高精度进阻断链；selftest 补 ⑪g..⑪k 五条腿，
   其中 ⑪k **打真实文件本文**（内存里把 `def lag_days` 那行删掉必须红、放回必须绿），条数由脚本自己算（74→80）。
   覆盖面＝`_test/*.py` 顶层 86 件；**不覆盖面**＝`server/` 与仓外自写脚本（那两处的权威判据仍是 javac / 各自套件）。
+- **整跑与推送边界（本轮实况）**：`run_all_suites.py --exclude-llm` **104/107 绿、3 条红全部归因到并行会话提交
+  `5f83c76`（r91 新判据 `ci_perf_wiring_check.py` 未进 quality-gates ＋ r91 轮次未进 `[Unreleased]`）**，
+  而我推的线上这三条红的因**机械不存在**（`git show 2d34e7b:_test/run_all_suites.py | grep -c ci_perf_wiring` = 0、
+  `git cat-file -e 2d34e7b:_test/ci_perf_wiring_check.py` 无此路径、`v1.7.0..2d34e7b` 里 r91 计数 0）。
+  ⇒ 用 `git push origin 2d34e7b:refs/heads/main` 只快进自己那条线（远端实测 == `2d34e7b40aa`），
+  **不代推他人未收口的提交**（那等于替别人决定发布时机，并把已知红发到共享 main）。
+  本轮 perf 现测：p95 **29.5ms** / **3003.0 rps**（4 目标预算内，最紧余量 370ms；自身棘轮非跨项目对比）。
 - **peers 复采**：`benchmark_metrics.py --cap-channel --doc-perf --quality-gates` 现采 16/16 仓
   （ts `2026-10-01 17:31 UTC`），与 10-01 快照比漂移 8 处 = 实质 1（lobehub release canary.34→.35）+ ★抖动 7。
   能力分布与三维通道读数与 r89 逐项相同（vector_memory 7/16、api_spec 1/16、CI 性能步与公开数字 0/16）
