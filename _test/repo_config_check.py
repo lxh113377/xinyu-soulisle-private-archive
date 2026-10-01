@@ -28,7 +28,10 @@
      必须各自报红，原样必须零问题 —— 证判据非恒真
   G9 判据脚本 import-safe：`_test/*.py` 的顶层入口调用（sys.exit(main()) 等）必须落在
      `if __name__ == "__main__":` 守卫之后 —— 判据脚本会被互相 import（--only 自查 / 聚合 runner 对账 /
-     CI 复用），无守卫 = "一 import 就跑全套或跑网络，且退出码 0"（r26 实测第五次同族坑）
+     CI 复用），无守卫 = "一 import 就跑全套或跑网络，且退出码 0"（r26 实测第五次同族坑）。
+     三腿：① import-safe ② 解析得动 ③ 块内非首条裸字符串（r90：`def lag_days` 被编辑吞掉后
+     原 docstring 变成 `return` 之后的裸字符串，**py_compile 与 selftest 全过**，只有这条腿看得见；
+     覆盖面=`_test/*.py` 顶层 86 文件实测 0 误报，不覆盖面=server/ 与仓库外的自写脚本）
   G10 判据必须挂在**真会走的路径**上：CI 步骤里要整跑电池（run_all_suites.py）且声明 --exclude-llm 豁免，
   豁免项必须是真实存在的套件（幽灵豁免=恒真风险）。根因两条：① 本项目 CI 长期只跑 browser_check 一条，
      r26-r28 新加的 patch_apply / settings_panel / offline_shell 全在发布路径之外（本地绿≠有人管）；
@@ -456,6 +459,36 @@ def py_syntax_hygiene(text):
     except Exception as e:                       # 递归过深等：同样算"解析不动"
         return [f"parse 异常 {type(e).__name__}"]
     return []
+
+
+def docstring_swallow(text):
+    """G9 第三腿：非块首的「裸字符串语句」= def/docstring 首行被编辑吞掉的指纹（r90 两次一手）。
+
+    为什么第二腿拦不住：`py_compile` / `ast.parse` 对「吞掉 `def f():` 或 `\"\"\"首行\"\"\"`」
+    **都可能全过**。本轮两次实测各有结局：一次是 SyntaxError（第二腿当场抓到）；另一次
+    `def lag_days(commits):` 被吞后，原 docstring 静默变成 `judge()` 里 `return` 之后的一条
+    **裸字符串语句**——编译过、导入过、`--selftest` 也过，只有真调用 `lag_days()` 时才 `NameError`。
+    判据取 flake8 B018 的同形：任何块（模块/函数/类）里**不是第一条**语句的裸字符串都不是有意写法。
+    真面误报率实测：`_test/*.py` 86 个文件命中 **0** 条 ⇒ 高精度，可进阻断链。
+    """
+    import ast as _ast
+    try:
+        tree = _ast.parse(text)
+    except Exception:
+        return []          # 语法坏了由第二腿点名，本腿不重复报
+    out = []
+    for node in _ast.walk(tree):
+        body = getattr(node, "body", None)
+        if not isinstance(body, list):
+            continue
+        for i, st in enumerate(body):
+            if i == 0:
+                continue                      # 块首裸字符串 = docstring，合法形态
+            if isinstance(st, _ast.Expr) and isinstance(st.value, _ast.Constant) \
+                    and isinstance(st.value.value, str):
+                out.append("第 %d 行是块内非首条裸字符串（上方 `def`/docstring 首行被吞的形状）"
+                           % st.lineno)
+    return out
 
 
 def java_quote_parity(text):
@@ -988,6 +1021,30 @@ def selftest():
                 if py_syntax_hygiene(p.read_text("utf-8", errors="replace"))]
     if _realbad:
         bad.append(f"篡改⑪f：本仓真实判据脚本有 {_realbad} 解析失败却该由 G9 主体报红")
+    # 篡改⑪g..⑪j：G9 第三腿（r90）——模块级裸字符串 = docstring/def 首行被编辑吞掉的指纹。
+    #   反例形状直接取自本轮我自己写坏的那两处：一处 SyntaxError（⑪d 已抓），
+    #   一处 `def lag_days` 被吞后**编译全过**、`--selftest` 也过 ⇒ 只有这条腿看得见。
+    if not docstring_swallow('def a():\n    return 1\n    "上面那行 def 被吞了，这段本该是它的 docstring"\n'):
+        bad.append("篡改⑪g（`def` 被吞→块内非首条裸字符串）未被抓到 ⇒ G9 第三腿恒真")
+    if docstring_swallow('"""模块 docstring。"""\n\nimport sys\n\ndef a():\n    return 1\n'):
+        bad.append("篡改⑪h（合法模块 docstring 被判违规）⇒ G9 第三腿恒假")
+    if docstring_swallow('import sys\ndef a():\n    """函数 docstring 是块首，不算违规。"""\n    return 1\n'):
+        bad.append("篡改⑪i（块首 docstring 被误判）⇒ 第三腿没按「非首条」取数")
+    _dsbad = [p.name for p in sorted((ROOT / "_test").glob("*.py"))
+              if docstring_swallow(p.read_text("utf-8", errors="replace"))]
+    if _dsbad:
+        bad.append(f"篡改⑪j：本仓真实判据脚本有 {_dsbad} 带块内非首条裸字符串却该由 G9 第三腿判红")
+    # 篡改⑪k：第三腿的对照必须打到**真实文件本文**（誊写夹具会顺手把错的地方改对）——
+    #   这里在内存里把 r90 自己吞掉的那一行 `def lag_days(commits):` 从真文里删掉再跑，
+    #   判据必须翻红；再把那一行原样放回，必须翻绿。两侧都取到才算这条腿有判定力。
+    _rg = (ROOT / "_test" / "release_governance_check.py").read_text("utf-8", errors="replace")
+    _broken = _rg.replace("def lag_days(commits):\n", "", 1)
+    if _broken == _rg:
+        bad.append("篡改⑪k 前置不成立：真文里找不到 `def lag_days(commits):` 那一行 ⇒ 这条对照打不到对象")
+    elif not docstring_swallow(_broken):
+        bad.append("篡改⑪k（真文吞掉 def 行）未被第三腿抓到 ⇒ 腿对本次真实事故无判定力")
+    elif docstring_swallow(_rg):
+        bad.append("篡改⑪k 复原侧判红 ⇒ 第三腿把完好文件也咬了（恒假）")
     # 篡改⑫：CI 覆盖面的正反两侧（缺电池步骤 / 幽灵豁免 必须报红；原样必须零违规）
     st = (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace")
     ci0 = (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace")
@@ -1307,9 +1364,13 @@ def main():
     #（该事实的权威判据是 javac + T4 盯 -DskipTests，见 java_quote_parity 的 docstring）。
     syviol = [f"{p.name} → {py_syntax_hygiene(p.read_text('utf-8', errors='replace'))[0]}"
               for p in scripts if py_syntax_hygiene(p.read_text("utf-8", errors="replace"))]
-    check("G9 判据脚本全部 import-safe（禁 import 即执行）且解析得动", not iviol and not syviol,
+    dsviol = [f"{p.name} → {docstring_swallow(p.read_text('utf-8', errors='replace'))[0]}"
+              for p in scripts if docstring_swallow(p.read_text("utf-8", errors="replace"))]
+    check("G9 判据脚本全部 import-safe（禁 import 即执行）、解析得动且无模块级裸字符串",
+          not iviol and not syviol and not dsviol,
           f"{len(scripts)} 个脚本已扫"
-          + ("；违规：" + " ; ".join((iviol + syviol)[:6]) if (iviol or syviol) else "，零违规"))
+          + ("；违规：" + " ; ".join((iviol + syviol + dsviol)[:6])
+             if (iviol or syviol or dsviol) else "，零违规"))
 
     fails = [r for r in results if not r[1]]
     print(f"\n合计 {len(results)} 项，失败 {len(fails)} 项")

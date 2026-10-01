@@ -34,6 +34,14 @@
 - **G18 展示面（低）**：`repo_config_check` 门面行原印「实跑 17 条判据」后跟 18 个号，读着像对账不上；
   实际是一条 `check()` 可点两个号（G9 两腿），17 与 18 同时为真 ⇒ 现把两个计数单位都印出来
   （`实跑 17 项检查，覆盖 18 个判据号：…`）。
+- **G9 第三腿（同族坑机器化，高）**：本轮我自己两次把 Edit 写成吞行（`parse_crosscheck()` 的 docstring
+  首行、`lag_days()` 的 `def` 行）。第一次是 SyntaxError（第二腿当场抓到），**第二次 `py_compile`、
+  `--selftest`、导入全过**——原 docstring 变成 `return` 之后一条合法的裸字符串语句，只有真调用才 `NameError`。
+  该族在本仓台账已登记 12+ 次而既有两腿只覆盖会报语法错的那一半 ⇒ 按「复发计数硬门槛」当轮交机器载体：
+  `docstring_swallow()`＝块内**非首条**裸字符串即红（flake8 B018 同形）。真面误报率实测
+  `_test/*.py` 86 文件命中 **0** ⇒ 高精度进阻断链；selftest 补 ⑪g..⑪k 五条腿，
+  其中 ⑪k **打真实文件本文**（内存里把 `def lag_days` 那行删掉必须红、放回必须绿），条数由脚本自己算（74→80）。
+  覆盖面＝`_test/*.py` 顶层 86 件；**不覆盖面**＝`server/` 与仓外自写脚本（那两处的权威判据仍是 javac / 各自套件）。
 - **peers 复采**：`benchmark_metrics.py --cap-channel --doc-perf --quality-gates` 现采 16/16 仓
   （ts `2026-10-01 17:31 UTC`），与 10-01 快照比漂移 8 处 = 实质 1（lobehub release canary.34→.35）+ ★抖动 7。
   能力分布与三维通道读数与 r89 逐项相同（vector_memory 7/16、api_spec 1/16、CI 性能步与公开数字 0/16）
