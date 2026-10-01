@@ -105,6 +105,8 @@ python _test/suite_resource_census.py               # r70 资源普查：全部�
 python _test/suite_resource_census.py --selftest     # r70 判据桩：11 腿（漏报/误报两侧 + 恒真守卫"纯函数源码不得判出资源" + port=0 不算排他 + 盲区不得落进 free 桶 + 无台账不得报已计时）
 python _test/peer_quality_tooling_probe.py   # r58 对标探针：lint／类型／单元可测性／CI 执行位（16 仓 + self，双通道）；r66 修「只印不写」＋r67 拆 struct 两态：null=未测、[]=测到零命中）
 python _test/peer_quality_tooling_probe.py --selftest  # r58 探针桩：7 类桩 + 恒真守卫（含「NOISE 不得滤掉 tests 目录」反例）
+python _test/ci_perf_wiring_check.py          # r91 性能接线面：C-IPW-1..5（workflow 名被 RE_CI_PERF 认下／正文真调 perf_baseline_check／java -jar 且等 /api/health 就绪／README 命中 published_numbers 且引用基线文档／README 与 PERF-BASELINE 的 p95 不超预算且不分叉）；正则从 benchmark_metrics 同源 import，不内联
+python _test/ci_perf_wiring_check.py --selftest  # r91 判据桩：11 条（正例 + 删 workflow／空正文／不调判据／不等 health／README 抽数字／抽基线引用／两处数量级分叉／超预算／基线失联 九反例 + 零输入恒真守护）
 ```
 
 > 前置：多数判据需 fat jar 起在 8123（`java -jar server/target/soulisle-server.jar --server.port=8123`，

@@ -220,6 +220,11 @@ SUITES = [
     # r84（R77-01 包装器侧）：后台测量的真退出码必须由**被包对象自己**写进日志尾行，
     # 调度层的 `completed (exit code 0)` 不算数（r82/r83 两次一手代价）。本腿自证它会转发非零。
     ("run_logged_selftest", [sys.executable, "_test/run_logged.py", "--selftest"]),
+    # r91 性能接线：对标尺 doc_perf 的 ci_perf_step / published_numbers 两格全池 0/16，r91 把性能判据
+    # 接进 .github/workflows/perf-baseline.yml、把实测数字写进 README 让两格翻真。翻真即开始漂移：
+    # workflow 可以空、可以起了 jar 不等 health（恒未验的假门）、README 数字可以手写 ⇒ 五条接线常驻。
+    ("ci_perf_wiring", [sys.executable, "_test/ci_perf_wiring_check.py"]),
+    ("ci_perf_wiring_selftest", [sys.executable, "_test/ci_perf_wiring_check.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），

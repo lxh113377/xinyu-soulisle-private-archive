@@ -429,6 +429,32 @@ def cap_channel_audit(repos):
     return out
 
 
+def self_cap_channel(rev="HEAD"):
+    """把第二通道那把**内容尺**也用在 self 上（r91）——消掉本池最后一处配套双标。
+
+    r73 立通道时 self 侧故意不参与，理由是对的：self 的 SSE 写在 `chat.js`/`ChatController.java`、
+    e2e 在 `_test/*.py`（playwright），**文件名匹配器**结构性看不见，只能靠 `caps_blind` 自述。
+    但那留下了一处不对称：对手那两格一直只由文件名法单独得出，我这两格一直只由我自述得出
+    ⇒ 「streaming 2/16」与「self 有流式」是两种证据，从没在同一把尺上比过（r89 §2③ 登记）。
+
+    本函数补的就是这一刀：**同一个 `cap_channel_class`**，self 侧喂 git 面的 README blob。
+
+    输入面的诚实声明（读完再引用结论）：peers 的 hay = description + homepage + README；
+    self 只有 README blob（私有归档仓没有 GitHub description/homepage 面）。self 的输入**更窄**
+    ⇒ 命中即为真；**未命中只说明"README 里没写"，不得读成"没有该能力"**。
+    换句话说这一格量的是"公开主张"，不是"代码事实"——对 self 与对 peers 完全一样。
+    """
+    paths = git_ls_tree(rev)
+    readme = git_blob("README.md", rev) if "README.md" in paths else ""
+    if not (readme or "").strip():
+        return {"streaming": "unverified", "e2e_browser": "unverified", "evidence": {},
+                "face": rev, "unverified": "README blob 空或未取到"}
+    c = cap_channel_class(readme)
+    c["face"] = rev
+    c["input_note"] = "仅 README blob（peers 另有 description+homepage ⇒ self 输入更窄，未命中≠没有）"
+    return c
+
+
 # ── r75：**质量门**的同址尺——问的是"这道检查能不能让构建失败"，不是"有没有这个配置文件"。
 #     起因（本轮只读枚举，非凭印象）：`_test/peer_quality_tooling_probe.py`（r58）自己写明了天花板
 #     ——「覆盖率与缺陷率都不在本轮取数面内」，它量的是**配置在不在、测试文件在不在、CI 有没有执行位**；
@@ -1256,6 +1282,39 @@ def selftest():
     if cap_channel_class(chan_samples["token_stream"]).get("caps"):
         print("SELFTEST-FAIL: 通道返回值里出现 caps 键 ⇒ 它正在变成第二把尺")
         return 1
+    # r91：self 侧同尺（self_cap_channel）——桩不得依赖本机 git 态，注入两组读数各验一次
+    _g91 = globals()
+    _o_ls, _o_blob = _g91["git_ls_tree"], _g91["git_blob"]
+    try:
+        _g91["git_ls_tree"] = lambda rev="HEAD": ["README.md"]
+        _g91["git_blob"] = lambda p, rev="HEAD": (
+            "逐字流式输出（SSE 直通）；端到端浏览器回归用 Playwright 跑真实 Chromium。")
+        s_ok = self_cap_channel()
+        if s_ok.get("streaming") != "token_stream" or s_ok.get("e2e_browser") != "test_e2e":
+            print("SELFTEST-FAIL: self 侧同尺没把 README 里的流式/e2e 判出来 ⇒ 通道在 self 上是瞎的")
+            return 1
+        if s_ok.get("face") != "HEAD":
+            print("SELFTEST-FAIL: self 侧同尺没记取数面（face）⇒ 读数会被当成工作树现状")
+            return 1
+        # 反例：README 取空必须记 unverified，不许折叠成 none（"没读到"≠"没有"）
+        _g91["git_blob"] = lambda p, rev="HEAD": ""
+        s_empty = self_cap_channel()
+        if s_empty.get("streaming") != "unverified" or s_empty.get("e2e_browser") != "unverified":
+            print("SELFTEST-FAIL: README 取空被判成 %s/%s ⇒ 零输入被当成「没有该能力」"
+                  % (s_empty.get("streaming"), s_empty.get("e2e_browser")))
+            return 1
+        # 恒真守卫：摘掉 RE_E2E 后 self 侧也不许再判 test_e2e（判定力必须在这条正则上）
+        _g91["git_blob"] = lambda p, rev="HEAD": "端到端浏览器回归用 Playwright 跑真实 Chromium。"
+        _o_e2e = _g91["RE_E2E"]
+        try:
+            _g91["RE_E2E"] = re.compile(r"(?!)")
+            if self_cap_channel().get("e2e_browser") == "test_e2e":
+                print("SELFTEST-FAIL: 摘掉 RE_E2E 后 self 侧仍判 test_e2e ⇒ 该类没在被判对象上")
+                return 1
+        finally:
+            _g91["RE_E2E"] = _o_e2e
+    finally:
+        _g91["git_ls_tree"], _g91["git_blob"] = _o_ls, _o_blob
     # 能力匹配器本体（r70）：`rag` 裸子串会把 storage/coverage 白送成一格能力 ⇒ 两向都验
     _vm = CAP_RULES["vector_memory"]
     _must_red = ["src/storage/db.js", "test/coverage.py", "_test/plan_pdf_coverage_check.py",
@@ -1698,6 +1757,15 @@ def main():
         if unv:
             print(f"  ⚠️ 通道分母不全（{len(unv)} 仓两路皆空：{'、'.join(unv)}）⇒ 不得据"
                   f"「内容法也没见到」下否定结论")
+        # r91：同一把内容尺也测 self，两格首次在同一证据类型上可比（消 r89 §2③ 登记的最后一处双标）
+        sc = self_cap_channel()
+        run["cap_channel_self"] = sc
+        print(f"    self(HEAD, 同尺): streaming={sc.get('streaming')} "
+              f"e2e_browser={sc.get('e2e_browser')}  ｜{sc.get('input_note') or sc.get('unverified', '')}")
+        for cap in ("streaming", "e2e_browser"):
+            e = (sc.get("evidence") or {}).get(cap)
+            if e:
+                print(f"      ▶ [self/{cap}] {e[:88]}")
     if args.doc_perf:
         # 同一套规则跑两侧：peers 走 tree+README（GitHub API），self 走 git HEAD 的 ls-tree+blob。
         # 目的就是把 r73 报告里「self=docs 9/9 vs peers=api_spec 1/16」那种**不同源对照**换成同址读数。

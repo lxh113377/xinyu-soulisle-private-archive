@@ -1,0 +1,96 @@
+# 性能基线回归 —— 自身棘轮，**不是**跨项目对比。
+#
+# 为什么单独成一个 workflow（而不是塞进 ci.yml 的一个 step）：
+#   ci_perf_step 这条对标杠篏的是「有没有一个专门跑性能的工作流文件」，但那只是副产品——
+#   真正的动因是 ci.yml 的 java-build 已经挂了 mvn verify + fat jar 校验 + 双端对账 + Docker 起服，
+#   再往上叠线程池压测，会让「红了是性能退化还是 ITSM 抖动/给 runner 争抢」无法归因。
+#   独立文件 ⇒ ① 红因单一 ② 可以定触发频率（周常 + server/src/测试脚本变动），不必每次 PR 付费。
+#
+# 口径铁律（改这个文件前先读 _test/perf_baseline_check.py 顶部注释）：
+#   · 只打本地无外网的三条面 + /api/emotion 危机短路路径；危机句一旦走到 LLM，判据自己判红。
+#   · 阈值是本机实测的约 20 倍余量，抓的是数量级退化（直读变落库 / 线程池打满），不是抖动。
+#   · 服务起不来时脚本 rc=2「未验证」，CI 里 rc=2 会让 job 红 —— 未验不得当成通过。
+name: Perf Baseline
+
+on:
+  workflow_dispatch:
+  # 周常：性能退化和信息安全缺失不同，不需要每次提交都付一遍构建成本
+  schedule:
+    - cron: "17 3 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "src/**"
+      - "_test/perf_baseline_check.py"
+      - "_test/ci_perf_wiring_check.py"
+      - ".github/workflows/perf-baseline.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  perf:
+    name: 性能基线（p95 预算 + 吞吐地板 + 危机路径口径守卫）
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      # 漏装会让 perf_baseline_check 以 rc=2「环境异常」报出，和真退化混在一起 ⇒ 单一清单、显式安装
+      - name: 装判据第三方依赖（单一清单）
+        run: pip install -r _test/requirements.txt
+      # 与 ci.yml 的 java-build 同相位（verify），不写 package、不带 -DskipTests：
+      # 覆盖率门绑在 verify，写成 package 这道门一次也不会执行（r75 同族口径陷阱）。
+      - name: 构建 fat jar（mvn verify）
+        run: mvn -B -ntp -f server/pom.xml verify
+      # 产物自证先行（r20 实证）：jar 进程存活时构建会留下瘦 jar，而旧进程照常回 200 ⇒ 假健康。
+      # 瘦 jar 跑出来的延迟是"内存里那个 jar"的，不是本次构建的产物 ⇒ 先卡体积再看性能。
+      - name: 校验 fat jar 产物（防"瘦 jar 冒充 fat jar"）
+        run: |
+          set -e
+          SZ=$(stat -c%s server/target/soulisle-server.jar)
+          echo "soulisle-server.jar = $SZ bytes"
+          if [ "$SZ" -lt 20000000 ]; then
+            echo "🔴 产物仅 $SZ B ⇒ repackage 未生效，这份被测对象不代表本次构建"; exit 1
+          fi
+          unzip -l server/target/soulisle-server.jar | grep -q "BOOT-INF/lib/" || { echo "🔴 缺 BOOT-INF/lib ⇒ 瘦 jar"; exit 1; }
+          echo "✅ FAT-JAR-OK"
+      - name: 起 fat jar 并跑性能基线
+        env:
+          XINYU_WEB_ROOT: ${{ github.workspace }}/src
+        run: |
+          set -e
+          java -jar server/target/soulisle-server.jar --server.port=8123 > /tmp/xinyu-perf-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:8123/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+          # 等不到 health 就直接让 job 红：这里的失败原因必须是"起服失败"而不是"性能退化"
+          curl -sf http://127.0.0.1:8123/api/health
+          python _test/perf_baseline_check.py --json /tmp/perf-baseline.json
+      # 判据自证必须和真跑同批：只跑不验的话，"恒慢样本会不会被判红"永远没人知道，
+      # 而一条从不红的的性能门禁，和没有门禁在受理面上没有区别（r41 同族）。
+      - name: 判据自证（恒慢/空样本/缺面/口径漂移必须红）
+        run: python _test/perf_baseline_check.py --selftest
+      # 接线自证：workflow 存在不等于它真在跑性能判据（C-IPW 五条，见判据顶部注释）
+      - name: 接线自证（perf workflow ⇄ 判据 ⇄ README 数字 ⇄ 基线文档）
+        run: |
+          python _test/ci_perf_wiring_check.py
+          python _test/ci_perf_wiring_check.py --selftest
+      - name: 落服务日志（红因归因用，失败也要留）
+        if: always()
+        run: cat /tmp/xinyu-perf-server.log || true

@@ -196,8 +196,9 @@ CloudBase 注意事项（实测得来）：
 
 ## ✅ 验证
 
-> **现状（与机器逐条对账，别手抄）**：GitHub Actions 四条门禁（`.github/workflows/ci.yml` 的 job 数）｜
-> ★ 全量电池（110 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
+> **现状（与机器逐条对账，别手抄）**：GitHub Actions 四条门禁（`.github/workflows/ci.yml` 的 job 数；
+> 另有独立的性能基线工作流 `.github/workflows/perf-baseline.yml`，周常复跑）｜
+> ★ 全量电池（112 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
 > 这三处数字由 `repo_config_check.py` 的 **G2 / G4 / G14** 当场等值对账，写错即红。
 >
 > **判据清单与逐条口径全文见 [docs/quality-gates.md](docs/quality-gates.md)**（r39 起从 README 迁出）。这里只留四个『现在到底是多少』的复算入口：
@@ -207,7 +208,18 @@ python _test/run_all_suites.py --list      # 全量电池套件条数（唯一�
 python _test/run_all_suites.py             # 逐条直取 rc，聚合不掩盖单项失败（三类收口：判红/未验/崩溃）
 python _test/ci_status_check.py            # 远端受理面现况（GREEN/RED/BLOCKED/UNKNOWN 四态）
 python _test/size_budget_check.py          # 首屏字节预算 + 新文件漏登记即红
+python _test/perf_baseline_check.py        # 性能基线（起 jar@8123 后跑）
 ```
+
+**性能（自身棘轮，不是跨项目对比）**：jar 直读 `src/` @8123，`python _test/perf_baseline_check.py` 实测
+P95=28.6ms（四目标全在 400ms 预算内，最紧余量 371ms）、吞吐 1013.9 rps，且 `llm_used=False`（危机路径不调 LLM，
+数字里不含上游网络延迟）。口径、预算与复算见 [docs/PERF-BASELINE.md](docs/PERF-BASELINE.md)；
+CI 侧由 `.github/workflows/perf-baseline.yml` 周常复跑，接线与两处数字的一致性由
+`python _test/ci_perf_wiring_check.py` 常驻盯（改动后两处数字分叉即红）。
+
+**端到端浏览器回归**：`_test/browser_check.py` / `_test/pixel_dual_check.py` 用 Playwright 起真实 Chromium
+跑浏览器回归——离线降级链路、星雾点亮、双色像素级判定都在真页面上断言，不是 DOM 快照对比；
+CI 的浏览器 job 与本地电池跑同一套（`playwright install chromium` 由 CI 自装）。
 
 
 ## 📚 文档
