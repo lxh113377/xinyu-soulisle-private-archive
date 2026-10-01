@@ -29,7 +29,7 @@
 | id | 批次 | 标题 | 状态 | 依赖 | 阻塞 | 更新于 | 证据 |
 |----|----|----|----|----|----|----|----|
 | VOL-04237 | P2 | 体量治理[L3 产物] <整仓> — 整仓瘦身：归档历史轮次产物 + recycle 备份残留 | todo | - | - | 2026-09-27 17:44 | - |
-| VOL-FC486 | P2 | 体量治理[L3 产物] 交付物/ — 目录内逐类治理：产物拆分/归档，备份残留走 recycle | todo | - | - | 2026-09-27 17:44 | - |
+| VOL-FC486 | P2 | 体量治理[L3 产物] 交付物/ — 目录内逐类治理：产物拆分/归档，备份残留走 recycle | done | - | - | 2026-10-02 01:44 | b649a92 交付物 184.8→129.5MB；corpus 43 份是 disclaimer_lint --all 分母⇒不搬（详见 r90 报告 §2） |
 | VOL-725F6 | P2 | 体量治理[L3 产物] server/ — 目录内逐类治理：产物拆分/归档，备份残留走 recycle | todo | - | - | 2026-09-27 17:44 | - |
 | VOL-C85CA | P2 | 体量治理[L3 产物] 交付物/提交包/demo_video_out/心屿SoulIsle-演示视频.mp4 — 拆分或归档（禁直删） | todo | - | - | 2026-09-27 17:44 | - |
 | VOL-04585 | P2 | 体量治理[L3 产物] _test/ — 目录内逐类治理：产物拆分/归档，备份残留走 recycle | todo | - | - | 2026-09-27 17:44 | - |
@@ -37,12 +37,13 @@
 | VOL-0580C | P2 | 体量治理[L3 产物] 交付物/提交包/心屿MindIsle_参赛方案.pptx — 拆分或归档（禁直删） | todo | - | - | 2026-09-28 01:14 | - |
 | VOL-AGG-20260928 | P1 | 体量治理[L1 记忆卷] 体量余量聚合（6 项） — 另有 6 项待判断，合计 139169 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-09-28 01:14 | - |
 | WF-r73-接入CI契约 | P1 | 陪聊当前未接入 CI 全绿契约（.ci/contract.json 缺失），而 ciwatch 实扫到 1 份 workflow / run 执行面 89 行 ⇒ 未接入 ≠ 没有 CI，这 89 行里没有一条是被契约点名的 blocking 判据。一致接入四步（本引擎 wflow.adapters.sevenstep 对位）：① 生成 .ci/contract.json（把 mvn verify / 关键门禁逐条列 blocking）；② 在 .github/workflows/ci.yml 里为每条加 run step 并 --sweep 复扫到 matched==declared；③ pre-push 接线 greencheck；④ 保留本项目特性（Java/Maven 档位与 8123 回归口不并入引擎）。前提可复算命令：cd 本仓 && python D:/global_skills/A-project-handoff/scripts/handoff.py flow . --status | todo | - | - | 2026-09-28 02:10 | - |
-| VOL-A5B8F | P2 | 体量治理[L3 产物] 交付物/提交包 (2).zip — 拆分或归档（禁直删） | todo | - | - | 2026-09-30 02:16 | - |
-| VOL-39DAB | P2 | 体量治理[L3 产物] 交付物/提交包.zip — 拆分或归档（禁直删） | todo | - | - | 2026-09-30 02:16 | - |
+| VOL-A5B8F | P2 | 体量治理[L3 产物] 交付物/提交包 (2).zip — 拆分或归档（禁直删） | done | - | - | 2026-10-02 01:44 | commit b649a92: git mv → archive/交付物-历史轮次/，判据认搬卷 rc=0 且 HOOK-DRILL-PASS |
+| VOL-39DAB | P2 | 体量治理[L3 产物] 交付物/提交包.zip — 拆分或归档（禁直删） | done | - | - | 2026-10-02 01:44 | commit b649a92: git mv → archive/交付物-历史轮次/，判据认搬卷 rc=0 且 HOOK-DRILL-PASS |
 | VOL-AGG-20260930 | P2 | 体量治理[L3 产物] 体量余量聚合（10 项） — 另有 10 项待判断，合计 26545458 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-09-30 02:16 | - |
 | VOL-8EF30 | P2 | 体量治理[L3 产物] 交付物/提交包/demo_video_out/心屿MindIsle-演示视频.mp4 — 拆分或归档（禁直删） | todo | - | - | 2026-10-01 03:57 | - |
 | VOL-CF954 | P2 | 体量治理[L3 产物] 交付物/心屿SoulIsle-作品提交-20260930.zip — 拆分或归档（禁直删） | todo | - | - | 2026-10-01 03:57 | - |
 | VOL-AGG-20261001 | P2 | 体量治理[L3 产物] 体量余量聚合（15 项） — 另有 15 项待判断，合计 103704007 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-01 03:57 | - |
+| WF-r90-sync状态词滞留 | P2 | flow --sync 只翻勾选位、不改登记行的「状态: todo」尾注 ⇒ 同一行 [x] 与 todo 自相矛盾（r90 实测 07.part62 VOL-FC486） | todo | - | - | 2026-10-02 01:45 | - |
 
 ## 推进记录
 
@@ -53,6 +54,13 @@
 - [2026-09-28 02:10] WF-r73-接入CI契约 新增（P1，todo）
 - [2026-09-30 02:16] 体量体检登记 3 项（待判断项转任务，id 前缀 VOL-）
 - [2026-10-01 03:57] 体量体检登记 3 项（待判断项转任务，id 前缀 VOL-）
+- [2026-10-02 01:44] VOL-39DAB todo → doing
+- [2026-10-02 01:44] VOL-39DAB doing → done
+- [2026-10-02 01:44] VOL-A5B8F todo → doing
+- [2026-10-02 01:44] VOL-A5B8F doing → done
+- [2026-10-02 01:44] VOL-FC486 todo → doing
+- [2026-10-02 01:44] VOL-FC486 doing → done
+- [2026-10-02 01:45] WF-r90-sync状态词滞留 新增（P2，todo）
 
 ## 分卷目录
 

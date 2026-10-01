@@ -8,7 +8,7 @@
 11 个 feat**（r40c/r40d/r41/r42/r43/r44/r45 整轮的功能增量），全躺在 `CHANGELOG [Unreleased]` 的
 20 条 bullet 里没有切版。⇒ **滞后指标只看两端时间，看不见中间增量**，这就是本件要补的形状。
 
-六条判据（R1/R2/R3/R6 阻断，R4 只报，R5 明确不重复造）：
+七条判据（R1/R2/R3/R6/R7 阻断，R4 只报，R5 明确不重复造）：
   R1 距上次切版的 feat 增量 ≤ CEILING（5）。超了就是「攒了够多能力却还在用旧版本号对外」。
      取 5 而非 0：0 会让每轮对标都必先切版才能推进，把判据变成拦路的闸门（advisory 不拦、
      阻断要留真实余量）。当前值与上限一起印进行里，余量可见。
@@ -28,6 +28,10 @@
      取数面**两个基准都要看**：`HEAD` 管"还没提交的吞行"（出事那一层在本机），
      `HEAD~1` 管"已经提交的吞行"（CI/干净克隆里 worktree==HEAD，只看 HEAD 会恒等而看不见失效）；
      两个基准都取不到（浅克隆/首提交）⇒ 记 `R6(未验)` 并**不得记为通过**（零输入不判绿）。
+  R7 一个版本号在 CHANGELOG 里只许有一个 `## [x.y.z]` 段（r90 落地）。
+     动因是 r90 盘面：`## [1.7.0]` 出现两次（57 行装切版后补记、102 行装主文），
+     而 R3 只问「最新 tag 有没有对应段」⇒ 重复段全程无感，「v1.7.0 的发布说明是哪一段」
+     在产物里没有唯一答案。正文取不到 ⇒ 记 `R7(未验)` 不判绿。
   R4 发布滞后天数：**只报不拦**。墙钟判据会在「零提交」的情况下自己从绿翻红，
      那是时间的颜色不是代码的颜色，进默认链就是误报源（本机既有铁律：默认链禁墙钟断言）。
   R5 版本三源对账（tag == pom == 文档）**已由 `repo_config_check.py` G12 负责**，本件不重复实现
@@ -173,6 +177,23 @@ def heading_set(md_text):
     return set(HEAD_LINE_RE.findall(md_text or ""))
 
 
+VERSION_HEAD_RE = re.compile(r"(?m)^## \[?v?(\d+\.\d+\.\d+[^\]\s]*)\]?")
+
+
+def duplicate_version_heads(md_text):
+    """同一版本号出现 ≥2 个 `## [x.y.z]` 段 → {版本: [行号,…]}（空 dict=无重复）。
+
+    立此判据的一手证据（r90 盘面）：`## [1.7.0] - 2026-09-30 …` 在 CHANGELOG 里出现**两次**
+    （第 57 行装 r83 切版后的补记，第 102 行装切版主文）。R3 只问「最新 tag 有没有对应段」，
+    重复段照样过 ⇒ 「v1.7.0 的发布说明是哪一段」这件事在产物里根本没有唯一答案。
+    Keep a Changelog 的一版一段不是格式洁癖：Release notes / 依赖机器人 / 下一轮对账都按版本取数。
+    """
+    pos = {}
+    for m in VERSION_HEAD_RE.finditer(md_text or ""):
+        pos.setdefault(m.group(1), []).append(md_text.count("\n", 0, m.start()) + 1)
+    return {k: v for k, v in pos.items() if len(v) > 1}
+
+
 def judge(tag, commits, bullets, md_text, ceiling=CEILING, prev_bases=None):
     """纯函数：输入全是已解析好的读数（含 CHANGELOG 正文），故 selftest 不碰 git、不碰本机状态。
 
@@ -234,6 +255,18 @@ def judge(tag, commits, bullets, md_text, ceiling=CEILING, prev_bases=None):
         if lost_all:
             bad.append("R6 CHANGELOG 段落标题消失 %d 条：%s ⇒ 把原标题按原文加回去（本仓纪律＝补更正注不删原文）"
                        % (len(lost_all), " ; ".join("%s 缺 %s" % (lb, x[:52]) for lb, x in lost_all[:2])))
+    # R7：一个版本号只许有一个 `## [x.y.z]` 段（r90 一手：v1.7.0 有两段，R3 对此完全无感）
+    if not (md_text or "").strip():
+        warn.append("R7(未验) CHANGELOG 正文取不到 ⇒ 版本段唯一性未验证，不得记为通过")
+    else:
+        dup = duplicate_version_heads(md_text)
+        n_heads = len(set(VERSION_HEAD_RE.findall(md_text)))
+        if dup:
+            bad.append("R7 CHANGELOG 有 %d 个版本号出现重复段：%s ⇒ 合并成一段（`### ` 小标题与正文一条不删）"
+                       % (len(dup), " ".join("%s@行%s" % (k, ",".join(map(str, v)))
+                                             for k, v in sorted(dup.items()))))
+        else:
+            notes.append("R7 版本段唯一性 %d/%d（每个版本号各一段）" % (n_heads, n_heads))
     return bad, warn, notes
 
 
@@ -361,7 +394,29 @@ def selftest():
         ok += 1
     else:
         fail.append("边界L 同一基准（零改动）误报消失或读数没进 notes：bad=%s notes=%s" % (_b4, _n4))
-    total = len(cases) + 12
+    # 边界 M..O：R7「一个版本号只许一段」——r90 盘面实测 v1.7.0 有两段而 R3 全程无感
+    r7_sites = 0
+    r7_sites += 1
+    _b5, _w5, _n5 = judge("v1.5.0", COMMITS, 3, CUR_OK, prev_bases=[("HEAD", PREV)])
+    if not any("R7" in x for x in _b5) and any(x.startswith("R7 版本段唯一性 1/1") for x in _n5):
+        ok += 1
+    else:
+        fail.append("边界M 正例（一版一段）被 R7 误判红或读数没进 notes：bad=%s notes=%s" % (_b5, _n5))
+    r7_sites += 1
+    CUR_DUP = CUR_OK + _NL + "## [1.5.0] - 历史（第二段）" + _NL + "### Fixed（补记）" + _NL
+    _b6, _w6, _n6 = judge("v1.5.0", COMMITS, 4, CUR_DUP, prev_bases=[("HEAD", PREV)])
+    _r7 = [x for x in _b6 if x.startswith("R7")]
+    if len(_r7) == 1 and "1.5.0@行" in _r7[0] and "," in _r7[0].split("1.5.0@行")[1]:
+        ok += 1
+    else:
+        fail.append("边界N 反例（同版本号两段）未咬或没点名版本与行号：bad=%s" % _b6)
+    r7_sites += 1
+    _b7, _w7, _n7 = judge("v1.5.0", COMMITS, 0, "")
+    if not any("R7" in x for x in _b7) and any("R7(未验)" in x for x in _w7):
+        ok += 1
+    else:
+        fail.append("边界O 正文取不到时把「看不见」当通过（应记 R7(未验) 且不判红）：bad=%s warn=%s" % (_b7, _w7))
+    total = len(cases) + 12 + r7_sites
     for x in fail:
         print("  SELFTEST-FAIL " + x)
     print("RELEASE-GOV-SELFTEST: %d/%d" % (ok, total))

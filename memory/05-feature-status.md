@@ -15,6 +15,16 @@
       `prefers-reduced-motion: reduce` 下不自动播（判据 `a11y_check` A5b）。手动那条路行为逐字未变。
       验收 = `AC-OBS-24` + `_test/lightshow_check.py` 判据⑧（四态同步点 `window.__XINYU__.opening`）。
 
+## ✅ 已实现（r90，2026-10-02 · 产物在位闸认搬卷 + 发布留痕唯一性）
+
+- [x] **归档通路打通**：`_test/deliverable_inventory_check.py` 现读 `git diff --cached -M --name-status -z HEAD`，
+      把「逐字节等价的暂存搬卷」与「丢失」分开；`ARCHIVE_ROOTS=("交付物","archive/交付物-历史轮次")` 一处两用
+      （既是 ④ 腿分母，也是被认落点）⇒ 搬走仍在守面内。落盘：两个重复打包 zip → `archive/`，交付物 184.8→**129.5 MB**。
+      反例三条皆仍红（面外 / `score<100` / 新落点不在磁盘），git 取不到 ⇒ 不替任何搬迁背书。
+- [x] **R7 版本段唯一性**：`release_governance_check.py` 新增一条「一个版本号只许一个 `## [x.y.z]` 段」，
+      真面当场抓出 `1.7.0@行57,102`；同时把 tag 之后的轮次（r83续/r84/r85）从 1.7.0 段搬回 `[Unreleased]`（正文零删除）。
+      验收 = `RELEASE-GOV-SELFTEST: 24/24` + `RELEASE-GOV-PASS` + `HOOK-DRILL-PASS`。
+
 ## ✅ 已实现（对标轮第二轮 2026-09-24：把首轮"赛后再做"直接落地）
 
 > 详见 `交付物/对标分析报告-2026-09-24-v2.md`（14 仓 gh api 实测指标）与 `03-tech-stack.md` 决策 #6–#9。
