@@ -17,10 +17,14 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - [ ] 🟠 [R90 新] **CI 全绿契约前提变了**：`greencheck.py bootstrap --repo-dir .` 实测 `checks=[]`（本仓门禁=自写电池非标准配置）
       ⇒ **禁造空契约**；须手写 `.ci/contract.json` blocking 清单（mvn verify + 关键判据），再加 CI run step 并
       `--sweep` 复扫到 `matched==declared`。前提可复算：`python D:/global_skills/A-project-handoff/scripts/greencheck.py bootstrap --repo-dir .`
-- [ ] 🟢 [R90 已收] **归档前提已解**（原 R89-01）：判据现读 `git diff --cached -M` 认「逐字节等价搬卷」，分母=`ARCHIVE_ROOTS`
-      （搬走仍在守面）；两个重复打包 zip 搬 `archive/交付物-历史轮次/` ⇒ 交付物 184.8→**129.5 MB**。
-      corpus 43 份**不搬**（实测是 `disclaimer_forensics_lint --all` 的分母）。复算：`deliverable_inventory_check --selftest` + `hook_wiring_check --drill`
-- [ ] 🟢 [R89 已收] 门面旧名 16 处→0（`brand_consistency` 常驻，电池 **110**）；C7/G19/展示崩溃修，详 `CHANGELOG` r89。
+- [ ] 🟠 [R90 新] **推平要等 r91 收口**：本地 main 领先远端 2 个提交（`5f83c76` 是并行 r91 的在途件，
+      它引入 3 条红：G16／repo_config_selftest ㉑a／R2c）。我推的 `2d34e7b` 上这三因机械不存在
+      （`grep -c ci_perf_wiring`=0 ＋ 该文件无此路径 ＋ v1.7.0..2d34e7b 无 r91）⇒ **不代推他人未收口件**；
+      待对方补齐 quality-gates+CHANGELOG 后一条快进推平，并回读 `2d34e7b` 的 CI 结论。
+- [ ] 🟢 [R89+R90 已收] 门面旧名归零（`brand_consistency` 常驻，电池 **110**）｜归档前提已解：判据读
+      `git diff --cached -M` 认「逐字节等价搬卷」＋分母=`ARCHIVE_ROOTS`（搬走仍在守面）⇒ 交付物
+      184.8→**129.5 MB**；corpus 43 份**不搬**（是 `disclaimer_forensics_lint --all` 的分母）｜C7/G19/R7/G9三腿。
+      复算见 `CHANGELOG` r90 与报告 r90 §5
 - [ ] 🔴 **P0 需老大在场**：撤销曾进过会话输出的明文 Key（r52/r53 各再犯），再消 `demo-config.js` 那条 404。`part37`
 
 ## 分卷目录
