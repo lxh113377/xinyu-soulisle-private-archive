@@ -83,8 +83,8 @@ python _test/peer_release_probe.py       # 对标 r45 探针：发布与版本�
 node _test/js/emotion-engine.unit.test.mjs   # 被测件本身：node:test + vm 载入浏览器全局脚本（含跨 realm 归一与夹具自证）
 python _test/js_unit_check.py                # r58 JS 单测执行判据：枚举 _test/js/*.test.mjs 真跑，判据行自带 tests/pass/fail 计数
 python _test/js_unit_check.py --selftest     # r58 判据桩：7 类（零分母/计数不自洽/tests=0/stderr 挤行/node 缺失）+ 恒绿守卫
-python _test/deliverable_inventory_check.py               # r59 交付物清单面：提交包「清单声明⇄磁盘⇄口径」三方对账（缺失/空件/页数越界/时长越界/指纹漂移/品牌分叉皆红）
-python _test/deliverable_inventory_check.py --selftest    # r59 判据桩：9 纯函数夹具 + 9 端到端反向腿（含「未登记草稿不判红、入库即拦」的棘轮腿；Ⓗ 腿当场抓到注入缝未接线的缺陷）
+python _test/deliverable_inventory_check.py               # r59 交付物清单面：提交包「清单声明⇄磁盘⇄口径」三方对账（缺失/空件/页数越界/时长越界/指纹漂移/品牌分叉皆红）；r90 起分母 = 交付面 + 归档面（archive/交付物-历史轮次），并认「逐字节等价的暂存搬卷」
+python _test/deliverable_inventory_check.py --selftest    # r59 判据桩：纯函数夹具 + 取数解析腿含独立通道对账 + 端到端反向腿含**真 git mv 往返**（条数由脚本自己印，本行不抄数；r90 加的搬卷五形：面外/改过内容/落点未落地/查不到/落点随后消失 皆须仍红）
 python _test/hook_wiring_check.py                          # r83 交付面在位闸的「接线回执」：_test/hooks/pre-commit 源在位 + sh -n 解析得动 + .git 副本按字节==源 + 被拦判据三态在位（CI/无 .git ⇒ 未验不判红）
 python _test/hook_wiring_check.py --selftest               # r83 判据桩：12 腿（副本漂一个字节必须红／CI 面不得判红／硬崩 rc 不得并入「环境未验」／端到端删一件入库件真被拦）
 python _test/hook_wiring_check.py --install                # 装法唯一入口（写后读回证明装的==声明的；异版先备份）

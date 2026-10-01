@@ -1320,10 +1320,12 @@ def main():
     #（与 r40b 给 perf_baseline 补实测值是同一族，修法同类而不是各修各的）。
     ran = sorted({g for n, _o, _d in results for g in re.findall(r"G\d+", n)},
                  key=lambda s: int(s[1:]))
-    print("REPO-CONFIG-PASS（实跑 %d 条判据：%s）" % (len(results), " ".join(ran))
+    # 计数单位写清楚：一条 check() 的名字里可以同时点两个判据号（G9 就是两腿），
+    # 所以 17 次调用与 18 个号**同时为真**。只印一个数，下一轮会把另一个读成对账不上（r90 一手）。
+    print("REPO-CONFIG-PASS（实跑 %d 项检查，覆盖 %d 个判据号：%s）" % (len(results), len(ran), " ".join(ran))
           if not fails else
-          "REPO-CONFIG-FAIL（实跑 %d 条，红 %d 条：%s）"
-          % (len(results), len(fails), " ".join(x[0].split()[0] for x in fails)))
+          "REPO-CONFIG-FAIL（实跑 %d 项，红 %d 项，覆盖 %d 个判据号：%s）"
+          % (len(results), len(fails), len(ran), " ".join(x[0].split()[0] for x in fails)))
     return 1 if fails else 0
 
 

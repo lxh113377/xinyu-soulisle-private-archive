@@ -52,6 +52,14 @@ PKG_DIR = ROOT / "交付物" / "提交包"
 CHECKLIST = PKG_DIR / "提交清单与验收状态.md"
 BRAND_AUTHORITY = ROOT / "src" / "index.html"
 
+# ④ 腿的受检面 = 交付面 + 它的归档落面（r90 一处两用）。
+# 这条常量同时决定「分母取哪些前缀」和「搬卷的落点允许落在哪」，因为二者必须是同一个集合：
+# 若允许搬到面外，55 MB 打包件搬出后就不再被 ④ 腿守着（搬 = 换个没人看的地方放着），
+# 而若分母含某面却不认搬到那儿，归档动作会被判成丢失 —— 07 在册的 🟠 R89-01 卡点正是这个。
+ARCHIVE_ROOTS = ("交付物", "archive/交付物-历史轮次")
+RENAME_STATUS_RE = re.compile(r"^[RCMDTUX]\d*$")
+ASSERT_COUNT = [0]  # selftest 实跑断言数（门面行据此打印，禁把条数硬写进文案 —— 抄一次就漂一次）
+
 # 交付物形状：只有这些后缀才算「要交出去的东西」，脚本/图片/中间件不参与未登记判定
 ARTIFACT_EXTS = {".pdf", ".mp4", ".pptx", ".docx", ".zip", ".mov", ".key"}
 # 尾随标点必须在字符集里排除，否则 token 会被拉长成不存在的路径（假红）
@@ -251,24 +259,97 @@ def committed_blobs(prefix: str = "交付物", root=None):
     return parse_ls_tree(r.stdout.decode("utf-8", "replace"))
 
 
+def committed_faces(root=None):
+    """ARCHIVE_ROOTS 全部前缀的入库条目并集 → ([(rel, size)], skipped, per_root_counts)。
+
+    「某根一条都没有」只可能是**还没往里搬**，不是「取数失效」⇒ 记计数不判未验；
+    只有**并集为空**才是分母为 0（那才是 R247 要拦的形态）。把零判据压在单根上会造出一条
+    「归档前必红」的闸 —— 正常流程走不通的判据没资格当闸（[[ratchet-floors-need-headroom]]）。
+    """
+    entries, skipped, per_root = [], 0, {}
+    for pfx in ARCHIVE_ROOTS:
+        got, skip = committed_blobs(pfx, root=root)
+        if got is None:
+            return None, 0, per_root
+        entries.extend(got)
+        skipped += skip
+        per_root[pfx] = len(got)
+    return entries, skipped, per_root
+
+
+def parse_name_status_z(raw: bytes):
+    """`git diff -M --name-status -z` 原文 → ({old:(new,score)}, unparsed)。
+
+    字段序取于 2026-10-02 本轮 `od` 级实测（**不是**按解析器假设构造）：
+    `R100\\0<old>\\0<new>\\0` —— 与无 `-z` 形态的 `R100\\t<old>\\t<new>` 不同，状态与路径之间是 NUL。
+    非 R 记录按 `M\\0<path>\\0` 两步走；形状对不上的记录计入 unparsed 交调用方判未验，
+    静默丢 = 把「没解析出来」写成「没有这次搬卷」，就会把在途的搬卷误判成丢失。
+    """
+    toks = [t for t in raw.decode("utf-8", "replace").split("\0") if t != ""]
+    moves, i, unparsed = {}, 0, 0
+    while i < len(toks):
+        st = toks[i]
+        if not RENAME_STATUS_RE.match(st):
+            unparsed += 1
+            break
+        if st[0] == "R":
+            if i + 2 >= len(toks):
+                unparsed += 1
+                break
+            try:
+                score = int(st[1:])
+            except ValueError:
+                score = -1
+            moves[toks[i + 1]] = (toks[i + 2], score)
+            i += 3
+        else:
+            i += 2
+    return moves, unparsed
+
+
+def staged_renames(root=None):
+    """HEAD ⇄ 暂存面的搬卷映射 {old_rel: (new_rel, score)}；git 不可用/解析失效 ⇒ (**None**, 原因)。
+
+    为什么取**暂存面**而不是工作树：本判据的调用点是 pre-commit，那一刻 `git mv` 已入索引，
+    HEAD⇄索引 正是「这次提交到底搬了什么」的权威视图；工作树里的未暂存 mv 不享有搬卷认定 ——
+    没被声明过的搬迁不该由判据替它背书。
+    """
+    root = Path(root) if root else ROOT
+    try:
+        r = subprocess.run(
+            ["git", "-c", "core.quotepath=false", "diff", "--cached", "-M",
+             "--name-status", "-z", "HEAD"],
+            cwd=str(root), capture_output=True, timeout=30)
+    except Exception as exc:
+        return None, "git diff 不可调用（%s）" % type(exc).__name__
+    if r.returncode != 0:
+        return None, "git diff rc=%d" % r.returncode
+    moves, unparsed = parse_name_status_z(r.stdout)
+    if unparsed:
+        return None, "搬卷记录有 %d 条解析不出形状 ⇒ 不替任何搬迁背书" % unparsed
+    return moves, "%d 条搬卷在册" % len(moves)
+
+
 def parse_crosscheck():
-    """⑫ 独立取数通道对账：同一 HEAD 用**另一条命令**再数一遍条目数。
+    """⑫ 独立取数通道对账：同一 HEAD 用**另一条命令**再数一遍条目数（分母 = ARCHIVE_ROOTS 并集）。
 
     为什么需要这条腿（本轮一手）：解析器与它的夹具当时按同一个错误假设写 ⇒ `--selftest` 全绿、
     真面 89/89 判废。夹具自证不了自己，只有**换一条命令**才可能暴露字段序假设错。
     返回 (True=两通道相等 / False=不等 / None=未验, 说明)。
     """
-    try:
-        r = subprocess.run(
-            ["git", "-c", "core.quotepath=false", "ls-tree", "-r", "--name-only", "-z",
-             "HEAD", "--", "交付物"],
-            cwd=str(ROOT), capture_output=True, timeout=30)
-    except Exception as exc:
-        return None, "独立通道不可调用（%s）" % type(exc).__name__
-    if r.returncode != 0:
-        return None, "独立通道 rc=%d" % r.returncode
-    indep = [x for x in r.stdout.decode("utf-8", "replace").split("\0") if x]
-    got, skipped = committed_blobs()
+    indep = []
+    for pfx in ARCHIVE_ROOTS:
+        try:
+            r = subprocess.run(
+                ["git", "-c", "core.quotepath=false", "ls-tree", "-r", "--name-only", "-z",
+                 "HEAD", "--", pfx],
+                cwd=str(ROOT), capture_output=True, timeout=30)
+        except Exception as exc:
+            return None, "独立通道不可调用（%s）" % type(exc).__name__
+        if r.returncode != 0:
+            return None, "独立通道 rc=%d（前缀 %s）" % (r.returncode, pfx)
+        indep.extend(x for x in r.stdout.decode("utf-8", "replace").split("\0") if x)
+    got, skipped, _per_root = committed_faces()
     if got is None:
         return None, "-l 通道不可用"
     if skipped:
@@ -278,8 +359,14 @@ def parse_crosscheck():
     return True, "%d 条两通道一致" % len(indep)
 
 
-def tracked_missing_check(entries, root=None, prefix: str = "交付物"):
-    """入库交付件 ⇄ 工作树 对账。返回 (violations, unverified, n_checked)。
+def tracked_missing_check(entries, root=None, moves=None):
+    """入库交付件 ⇄ 工作树 对账。返回 (violations, unverified, n_checked, moved)。
+
+    `moves` = `staged_renames()` 的结果；**只有** 逐字节等价（score==100）且落点仍在 ARCHIVE_ROOTS
+    某一根内、且该落点在磁盘上真实存在的记录才算「搬」，其余一律照旧判红。三条牙各挡一种滥用：
+    score<100 挡「改过内容再搬」（那是内容变更，须人看）；落点须在面内挡「搬到没人守的地方」；
+    磁盘须在位挡「索引里写了新路径但文件其实没落地」。`moves=None`（git 取不到）⇒ 不替任何搬迁
+    背书，完全回落 r82 的旧行为 —— 宁可把一次真归档判红让人复核，也不给「查不到」发通行证。
 
     立此腿的一手证据（第二次复发）：2026-09-29 17:4x 实测 `git status --porcelain` 打出
     **7 条 ` D`**（含 22,954,501 B 的参赛成片 `demo_video_out/心屿SoulIsle-演示视频.mp4`、
@@ -291,22 +378,34 @@ def tracked_missing_check(entries, root=None, prefix: str = "交付物"):
     """
     root = Path(root) if root else ROOT
     if entries is None:
-        return [], ["git HEAD 树取不到 ⇒ 入库件在位性未验（不得读成「都在」）"], 0
+        return [], ["归档面 HEAD 树取不到 ⇒ 入库件在位性未验（不得读成「都在」）"], 0, []
     if not entries:
-        return [], ["HEAD 树该前缀零条目 ⇒ 分母为 0，本腿不判绿（R247）"], 0
-    bad = []
+        return [], ["HEAD 树在 ARCHIVE_ROOTS 上零条目 ⇒ 分母为 0，本腿不判绿（R247）"], 0, []
+    bad, moved = [], []
     n = 0
     for rel, size in entries:
-        if not rel.startswith(prefix + "/"):
+        if not any(rel.startswith(p + "/") for p in ARCHIVE_ROOTS):
             continue
         n += 1
         p = root / rel
-        if not p.is_file():
-            bad.append("入库件从工作树消失: %s（HEAD blob %d B 在，磁盘没有 ⇒ 无人声明也丢）"
-                       % (rel, size))
-        elif size > 0 and p.stat().st_size == 0:
-            bad.append("入库件被清成 0 B: %s（HEAD blob %d B，磁盘 0 B）" % (rel, size))
-    return bad, [], n
+        if p.is_file():
+            if size > 0 and p.stat().st_size == 0:
+                bad.append("入库件被清成 0 B: %s（HEAD blob %d B，磁盘 0 B）" % (rel, size))
+            continue
+        mv = (moves or {}).get(rel)
+        if mv:
+            new_rel, score = mv
+            in_face = any(new_rel.startswith(q + "/") for q in ARCHIVE_ROOTS)
+            if score == 100 and in_face and (root / new_rel).is_file():
+                moved.append("%s → %s" % (rel, new_rel))
+                continue
+            why = ("内容不等（score=%s）" % score) if score != 100 else (
+                "落点在受检面外" if not in_face else "新落点不在磁盘上")
+            bad.append("入库件消失（有搬卷记录但不认）: %s ⇒ %s" % (rel, why))
+            continue
+        bad.append("入库件从工作树消失: %s（HEAD blob %d B 在，磁盘没有 ⇒ 无人声明也丢）"
+                   % (rel, size))
+    return bad, [], n, moved
 
 
 def evaluate(rows, paths, root=None, tracked=None):
@@ -459,20 +558,28 @@ def real_run() -> int:
     rows = table_rows(text)
     paths = declared_paths(rows)
     bad, unver, notes, c = evaluate(rows, paths)
-    entries, skipped = committed_blobs()
-    t_bad, t_unver, t_n = tracked_missing_check(entries)
+    entries, skipped, per_root = committed_faces()
+    moves, mv_why = staged_renames()
+    if moves is None:
+        unver.append("搬卷面未验（%s）⇒ 本轮不认任何搬迁，缺失照旧判红" % mv_why)
+    t_bad, t_unver, t_n, moved = tracked_missing_check(entries, moves=moves)
     bad += t_bad
     unver += t_unver
     if skipped:
         unver.append("HEAD 树有 %d 条记录取不到尺寸 ⇒ 入库面分母不完整，本腿不判绿" % skipped)
     for n in notes:
         print("  · " + n)
+    for m in moved:
+        print("  → 搬卷（逐字节等价、落点仍在受检面内）: " + m)
     for b in bad:
         print("  ✗ " + b)
     for u in unver:
         print("  ? " + u)
-    tail = ("声明 %d 条｜受检 %d｜品牌在册比对 %d｜未登记交付物 %d｜入库件在位 %d｜未验 %d"
-            % (c["declared"], c["checked"], c["brand_checked"], c["undeclared"], t_n, len(unver)))
+    tail = ("声明 %d 条｜受检 %d｜品牌在册比对 %d｜未登记交付物 %d｜入库件在位 %d｜搬卷 %d｜未验 %d"
+            "｜分母根 %s（%s）"
+            % (c["declared"], c["checked"], c["brand_checked"], c["undeclared"], t_n,
+               len(moved), len(unver), len(per_root),
+               " ".join("%s=%d" % (k, v) for k, v in sorted(per_root.items()))))
     if bad:
         print("DELIVERABLE-INVENTORY-FAIL: %d 条违规（%s）" % (len(bad), tail))
         return 1
@@ -491,6 +598,7 @@ def selftest() -> int:
     bad = []
 
     def ck(name, cond):
+        ASSERT_COUNT[0] += 1
         if not cond:
             bad.append(name)
 
@@ -547,11 +655,72 @@ def selftest() -> int:
         print("  ! ⑫独立通道交叉核对未执行（%s）⇒ 该腿本轮未验，不算过" % x12[1])
 
     bad += fixture_legs()
-    print("DELIVERABLE-INVENTORY-SELFTEST-%s（9 类纯函数夹具 + 3 条取数解析腿含独立通道对账 + 16 条端到端反向腿）"
-          % ("PASS" if not bad else "FAIL: " + "; ".join(bad)))
+    print(("DELIVERABLE-INVENTORY-SELFTEST-%s（实跑 %d 条断言：纯函数夹具 + 取数解析腿含独立通道对账 "
+           "+ 端到端反向腿含真 git mv 往返）")
+          % ("PASS" if not bad else "FAIL: " + "; ".join(bad), ASSERT_COUNT[0]))
     for x in bad:
         print("  ✗ " + x)
     return 1 if bad else 0
+
+
+def name_status_legs(root: Path, archived: str) -> list:
+    """`parse_name_status_z` 的取数层夹具 —— 输入**逐字节**取自 2026-10-02 本轮在同一台机器、
+    同一个仓上对真 `git mv` 取回的原文（`R100\\0<old>\\0<new>\\0`），不是按解析器假设构造。
+
+    立此约束的一手教训就在本文件 ⑩⑪ 两条腿的注释里：夹具与解析器按同一个错假设写 ⇒
+    `--selftest` 全绿而真面 89/89 判废。所以这三条腿额外做一次**真 git 往返**（在本轮合成的
+    temp 仓里 `git mv` 一个文件再看 helper 认不认），把「假设」换成「被测数据面自己吐的字节」。
+    """
+    bad = []
+
+    def ck(name, cond):
+        ASSERT_COUNT[0] += 1
+        if not cond:
+            bad.append(name)
+
+    measured = ("R100\x00交付物/对标分析报告-2026-09-24.md\x00"
+                "交付物/_历史轮次-对标/对标分析报告-2026-09-24.md\x00").encode("utf-8")
+    m1, u1 = parse_name_status_z(measured)
+    ck("㉑本轮实测字节（R100+两条 CJK 路径，NUL 分隔）解析出 1 条: %s/%d" % (m1, u1),
+       len(m1) == 1 and u1 == 0
+       and m1["交付物/对标分析报告-2026-09-24.md"][1] == 100)
+    m2, u2 = parse_name_status_z(b"M\x00a.txt\x00R100\x00b.txt\x00")
+    ck("㉒非 R 记录按 状态+路径 两步走；被截断的 R 必须计入 unparsed 而非静默丢: %s/%d" % (m2, u2),
+       len(m2) == 0 and u2 == 1)
+    m3, u3 = parse_name_status_z(b"not-a-status\x00x\x00")
+    ck("㉓首字段不是状态 ⇒ unparsed=1（调用方据此不替任何搬迁背书）: %s/%d" % (m3, u3),
+       not m3 and u3 == 1)
+
+    # ㉔ 真 git 往返：在被检对象自己的仓库视图里做一次搬卷，helper 必须认下来
+    import os
+    repo = root / "git-probe"
+    try:
+        (repo / "交付物").mkdir(parents=True)
+        src = repo / "交付物" / "p.md"
+        src.write_text("同一份字节", encoding="utf-8")
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t",
+                   GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+        rq = ["git"]
+        if subprocess.run(rq + ["--version"], cwd=str(repo), capture_output=True).returncode != 0:
+            ck("㉔真 git 往返未执行（git 不可调用）", False)
+            return bad
+        subprocess.run(rq + ["init", "-q"], cwd=str(repo), capture_output=True, env=env)
+        subprocess.run(rq + ["add", "-A"], cwd=str(repo), capture_output=True, env=env)
+        subprocess.run(rq + ["commit", "-q", "-m", "seed"], cwd=str(repo),
+                       capture_output=True, env=env)
+        (repo / "交付物" / "_历史轮次-对标").mkdir(parents=True)
+        subprocess.run(rq + ["mv", "交付物/p.md", "交付物/_历史轮次-对标/p.md"],
+                       cwd=str(repo), capture_output=True, env=env)
+        moves, why = staged_renames(root=repo)
+        got = (moves or {}).get("交付物/p.md")
+        ck("㉔真 `git mv` 后 staged_renames 认出搬卷（moves=%s why=%s）" % (moves, why),
+           moves is not None and got is not None and got[1] == 100
+           and got[0] == "交付物/_历史轮次-对标/p.md")
+        tb, _, _, mv = tracked_missing_check([("交付物/p.md", 15)], root=repo, moves=moves)
+        ck("㉔同一状态过在位判据 ⇒ 不红且计入搬卷（%s/%s）" % (tb, mv), not tb and len(mv) == 1)
+    except Exception as exc:
+        ck("㉔真 git 往返异常 %s" % type(exc).__name__, False)
+    return bad
 
 
 def fixture_legs() -> list:
@@ -572,6 +741,7 @@ def fixture_legs() -> list:
     bad = []
 
     def ck(name, cond):
+        ASSERT_COUNT[0] += 1
         if not cond:
             bad.append(name)
 
@@ -650,24 +820,64 @@ def fixture_legs() -> list:
 
         # Ⓙ-Ⓝ r82 新腿：入库面（分母 = HEAD 树，被检对象写不进去）
         ghost = "交付物/提交包/demo_video_out/gone.mp4"
-        tb1, tu1, tn1 = tracked_missing_check(
+        tb1, tu1, tn1, mv1 = tracked_missing_check(
             [(ghost, 22954501), ("交付物/提交包/plan.pdf", 1000)], root=root)
         ck("Ⓙ入库件消失⇒必红（且它**不在声明面**，旧腿抓不到）%s" % tb1,
            ghost not in good_paths and len(tb1) == 1 and "入库件从工作树消失" in tb1[0]
-           and tn1 == 2 and not tu1)
-        tb2, tu2, tn2 = tracked_missing_check(
+           and tn1 == 2 and not tu1 and not mv1)
+        tb2, tu2, tn2, mv2 = tracked_missing_check(
             [("交付物/提交包/plan.pdf", 1000), ("交付物/提交包/notes.md", 50)], root=root)
         ck("Ⓚ入库件都在位 ⇒ 不红且不虚报未验 %s/%s" % (tb2, tu2),
-           not tb2 and not tu2 and tn2 == 2)
+           not tb2 and not tu2 and tn2 == 2 and not mv2)
         (pkg / "zeroed.md").write_text("", encoding="utf-8")
-        tb3, _, _ = tracked_missing_check([("交付物/提交包/zeroed.md", 512)], root=root)
+        tb3, _, _, _ = tracked_missing_check([("交付物/提交包/zeroed.md", 512)], root=root)
         ck("Ⓦ入库件被清成 0 B ⇒ 必红", tb3 and "0 B" in tb3[0])
         (pkg / "zeroed.md").unlink()
-        tb4, tu4, tn4 = tracked_missing_check(None, root=root)
+        tb4, tu4, tn4, _ = tracked_missing_check(None, root=root)
         ck("Ⓜgit 取不到 ⇒ UNVERIFIED 而非判绿 %s" % tu4,
            not tb4 and len(tu4) == 1 and tn4 == 0)
-        tb5, tu5, _ = tracked_missing_check([], root=root)
+        tb5, tu5, _, _ = tracked_missing_check([], root=root)
         ck("ⓃHEAD 该前缀零条目 ⇒ 分母为 0 不判绿", not tb5 and len(tu5) == 1)
+
+        # ⓣ-ⓙ r90 新腿：搬卷认定（07 在册 🟠 R89-01 卡点）
+        # 夹具形态必须忠实于「搬」这件事本身：旧路径**不在磁盘上**、新路径在。
+        # 第一版我拿还在磁盘上的 notes.md 当被搬件 ⇒ 五条腿全被判据的 is_file() 分支短路掉
+        # （走了「件还在」而不是「件搬走了」），绿是绿不了但红得毫无信息量 —— 同族教训见 ⑩⑪。
+        gone_rel = "交付物/提交包/gone.md"
+        archived = "交付物/_历史轮次-对标/gone.md"
+        (pkg.parent / "_历史轮次-对标").mkdir(exist_ok=True)
+        (root / archived).write_text("搬来的正文", encoding="utf-8")
+        moved_ok = {gone_rel: (archived, 100)}
+        tb6, tu6, tn6, mv6 = tracked_missing_check(
+            [(gone_rel, 17)], root=root, moves=moved_ok)
+        ck("ⓣ逐字节等价搬卷且落点在面内 ⇒ 不红且计入搬卷 %s/%s" % (tb6, mv6),
+           not tb6 and not tu6 and tn6 == 1 and len(mv6) == 1)
+        tb7, _, _, mv7 = tracked_missing_check(
+            [(gone_rel, 17)], root=root, moves={gone_rel: (archived, 95)})
+        ck("ⓕ改过内容再搬（score<100）⇒ 仍判红，不替内容变更背书 %s" % mv7,
+           tb7 and "不认" in tb7[0] and not mv7)
+        tb8, _, _, _ = tracked_missing_check(
+            [(gone_rel, 17)], root=root, moves={gone_rel: ("docs/gone.md", 100)})
+        ck("ⓖ搬到受检面外 ⇒ 仍判红（搬=换个没人看的地方，不算归档）%s" % tb8,
+           tb8 and "落点在受检面外" in tb8[0])
+        tb9, _, _, _ = tracked_missing_check(
+            [(gone_rel, 17)], root=root,
+            moves={gone_rel: ("交付物/_历史轮次-对标/not-on-disk.md", 100)})
+        ck("ⓗ索引写了新路径但磁盘没落地 ⇒ 仍判红 %s" % tb9,
+           tb9 and "新落点不在磁盘上" in tb9[0])
+        tb10, _, _, mv10 = tracked_missing_check([(gone_rel, 17)], root=root, moves=None)
+        ck("ⓘ搬卷面取不到（moves=None）⇒ 回落旧行为判红，绝不因查不到而放行 %s" % mv10,
+           len(tb10) == 1 and "无人声明也丢" in tb10[0] and not mv10)
+        tba, _, tna, _ = tracked_missing_check(
+            [("archive/交付物-历史轮次/lost.md", 123)], root=root)
+        ck("ⓙ归档根上的件同样受检（搬进去≠出了守面）%s" % tba,
+           len(tba) == 1 and tna == 1 and "从工作树消失" in tba[0])
+        (root / archived).unlink()
+        tbb, _, _, mvb = tracked_missing_check([(gone_rel, 17)], root=root, moves=moved_ok)
+        ck("㉑落点文件随后也没了 ⇒ 不认搬、判红（搬一半丢一半不许绿）%s/%s" % (tbb, mvb),
+           len(tbb) == 1 and not mvb)
+        (root / archived).write_text("搬来的正文", encoding="utf-8")
+        bad += name_status_legs(root, archived)
     return bad
 
 
