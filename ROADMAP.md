@@ -1,4 +1,4 @@
-# 心屿 SoulIsle · 公开路线图
+# 心屿 MindIsle · 公开路线图
 
 > 依据：`交付物/对标分析报告-2026-09-24.md`（首轮，对标 LobeChat / Open-LLM-VTuber / SillyTavern）
 > 与 `交付物/对标分析报告-2026-09-24-v2.md`（第二轮，14 仓 gh api 实测指标 + 同体量垂类项目横向对账）。

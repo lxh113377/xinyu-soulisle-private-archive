@@ -14,6 +14,12 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - [ ] 🟠 [推荐:R83-02] **共享环境隔离待老大**：陪聊 / iCAN 门店 / 医 同居一个 CloudBase env（静态根 + 云函数），
       子目录避让只是止血；命名空间或独立 env 属跨项目决定，本轮未擅动。`part92` §②
 - [ ] **同族坑收口**：台账 `part18`/`part20`；G9 常驻 `repo_config_check`。
+- [ ] 🟠 [推荐:R89-01] **交付物归档前提未解**：`交付物/` 186 MB + 对标 corpus 42 份（P2 VOL 项在册）。
+      卡点 = `deliverable_inventory_check` ④分母取 `git ls-tree HEAD -- 交付物`，而**搬卷的删除发生在同一次提交里**
+      ⇒ 钩子视图（HEAD+本次路径）会把"搬走"读成"丢失"。前提可复算：`python _test/deliverable_inventory_check.py`
+      + `python _test/hook_wiring_check.py --drill`；先让判据认「同批 rename/delete 是搬不是丢」再动盘（禁擅动）。
+- [ ] 🟢 [R89 已收] 门面旧作品名 16 处 → 0（新判据 `brand_consistency_check` 常驻，电池 108→**110**）；
+      `docs/API.md` 进契约 C7；`docs/` ⇄ 索引 G19；`benchmark_metrics.py` 展示行崩溃修（见 CHANGELOG r89 + `交付物/对标分析报告-2026-10-01-r89.md`）。
 - [ ] 🔴 **P0 需老大在场**：撤销曾进过会话输出的明文 Key（r52/r53 各再犯），再消 `demo-config.js` 那条 404。`part37`
 
 ## 分卷目录

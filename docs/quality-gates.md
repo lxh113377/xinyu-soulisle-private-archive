@@ -45,7 +45,7 @@ python _test/live_sync_check.py          # 线上 `/` 与 deploy/xinyu 逐字节
 python _test/safety_guard_check.py        # 输入侧护栏行为验证：注入 6 例必须点名 + 正常 6 例不得误伤（含 --selftest）
 python _test/eol_parity_check.py         # 行尾确定性：工作树字节 == 仓库 blob 字节 + binary 形状（E1–E4，8 类 --selftest）
 python _test/patch_apply.py --selftest       # 补丁器自证：锚点失配/歧义/同义/插入/正常/缺失 + 行尾两侧 八类行为（防"没报错=生效了"）
-python _test/api_contract_check.py       # 接口契约三方对账（控制器↔docs/openapi.yaml↔前端）+ 11 条运行态真实打 + C6 零漏探测
+python _test/api_contract_check.py       # 接口契约三方对账（控制器↔docs/openapi.yaml↔前端）+ 11 条运行态真实打 + C6 零漏探测 + C7（r89）人读手册 API.md ⇄ yaml 双向对账（缺/虚/计数过期都红，`--selftest` ㉑类篡改各证一腿）
 python _test/repo_config_check.py --online # 仓库配置自洽：dependabot schema/目录可达 + 文档数字断言==机器实测 + 默认分支受理面
 
 # ↓ r57 补登记：以下 16 条在电池里，而本节（被当作"判据清单"来读）从来没有它们。
@@ -99,6 +99,8 @@ python _test/storage_resilience_check.py                 # r60 持久层异常�
 python _test/storage_resilience_check.py --selftest      # r60 判据桩：10 腿（合规正例不假红 + 六形必红 + 坏页端到端真崩 + 零读数不判绿）
 python _test/js_syntax_check.py                     # r67 JS 语法面：src/js 与 deploy/xinyu/js 双份逐文件 node --check（覆盖面=可解析性；不覆盖面=风格/未定义变量/lint 规则）
 python _test/js_syntax_check.py --selftest           # r67 判据桩：5 腿（坏文件点名 + 未闭合字符串 + 合规正例不假红 + 零输入不判绿 + 枚举下限防 FACES 拼错静默少测）
+python _test/brand_consistency_check.py              # r89 作品名门面：24 个门面面（README/docs/LICENSE/.env.example/openapi title/deploy jar/memory 01）剥掉技术标识白名单后不得再现旧作品名，另带品牌位在场反向腿（缺 B2 时 B1 可靠"整页没品牌"骗绿）
+python _test/brand_consistency_check.py --selftest    # r89 判据桩：3 腿（挂旧显示名必须被抓／纯技术标识不误伤／旧名与技术标识混排不得放过——白名单过宽等于没有门）
 python _test/suite_resource_census.py               # r70 资源普查：全部套件（分母从 SUITES 现读）按**目标脚本源码证据**分类（碰 8123/自绑端口/起浏览器/出公网），分桶恒等式 + BLIND 单列；天花板只报"算出的下界"并标明非实测
 python _test/suite_resource_census.py --selftest     # r70 判据桩：11 腿（漏报/误报两侧 + 恒真守卫"纯函数源码不得判出资源" + port=0 不算排他 + 盲区不得落进 free 桶 + 无台账不得报已计时）
 python _test/peer_quality_tooling_probe.py   # r58 对标探针：lint／类型／单元可测性／CI 执行位（16 仓 + self，双通道）；r66 修「只印不写」＋r67 拆 struct 两态：null=未测、[]=测到零命中）

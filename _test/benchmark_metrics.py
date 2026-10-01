@@ -1575,6 +1575,20 @@ def selftest():
         print("SELFTEST-FAIL: A9 有调用点不按四档解包（签名演进时漏改的那一处就是真面会崩的那一处）："
               "%r ｜ 已扫 %d 处调用点" % (_bad_arity, len(_call_sites)))
         return 1
+    # r89 展示行守卫：采集与写盘都已成功之后，收尾那条**纯显示** print 不得再把进程带崩。
+    # 一手起因（2026-10-01 r89）：`--out` 传相对路径时 `snap_target.relative_to(ROOT)` 抛
+    # ValueError，台账已写对而 rc≠0 ⇒ 调用方看到"失败"、盘面却是成功，状态与事实相反。
+    for _cand in ("交付物/对标数据/benchmark-metrics.json",
+                  str(ROOT / "docs" / "API.md"), "../仓外/x.json"):
+        try:
+            _s = shown_path(Path(_cand))
+        except Exception as _e:
+            print(f"SELFTEST-FAIL: shown_path 在 {_cand!r} 上抛异常（{_e}）"
+                  "⇒ 展示行仍会崩掉已完成的采集")
+            return 1
+        if not isinstance(_s, str) or not _s:
+            print(f"SELFTEST-FAIL: shown_path({_cand!r}) 返回空 ⇒ 门面行没读数")
+            return 1
     print("SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（"
           f"{len(got)} 条）；分档正确（实质 {len(sub)} / 抖动 {len(noise)}）且纯抖动场景零实质；"
           "分母证明正确（1 有效 / 2 盲区点名，健康仓不误踢）；"
@@ -1596,6 +1610,17 @@ def selftest():
           "另一侧反例＝CI 里只有步骤名/注释提「无密钥」而执行行是 java -jar ⇒ 必须判无（防升格）；"
           "摘掉该路由正例即回 False（变异腿）、还原即回 True")
     return 0
+
+
+def shown_path(p):
+    """展示用路径字符串，**永不抛异常**（r89）：relative_to 只认「同为绝对且确在 ROOT 下」，
+    而 `--out` 允许相对路径 ⇒ 采集与写盘已成功的收尾 print 曾把整个进程带崩（rc≠0 而台账已新）。
+    非仓内路径原样给出正斜杠串，不假装它是仓内相对路径。"""
+    pp = p if isinstance(p, Path) else Path(str(p))
+    try:
+        return pp.relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(pp).replace("\\", "/")
 
 
 def main():
@@ -1726,6 +1751,16 @@ def main():
         if qg_self.get("unverified") or qg_self.get("partial_errors"):
             print(f"    ⚠️ self 侧未验项：{qg_self.get('unverified')} {qg_self.get('partial_errors')[:80]}")
     hist = (hist + [run])[-6:]
+    # r89 通道收窄告警（一手：本轮只跑核心采集，写出的 run 比保留的 5 次少三个观测通道，
+    # 而引用方按"最新 run"取数就会把细分维读空 —— 台账没报错，因为 16/16 看着是完整采集）。
+    # 只告警不拦截：默认采集是本工具的正当用法，拦它等于造一条正常流程必红的闸。
+    _prior = hist[-2] if len(hist) > 1 else {}
+    _lost = [c for c in ("cap_channel", "doc_perf_channel", "quality_gate_channel")
+             if c not in run and c in _prior]
+    if _lost:
+        print("⚠️ 通道收窄：本轮 run 缺 " + " / ".join(_lost)
+              + "（上一轮有）⇒ 引用文档/性能/质量门细分维时不得取本轮，"
+                "须带 --doc-perf --quality-gates --cap-channel 重采")
     drift = diff_snap(prev_repos, cur)
     # 降级采集不得覆写权威台账（r77 一手：02:53 那次 3 仓 EOF 仍把残缺快照写进基线，
     # 下一次于是报出 5 处"实质漂移"，全是 None -> 值 —— 是我上轮瞎了，不是对手动了）
@@ -1740,7 +1775,7 @@ def main():
     tmp.write_bytes(json.dumps(payload, ensure_ascii=False, indent=1).encode("utf-8"))
     os.replace(tmp, snap_target)
 
-    print(f"采集: {len(cur)}/{len(PEERS)} 仓 | 快照 {snap_target.relative_to(ROOT).as_posix()}"
+    print(f"采集: {len(cur)}/{len(PEERS)} 仓 | 快照 {shown_path(snap_target)}"
           + ("｜⚠️ 降级：权威台账未覆写，基线仍取上一次完整采集" if snap_target != path else "")
           + f" | 历史 {len(hist)} 次")
     if not cur:

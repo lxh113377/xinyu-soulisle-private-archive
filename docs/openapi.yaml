@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: 心屿 SoulIsle 服务端接口契约
+  title: 心屿 MindIsle 服务端接口契约
   version: "1.4.0"
   description: |
     **唯一机器可读接口契约**（r21 新增）。三条使用约束，都由 `_test/api_contract_check.py` 机器强制：

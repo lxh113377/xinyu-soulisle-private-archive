@@ -1,4 +1,4 @@
-# 心屿 SoulIsle 性能基线（PERF-BASELINE）
+# 心屿 MindIsle 性能基线（PERF-BASELINE）
 
 > 口径：本地无外网 + 危机路径不调 LLM。这是**自身棘轮**（防退化），不是跨项目对比（全行业 0/16 公开可比数字，见对标 r87 §2 G5）。
 

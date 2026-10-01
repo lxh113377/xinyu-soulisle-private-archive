@@ -5,6 +5,29 @@
 
 ## [Unreleased]
 
+### Added + Fixed（r89 · 对标八维复采 + 三处"写了但没人量"的一致性收口）
+- **对标复采（peers 侧不再引用旧台账）**：`benchmark_metrics.py` 现采 16/16 仓（ts `2026-10-01 06:02 UTC`），
+  与 09-30 快照比漂移 6 处 = 实质 2（lobehub pushed→10-01、sapphire pushed→09-30）+ ★抖动 4。
+  self 侧同轮现测：p95=30.4ms / 1565.8rps、src(除 vendor) 2,558 行、CI 4 job 全绿。报告 `交付物/对标分析报告-2026-10-01-r89.md`。
+- **对上轮"待办清单"做行为对账，两条不成立**：r87 §3 的「SSE 排 P1」与「`node --check` 语法门待排期」——
+  前者三处代码 r88 已核实在册，后者 `_test/js_syntax_check.py` 自 r67 起就在电池里。
+  另发现 r87 总览表把 peers 取数时刻写成 09-28，而台账最新 run 是 09-30 ⇒ 本轮起总览表只附**现采 ts**。
+- **品牌门面漂移收口（高）**：r86 声称「更名 MindIsle 全线执行」，实测 **16 处显示名仍挂 SoulIsle**，
+  全在门面（README×2 / README.en×2 / CONTRIBUTING / ROADMAP / LICENSE / .env.example / docs 四件 / openapi 标题 /
+  deploy jar 三件 / AGENTS / memory 01）。按字节替换（新旧等长 ⇒ 字节预算零扰动），技术标识（域名 /
+  `com.xinyu.soulisle` / `SoulIsleApplication` / `soulisle-server` / 留档文件名）**不动**。
+  新增常驻判据 `_test/brand_consistency_check.py`（24 门面面 + 白名单 6 类 + 品牌位反向腿），
+  电池 +2 条（108→**110**，README 套件数同批改，G4 才不红）。演习：注入旧名 `rc=1` 点名 → 按字节复原 `rc=0`。
+- **人读手册进契约（高）**：`api_contract_check.py` 加 **C7**——`docs/API.md` ⇄ `openapi.yaml` 双向
+  （yaml 每条路径须在手册、手册不得虚报、手册声明的「N 路径」须等于实值）。C1–C6 此前只钉
+  控制器/前端/运行态，r87 交付的手册**不在任何取数面里**，yaml 一改即静默过期。`--selftest` 加 3 类篡改腿。
+- **docs 目录可发现性（高）**：r87 一次交付三本手册而 `docs/README.md` 索引仍只列 `openapi.yaml`
+  ⇒「写了但读者找不到」，与对标判 peers 的 G6 同一条缺陷。`repo_config_check.py` 加 **G19**
+  （`docs/` 真实文件 ⇄ 索引双向，零分母不判绿）+ selftest ㉔a-d 四腿；索引表现列全 7 件。
+- **Fix（工具健壮性，本轮真实踩到）**：`benchmark_metrics.py` 采集与写盘均成功后，收尾**纯显示** print 里
+  `relative_to(ROOT)` 遇 `--out` 相对路径抛 ValueError ⇒ 台账已更新而 rc≠0（状态与事实相反）。
+  改走 `shown_path()`：非仓内路径原样显示不抛；selftest 补三类路径用例。
+
 ### Added（r86 · 作品更名「心屿 MindIsle」全线执行 + 备用线改判真实在线）
 - **品牌改版（老大 2026-10-01 拍板）**：作品名 SoulIsle → **MindIsle** 全线落地 —— `src/index.html`
   品牌位 / manifest / css 注释 → `deploy/xinyu` 同步副本 →《应用方案》PDF 重渲染

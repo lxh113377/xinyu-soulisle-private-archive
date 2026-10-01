@@ -1,7 +1,8 @@
-# 心屿 SoulIsle API 手册（人类可读版）
+# 心屿 MindIsle API 手册（人类可读版）
 
-> 机器契约唯一真相源 = `docs/openapi.yaml`（11 路径，`_test/api_contract_check.py` 强制三条：文档不缺/不虚/前端不偷调）。
-> 本手册是人阅读版，字段与示例逐条对 yaml + 控制器实测（`HealthController/ChatController/EmotionController/MemoryController`），yaml 改了这里必须跟改。
+> 机器契约唯一真相源 = `docs/openapi.yaml`（11 路径，`_test/api_contract_check.py` 强制：文档不缺/不虚/前端不偷调/运行态一致/零豁免探测，
+> 并自 r89 起**把本手册也钉进对账**（C7：yaml 每条路径必须在本文件出现、本文件不得虚报接口、上方路径计数必须等于实值）——
+> 手册此前"没有任何读者"，yaml 一改它就静默过期）。
 > 基地址：本地 `http://127.0.0.1:8123`；公网 Pages 只有 `/api/chat`（其余接口不在此形态暴露）。
 
 ## 1. 健康自证 `GET /api/health` → 200

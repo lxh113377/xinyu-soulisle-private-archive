@@ -40,6 +40,9 @@
   G16 电池脚本 ⇄ `docs/quality-gates.md` 明细双向对账：电池里跑的 `_test/*.py|js` 必须在该文档出现，
      文档写了而 `_test/` 查无此件也算红（r57 实证：该文档被当作"判据清单"读，而 44 条套件里 16 条从未在其中，
      同族根因 M5⑥ 一处清单两处实现；分母从 SUITES 现读，零分母不判绿）
+  G19 `docs/` 真实文件 ⇄ `docs/README.md` 索引双向对账（r89）：磁盘上的每份文档都必须被索引链接（幽灵引文也算红）。
+     动因：r87 交付 API/EXTENSIONS/PERF-BASELINE 三本手册后索引仍只列 openapi.yaml ⇒ 写了但没人找得到；
+     原 G3 只问"openapi 被引用了吗"，对其余文档零覆盖（拿存在性结论冒充目录完整性）
   G17 对标台账 self 行的**取数面必须显式为 git HEAD**（r72，[推荐:R71-01] 的机器落点）：
      缺 `self_face` / 值非 HEAD / `self_face_errors` 非空 / `regression_suites` 非正整数 ⇒ 红。
      动因（r71 一手）：`self_metrics()` 曾一半走 git、一半 `rglob` 工作树，同一行里
@@ -177,6 +180,32 @@ def gate_doc_audit(scripts, doc_text, on_disk):
     ghost = sorted(n for n in named if n not in on_disk)
     if ghost:
         bad.append("quality-gates 写了而 `_test/` 查无此件：%s" % "、".join(ghost))
+    return bad
+
+
+def docs_index_audit(index_text, disk_names):
+    """G19 纯函数：`docs/` 真实文件 ⇄ `docs/README.md` 索引双向对账。
+
+    立此条的实证（r89，2026-10-01）：r87 一次性交付 `API.md`/`EXTENSIONS.md`/`PERF-BASELINE.md`
+    三本手册，而索引表里仍只有 `openapi.yaml` 一行 ⇒ **写了但没人找得到**。这与对标 G6 判的
+    「机制有、文档无 = 扩展能力不可发现」是同一条缺陷，只不过这次砸在上一轮自己的交付物上；
+    而原 G3 只问「openapi.yaml 被索引引用了吗」，对**其余文档**零覆盖（存在性结论冒充目录完整性）。
+    零分母不得判绿（R247）。
+    """
+    if not disk_names:
+        return ["G19 取不到 docs/ 下任何文件（目录改名或扫描失效）⇒ 不得据此判绿"]
+    linked = set()
+    for t in re.findall(r"\]\(([^)\s]+?)\)", index_text):
+        linked.add(Path(t.split("#")[0]).name)
+    names = set(disk_names)
+    bad = []
+    missing = sorted(n for n in names if n != "README.md" and n not in linked)
+    if missing:
+        bad.append("磁盘有、索引不引（写了等于没写）：%s" % "、".join(missing))
+    ghost = sorted(n for n in linked
+                   if n.endswith((".md", ".yaml")) and n not in names)
+    if ghost:
+        bad.append("索引引了而磁盘查无此件：%s" % "、".join(ghost))
     return bad
 
 
@@ -1062,6 +1091,23 @@ def selftest():
         bad.append("篡改㉑c（文档引用不存在的判据脚本）未被抓到 ⇒ 反向腿失效")
     if not gate_doc_audit(set(), real_doc, real_disk):
         bad.append("篡改㉑d（分母取空）被判绿 ⇒ 违 R247 零命中不得判绿")
+    # ㉔ G19 docs 索引双向对账：正向不误伤 + 抹链接必红 + 幽灵引文必红 + 空分母不得判绿
+    dn_real = sorted(p.name for p in (ROOT / "docs").iterdir() if p.is_file()) \
+        if (ROOT / "docs").exists() else []
+    di_real = _read("docs/README.md")
+    if docs_index_audit(di_real, dn_real):
+        bad.append("篡改㉔a（当前真实 docs 索引）被判红：%s" % docs_index_audit(di_real, dn_real))
+    _dvictim = next((n for n in dn_real if n not in ("README.md", "openapi.yaml")), "")
+    if _dvictim:
+        _thinned = re.sub(r"\]\(" + re.escape(_dvictim) + r"(?:#[^)]*)?\)", "](索引里被抹掉的一行)", di_real)
+        if _thinned == di_real:
+            bad.append(f"篡改㉔b 前置不成立：索引里找不到 {_dvictim} 的链接 ⇒ 这条腿在打不存在的靶子")
+        elif not docs_index_audit(_thinned, dn_real):
+            bad.append(f"篡改㉔b（从索引抹掉 {_dvictim} 的链接）未被抓到 ⇒ 漏引可隐形")
+    if not docs_index_audit(di_real + "\n[幽灵](NEVER_WRITTEN_DOC.md)\n", dn_real):
+        bad.append("篡改㉔c（索引引一份磁盘没有的文档）未被抓到 ⇒ 反向腿失效")
+    if not docs_index_audit(di_real, []):
+        bad.append("篡改㉔d（docs 分母取空）被判绿 ⇒ 违 R247 零命中不得判绿")
     # ㉒ G17 台账取数面：正向必须零问题（不误伤真台账），四条负向各自必须红，零输入不得判绿
     ls_real = ledger_last_self()
     if ledger_face_problems(ls_real):
@@ -1145,6 +1191,11 @@ def main():
         if (ROOT / "docs" / "README.md").exists() else False
     check("G3 契约文件存在且被索引引用（不留孤文件）", spec_ok and refs,
           f"存在={spec_ok} 被 docs/README.md 引用={refs}")
+    docs_names = sorted(p.name for p in (ROOT / "docs").iterdir() if p.is_file()) \
+        if (ROOT / "docs").exists() else []
+    g19bad = docs_index_audit(_read("docs/README.md"), docs_names)
+    check("G19 docs/ 文件 ⇄ docs/README.md 索引双向对账（漏引/幽灵引都红）", not g19bad,
+          f"docs/ 实有 {len(docs_names)} 件（分母从目录现读）| " + (" ; ".join(g19bad) or "全部在册"))
     n = battery_count()
     check("G4 电池条目数 == README 声称的套件数", s_claim is not None and s_claim == n,
           f"run_all_suites.py 实测 {n} | README 声称 {s_claim}")

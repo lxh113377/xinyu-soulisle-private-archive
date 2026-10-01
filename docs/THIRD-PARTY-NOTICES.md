@@ -26,7 +26,7 @@
 
 除上表**四个**文件（`src/vendor/` 三件及其在 `deploy/xinyu/vendor/` 的逐字节副本，加上 `_test/vendor/` 的
 axe-core 测试资产）外，`src/`、`server/`、`_test/`（`_test/vendor/` 除外）、`deploy/functions/`
-等全部由心屿 SoulIsle 团队原创，按 `LICENSE` 的 **MIT** 授权。
+等全部由心屿 MindIsle 团队原创，按 `LICENSE` 的 **MIT** 授权。
 
 ## 参赛与展示场景的口径（本项目实际情形）
 

@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-# SoulIsle fat-jar launcher (Windows / PowerShell)
+# MindIsle fat-jar launcher (Windows / PowerShell)
 # Usage:
 #   .\start.ps1                          # port 8080, serve ./web if present else <repo>/src
 #   .\start.ps1 -Port 8123               # custom port

@@ -1,4 +1,4 @@
-# 心屿 SoulIsle 扩展手册（EXTENSIONS）
+# 心屿 MindIsle 扩展手册（EXTENSIONS）
 
 > 解决对标 G6"有机制无文档"：扩展点本来就存在，本文件让它们可发现、可操作。每节含位置、改法、验证。
 

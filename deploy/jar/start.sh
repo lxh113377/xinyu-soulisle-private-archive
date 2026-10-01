@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SoulIsle fat-jar launcher (Linux / macOS)
+# MindIsle fat-jar launcher (Linux / macOS)
 # Usage:
 #   ./start.sh                          # port 8080, serve ./web if present else <repo>/src
 #   ./start.sh --port 8123

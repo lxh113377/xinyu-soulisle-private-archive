@@ -1,4 +1,4 @@
-# 心屿 SoulIsle (English)
+# 心屿 MindIsle (English)
 
 > An AI emotional-companion web app: a scroll-driven **3D emotion narrative** (WebGL + GSAP) carrying a real empathy pipeline — emotion recognition → empathetic strategy → online LLM generation → emotion visualization (a particle "star mist" that changes color and lights up per sentence) → persistent memory. Not another chat-box wrapper.
 
@@ -50,4 +50,4 @@ For research and companionship purposes only; **not** medical diagnosis or psych
 
 ## License
 
-[MIT](LICENSE) © 2026 心屿 SoulIsle team — **our original code only**; the three files under `src/vendor/` keep their own terms (three.js = MIT; GSAP / ScrollTrigger = GreenSock Standard License, **not MIT**), itemised in [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md). Entry for the 2026 iCAN AI Innovation Challenge (submission deadline 2026-09-30).
+[MIT](LICENSE) © 2026 心屿 MindIsle team — **our original code only**; the three files under `src/vendor/` keep their own terms (three.js = MIT; GSAP / ScrollTrigger = GreenSock Standard License, **not MIT**), itemised in [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md). Entry for the 2026 iCAN AI Innovation Challenge (submission deadline 2026-09-30).

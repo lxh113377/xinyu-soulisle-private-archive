@@ -14,8 +14,12 @@
   C4 运行态一致：带 `x-live-check` 的端点发真实请求，状态码 ∈ 声明集 且 required_keys 齐
                 （探测统一用 sessionId=`contract-probe`，结尾 DELETE 清理，不污染演示数据）
   C5 --selftest：合成样本证明 C1/C2/C3/C4 四条**都会报红**（不是恒真判据）
+  C7 人读手册对账（r89）：docs/API.md 与 spec 双向 —— yaml 每条 path 必须在手册里出现（不缺）、
+                手册里每个 `/api/...` 令牌必须已在 yaml 声明（不虚）、手册声明的「N 路径」须等于
+                len(paths)（计数不失）。补这一腿的动因：C1-C6 只钉住 yaml↔控制器↔前端↔运行态，
+                而 r87 新写的人读手册**没有任何读者**，yaml 一改它就静默过期（同族：门面自证没人量）。
 
-前置：fat jar 起在 8123（C4 用；C1–C3、C5 完全离线）
+前置：fat jar 起在 8123（C4 用；C1–C3、C5、C7 完全离线）
 退出码：0=API-CONTRACT-PASS 1=任一判据失败 2=环境异常（jar 不可达 / 缺 PyYAML / 缺 yaml 文件）
 """
 import json
@@ -173,6 +177,30 @@ def live_probes(spec, ann=None):
     return done, skipped
 
 
+def norm_path(p):
+    """归一化路径以便双向对账：`{sessionId}` 这类模板段统一成 `*`，去尾斜杠。"""
+    return re.sub(r"\{[^}]+\}", "*", p).rstrip("/")
+
+
+def manual_legs(spec_paths, manual_text):
+    """C7 纯函数：yaml 路径集 ⇄ 人读手册文本。返回失败描述列表（空=一致）。
+    分母取自 yaml（被检对象写不进去的量）；手册侧只认 `/api/` 前缀令牌。"""
+    bad = []
+    want = {norm_path(p) for p in spec_paths}
+    missing = sorted(p for p in spec_paths if norm_path(p) not in
+                     {norm_path(t) for t in re.findall(r"/api/[A-Za-z0-9_/{}-]+", manual_text)})
+    if missing:
+        bad.append(f"手册缺接口（yaml 有、API.md 无）：{missing}")
+    ghost = sorted({t for t in re.findall(r"/api/[A-Za-z0-9_/{}-]+", manual_text)
+                    if norm_path(t) not in want})
+    if ghost:
+        bad.append(f"手册虚报接口（API.md 写了、yaml 无）：{ghost}")
+    claimed = re.findall(r"(\d+)\s*(?:条)?路径", manual_text)
+    if claimed and int(claimed[0]) != len(want):
+        bad.append(f"手册声明的路径数过期：写 {claimed[0]}、yaml 实为 {len(want)}")
+    return bad
+
+
 def selftest():
     """合成样本证明 C1/C2/C3/C4 四条判据**都会报红**（不是恒真）。"""
     import yaml
@@ -204,7 +232,22 @@ def selftest():
     a_full, a_strip = annotated_ops(spec), annotated_ops(stripped)
     if len(a_strip) >= len(a_full):
         bad.append("篡改⑤（抹掉一条 x-live-check 标注）未被 C6 抓到 ⇒ 覆盖判据恒真")
-    print("SELFTEST-PASS: 删文档/加幽灵/偷调用/缺键/抹标注 五类样本均被抓到、原样零问题"
+    # C7 三态：原样必须过，三类合成篡改必须各报红
+    sp = set(spec.get("paths") or {})
+    mdp = ROOT / "docs" / "API.md"
+    if not mdp.exists():
+        bad.append("C7 自检读不到 docs/API.md ⇒ 无法证伪（不得据此算过）")
+    else:
+        md = mdp.read_text("utf-8", errors="replace")
+        if manual_legs(sp, md):
+            bad.append(f"原样手册被判失败：{manual_legs(sp, md)}")
+        if not manual_legs(sp | {"/api/brand-new-route"}, md):
+            bad.append("篡改⑥（yaml 新增接口而手册没写）未被 C7 抓到 ⇒ 手册腿恒真")
+        if not manual_legs(sp, md + "\n`GET /api/ghostly-side-door`\n"):
+            bad.append("篡改⑦（手册凭空多写一条接口）未被 C7 抓到 ⇒ 手册腿恒真")
+        if not manual_legs(sp, md.replace("11 路径", "99 路径", 1)):
+            bad.append("篡改⑧（手册把路径计数写歪）未被 C7 抓到 ⇒ 计数腿恒真")
+    print("SELFTEST-PASS: 删文档/加幽灵/偷调用/缺键/抹标注/手册三面漂移 八类样本均被抓到、原样零问题"
           if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
     return 1 if bad else 0
 
@@ -226,6 +269,15 @@ def main():
     jv = java_routes()
     print(f"  · 控制器路由 {len(jv)} 条 | spec 操作 {len(spec_ops(spec))} 条 | 前端引用 "
           f"{len(frontend_calls())} 条")
+    # C7（r89）：人读手册 ⇄ yaml。放在 jar 探测**之前**，这样无密钥/无服务的降级环境里
+    # 这一腿仍出数；手册缺失按判红处理（人读手册是门面件，被删不是"环境异常"）。
+    mdp = ROOT / "docs" / "API.md"
+    if not mdp.exists():
+        check("C7 人读手册对账（API.md ⇄ openapi.yaml）", False, "docs/API.md 不存在")
+    else:
+        mb = manual_legs(set((spec.get("paths") or {})), mdp.read_text("utf-8", errors="replace"))
+        check("C7 人读手册对账（API.md ⇄ openapi.yaml：不缺/不虚/计数不失）",
+              not mb, " ; ".join(mb) or f"yaml {len(spec.get('paths') or {})} 路径逐条在册、零幽灵")
     st, _ = http("get", BASE + "/api/health")
     if st != 200:
         print("API-CONTRACT-ENV-ERROR: fat jar 未在 8123 运行（C4 需要它）")

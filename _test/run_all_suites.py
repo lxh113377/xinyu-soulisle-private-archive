@@ -213,6 +213,10 @@ SUITES = [
     # 而丢失发生在两次提交之间 ⇒ 本轮把 `_test/hooks/pre-commit` 装上，本件盯「装没装、装的是不是源」。
     ("hook_wiring", [sys.executable, "_test/hook_wiring_check.py"]),
     ("hook_wiring_selftest", [sys.executable, "_test/hook_wiring_check.py", "--selftest"]),
+    # r89 作品名门面：r86 声称"全线改名 MindIsle"，而本轮实测 16 处显示名仍挂旧名（README/docs/LICENSE…）。
+    # 改名是**决定**而不是**一次性动作** ⇒ 要有尺盯着门面，否则下一轮 sync/手写又把旧名抄回来。
+    ("brand_consistency", [sys.executable, "_test/brand_consistency_check.py"]),
+    ("brand_consistency_selftest", [sys.executable, "_test/brand_consistency_check.py", "--selftest"]),
     # r84（R77-01 包装器侧）：后台测量的真退出码必须由**被包对象自己**写进日志尾行，
     # 调度层的 `completed (exit code 0)` 不算数（r82/r83 两次一手代价）。本腿自证它会转发非零。
     ("run_logged_selftest", [sys.executable, "_test/run_logged.py", "--selftest"]),
