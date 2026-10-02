@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Added（r91 · 性能步进CI + 同址对标）
+- **性能步周常化**：新增 `.github/workflows/perf-baseline.yml` 独立性能工作流 +
+  `ci_perf_wiring_check` 常驻判据（正/反例），电池 110→**112**；README 落实测性能数字
+  （p95 峰值 28.6ms / 1013.9 rps，同机棘轮）。
+- **同址对标满格**：`self_cap_channel()` 与 peers 同一把尺测 self，`streaming`/`e2e_browser`
+  双标确认 self 两格都在；`ci_perf_step`/`published_numbers` 由"行业共同缺失"翻成我方 1/16，
+  同址尺 self 7/7。报告 `交付物/对标分析报告-2026-10-02-r91.md`
+  （peers 现采 16/16，ts `2026-10-01 17:50 UTC`；取数面=git HEAD `5f83c76`）。
+
 ### Added + Fixed（r90 · 归档前提破解 + 发布留痕两处真缺陷）
 - **归档前提破解（07 在册 🟠 R89-01，高）**：`_test/deliverable_inventory_check.py` 的「入库件在位」腿
   此前把**同批 `git mv` 的删除读成丢失** ⇒ 归档动作在提交面走不通。本轮先复现再修：`git mv` 一件入库

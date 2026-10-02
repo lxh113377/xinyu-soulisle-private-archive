@@ -11,20 +11,19 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 ## P0 — 必须做
 
 - [ ] **J3/J4 变现** [推荐:R35-02]：① ② ③ 三件均已实测就绪 ⇒ **唯一阻塞 = 老大给目标机器**（IP/登录/安全组）。`part17`
-- [ ] 🟠 [推荐:R83-02] **共享环境隔离待老大**：陪聊 / iCAN 门店 / 医 同居一个 CloudBase env（静态根 + 云函数），
+- [ ] 🟠 [推荐:R83-02] **共享环境隔离待老大**：陪聊 / iCAN 门店 / 医 同居一个 CloudBase env，
       子目录避让只是止血；命名空间或独立 env 属跨项目决定，本轮未擅动。`part92` §②
 - [ ] **同族坑收口**：台账 `part18`/`part20`；G9 常驻 `repo_config_check`。
 - [ ] 🟠 [R90 新] **CI 全绿契约前提变了**：`greencheck.py bootstrap --repo-dir .` 实测 `checks=[]`（本仓门禁=自写电池非标准配置）
-      ⇒ **禁造空契约**；须手写 `.ci/contract.json` blocking 清单（mvn verify + 关键判据），再加 CI run step 并
-      `--sweep` 复扫到 `matched==declared`。前提可复算：`python D:/global_skills/A-project-handoff/scripts/greencheck.py bootstrap --repo-dir .`
-- [ ] 🟠 [R90 新] **推平要等 r91 收口**：本地 main 领先远端 2 个提交（`5f83c76` 是并行 r91 的在途件，
-      它引入 3 条红：G16／repo_config_selftest ㉑a／R2c）。我推的 `2d34e7b` 上这三因机械不存在
-      （`grep -c ci_perf_wiring`=0 ＋ 该文件无此路径 ＋ v1.7.0..2d34e7b 无 r91）⇒ **不代推他人未收口件**；
-      待对方补齐 quality-gates+CHANGELOG 后一条快进推平，并回读 `2d34e7b` 的 CI 结论。
-- [ ] 🟢 [R89+R90 已收] 门面旧名归零（`brand_consistency` 常驻，电池 **110**）｜归档前提已解：判据读
-      `git diff --cached -M` 认「逐字节等价搬卷」＋分母=`ARCHIVE_ROOTS`（搬走仍在守面）⇒ 交付物
-      184.8→**129.5 MB**；corpus 43 份**不搬**（是 `disclaimer_forensics_lint --all` 的分母）｜C7/G19/R7/G9三腿。
-      复算见 `CHANGELOG` r90 与报告 r90 §5
+      ⇒ **禁造空契约**；须手写 `.ci/contract.json` blocking 清单，再加 step 并
+      `--sweep` 复扫到 `matched==declared`。前提：`python D:/global_skills/A-project-handoff/scripts/greencheck.py bootstrap --repo-dir .`
+- [ ] 🟠 [R90 续测] **推平要等 r91 收口**（10-02 复跑）：本地领先远端 **5** 提交（我方 4 ＋
+      r91 的 `5f83c76`），远端仍 `2d34e7b`（CI `36907471857` 4/4 success 已回读）。唯一真红 = R2c 点名
+      **r91 无自己的 `### ` 小节**（`grep -c '^### .*r91' CHANGELOG.md`=0；661eff0 起散文不算登记）
+      ⇒ **不代推**；对方补小节后一条 `bash _test/push_and_watch.sh` 推平。
+- [ ] 🟢 [R89+R90 已收] 门面旧名归零（`brand_consistency` 常驻）｜归档前提已解：判据读
+      `git diff --cached -M` 认「逐字节等价搬卷」＋分母=`ARCHIVE_ROOTS` ⇒ 交付物 184.8→**129.5 MB**
+      （corpus 全量不搬，分母由 `disclaimer_forensics_lint --all` 现读）｜C7/G19/R7｜电池 **112**
 - [ ] 🔴 **P0 需老大在场**：撤销曾进过会话输出的明文 Key（r52/r53 各再犯），再消 `demo-config.js` 那条 404。`part37`
 
 ## 分卷目录

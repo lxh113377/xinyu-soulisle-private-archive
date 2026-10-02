@@ -1,12 +1,12 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 110,
+ "suites": 112,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
   "jar8123": {
-   "n": 37,
+   "n": 39,
    "seconds": 531.0,
    "members": [
     "preflight",
@@ -45,7 +45,9 @@
     "lightshow",
     "online_check",
     "storage_resilience",
-    "storage_resilience_selftest"
+    "storage_resilience_selftest",
+    "ci_perf_wiring",
+    "ci_perf_wiring_selftest"
    ]
   },
   "free": {
@@ -1200,6 +1202,30 @@
    "mode": "stub",
    "facets": [],
    "exclusive": []
+  },
+  {
+   "suite": "ci_perf_wiring",
+   "target": "_test/ci_perf_wiring_check.py",
+   "mode": "real",
+   "facets": [
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "ci_perf_wiring_selftest",
+   "target": "_test/ci_perf_wiring_check.py",
+   "mode": "stub",
+   "facets": [
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
   }
  ]
 }
