@@ -46,6 +46,16 @@
 - **`backup_online` B2 的 Playwright 导航竞态（Fixed）**：电池里红 1 次，失败形态是
   `Page.evaluate: Execution context was destroyed`（页面在 evaluate 期间导航），单独复跑 2 次全绿。
   给该腿加**有界重试一次**（1.2s 后重读同一份 localStorage，第二次仍红照判）——修竞态不是放宽判据。
+- **事故留档：15 个交付物二进制被我改坏（已全部恢复）**：归一脚本用 `git check-attr` 判二进制，
+  `subprocess.run(text=True)` 按 locale 解码 git 的 UTF-8 输出 ⇒ 中文路径乱码 ⇒ 二进制判定失效
+  ⇒ 15 个 PNG/ZIP/PDF/MP4 被当文本 CRLF→LF 改写。已逐个 `git checkout --` 恢复，复检 0。
+  两条硬规矩：①凡「按路径匹配子进程输出」必须显式 `encoding="utf-8"``（本仓同族坑第三条；
+  另两条是 `gh` 的 0 字节占位文件、`date -u` 跨平台不存在）②破坏性批量操作先 dry-run
+  （`_r94_eol.py` 现默认 dry-run + `--apply` 才改盘，且只碰文本类扩展名 + 内容含 NUL 一律跳过）。
+- **`eol_parity` 扩为双面（Fixed）**：扫描面此前是 `git ls-files`，**不含未跟踪文件** ⇒
+  「刚写完、还没入库」的脚本在本门下完全不可见 ⇒ 表现为**提交前绿、提交后红**。
+  现增一路「未入库」面（只查工作树含 CRLF，因未入库文件没有 blob 可比），门面行分别印
+  两个分母；`--selftest` 补 4 条未入库腿（CRLF 必红 / LF 不红 / binary 不红 / 零输入分母为 0）。
 - **loc 门第一次对真实回归亮红（门有牙的实证）**：补 `return results` 时 accompanying 的注释把
   `_run_checks` 顶到 155 行 ⇒ `loc_guard` 当场 `LOC-FAIL` rc=1；压缩后恢复 `LOC-PASS`。
   在此之前这条门只印读数、从不拦人 —— 这就是「有门」与「门有牙」的分界线。

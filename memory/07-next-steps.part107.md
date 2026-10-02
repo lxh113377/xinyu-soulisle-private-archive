@@ -38,6 +38,20 @@
   下轮可考虑给 `eol_parity` 加一条 `--worktree` 面（含未入库文件），或至少在门面行印出
   「本门只查 HEAD 面，未入库文件不在内」。
 
+## ②-2 事故留档：15 个交付物二进制被我改坏（已全部恢复）
+
+`_r94_eol.py` 第二版用 `git check-attr` 判二进制，`subprocess.run(text=True)` 按 locale 解码
+git 的 UTF-8 输出 ⇒ 中文路径乱码 ⇒ 二进制判定失效 ⇒ 15 个 PNG/ZIP/PDF/MP4 被当文本 CRLF→LF
+改写。`git status` 见 15 个二进制呈 `M` ⇒ 逐个 `git checkout --` 恢复 ⇒ 复检 0。
+
+两条硬规矩（已落进脚本与流程）：
+1. **凡「按路径匹配子进程输出」的代码必须显式 `encoding="utf-8"`**（本仓同族坑第三条：
+   `gh` 0 字节占位文件 / `date -u` 跨平台 / 本次 locale 乱码）。
+2. **破坏性批量操作先 dry-run**：`_r94_eol.py` 现默认 dry-run，`--apply` 才改盘；
+   两道闸：只碰文本类扩展名 + 前 8KB 含 NUL 一律跳过。**属性表会漏，字节不会。**
+
+产品面：`eol_parity` 扩为双面（已跟踪/未入库两个分母都印在门面行）+ 自检补 4 条未入库腿。
+
 ## ③ 下一轮入口（r95）
 
 1. 8 个 probe 的写盘段只验了 `peer_repro_probe --self-only --json` 真落盘，其余 7 个未实跑 ——

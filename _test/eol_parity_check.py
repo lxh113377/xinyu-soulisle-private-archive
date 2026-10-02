@@ -93,6 +93,34 @@ def audit(paths, reader=None, bin_check=None, blob_reader=None, dirty=None):
     return bad, {"text": n_text, "binary": n_bin, "total": len(paths)}
 
 
+def audit_untracked(paths, reader=None, bin_check=None):
+    """未入库文件（`git ls-files --others --exclude-standard`）：**没有 blob 可比**，只查 CRLF。
+
+    为什么必须单独一路（r94 一手）：`git ls-files` 不含未跟踪文件 ⇒ 刚写完、还没入库的脚本
+    在本门下**完全不可见**。而它入库后，工作树那份若是 CRLF，就立刻变成「工作树字节 != blob
+    字节」的红 —— 表现为「提交前绿、提交后红」，很容易被误读成「归一忘了」。
+
+    为什么不并入 `audit()`：并进去会让 `wt != blob` 那条判据拿 `b""`（未入库文件没有 blob）
+    去比，**必然不等** ⇒ 每个新文件都假红。`dirty` 也救不了：未跟踪文件在 `status --porcelain`
+    里是 `??`，而 `main()` 组 dirty 时明确排除了 `??`。
+    """
+    read = reader or (lambda rel: (ROOT / rel).read_bytes() if (ROOT / rel).is_file() else None)
+    binlike = bin_check or is_binary
+    bad, n_text, n_bin, n_miss = [], 0, 0, 0
+    for rel in paths:
+        wt = read(rel)
+        if wt is None:
+            n_miss += 1
+            continue
+        if binlike(rel):
+            n_bin += 1
+            continue
+        n_text += 1
+        if b"\r\n" in wt:
+            bad.append("未入库文件工作树含 CRLF（入库后即成「工作树 != blob」的红）：%s" % rel)
+    return bad, {"text": n_text, "binary": n_bin, "total": len(paths), "missing": n_miss}
+
+
 def selftest() -> int:
     """判据非恒真自证：该红的必须红、该放行的必须放行、零输入不得判绿。"""
     bad = []
@@ -141,12 +169,41 @@ def selftest() -> int:
     _, st0 = audit([], reader_with({}), fake_bin)
     if st0["total"] != 0:
         bad.append("零输入却算出非零分母")
+
+    # ── r94：未入库面（`git ls-files` 不含它们，r94 前完全不可见）──
+    def rd(payloads):
+        return lambda rel: payloads[rel]
+
+    PNG = b"\x89PNG\r\n\x1a\n"
+    u_cases = [
+        ("未入库 + CRLF ⇒ 必须点名（入库后就是「工作树 != blob」的红）",
+         {"n.py": b"x\r\ny\r\n"}, ["n.py"]),
+        ("未入库 + LF ⇒ 不得误报（提前红成噪声，门就没人看了）",
+         {"n.py": b"x\ny\n"}, []),
+        ("未入库 + 声明 binary 且含 0D0A ⇒ 放行（绝不能去动二进制）",
+         {"n.png": PNG}, []),
+        ("未入库 + 取不到字节 ⇒ 计入 missing 且不判红（分母仍闭合）",
+         {"gone.py": None}, []),
+    ]
+    for name, payloads, expect in u_cases:
+        e2u, stu = audit_untracked(list(payloads), reader=rd(payloads), bin_check=fake_bin)
+        hit = [x for x in expect if any(x in m for m in e2u)]
+        if expect and len(hit) != len(expect):
+            bad.append("未入库面违规样本漏报：%s -> %s" % (name, e2u[:1]))
+        if not expect and e2u:
+            bad.append("未入库面合规样本被误判：%s -> %s" % (name, e2u[:1]))
+        if stu["text"] + stu["binary"] + stu["missing"] != stu["total"]:
+            bad.append("未入库面分母不闭合：%s（%s）" % (name, stu))
+    _, stu0 = audit_untracked([], reader=rd({}), bin_check=fake_bin)
+    if stu0["total"] != 0:
+        bad.append("未入库面零输入却算出非零分母")
     if bad:
         print("EOL-PARITY-SELFTEST-FAIL: " + " ; ".join(bad))
         return 1
-    print("EOL-PARITY-SELFTEST-PASS: %d 类样本各归各位（合规文本放行 / 工作树 CRLF 判红 / "
-          "binary 的 0D0A 放行与不要求 / 未声明 binary 的 0D0A 判红 / 仓库侧 CRLF 判红）"
-          "+ 零输入分母为 0" % len(cases))
+    print("EOL-PARITY-SELFTEST-PASS: %d 类已跟踪样本 + %d 类未入库样本各归各位"
+          "（合规文本放行 / 工作树 CRLF 判红 / binary 的 0D0A 放行与不要求 / 未声明 binary 判红 /"
+          " 仓库侧 CRLF 判红 / 未入库+CRLF 判红 / 未入库+LF 放行）+ 两面零输入分母为 0"
+          % (len(cases), len(u_cases)))
     return 0
 
 
@@ -159,6 +216,8 @@ def main() -> int:
     if not paths:
         print("EOL-PARITY-ENV: git ls-files 返回 0 个文件 ⇒ 分母为空，不得据此判绿（R247）")
         return 2
+    # r94：第二路扫描面 = 未入库文件（ls-files 不含它们）。零个也照走，让门面行的分母可复算。
+    untracked = git_z("ls-files", "--others", "--exclude-standard")
 
     bad = []
     ga = ROOT / ".gitattributes"
@@ -178,16 +237,22 @@ def main() -> int:
             dirty.add(rel)                    # 有未提交内容改动：只查 CRLF，不查与仓库侧相等
     e2, st = audit(paths, dirty=dirty)
     bad += e2
+    e2u, stu = audit_untracked(untracked)
+    bad += e2u
     if st["text"] + st["binary"] != st["total"]:
         bad.append("E4 分母不闭合：text %d + binary %d != total %d"
                    % (st["text"], st["binary"], st["total"]))
+    if stu["text"] + stu["binary"] + stu["missing"] != stu["total"]:
+        bad.append("E4b 未入库面分母不闭合：text %d + binary %d + 取不到 %d != total %d"
+                   % (stu["text"], stu["binary"], stu["missing"], stu["total"]))
     for line in bad:
         print("  FAIL", line)
     if bad:
         print("EOL-PARITY-FAIL: %d 项 ⇒ 「逐字节 / SHA256 / 字节预算」类主张在他人 clone 上不可复算" % len(bad))
         return 1
-    print("EOL-PARITY-PASS（text=%d binary=%d total=%d；工作树字节 == blob 字节 ⇒ 与机器无关）"
-          % (st["text"], st["binary"], st["total"]))
+    print("EOL-PARITY-PASS（已跟踪：text=%d binary=%d total=%d｜未入库：text=%d binary=%d 取不到=%d"
+          "；工作树字节 == blob 字节 ⇒ 与机器无关）"
+          % (st["text"], st["binary"], st["total"], stu["text"], stu["binary"], stu["missing"]))
     return 0
 
 
