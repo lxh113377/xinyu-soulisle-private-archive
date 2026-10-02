@@ -44,10 +44,13 @@
 | VOL-CF954 | P2 | 体量治理[L3 产物] 交付物/心屿SoulIsle-作品提交-20260930.zip — 拆分或归档（禁直删） | todo | - | - | 2026-10-01 03:57 | - |
 | VOL-AGG-20261001 | P2 | 体量治理[L3 产物] 体量余量聚合（15 项） — 另有 15 项待判断，合计 103704007 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-01 03:57 | - |
 | WF-r90-sync状态词滞留 | P2 | flow --sync 只翻勾选位、不改登记行的「状态: todo」尾注 ⇒ 同一行 [x] 与 todo 自相矛盾（r90 实测 07.part62 VOL-FC486） | todo | - | - | 2026-10-02 01:45 | - |
-| WF-r93-对标轮 | P1 | r93 八维对标 + 四项改进（loc 门 / rollup 两新增维度 / corpus 归档 / peers 全量重采落工作区） | doing | - | - | 2026-10-02 22:10 | 报告 交付物/对标分析报告-2026-10-02-r93.md；BENCHMARK-METRICS-PASS；DISCLAIMER-CLEAN 46 份(0+46)；搬卷 45/未验 0；REPO-CONFIG-PASS 17 项 |
-| WF-r93-loc超限治理 | P2 | loc 门 22/156 文件超限（最大 benchmark_metrics.py 1913 行/最长函数 628 行）⇒ 清零后切 --enforce 并加 CI 接线判据 | todo | WF-r93-对标轮 | - | 2026-10-02 22:10 | _test/loc_guard_check.py（report-only，超限清单在盘） |
-| WF-r93-辅助台账重采 | P2 | peer-quality-tooling / peer-repro 两份台账分母 16 仍含已换址的旧 letta 行 ⇒ rollup 已标 stale，需重采 | todo | - | - | 2026-10-02 22:10 | 交付物/对标数据/benchmark-rollup-r93.json（stale 字段在产物里） |
-| WF-r93-cijob双读数 | P2 | ci_job数两个读数并存（benchmark_metrics ci_workflows=4 文件数 vs bench_rollup ci_jobs=5 job 条数）⇒ 统一口径或写清定义域 | todo | - | - | 2026-10-02 22:10 | 两读数均已登记在 r93 报告 §2B |
+| WF-r93-对标轮 | P1 | r93 八维对标 + 四项改进（loc 门 / rollup 两新增维度 / corpus 归档 / peers 全量重采落工作区） | done | - | - | 2026-10-02 23:10 | 报告 交付物/对标分析报告-2026-10-02-r93.md（提交 1846cf3/7ae33b9）；BENCHMARK-METRICS-PASS；DISCLAIMER-CLEAN 46 份(0+46)；搬卷 45/未验 0；REPO-CONFIG-PASS 17 项；BATTERY 116/116；CI run 37023508041/37027916208 绿 |
+| WF-r93-loc超限治理 | P2 | loc 门 22/156 文件超限（最大 benchmark_metrics.py 1913 行/最长函数 628 行）⇒ 清零后切 --enforce 并加 CI 接线判据 | done | WF-r93-对标轮 | - | 2026-10-03 01:40 | r94：先修尺（22→8，14 项为类/IIFE 误判）→ 拆 10 个真超限函数 → **超限 0（LOC-PASS）** → 切 enforce + 接线自证 wiring_report()；selftest 9→17 条 |
+| WF-r93-辅助台账重采 | P2 | peer-quality-tooling / peer-repro 两份台账分母 16 仍含已换址的旧 letta 行 ⇒ rollup 已标 stale，需重采 | done | - | - | 2026-10-03 01:40 | 两份 …-2026-10-03.json 在盘；有 lockfile 10→11/16、有测试结构 6→7/16；bench_rollup 改取最新+stale 按内容判定+产物名跟随 |
+| WF-r93-cijob双读数 | P2 | ci_job数两个读数并存（benchmark_metrics ci_workflows=4 文件数 vs bench_rollup ci_jobs=5 job 条数）⇒ 统一口径或写清定义域 | done | - | - | 2026-10-03 01:40 | r94 已统一：实为**同名不同义**（self 侧 ci_workflows 实为 ci.yml job 条数，与 peers 的 GitHub API workflow 总数不同源）⇒ self 分列 ci_jobs_in_ci_yml/ci_workflow_files + 定义域 + 不变式断言 |
+| WF-r93-loc超限治理 | P2 | loc 门 22/156 文件超限（最大 benchmark_metrics.py 1913 行/最长函数 628 行）⇒ 清零后切 --enforce 并加 CI 接线判据 | done | WF-r93-对标轮 | - | 2026-10-03 01:40 | r94：先修尺（22→8，14 项为类/IIFE 误判）→ 拆 10 个真超限函数 → **超限 0（LOC-PASS）** → 切 enforce + 接线自证 wiring_report()；selftest 9→17 条 |
+| WF-r93-辅助台账重采 | P2 | peer-quality-tooling / peer-repro 两份台账分母 16 仍含已换址的旧 letta 行 ⇒ rollup 已标 stale，需重采 | done | - | - | 2026-10-03 01:40 | 两份 …-2026-10-03.json 在盘；有 lockfile 10→11/16、有测试结构 6→7/16；bench_rollup 改取最新+stale 按内容判定+产物名跟随 |
+| WF-r94-probe落盘验证 | P2 | 8 个 peer_*_probe 的 `date -u` 已修（Windows 无此命令，致「跑完不写盘」），但只实跑验证了 repro 一个 | todo | - | - | 2026-10-03 01:40 | 编译全过；`peer_repro_probe --self-only --json` 实跑落盘已验；其余 7 个待用到时实跑 |
 
 ## 推进记录
 

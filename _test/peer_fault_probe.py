@@ -21,6 +21,7 @@ import json
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 import sys
 import urllib.request
 from pathlib import Path
@@ -288,8 +289,8 @@ def main():
             {"repos": rows, "na": na, "denominator": n, "blind": len(na), "usable": n - len(na),
              "ceiling_note": "故障注入无法对他人站点实施 ⇒ 本面只出结构与声明证据，"
                              "不得写成报错体验对比结论",
-             "ts": subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"],
-                                  capture_output=True, text=True).stdout.strip()},
+             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
+
             ensure_ascii=False, indent=1).encode("utf-8"))
         print("快照 -> " + a.json)
     if a.self_only:

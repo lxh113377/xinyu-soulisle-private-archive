@@ -33,6 +33,15 @@ import re
 import sys
 from pathlib import Path
 
+try:
+    # r94：原先在 `main()` 里做这次 import（局部名）。r94 把 with 块搬进 `_run_audit()` 后，
+    # 搬走的那段看不到局部名 ⇒ NameError。故提到模块级，并在 main 里保留 rc=2 的环境门语义。
+    from playwright.sync_api import sync_playwright
+    _PW_ERR = None
+except Exception as _e:                      # 缺依赖 ⇒ 记未验，不得当通过
+    sync_playwright = None
+    _PW_ERR = str(_e)[:120]
+
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ROOT = Path(__file__).resolve().parent.parent
 AXE_PATH = ROOT / "_test" / "vendor" / "axe-core-4.10.2.min.js"
@@ -213,33 +222,21 @@ def goto_state(pg, state):
         pg.wait_for_timeout(900)
 
 
-def main():
-    if "--selftest" in sys.argv[1:]:
-        return run_selftest()
-    # ---- 环境门：取不到证据就不给绿，也不给红 ----
-    if AXE_LIB is None:
-        print("A11Y-ENV-UNVERIFIED %s" % AXE_PIN_ERR)
-        return 2
-    if not AXE_PATH.exists():
-        print("A11Y-ENV-UNVERIFIED axe 件缺失 %s（禁在线回落：判据不接受顺手下一个）" % AXE_PATH)
-        return 2
-    raw = AXE_PATH.read_bytes()
-    if len(raw) != AXE_LEN:
-        print("A11Y-ENV-UNVERIFIED axe 件长度 %d != 名册钉定 %d（被截断或被替换）" % (len(raw), AXE_LEN))
-        return 2
-    sha = hashlib.sha256(raw).hexdigest()
-    if sha != AXE_SHA256:
-        print("A11Y-ENV-UNVERIFIED axe sha256 %s != 名册钉定 %s（等长替换也会在这里露出来）"
-              % (sha[:16], AXE_SHA256[:16]))
-        return 2
-    try:
-        from playwright.sync_api import sync_playwright
-    except Exception as e:
-        print("A11Y-ENV-UNVERIFIED playwright 不可用 %s" % e)
-        return 2
-    src = raw.decode("utf-8")
-    opts = {"resultSelection": "farest", "runOnly": {"type": "tag", "values": TAGS}}
+# r94：键盘可达性探针的浏览器端脚本提到模块级（原在 `main` 内占 15 行，是该函数据
+# loc_guard 函数长门超标的原因之一）。搬的是**字符串常量**，无变量捕获，行为不变。
+_JS_KB = """() => {
+          const seq = []; let cur = document.activeElement;          for (let i = 0; i < 24; i++) {            const s = document.activeElement;            seq.push((s.id || s.tagName.toLowerCase()) +                     '|outline:' + getComputedStyle(s).outlineStyle + '/' + getComputedStyle(s).outlineWidth);            s.dispatchEvent;            const nx = s.nextElementSibling || (s.parentElement && s.parentElement.nextElementSibling);            if (!nx) break;            try { nx.focus(); } catch (e) { break; }            if (document.activeElement === cur) break;            cur = document.activeElement;          }          return {seq: seq.slice(0, 12)};}"""
 
+
+def _probe_kb(pg):
+    """r94：Tab 焦点序列探针（取样 + 落一个 Tab，与原内联两行同序同值）。"""
+    kb = pg.evaluate(_JS_KB)
+    pg.keyboard.press("Tab")
+    return kb
+
+
+def _run_audit(src, opts):
+    """r94：由 `main` 的「累加器初始化 + `with sync_playwright()` 整块」下移（`results`/`check` 在模块级）。"""
     viol_total = 0
     states_red = []
     passes_min = 10 ** 6
@@ -339,22 +336,7 @@ def main():
         ctx, pg = open_page("dark")
         pg.goto(BASE, wait_until="networkidle")
         pg.wait_for_timeout(600)
-        kb = pg.evaluate("""() => {
-          const seq = []; let cur = document.activeElement;
-          for (let i = 0; i < 24; i++) {
-            const s = document.activeElement;
-            seq.push((s.id || s.tagName.toLowerCase()) +
-                     '|outline:' + getComputedStyle(s).outlineStyle + '/' + getComputedStyle(s).outlineWidth);
-            s.dispatchEvent;
-            const nx = s.nextElementSibling || (s.parentElement && s.parentElement.nextElementSibling);
-            if (!nx) break;
-            try { nx.focus(); } catch (e) { break; }
-            if (document.activeElement === cur) break;
-            cur = document.activeElement;
-          }
-          return {seq: seq.slice(0, 12)};
-        }""")
-        pg.keyboard.press("Tab")
+        kb = _probe_kb(pg)
         focused1 = pg.evaluate("() => { const s=document.activeElement; const cs=getComputedStyle(s);"
                                "return (s.id||s.tagName)+'|'+cs.outlineStyle+'|'+cs.boxShadow.slice(0,24); }")
         names = pg.evaluate("""() => [...document.querySelectorAll('button,input[type=submit],a')]
@@ -400,6 +382,39 @@ def main():
                   "normal=%.5f reduce=%.5f 比值=%.3f" % (normal, reduced,
                                                      reduced / normal if normal else -1))
         b.close()
+    return viol_total, states_red, passes_min, inc, deltas
+
+
+def main():
+    if "--selftest" in sys.argv[1:]:
+        return run_selftest()
+    # ---- 环境门：取不到证据就不给绿，也不给红 ----
+    if AXE_LIB is None:
+        print("A11Y-ENV-UNVERIFIED %s" % AXE_PIN_ERR)
+        return 2
+    if not AXE_PATH.exists():
+        print("A11Y-ENV-UNVERIFIED axe 件缺失 %s（禁在线回落：判据不接受顺手下一个）" % AXE_PATH)
+        return 2
+    raw = AXE_PATH.read_bytes()
+    if len(raw) != AXE_LEN:
+        print("A11Y-ENV-UNVERIFIED axe 件长度 %d != 名册钉定 %d（被截断或被替换）" % (len(raw), AXE_LEN))
+        return 2
+    sha = hashlib.sha256(raw).hexdigest()
+    if sha != AXE_SHA256:
+        print("A11Y-ENV-UNVERIFIED axe sha256 %s != 名册钉定 %s（等长替换也会在这里露出来）"
+              % (sha[:16], AXE_SHA256[:16]))
+        return 2
+    # r94 注：原先这里有一句**函数内** `from playwright.sync_api import sync_playwright`，
+    # 而 r94 把 with 块搬进了 `_run_audit()` ⇒ 那个局部 import 留在 `main` 里，搬走的那段
+    # 直接 NameError（battery 抓到：`NameError: name 'sync_playwright' is not defined`）。
+    # 搬块前必须问「这个名字原来从哪来」——import 也要跟着搬。现已提到模块级，这里只留环境门：
+    if sync_playwright is None:
+        print("A11Y-ENV-UNVERIFIED playwright 不可用 %s" % _PW_ERR)
+        return 2
+    src = raw.decode("utf-8")
+    opts = {"resultSelection": "farest", "runOnly": {"type": "tag", "values": TAGS}}
+
+    viol_total, states_red, passes_min, inc, deltas = _run_audit(src, opts)
 
     bad = [n for n, ok, d in results if ok is False]
     unv = [n for n, ok, d in results if ok is None]

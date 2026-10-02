@@ -107,10 +107,10 @@ python _test/peer_quality_tooling_probe.py   # r58 对标探针：lint／类型�
 python _test/peer_quality_tooling_probe.py --selftest  # r58 探针桩：7 类桩 + 恒真守卫（含「NOISE 不得滤掉 tests 目录」反例）
 python _test/ci_perf_wiring_check.py          # r91 性能接线面：C-IPW-1..5（workflow 名被 RE_CI_PERF 认下／正文真调 perf_baseline_check／java -jar 且等 /api/health 就绪／README 命中 published_numbers 且引用基线文档／README 与 PERF-BASELINE 的 p95 不超预算且不分叉）；正则从 benchmark_metrics 同源 import，不内联
 python _test/ci_perf_wiring_check.py --selftest  # r91 判据桩：11 条（正例 + 删 workflow／空正文／不调判据／不等 health／README 抽数字／抽基线引用／两处数量级分叉／超预算／基线失联 九反例 + 零输入恒真守护）
-python _test/loc_guard_check.py                # r93 行数/函数长（对标 opensoul `pnpm check:loc`：文件 ≤2000 行／函数 ≤150 行）。**report-only**：只登记超限清单与排名，rc 不阻断；零输入/取数面读不到判 rc=2。面板同时打印既有更严约束（size_budget 字节预算、行为 Core P0.8 函数 ≤50 行），防「门更松所以通过」的误读。加 --enforce 才阻断
-python _test/loc_guard_check.py --selftest      # r93 判据桩：9 条（超限样本必报行数/函数长超限／未超限不误报／等值边界不判红／两条阈值放大变异腿／零文件不产生任何结论／零文件必须被判 UNVERIFIED／合成面超限清单非空）
-python _test/bench_rollup.py                   # r93 两新增维度汇总（只读、零网络、数字带来源）：①测试与可复现性（self 现测 116 套件／11 个 Java 测试类／88 个 @Test／jacoco LINE≥0.90∧BRANCH≥0.90 ⇄ peers 同址尺 coverage_gate 0/16）②零构建成本-收益（前端构建链配置 0 个 ⇒ 零构建成立；平台函数依赖清单 1 份单列；首屏预算 22 文件/888,474 B；CI 2 workflow/5 job）。peers 成本项**未取数**即写「未取数」，不得塌缩成 0
-python _test/bench_rollup.py --selftest         # r93 判据桩：5 条（缺源检出／合成样本出表／成本项未取数不得写成 0／job 计数不得把 job 内保留键算成 job／无 jobs 块时不得凭空数出 job）
+ python _test/loc_guard_check.py                # r94 起**默认 enforce**（超限即 rc=1，进了电池就会红）。行数 ≤2000 / 函数长 ≤150（对标 opensoul `check:loc`，其 `--max 2000 --max-function 150` 已实测坐实）。**函数口径只取 `func` 块**：Java/JS 的类与 IIFE 模块包装是类型/模块容器，不计函数长（行数照常计入文件行数）；嵌套函数**会**被测量。面板打印被排除的类/模块数 + 既有更严约束（size_budget 字节预算、Core P0.8 函数 ≤50 行）。`--report-only` 只报不拦
+ python _test/loc_guard_check.py --selftest      # r94 判据桩：17 条（超限必报／未超限不误报／等值边界／两条阈值放大变异腿／零文件不产生结论且必判 UNVERIFIED／合成面超限非空／类 300 行与 IIFE 包装**不得**判函数超限而其内部 200 行函数必红／接线三腿：当前电池条目带 --enforce、摘掉后判否、只动一处不误伤）
+ python _test/bench_rollup.py                   # r93 起提供两新增维度的只读汇总（只读、零网络、数字带来源）：①测试与可复现性（self 套件数／Java 测试类与 @Test 数／jacoco LINE≥0.90∧BRANCH≥0.90 ⇄ peers 同址尺 coverage_gate 等）②零构建成本-收益（前端构建链配置 0 个 ⇒ 零构建成立；平台函数依赖清单单列；首屏预算；CI workflow 文件数与 job 条数）。**r94 起输入/产物都不写死轮次号**：自动取最新 `benchmark-metrics-*.json` 与 `peer-quality-tooling-*.json`／`peer-repro-*.json`，产物名跟随输入轮次；stale 标记按台账内容判定（含旧 letta 行才标 stale，不再硬编码）
+ python _test/bench_rollup.py --selftest         # r94 判据桩：5 条（缺源检出／合成样本出表／成本项未取数不得写成 0／job 计数不得把 job 内保留键算成 job／无 jobs 块时不得凭空数出 job）
 ```
 
 > 前置：多数判据需 fat jar 起在 8123（`java -jar server/target/soulisle-server.jar --server.port=8123`，

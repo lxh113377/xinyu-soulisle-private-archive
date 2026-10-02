@@ -1,0 +1,121 @@
+{
+  "generated_by": "_test/bench_rollup.py",
+  "dim_a_testing_repro": {
+    "self": {
+      "face": "git HEAD",
+      "regression_suites": 116,
+      "java_test_files": 11,
+      "java_test_cases": 88,
+      "jacoco_minimum": {
+        "LINE": 0.9,
+        "BRANCH": 0.9
+      },
+      "check_scripts_in_test": 0,
+      "src_code_files": 19,
+      "first_screen_budget": {
+        "files": 22,
+        "total_bytes": 888474
+      },
+      "build_config_files": [
+        "deploy/cloudbase/functions/chat/package.json"
+      ],
+      "frontend_build_configs": [],
+      "platform_function_manifests": [
+        "deploy/cloudbase/functions/chat/package.json"
+      ],
+      "zero_build": true,
+      "ci_workflow_files": 2,
+      "ci_jobs": 5
+    },
+    "peers_quality_tooling": {
+      "available": true,
+      "file": "peer-quality-tooling-2026-10-03.json",
+      "ts": "2026-10-03",
+      "generated_by": "peer_quality_tooling_probe.py",
+      "denominator": 16,
+      "have_test_struct": 7,
+      "ci_unit_step": 5,
+      "note": "只出结构化在册证据；不得据此比较代码质量/缺陷率（覆盖率不在取数面内）",
+      "stale": null
+    },
+    "peers_repro": {
+      "available": true,
+      "file": "peer-repro-2026-10-03.json",
+      "ts": "2026-10-02T17:32:45Z",
+      "denominator": 16,
+      "with_lockfile": 11,
+      "stale": null
+    }
+  },
+  "dim_b_zero_build_cost": {
+    "self_cost": {
+      "face": "git HEAD",
+      "regression_suites": 116,
+      "java_test_files": 11,
+      "java_test_cases": 88,
+      "jacoco_minimum": {
+        "LINE": 0.9,
+        "BRANCH": 0.9
+      },
+      "check_scripts_in_test": 0,
+      "src_code_files": 19,
+      "first_screen_budget": {
+        "files": 22,
+        "total_bytes": 888474
+      },
+      "build_config_files": [
+        "deploy/cloudbase/functions/chat/package.json"
+      ],
+      "frontend_build_configs": [],
+      "platform_function_manifests": [
+        "deploy/cloudbase/functions/chat/package.json"
+      ],
+      "zero_build": true,
+      "ci_workflow_files": 2,
+      "ci_jobs": 5
+    },
+    "peers_build_gates": {
+      "repo_count": 16,
+      "ts": "2026-10-02 17:22 UTC",
+      "quality_gate_classes": {
+        "coverage_gate": {
+          "yes": 0,
+          "no": 16,
+          "unverified": 0
+        },
+        "mutation_gate": {
+          "yes": 0,
+          "no": 16,
+          "unverified": 0
+        },
+        "lint_gate": {
+          "yes": 2,
+          "no": 13,
+          "unverified": 1
+        },
+        "typecheck_gate": {
+          "yes": 0,
+          "no": 14,
+          "unverified": 2
+        },
+        "secret_scan_gate": {
+          "yes": 1,
+          "no": 13,
+          "unverified": 2
+        }
+      },
+      "cap_counts": {},
+      "doc_perf_raw_keys": [
+        "29-Cu/succhia",
+        "Bwcx-songyu/MoodChat",
+        "CheaperjamRen/leemo",
+        "Lum1104/MER-Factory",
+        "NJX-njx/opensoul",
+        "Open-LLM-VTuber/Open-LLM-VTuber",
+        "Rogendo/Mental-health-Chatbot",
+        "SillyTavern/SillyTavern"
+      ]
+    },
+    "peers_cost_items": "未取数（本轮只取构建门分布；成本项不得塌缩成 0）"
+  }
+}

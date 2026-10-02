@@ -154,6 +154,138 @@ def selftest() -> int:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _simulate(tmp, java, copies, envs, workdir, ignores, fails):
+    """r94：由 `main()` 的 try 体整体下移而来（main 原 167 行 > loc_guard 的 150 行门）。
+
+    搬移的是**整块**，不是挑几行：try 体内无 `return`/`raise`，只往 `fails` 里追加，
+    故语义等价于原来那段（依赖全部显式入参，不靠闭包捕获）。
+    """
+    # ---- 1) 执行 COPY（含 .dockerignore 语义）----
+    src_count = 0
+    for srcs, dst in copies:
+        if len(srcs) != 1:
+            fails.append(f"多源 COPY 未支持，请人工核对: {srcs} -> {dst}")
+            continue
+        src = ROOT / srcs[0]
+        rel_dst = dst[len(IMAGE_ROOT):].lstrip("/") if dst.startswith(IMAGE_ROOT) else dst.lstrip("/")
+        target = tmp / rel_dst
+        if not src.exists():
+            fails.append(f"COPY 源不存在: {srcs[0]}")
+            continue
+        if src.is_dir() or srcs[0].endswith("/"):
+            for f in src.rglob("*"):
+                if not f.is_file():
+                    continue
+                rel_from_src = f.relative_to(src).as_posix()
+                if is_ignored(f"{srcs[0].rstrip('/')}/{rel_from_src}", ignores):
+                    continue
+                out = target / rel_from_src
+                out.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, out)
+                src_count += 1
+        else:
+            if is_ignored(srcs[0], ignores):
+                print(f"  (被 .dockerignore 排除) {srcs[0]}")
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, target)
+            src_count += 1
+    print(f"[COPY] 共写入 {src_count} 个文件 -> {tmp}")
+    if src_count < 3:
+        fails.append(f"COPY 只写入 {src_count} 个文件，输入可疑")
+
+    # ---- 2) 镜像内容物断言（不依赖运行）----
+    web = tmp / "web"
+    for need in ("index.html", "js/app.js", "js/emotion-engine.js", "vendor/three.min.js", "css/style.css"):
+        if not (web / need).is_file():
+            fails.append(f"镜像内缺前端文件: web/{need}")
+    if not (tmp / "app.jar").is_file():
+        fails.append("镜像内缺 app.jar")
+    ds = tmp / "_test" / "emotion-eval-dataset.json"
+    if not ds.is_file():
+        fails.append("镜像内缺评测集")
+    else:
+        n = len(json.loads(ds.read_text(encoding="utf-8"))["items"])
+        print(f"[内容] 评测集 {n} 条")
+        if n < 60:
+            fails.append(f"镜像内评测集只有 {n} 条（应为 73）")
+
+    # ---- 3) 镜像内密钥扫描（红线）----
+    hits = scan_keys(tmp)
+    print(f"[红线] 镜像内 sk- 命中: {len(hits)}  {hits[:3]}")
+    if hits:
+        fails.append(f"红线：镜像内含真实 Key -> {hits[:3]}")
+
+    # ---- 4) 真实运行（ENV / WORKDIR / ENTRYPOINT）----
+    run_env = os.environ.copy()
+    for k, v in envs.items():
+        run_env[k] = v.replace(IMAGE_ROOT, str(tmp))
+    # 模拟 docker run -e DEEPSEEK_KEY=... 给一个假 key，避免回落离线影响断言
+    run_env.setdefault("DEEPSEEK_KEY", "")
+
+    # WORKDIR 映射：`/app` 本身 = 临时根，`/app/x` = tmp/x
+    sub = workdir[len(IMAGE_ROOT):].lstrip("/") if workdir.startswith(IMAGE_ROOT) else workdir.lstrip("/")
+    work_cwd = tmp / sub if sub else tmp
+    work_cwd.mkdir(parents=True, exist_ok=True)
+    print(f"[WORK] cwd={work_cwd}")
+
+    proc = subprocess.Popen(
+        [str(java), "-jar", str(tmp / "app.jar"), f"--server.port={PORT}"],
+        cwd=str(work_cwd), env=run_env,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        encoding="utf-8", errors="replace",
+    )
+    try:
+        base = f"http://127.0.0.1:{PORT}"
+        health = None
+        for _ in range(60):
+            if proc.poll() is not None:
+                break
+            try:
+                with urllib.request.urlopen(base + "/api/health", timeout=3) as r:
+                    health = json.loads(r.read().decode("utf-8"))
+                break
+            except Exception:
+                time.sleep(1)
+        if not health:
+            out = proc.stdout.read() if proc.stdout else ""
+            fails.append("服务未就绪（复现镜像启动失败）。最后 800 字日志:\n" + out[-800:])
+        else:
+            print(f"[健康] {json.dumps(health, ensure_ascii=False)}")
+            if health.get("status") != "UP":
+                fails.append("health.status != UP")
+            for k in ("indexFound", "vendorFound"):
+                if not health.get(k):
+                    fails.append(f"health.{k} != true")
+            if str(tmp) not in health.get("webRoot", "") and IMAGE_ROOT not in health.get("webRoot", ""):
+                fails.append(f"webRoot 未指向镜像内前端: {health.get('webRoot')}")
+
+            for path in ("/", "/js/app.js", "/vendor/three.min.js", "/css/style.css"):
+                try:
+                    with urllib.request.urlopen(base + path, timeout=10) as r:
+                        code, ln = r.status, len(r.read())
+                except urllib.error.HTTPError as e:
+                    code, ln = e.code, 0
+                print(f"[静态] {code} {path} ({ln}B)")
+                if code != 200:
+                    fails.append(f"静态资源非 200: {path} -> {code}")
+
+            try:
+                with urllib.request.urlopen(base + "/api/emotion/eval", timeout=60) as r:
+                    ev = json.loads(r.read().decode("utf-8"))
+                print(f"[评测] {ev.get('total')} 条 / {ev.get('accuracy')} / 危机 {ev.get('crisis_recall')}")
+                if ev.get("total") != 73 or ev.get("accuracy") != "98.6%":
+                    fails.append(f"镜像内评测指标异常: {ev.get('total')} / {ev.get('accuracy')}")
+            except Exception as exc:  # noqa: BLE001
+                fails.append(f"/api/emotion/eval 失败: {exc}")
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
 def main() -> int:
     if "--selftest" in sys.argv:
         return selftest()
@@ -180,130 +312,7 @@ def main() -> int:
     keep = "--keep" in sys.argv
     tmp = Path(tempfile.mkdtemp(prefix="xinyu_imagesim_"))
     try:
-        # ---- 1) 执行 COPY（含 .dockerignore 语义）----
-        src_count = 0
-        for srcs, dst in copies:
-            if len(srcs) != 1:
-                fails.append(f"多源 COPY 未支持，请人工核对: {srcs} -> {dst}")
-                continue
-            src = ROOT / srcs[0]
-            rel_dst = dst[len(IMAGE_ROOT):].lstrip("/") if dst.startswith(IMAGE_ROOT) else dst.lstrip("/")
-            target = tmp / rel_dst
-            if not src.exists():
-                fails.append(f"COPY 源不存在: {srcs[0]}")
-                continue
-            if src.is_dir() or srcs[0].endswith("/"):
-                for f in src.rglob("*"):
-                    if not f.is_file():
-                        continue
-                    rel_from_src = f.relative_to(src).as_posix()
-                    if is_ignored(f"{srcs[0].rstrip('/')}/{rel_from_src}", ignores):
-                        continue
-                    out = target / rel_from_src
-                    out.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(f, out)
-                    src_count += 1
-            else:
-                if is_ignored(srcs[0], ignores):
-                    print(f"  (被 .dockerignore 排除) {srcs[0]}")
-                    continue
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, target)
-                src_count += 1
-        print(f"[COPY] 共写入 {src_count} 个文件 -> {tmp}")
-        if src_count < 3:
-            fails.append(f"COPY 只写入 {src_count} 个文件，输入可疑")
-
-        # ---- 2) 镜像内容物断言（不依赖运行）----
-        web = tmp / "web"
-        for need in ("index.html", "js/app.js", "js/emotion-engine.js", "vendor/three.min.js", "css/style.css"):
-            if not (web / need).is_file():
-                fails.append(f"镜像内缺前端文件: web/{need}")
-        if not (tmp / "app.jar").is_file():
-            fails.append("镜像内缺 app.jar")
-        ds = tmp / "_test" / "emotion-eval-dataset.json"
-        if not ds.is_file():
-            fails.append("镜像内缺评测集")
-        else:
-            n = len(json.loads(ds.read_text(encoding="utf-8"))["items"])
-            print(f"[内容] 评测集 {n} 条")
-            if n < 60:
-                fails.append(f"镜像内评测集只有 {n} 条（应为 73）")
-
-        # ---- 3) 镜像内密钥扫描（红线）----
-        hits = scan_keys(tmp)
-        print(f"[红线] 镜像内 sk- 命中: {len(hits)}  {hits[:3]}")
-        if hits:
-            fails.append(f"红线：镜像内含真实 Key -> {hits[:3]}")
-
-        # ---- 4) 真实运行（ENV / WORKDIR / ENTRYPOINT）----
-        run_env = os.environ.copy()
-        for k, v in envs.items():
-            run_env[k] = v.replace(IMAGE_ROOT, str(tmp))
-        # 模拟 docker run -e DEEPSEEK_KEY=... 给一个假 key，避免回落离线影响断言
-        run_env.setdefault("DEEPSEEK_KEY", "")
-
-        # WORKDIR 映射：`/app` 本身 = 临时根，`/app/x` = tmp/x
-        sub = workdir[len(IMAGE_ROOT):].lstrip("/") if workdir.startswith(IMAGE_ROOT) else workdir.lstrip("/")
-        work_cwd = tmp / sub if sub else tmp
-        work_cwd.mkdir(parents=True, exist_ok=True)
-        print(f"[WORK] cwd={work_cwd}")
-
-        proc = subprocess.Popen(
-            [str(java), "-jar", str(tmp / "app.jar"), f"--server.port={PORT}"],
-            cwd=str(work_cwd), env=run_env,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            encoding="utf-8", errors="replace",
-        )
-        try:
-            base = f"http://127.0.0.1:{PORT}"
-            health = None
-            for _ in range(60):
-                if proc.poll() is not None:
-                    break
-                try:
-                    with urllib.request.urlopen(base + "/api/health", timeout=3) as r:
-                        health = json.loads(r.read().decode("utf-8"))
-                    break
-                except Exception:
-                    time.sleep(1)
-            if not health:
-                out = proc.stdout.read() if proc.stdout else ""
-                fails.append("服务未就绪（复现镜像启动失败）。最后 800 字日志:\n" + out[-800:])
-            else:
-                print(f"[健康] {json.dumps(health, ensure_ascii=False)}")
-                if health.get("status") != "UP":
-                    fails.append("health.status != UP")
-                for k in ("indexFound", "vendorFound"):
-                    if not health.get(k):
-                        fails.append(f"health.{k} != true")
-                if str(tmp) not in health.get("webRoot", "") and IMAGE_ROOT not in health.get("webRoot", ""):
-                    fails.append(f"webRoot 未指向镜像内前端: {health.get('webRoot')}")
-
-                for path in ("/", "/js/app.js", "/vendor/three.min.js", "/css/style.css"):
-                    try:
-                        with urllib.request.urlopen(base + path, timeout=10) as r:
-                            code, ln = r.status, len(r.read())
-                    except urllib.error.HTTPError as e:
-                        code, ln = e.code, 0
-                    print(f"[静态] {code} {path} ({ln}B)")
-                    if code != 200:
-                        fails.append(f"静态资源非 200: {path} -> {code}")
-
-                try:
-                    with urllib.request.urlopen(base + "/api/emotion/eval", timeout=60) as r:
-                        ev = json.loads(r.read().decode("utf-8"))
-                    print(f"[评测] {ev.get('total')} 条 / {ev.get('accuracy')} / 危机 {ev.get('crisis_recall')}")
-                    if ev.get("total") != 73 or ev.get("accuracy") != "98.6%":
-                        fails.append(f"镜像内评测指标异常: {ev.get('total')} / {ev.get('accuracy')}")
-                except Exception as exc:  # noqa: BLE001
-                    fails.append(f"/api/emotion/eval 失败: {exc}")
-        finally:
-            proc.terminate()
-            try:
-                proc.wait(timeout=15)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+        _simulate(tmp, java, copies, envs, workdir, ignores, fails)
     finally:
         if keep:
             print(f"[保留] 模拟根目录: {tmp}")

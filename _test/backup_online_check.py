@@ -62,11 +62,22 @@ def main() -> int:
             pg.wait_for_timeout(4000)
         brand = (pg.text_content(".brand") or "").replace("\n", "").strip()
         ck("B1 品牌=心屿+MindIsle", "心屿" in brand and "MindIsle" in brand, brand[:30])
-        proxy = pg.evaluate(
-            "() => { try { return JSON.parse(localStorage.getItem('peiliao.cfg.v1')||'{}').proxy || ''; }"
-            " catch (e) { return 'ERR'; } }")
+        # r94：页面若在 evaluate 期间发生导航（腾讯「确定访问」页跳转 / SW 重载），
+        # Playwright 抛 `Execution context was destroyed` —— 本轮电池实测红 1 次、
+        # 单独复跑 2 次全绿 ⇒ 判为竞态。处置：**有界重试一次**（不是放宽判据：
+        # 真缺陷第二次仍会红，判据照旧拦得住）。
+        proxy, perr = "", ""
+        for _ in range(2):
+            try:
+                proxy = pg.evaluate(
+                    "() => { try { return JSON.parse(localStorage.getItem('peiliao.cfg.v1')||'{}').proxy || ''; }"
+                    " catch (e) { return 'ERR'; } }")
+                break
+            except Exception as e:            # 导航竞态 ⇒ 等一下再读同一份 localStorage
+                perr = str(e)[:60]
+                pg.wait_for_timeout(1200)
         ck("B2 stub 指向 pages.dev 的函数",
-           proxy == "https://xinyu-soulisle.pages.dev/api/chat", proxy[:60])
+           proxy == "https://xinyu-soulisle.pages.dev/api/chat", (proxy or perr)[:60])
         # B4 从「应用已真正加载」起算：CDN 传播期文档自身的偶发 404（curl 同 URL 200，r86 现场证过）
         # 算取数抖动，不算应用报错；应用真有 CSP/CORS 报错会在对话后继续现形。
         errors.clear()

@@ -1,0 +1,23 @@
+----------------------------------------------------------------------------------------------------------------------
+[HIT ] [self] 心屿 SoulIsle                 结构 2/7 类（js测试 1 py测试 0 java测试 11）｜CI 执行位 unit｜声明 e2e
+[HIT ] lobehub/lobehub                    结构 5/7 类（js测试 3909 py测试 0 java测试 0）｜CI 执行位 lint,typecheck,unit｜声明 linter
+[HIT ] SillyTavern/SillyTavern            结构 3/7 类（js测试 19 py测试 0 java测试 0）｜CI 执行位 unit｜声明 无
+[no  ] Open-LLM-VTuber/Open-LLM-VTuber    结构 0/7 类｜CI 执行位 无｜声明 无
+[HIT ] morettt/my-neuro                   结构 2/7 类（js测试 3 py测试 4 java测试 0）｜CI 执行位 无｜声明 无
+[HIT ] letta-ai/letta-code                结构 3/7 类（js测试 954 py测试 0 java测试 0）｜CI 执行位 lint｜声明 无
+[no  ] hello-diana/MASCOT                 结构 0/7 类｜CI 执行位 无｜声明 无
+[HIT ] ddxfish/sapphire                   结构 2/7 类（js测试 4 py测试 379 java测试 0）｜CI 执行位 无｜声明 无
+[HIT ] v2rockets/Loyal-Elephie            结构 1/7 类｜CI 执行位 无｜声明 无
+[no  ] Rogendo/Mental-health-Chatbot      结构 0/7 类｜CI 执行位 无｜声明 无
+[HIT ] Lum1104/MER-Factory                结构 1/7 类（js测试 0 py测试 2 java测试 0）｜CI 执行位 无｜声明 无
+[HIT ] CheaperjamRen/leemo                结构 4/7 类（js测试 316 py测试 3 java测试 0）｜CI 执行位 typecheck,unit｜声明 无
+[HIT ] NJX-njx/opensoul                   结构 3/7 类（js测试 1066 py测试 0 java测试 0）｜CI 执行位 lint,unit｜声明 typecheck,unit
+[HIT ] s-nagaev/chibi                     结构 1/7 类（js测试 0 py测试 89 java测试 0）｜CI 执行位 unit｜声明 无
+[no  ] 29-Cu/succhia                      结构 0/7 类｜CI 执行位 无｜声明 无
+[no  ] zeroa234/ryza-ai-revive            结构 0/7 类｜CI 执行位 无｜声明 无
+[no  ] Bwcx-songyu/MoodChat               结构 0/7 类｜CI 执行位 无｜声明 无
+----------------------------------------------------------------------------------------------------------------------
+peers：有 JS 测试文件 7/16 ｜ CI 有单测执行位 5/16 ｜ 有 linter 配置 2/16 ｜ 有 tsconfig 5/16
+预算 240s ｜ 已用 159s ｜ budget 耗尽后停取 否
+应测 16 仓 ｜ 计入分母 16 ｜ BLIND(NA) 0 ｜ 恒等式：OK
+快照 -> C:\Users\37533\Desktop\workspace\项目\陪聊\交付物\对标数据\peer-quality-tooling-2026-10-03.json ｜ 台账指纹 sha256=91c8793da7fcbded bytes=4137

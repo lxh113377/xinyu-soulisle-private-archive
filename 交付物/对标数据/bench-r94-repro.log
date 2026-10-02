@@ -1,0 +1,21 @@
+[A  ] lobehub/lobehub                      lock=1  envx=5  runtime=8  guide=0  README=codeblock:8,env_doc:7,install_cmd:1 钉版=0/3 (ok)
+[A  ] SillyTavern/SillyTavern              lock=3  envx=0  runtime=2  guide=0  README=quickstart:1                 钉版=1/72 (ok)
+[B  ] Open-LLM-VTuber/Open-LLM-VTuber      lock=1  envx=0  runtime=1  guide=0  README=none                         钉版=0/61 (ok)
+[B  ] morettt/my-neuro                     lock=6  envx=0  runtime=0  guide=3  README=none                         钉版=0/1 (ok)
+[D  ] letta-ai/letta-code                  lock=1  envx=0  runtime=1  guide=0  README=codeblock:18,env_doc:1,install_cmd:1,quickstart:1 钉版=4/23 (ok)
+[C  ] hello-diana/MASCOT                   lock=0  envx=0  runtime=0  guide=0  README=codeblock:28,env_doc:1,install_cmd:7 钉版=0/48 (ok)
+[C  ] ddxfish/sapphire                     lock=0  envx=0  runtime=2  guide=2  README=codeblock:14,install_cmd:2,quickstart:1 钉版=0/27 (ok)
+[C  ] v2rockets/Loyal-Elephie              lock=1  envx=0  runtime=0  guide=0  README=codeblock:16,install_cmd:2   钉版=8/16 (ok)
+[C  ] Rogendo/Mental-health-Chatbot        lock=0  envx=0  runtime=0  guide=0  README=codeblock:4,install_cmd:1    钉版=1/2 (ok)
+[D  ] Lum1104/MER-Factory                  lock=1  envx=1  runtime=0  guide=2  README=codeblock:58,install_cmd:2,quickstart:2 钉版=0/12 (ok)
+[C  ] CheaperjamRen/leemo                  lock=7  envx=1  runtime=0  guide=0  README=none                         钉版=0/8 (ok)
+[C  ] NJX-njx/opensoul                     lock=2  envx=2  runtime=7  guide=11 README=codeblock:18,install_cmd:3,quickstart:3 钉版=0/1 (ok)
+[C  ] s-nagaev/chibi                       lock=2  envx=1  runtime=5  guide=0  README=codeblock:16,install_cmd:2,quickstart:1 钉版=0/132 (ok)
+[C  ] 29-Cu/succhia                        lock=0  envx=0  runtime=0  guide=0  README=codeblock:4,install_cmd:1,quickstart:1 钉版=None/0 (not_applicable)
+[C  ] zeroa234/ryza-ai-revive              lock=1  envx=0  runtime=0  guide=1  README=codeblock:6,install_cmd:1    钉版=2/2 (ok)
+[C  ] Bwcx-songyu/MoodChat                 lock=0  envx=0  runtime=0  guide=0  README=codeblock:1,install_cmd:1    钉版=None/0 (not_applicable)
+[self] 心屿 SoulIsle                          lock=0  envx=1  runtime=1  guide=0  README=codeblock:14,env_doc:8,install_cmd:1 钉版=None/0 (not_applicable)
+----------------------------------------------------------------------------------------------------------------------------
+peers：有 lockfile 11/16 ｜ 有 .env.example 5/16 ｜ 有 compose/Dockerfile 7/16 ｜ 有可执行快速上手 9/16 ｜ 钉版率≥90% 1/14（通道 C 可判 14 家）
+应测 16 仓 ｜ 计入分母 16 ｜ BLIND 0 ｜ 恒等式 usable+blind==总数：OK
+快照 -> 交付物\对标数据\peer-repro-2026-10-03.json

@@ -925,8 +925,11 @@ def guard_inventory(header_text, source_text):
     return bad
 
 
-def selftest():
-    bad = []
+def _st_mut_a(bad):
+    """r94：由 `selftest` 前段整体下移（selftest 原 291 行 > loc_guard 的 150 行门）。
+
+    切点由 AST 求得（段内 ≤140 行且跨越变量最少），不靠目测；本段产出 ex0/n_all/p 供后段用。
+    """
     cfg = load_yaml(".github/dependabot.yml")
     if validate_dependabot(cfg):
         bad.append(f"原样配置被判失败：{validate_dependabot(cfg)}")
@@ -1065,6 +1068,13 @@ def selftest():
     if ci_battery_audit(ci0.replace("run_all_suites.py --exclude-llm", "run_all_suites.py --exclude-llm --exclude-llm"), st)[0]:
         bad.append("篡改⑫d 对照失效：重复 flag 不应触发任何违规（判据过敏）")
     # 篡改⑬：依赖清单与 CI 装依赖（本次事故的机器化封口）
+    # r94 注：AST 把 `p` 也报成跨越量，但它是**推导式局部变量**（`[p.name for p in ...]`），
+    # py3 下不外泄 ⇒ 不进签名（照抄 AST 会拿到 NameError，实测踩到）。真正要交出去的是 n_all/ex0。
+    return n_all, ex0
+
+
+def _st_mut_b(bad):
+    """r94：由 `selftest` 中段下移。这段只依赖 `bad`，不读前段产出（已逐行核过）。"""
     ci_full = (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace")
     req_full = (ROOT / "_test" / "requirements.txt").read_text("utf-8", errors="replace")
     imps = third_party_imports(ci_invoked_scripts(ci_full, (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace")))
@@ -1080,6 +1090,14 @@ def selftest():
     if not r_run:
         bad.append("篡改⑬ 反例组失效：CI 里根本没解析到跑判据的 job（G11 在读空气）")
     # 篡改⑭：版本断言三源对账（r35 一手实证 —— ROADMAP 停在 v1.3.0 而 tag/pom 已是 1.4.0）
+
+
+def _st_mut_c(bad, n_all, ex0):
+    """r94：由 `selftest` 后段下移（含收尾打印与退出码）。
+
+    `n_all`/`ex0` 由前段产出、收尾打印要用 ⇒ 显式入参（AST 在切点 1083 报的跨越集是空的，
+    那是因为它按「定义于前、读于后」统计，而这两个名字在收尾 print 里被读 ⇒ 仍须传入）。
+    """
     if version_truth("v1.4.0", "1.4.0"):
         bad.append("篡改⑭a（tag 与 pom 相等）被判失败 ⇒ G12 恒假，只会刷红")
     if not version_truth("v1.4.0", "1.3.0"):
@@ -1219,7 +1237,24 @@ def selftest():
     return 1 if bad else 0
 
 
-def main():
+def selftest():
+    """r94：只留调度——三段断言体已下移到 `_st_mut_a/b/c`。
+
+    拆的动因是 loc_guard 的函数长门（≤150）；拆法保证调用序与原来逐语句一致，
+    故首个失败点、断言条数与退出码都不变（`--selftest` 的 n_mut 是验真点）。
+    """
+    bad = []
+    n_all, ex0 = _st_mut_a(bad)
+    _st_mut_b(bad)
+    return _st_mut_c(bad, n_all, ex0)
+
+
+
+def _cfg_head():
+    """r94：main() 的 argparse + 环境门（原 main 171 行 > loc_guard 的 150 行门）。
+
+    `check()`（第 84 行）与 `results`（第 81 行）都在模块级 ⇒ 各段追加无需传参。
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--online", action="store_true")
@@ -1299,6 +1334,11 @@ def main():
     g13bad = guard_inventory(HEADER_DOC, Path(__file__).read_text("utf-8", errors="replace"))
     check("G13 判据账本自洽（头部登记 == main() 实际执行，漏登/幽灵登都红）", not g13bad,
           " ; ".join(g13bad))
+    return a
+
+
+def _cfg_body(a):
+    """r94：main() 的在线通道 + G6/G7/G8/G11/G10/G9（原样搬，判据口径零改写）。"""
     if a.online:
         repo = None
         try:
@@ -1372,6 +1412,10 @@ def main():
           + ("；违规：" + " ; ".join((iviol + syviol + dsviol)[:6])
              if (iviol or syviol or dsviol) else "，零违规"))
 
+
+
+def _cfg_report(results):
+    """r94：main() 的收尾统计与退出码（原样搬）。"""
     fails = [r for r in results if not r[1]]
     print(f"\n合计 {len(results)} 项，失败 {len(fails)} 项")
     for nm, _, d in fails:
@@ -1388,6 +1432,20 @@ def main():
           "REPO-CONFIG-FAIL（实跑 %d 项，红 %d 项，覆盖 %d 个判据号：%s）"
           % (len(results), len(fails), len(ran), " ".join(x[0].split()[0] for x in fails)))
     return 1 if fails else 0
+
+
+def main():
+    """r94：只留调度——三段分别下移到 `_cfg_head` / `_cfg_body` / `_cfg_report`。
+
+    调用序与原来逐语句一致 ⇒ 判据号、计数与退出码都不变（`REPO-CONFIG-PASS` 的
+    「实跑 N 项」是验真点）。切点由 AST 定位，不靠行号。
+    """
+    a = _cfg_head()
+    if a.selftest:
+        sys.exit(selftest())
+    _cfg_body(a)
+    return _cfg_report(results)
+
 
 
 if __name__ == "__main__":

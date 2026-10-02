@@ -217,31 +217,9 @@ def run_static_only():
     return 0 if not bad else 1
 
 
-def run_runtime():
-    from playwright.sync_api import sync_playwright
-    errs = []
-    miss = []            # SW 侧"壳里没这件"的现场留痕，R7 报红时直接指到文件名
-    pw = sync_playwright().start()
-    browser = launch(pw)
-    try:
-        # —— 本地 jar（权威源 + 真实 /api）：R1 / R2 / R4 / R5 / R7
-        ctx = browser.new_context()
-        pg = ctx.new_page()
-        pg.on("pageerror", lambda e: errs.append(str(getattr(e, "stack", None) or e)))
-        pg.goto(API_BASE + "/index.html")
-        pg.wait_for_function("() => navigator.serviceWorker.getRegistration().then(r => !!r && !!r.active)", timeout=20000)
-        want = arr((ROOT / "src" / "sw.js").read_text("utf-8"), "PRECACHE") or []
-        have, missing = wait_precache(pg, want)
-        check("R8 PRECACHE 清单全部真入缓存（清单复算自 sw.js 源码，缺一个就点名）",
-              bool(have) and not missing, f"入缓存 {len(have)}/{len(want)} 项，缺={missing}")
-        ctrl = False
-        for i in range(4):                                    # SW 接管是异步的：重新进入并轮询，不靠"睡一下"
-            pg.goto(API_BASE + "/index.html")
-            ctrl = pg.evaluate("() => !!navigator.serviceWorker.controller")
-            if ctrl:
-                break
-        check("R1 离线壳注册且重新进入后接管", ctrl, f"controller={ctrl}（轮询至多 4 次）")
-        nav = pg.evaluate("""async () => {
+# r94：R2 的浏览器端探针脚本提到模块级（原在 `run_runtime` 内占 12 行，是该函数据 loc_guard
+# 函数长门超标的原因之一）。搬的是**字符串常量**，没有变量捕获，行为不变。
+_JS_PROBE_HTML = """async () => {
             const out = [];
             for (let i = 0; i < 2; i++) {                 // 两次进入：第二次仍必须是 network（不是 cache）
                 const r = await fetch('/index.html?probe=' + Date.now() + i);
@@ -252,132 +230,167 @@ def run_runtime():
             await r3.text();
             out.push(r3.headers.get('x-xinyu-src'));      // 不带 query 的同一 URL 也要回源
             return out.join(' | ');
-        }""")
-        check("R2 HTML 每次真回源（SW 自报来源，非 transferSize 猜）",
-              nav.startswith("network") and "network" in nav and "cache/" not in nav and nav.endswith("network"),
-              f"x-xinyu-src={nav}")
-        got = pg.evaluate("""async () => {
-            const a = await fetch('/api/health'); await a.json();
-            const b = await fetch('/api/emotion', {method:'POST',headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({text:'今天有点累'})});
-            await b.json();
-            return performance.getEntriesByType('resource')
-              .filter(e => e.name.includes('/api/'))
-              .map(e => ({n: e.name.replace(location.origin,'').split('?')[0], t: e.transferSize, s: e.responseStatus}));
-        }""")
-        onnet = [x for x in got if x["t"] > 0]
-        check("R4 /api/** 每次真到网络（含 POST，不被缓存回放）", bool(got) and len(onnet) == len(got),
-              json.dumps(got, ensure_ascii=False)[:160])
-        check("R4b 接口未被 SW 拦坏（状态码全 200）", bool(got) and all(x["s"] == 200 for x in got), str([x["s"] for x in got]))
+        }"""
+
+
+def _run_checks(browser, errs, miss):
+    """r94：由 `run_runtime` 的 try 体整体下移（`run_runtime` 原 174 行 > 150 行门）；`check` 闭包随之搬移。"""
+    # —— 本地 jar（权威源 + 真实 /api）：R1 / R2 / R4 / R5 / R7
+    ctx = browser.new_context()
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: errs.append(str(getattr(e, "stack", None) or e)))
+    pg.goto(API_BASE + "/index.html")
+    pg.wait_for_function("() => navigator.serviceWorker.getRegistration().then(r => !!r && !!r.active)", timeout=20000)
+    want = arr((ROOT / "src" / "sw.js").read_text("utf-8"), "PRECACHE") or []
+    have, missing = wait_precache(pg, want)
+    check("R8 PRECACHE 清单全部真入缓存（清单复算自 sw.js 源码，缺一个就点名）",
+          bool(have) and not missing, f"入缓存 {len(have)}/{len(want)} 项，缺={missing}")
+    ctrl = False
+    for i in range(4):                                    # SW 接管是异步的：重新进入并轮询，不靠"睡一下"
         pg.goto(API_BASE + "/index.html")
-        pg.wait_for_timeout(600)
-        vsrc = pg.evaluate("""async () => {
-            const files = ['vendor/three.min.js', 'vendor/gsap.min.js', 'vendor/ScrollTrigger.min.js'];
-            const out = {};
-            for (const f of files) { const r = await fetch('/' + f); out[f] = r.headers.get('x-xinyu-src'); await r.text(); }
-            return JSON.stringify(out);
+        ctrl = pg.evaluate("() => !!navigator.serviceWorker.controller")
+        if ctrl:
+            break
+    check("R1 离线壳注册且重新进入后接管", ctrl, f"controller={ctrl}（轮询至多 4 次）")
+    nav = pg.evaluate(_JS_PROBE_HTML)
+    check("R2 HTML 每次真回源（SW 自报来源，非 transferSize 猜）",
+          nav.startswith("network") and "network" in nav and "cache/" not in nav and nav.endswith("network"),
+          f"x-xinyu-src={nav}")
+    got = pg.evaluate("""async () => {
+        const a = await fetch('/api/health'); await a.json();
+        const b = await fetch('/api/emotion', {method:'POST',headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({text:'今天有点累'})});
+        await b.json();
+        return performance.getEntriesByType('resource')
+          .filter(e => e.name.includes('/api/'))
+          .map(e => ({n: e.name.replace(location.origin,'').split('?')[0], t: e.transferSize, s: e.responseStatus}));
+    }""")
+    onnet = [x for x in got if x["t"] > 0]
+    check("R4 /api/** 每次真到网络（含 POST，不被缓存回放）", bool(got) and len(onnet) == len(got),
+          json.dumps(got, ensure_ascii=False)[:160])
+    check("R4b 接口未被 SW 拦坏（状态码全 200）", bool(got) and all(x["s"] == 200 for x in got), str([x["s"] for x in got]))
+    pg.goto(API_BASE + "/index.html")
+    pg.wait_for_timeout(600)
+    vsrc = pg.evaluate("""async () => {
+        const files = ['vendor/three.min.js', 'vendor/gsap.min.js', 'vendor/ScrollTrigger.min.js'];
+        const out = {};
+        for (const f of files) { const r = await fetch('/' + f); out[f] = r.headers.get('x-xinyu-src'); await r.text(); }
+        return JSON.stringify(out);
+    }""")
+    hits = vsrc.count("cache")
+    check("R5 二次进入 vendor 由缓存供弹（离线收益非空壳）", hits == 3, f"{hits}/3 cache，明细={vsrc}")
+    ctx.close()
+
+    # —— 临时静态副本：R3 断网可打开（不动权威文件）
+    tmp = Path(tempfile.mkdtemp(prefix="xinyu-shell-"))
+    shutil.copytree(ROOT / "src", tmp / "web")
+
+    class H(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, directory=str(tmp / "web"), **kw)
+
+        def log_message(self, *a):
+            pass
+
+    H.extensions_map = {**getattr(H, "extensions_map", {}), ".webmanifest": "application/manifest+json"}
+    # 必须是**线程版**：SW 安装期会并发发 17 个 c.add()，单线程 TCPServer 会让一部分排队失败，
+    # 表现为"离线时某模块 undefined"的间歇红 —— 那是脚手架的缺陷，不是产品的缺陷（r28 实测 3 跑 2 红）。
+    srv = _hs.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{srv.server_address[1]}/index.html"
+    try:
+        c2 = browser.new_context()
+        miss = []
+        c2.on("console", lambda m: miss.append(m.text[:90]) if "XINYU-SHELL-MISS" in m.text else None)
+        p2 = c2.new_page()
+        p2.on("pageerror", lambda e: errs.append("offline: " + str(getattr(e, "stack", None) or e)))
+        p2.goto(url)
+        p2.wait_for_function("() => navigator.serviceWorker.getRegistration().then(r => !!r && !!r.active)", timeout=20000)
+        w2 = arr((ROOT / "src" / "sw.js").read_text("utf-8"), "PRECACHE") or []
+        hv, ms = wait_precache(p2, w2)
+        check("R3a 断网前先确认壳已装完（否则 R3 红的是判据不是产品）", not ms, f"缺={ms}")
+        p2.goto(url)
+        badge_on = p2.evaluate("() => (document.querySelector('#mode-badge')||{}).textContent || ''")
+        check("R10a 联网态徽章仍明示「在线 AI」（反向断言：防把分支写反致恒绿）",
+              "在线 AI" in badge_on, badge_on.strip()[:36])
+        greet = p2.evaluate("""() => {
+          const t = document.querySelector('#chat-log .msg .tag, #chat-log .tag');
+          return t ? t.textContent : '';
         }""")
-        hits = vsrc.count("cache")
-        check("R5 二次进入 vendor 由缓存供弹（离线收益非空壳）", hits == 3, f"{hits}/3 cache，明细={vsrc}")
-        ctx.close()
-
-        # —— 临时静态副本：R3 断网可打开（不动权威文件）
-        tmp = Path(tempfile.mkdtemp(prefix="xinyu-shell-"))
-        shutil.copytree(ROOT / "src", tmp / "web")
-
-        class H(http.server.SimpleHTTPRequestHandler):
-            def __init__(self, *a, **kw):
-                super().__init__(*a, directory=str(tmp / "web"), **kw)
-
-            def log_message(self, *a):
-                pass
-
-        H.extensions_map = {**getattr(H, "extensions_map", {}), ".webmanifest": "application/manifest+json"}
-        # 必须是**线程版**：SW 安装期会并发发 17 个 c.add()，单线程 TCPServer 会让一部分排队失败，
-        # 表现为"离线时某模块 undefined"的间歇红 —— 那是脚手架的缺陷，不是产品的缺陷（r28 实测 3 跑 2 红）。
-        srv = _hs.ThreadingHTTPServer(("127.0.0.1", 0), H)
-        threading.Thread(target=srv.serve_forever, daemon=True).start()
-        url = f"http://127.0.0.1:{srv.server_address[1]}/index.html"
+        check("R10c 开场白标签不得伪装来自大模型（本机生成＝红线「禁伪装在线」的同类出口）",
+              ("在线" not in greet) and ("本机" in greet) and ("未经大模型" in greet), greet.strip()[:36])
+        c2.set_offline(True)
         try:
-            c2 = browser.new_context()
-            miss = []
-            c2.on("console", lambda m: miss.append(m.text[:90]) if "XINYU-SHELL-MISS" in m.text else None)
-            p2 = c2.new_page()
-            p2.on("pageerror", lambda e: errs.append("offline: " + str(getattr(e, "stack", None) or e)))
-            p2.goto(url)
-            p2.wait_for_function("() => navigator.serviceWorker.getRegistration().then(r => !!r && !!r.active)", timeout=20000)
-            w2 = arr((ROOT / "src" / "sw.js").read_text("utf-8"), "PRECACHE") or []
-            hv, ms = wait_precache(p2, w2)
-            check("R3a 断网前先确认壳已装完（否则 R3 红的是判据不是产品）", not ms, f"缺={ms}")
-            p2.goto(url)
-            badge_on = p2.evaluate("() => (document.querySelector('#mode-badge')||{}).textContent || ''")
-            check("R10a 联网态徽章仍明示「在线 AI」（反向断言：防把分支写反致恒绿）",
-                  "在线 AI" in badge_on, badge_on.strip()[:36])
-            greet = p2.evaluate("""() => {
-              const t = document.querySelector('#chat-log .msg .tag, #chat-log .tag');
-              return t ? t.textContent : '';
-            }""")
-            check("R10c 开场白标签不得伪装来自大模型（本机生成＝红线「禁伪装在线」的同类出口）",
-                  ("在线" not in greet) and ("本机" in greet) and ("未经大模型" in greet), greet.strip()[:36])
-            c2.set_offline(True)
-            try:
-                p2.reload(wait_until="domcontentloaded", timeout=20000)
-                ok3 = p2.evaluate("() => !!document.querySelector('#gl') && document.querySelectorAll('section').length > 0")
-            except Exception as e:
-                ok3, err3 = False, str(e)[:70]
-            else:
-                err3 = ""
-            diag = p2.evaluate("""() => ({
-              CA: typeof window.ChatAgent, MS: typeof window.MemoryStore, EE: typeof window.EmotionEngine,
-              SW: typeof window.Settings, CW: typeof window.ChatWindow, CH: typeof window.Chart, VO: typeof window.Voice,
-              zero: performance.getEntriesByType('resource').filter(e => e.responseStatus === 0).map(e => e.name.split('/').pop()),
-              cached: !!navigator.serviceWorker.controller
-            })""")
-            check("R3 断网后可离线打开（壳真生效）", bool(ok3), f"结构在={ok3} {err3} 诊断={json.dumps(diag, ensure_ascii=False)[:230]}")
-            badge_off = p2.evaluate("() => (document.querySelector('#mode-badge')||{}).textContent || ''")
-            check("R10b 断网重载后徽章不得伪装在线（红线：界面明示模式，禁伪装在线）",
-                  ("在线 AI" not in badge_off) and ("网络不可用" in badge_off), badge_off.strip()[:36])
-            c2.close()
-        finally:
-            srv.shutdown()
-            shutil.rmtree(tmp, ignore_errors=True)
-
-        # —— R9 公网真断网实测（"现场 WiFi 挂了还能演五幕"是这条能力的唯一存在理由）
-        try:
-            c3 = browser.new_context()
-            p3 = c3.new_page()
-            p3.on("pageerror", lambda e: errs.append("live: " + str(getattr(e, "stack", None) or e)))
-            p3.goto(LIVE_BASE + "/", wait_until="domcontentloaded", timeout=45000)
-            p3.wait_for_function("() => navigator.serviceWorker.getRegistration().then(r => !!r && !!r.active)", timeout=30000)
-            w3 = arr((ROOT / "src" / "sw.js").read_text("utf-8"), "PRECACHE") or []
-            hv3, ms3 = wait_precache(p3, w3, timeout_ms=25000)
-            check("R9a 公网壳已装完（入缓存数对得上清单）", not ms3, f"{len(hv3)}/{len(w3)} 缺={ms3[:4]}")
-            c3.set_offline(True)
-            try:
-                p3.reload(wait_until="domcontentloaded", timeout=25000)
-                ok9 = p3.evaluate("() => !!document.querySelector('#gl') && document.querySelectorAll('section').length > 0")
-                err9 = ""
-            except Exception as e:
-                ok9, err9 = False, str(e)[:70]
-            check("R9b 公网断网后可离线打开", bool(ok9), f"结构在={ok9} {err9}")
-            c3.close()
+            p2.reload(wait_until="domcontentloaded", timeout=20000)
+            ok3 = p2.evaluate("() => !!document.querySelector('#gl') && document.querySelectorAll('section').length > 0")
         except Exception as e:
-            check("R9a 公网壳已装完（入缓存数对得上清单）", False, f"公网不可达/注册超时 ⇒ 记为未验证：{str(e)[:70]}")
-
-        # —— R6 两端 HTTP 头实测（公网不可达就点名，不判绿）
-        paths = ["/", "/index.html", "/sw.js", "/vendor/three.min.js"]
-        local = probe_headers(API_BASE, paths)
-        weak = [f"{p}={local[p]!r}" for p, ok in header_rules(local).items() if not ok]
-        check("R6a 本地 jar：入口/SW/静态都要'再验证'（缺头=可启发式缓存，不可信）", not weak,
-              ("不合格项: " + "; ".join(weak)) if weak else json.dumps(local, ensure_ascii=False))
-        live = probe_headers(LIVE_BASE, paths)
-        if any(str(v).startswith("ERR") for v in live.values()):
-            check("R6b 公网头策略（Pages _headers 真生效）", False,
-                  f"不可达 ⇒ 记为未验证，不判绿：{json.dumps(live, ensure_ascii=False)[:120]}")
+            ok3, err3 = False, str(e)[:70]
         else:
-            weak_l = [f"{p}={live[p]!r}" for p, ok in header_rules(live).items() if not ok]
-            check("R6b 公网头策略（Pages _headers 真生效）", not weak_l,
-                  ("不合格项: " + "; ".join(weak_l)) if weak_l else json.dumps(live, ensure_ascii=False))
+            err3 = ""
+        diag = p2.evaluate("""() => ({
+          CA: typeof window.ChatAgent, MS: typeof window.MemoryStore, EE: typeof window.EmotionEngine,
+          SW: typeof window.Settings, CW: typeof window.ChatWindow, CH: typeof window.Chart, VO: typeof window.Voice,
+          zero: performance.getEntriesByType('resource').filter(e => e.responseStatus === 0).map(e => e.name.split('/').pop()),
+          cached: !!navigator.serviceWorker.controller
+        })""")
+        check("R3 断网后可离线打开（壳真生效）", bool(ok3), f"结构在={ok3} {err3} 诊断={json.dumps(diag, ensure_ascii=False)[:230]}")
+        badge_off = p2.evaluate("() => (document.querySelector('#mode-badge')||{}).textContent || ''")
+        check("R10b 断网重载后徽章不得伪装在线（红线：界面明示模式，禁伪装在线）",
+              ("在线 AI" not in badge_off) and ("网络不可用" in badge_off), badge_off.strip()[:36])
+        c2.close()
+    finally:
+        srv.shutdown()
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # —— R9 公网真断网实测（"现场 WiFi 挂了还能演五幕"是这条能力的唯一存在理由）
+    try:
+        c3 = browser.new_context()
+        p3 = c3.new_page()
+        p3.on("pageerror", lambda e: errs.append("live: " + str(getattr(e, "stack", None) or e)))
+        p3.goto(LIVE_BASE + "/", wait_until="domcontentloaded", timeout=45000)
+        p3.wait_for_function("() => navigator.serviceWorker.getRegistration().then(r => !!r && !!r.active)", timeout=30000)
+        w3 = arr((ROOT / "src" / "sw.js").read_text("utf-8"), "PRECACHE") or []
+        hv3, ms3 = wait_precache(p3, w3, timeout_ms=25000)
+        check("R9a 公网壳已装完（入缓存数对得上清单）", not ms3, f"{len(hv3)}/{len(w3)} 缺={ms3[:4]}")
+        c3.set_offline(True)
+        try:
+            p3.reload(wait_until="domcontentloaded", timeout=25000)
+            ok9 = p3.evaluate("() => !!document.querySelector('#gl') && document.querySelectorAll('section').length > 0")
+            err9 = ""
+        except Exception as e:
+            ok9, err9 = False, str(e)[:70]
+        check("R9b 公网断网后可离线打开", bool(ok9), f"结构在={ok9} {err9}")
+        c3.close()
+    except Exception as e:
+        check("R9a 公网壳已装完（入缓存数对得上清单）", False, f"公网不可达/注册超时 ⇒ 记为未验证：{str(e)[:70]}")
+
+    # —— R6 两端 HTTP 头实测（公网不可达就点名，不判绿）
+    paths = ["/", "/index.html", "/sw.js", "/vendor/three.min.js"]
+    local = probe_headers(API_BASE, paths)
+    weak = [f"{p}={local[p]!r}" for p, ok in header_rules(local).items() if not ok]
+    check("R6a 本地 jar：入口/SW/静态都要'再验证'（缺头=可启发式缓存，不可信）", not weak,
+          ("不合格项: " + "; ".join(weak)) if weak else json.dumps(local, ensure_ascii=False))
+    live = probe_headers(LIVE_BASE, paths)
+    if any(str(v).startswith("ERR") for v in live.values()):
+        check("R6b 公网头策略（Pages _headers 真生效）", False,
+              f"不可达 ⇒ 记为未验证，不判绿：{json.dumps(live, ensure_ascii=False)[:120]}")
+    else:
+        weak_l = [f"{p}={live[p]!r}" for p, ok in header_rules(live).items() if not ok]
+        check("R6b 公网头策略（Pages _headers 真生效）", not weak_l,
+              ("不合格项: " + "; ".join(weak_l)) if weak_l else json.dumps(live, ensure_ascii=False))
+    # r94：搬块时漏了 return（脚本只做了「搬 + 调用」）⇒ 调用方拿到 None，收尾 `for r in results`
+    # 崩 TypeError。`results`/`check` 是模块级（第 55/58 行），这里只需把累积结果交回。
+    return results
+
+
+def run_runtime():
+    from playwright.sync_api import sync_playwright
+    errs = []
+    miss = []            # SW 侧"壳里没这件"的现场留痕，R7 报红时直接指到文件名
+    pw = sync_playwright().start()
+    browser = launch(pw)
+    try:
+        results = _run_checks(browser, errs, miss)
     finally:
         browser.close()
         pw.stop()

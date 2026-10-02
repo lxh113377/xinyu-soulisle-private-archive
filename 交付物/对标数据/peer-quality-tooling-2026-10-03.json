@@ -1,0 +1,266 @@
+{
+ "generated_by": "peer_quality_tooling_probe.py",
+ "ceiling": "只出结构化在册证据；不得据此比较代码质量/缺陷率（覆盖率不在取数面内）",
+ "noise_note": "本件 NOISE 故意不滤 tests 目录，否则会把被测对象滤掉",
+ "peers_expected": 16,
+ "counted": 16,
+ "na": [],
+ "self": {
+  "struct": [
+   "java_test_file",
+   "js_test_file"
+  ],
+  "test_counts": {
+   "js_test_file": 1,
+   "java_test_file": 11
+  },
+  "ci_steps": [
+   "unit"
+  ],
+  "declared": [
+   "e2e_declared"
+  ]
+ },
+ "rows": [
+  {
+   "repo": "[self] 心屿 SoulIsle",
+   "struct": [
+    "java_test_file",
+    "js_test_file"
+   ],
+   "counts": {
+    "js_test_file": 1,
+    "java_test_file": 11
+   },
+   "ci": [
+    "unit"
+   ],
+   "declared": [
+    "e2e_declared"
+   ],
+   "flag": "n/a",
+   "files": 489
+  },
+  {
+   "repo": "lobehub/lobehub",
+   "struct": [
+    "formatter",
+    "js_test_cfg",
+    "js_test_file",
+    "linter",
+    "typecheck"
+   ],
+   "counts": {
+    "js_test_file": 3909
+   },
+   "ci": [
+    "lint",
+    "typecheck",
+    "unit"
+   ],
+   "declared": [
+    "linter_declared"
+   ],
+   "flag": "ok",
+   "files": 18080
+  },
+  {
+   "repo": "SillyTavern/SillyTavern",
+   "struct": [
+    "js_test_cfg",
+    "js_test_file",
+    "linter"
+   ],
+   "counts": {
+    "js_test_file": 19
+   },
+   "ci": [
+    "unit"
+   ],
+   "declared": [],
+   "flag": "ok",
+   "files": 1010
+  },
+  {
+   "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
+   "struct": [],
+   "counts": {},
+   "ci": [],
+   "declared": [],
+   "flag": "ok",
+   "files": 253
+  },
+  {
+   "repo": "morettt/my-neuro",
+   "struct": [
+    "js_test_file",
+    "py_test_file"
+   ],
+   "counts": {
+    "js_test_file": 3,
+    "py_test_file": 4
+   },
+   "ci": [],
+   "declared": [],
+   "flag": "ok",
+   "files": 646
+  },
+  {
+   "repo": "letta-ai/letta-code",
+   "struct": [
+    "formatter",
+    "js_test_file",
+    "typecheck"
+   ],
+   "counts": {
+    "js_test_file": 954
+   },
+   "ci": [
+    "lint"
+   ],
+   "declared": [],
+   "flag": "ok",
+   "files": 2445
+  },
+  {
+   "repo": "hello-diana/MASCOT",
+   "struct": [],
+   "counts": {},
+   "ci": [],
+   "declared": [],
+   "flag": "ok",
+   "files": 81
+  },
+  {
+   "repo": "ddxfish/sapphire",
+   "struct": [
+    "js_test_file",
+    "py_test_file"
+   ],
+   "counts": {
+    "py_test_file": 379,
+    "js_test_file": 4
+   },
+   "ci": [],
+   "declared": [],
+   "flag": "ok",
+   "files": 1230
+  },
+  {
+   "repo": "v2rockets/Loyal-Elephie",
+   "struct": [
+    "typecheck"
+   ],
+   "counts": {},
+   "ci": [],
+   "declared": [],
+   "flag": "ok",
+   "files": 124
+  },
+  {
+   "repo": "Rogendo/Mental-health-Chatbot",
+   "struct": [],
+   "counts": {},
+   "ci": [],
+   "declared": [],
+   "flag": "ok",
+   "files": 10
+  },
+  {
+   "repo": "Lum1104/MER-Factory",
+   "struct": [
+    "py_test_file"
+   ],
+   "counts": {
+    "py_test_file": 2
+   },
+   "ci": [],
+   "declared": [],
+   "flag": "ok",
+   "files": 158
+  },
+  {
+   "repo": "CheaperjamRen/leemo",
+   "struct": [
+    "js_test_cfg",
+    "js_test_file",
+    "py_test_file",
+    "typecheck"
+   ],
+   "counts": {
+    "js_test_file": 316,
+    "py_test_file": 3
+   },
+   "ci": [
+    "typecheck",
+    "unit"
+   ],
+   "declared": [],
+   "flag": "ok",
+   "files": 1518
+  },
+  {
+   "repo": "NJX-njx/opensoul",
+   "struct": [
+    "js_test_cfg",
+    "js_test_file",
+    "typecheck"
+   ],
+   "counts": {
+    "js_test_file": 1066
+   },
+   "ci": [
+    "lint",
+    "unit"
+   ],
+   "declared": [
+    "typecheck_declared",
+    "unit_declared"
+   ],
+   "flag": "ok",
+   "files": 6141
+  },
+  {
+   "repo": "s-nagaev/chibi",
+   "struct": [
+    "py_test_file"
+   ],
+   "counts": {
+    "py_test_file": 89
+   },
+   "ci": [
+    "unit"
+   ],
+   "declared": [],
+   "flag": "ok",
+   "files": 273
+  },
+  {
+   "repo": "29-Cu/succhia",
+   "struct": [],
+   "counts": {},
+   "ci": [],
+   "declared": [],
+   "flag": "ok",
+   "files": 7
+  },
+  {
+   "repo": "zeroa234/ryza-ai-revive",
+   "struct": [],
+   "counts": {},
+   "ci": [],
+   "declared": [],
+   "flag": "ok",
+   "files": 1762
+  },
+  {
+   "repo": "Bwcx-songyu/MoodChat",
+   "struct": [],
+   "counts": {},
+   "ci": [],
+   "declared": [],
+   "flag": "ok",
+   "files": 54
+  }
+ ]
+}

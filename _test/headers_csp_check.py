@@ -240,16 +240,9 @@ def head_via(url):
 def run_local():
     from playwright.sync_api import sync_playwright
     rules = parse_headers(HEADERS_FILE.read_text("utf-8"))
-    declared = {}
     srv, base = serve()
     try:
-        observed, probe = {}, {}
-        for p in ("/", "/index.html", "/js/app.js", "/css/style.css", "/sw.js"):
-            h = head_via(base + p)
-            observed[p] = {k: v for k, v in h.items() if k in
-                           ("content-security-policy", "cache-control", "x-content-type-options",
-                            "referrer-policy", "x-frame-options", "permissions-policy")}
-            observed[p]["__status__"] = h.get("__status__") or h.get("__err__")
+        observed, probe = _observe_paths(base)
         errs, vios = [], []
         with sync_playwright() as pw:
             try:
@@ -385,11 +378,32 @@ def run_local():
                             "readout_wait": app.get("readout_wait"),
                             "crisis_w": app["crisis_w"],
                             "csp_vios_after_crisis": app["csp_vios_after_crisis"]}
-            probe["strict"] = csp_map(observed["/"].get("content-security-policy", ""))
             b.close()
     finally:
         srv.shutdown()
         srv.server_close()
+    return _finalize_probe(probe, observed, rules)
+
+
+def _observe_paths(base):
+    """r94：从 `run_local` 分出（同一动机：函数长门 ≤150）。返回 (observed, probe)。"""
+    observed, probe = {}, {}
+    for p in ("/", "/index.html", "/js/app.js", "/css/style.css", "/sw.js"):
+        h = head_via(base + p)
+        observed[p] = {k: v for k, v in h.items() if k in
+                       ("content-security-policy", "cache-control", "x-content-type-options",
+                        "referrer-policy", "x-frame-options", "permissions-policy")}
+        observed[p]["__status__"] = h.get("__status__") or h.get("__err__")
+    return observed, probe
+
+
+def _finalize_probe(probe, observed, rules):
+    """r94：从 `run_local` 尾部分出（该函数原 157 行 > loc_guard 的 150 行函数长门）。
+
+    搬的是**收尾赋值**，不是控制流：`strict/declared/observed/inline_scripts` 四键都只依赖
+    入参，搬到 `finally` 之后计算与在 `try` 内计算同值（唯一差别是不再依赖 `b.close()` 的先后）。
+    """
+    probe["strict"] = csp_map(observed["/"].get("content-security-policy", ""))
     probe["declared"] = {p: merged(p, rules) for p in observed}
     probe["observed"] = observed
     probe["inline_scripts"] = len(re.findall(

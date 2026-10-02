@@ -310,19 +310,19 @@ def lag_days(commits):
 
 
 # ---------------- selftest：正例 + 五条反例 + 边界，证明判据非恒真 ----------------
-def selftest():
-    ok, fail = 0, []
-    good = "## [Unreleased]\n### Added\n- 一条\n\n## [1.5.0] - 2026-09-27\n- 历史\n"
-    cases = [
+# r94：用例表提到模块级（原在 selftest 内，占 23 行 ⇒ 函数 166 行越过 loc_guard 的 150 行函数长门）。
+# 提到外面不是为好看：`good` 与用例表是**数据**，与断言逻辑同处一函数会让「门」逼人去拆断言。
+_GOOD_MD = "## [Unreleased]\n### Added\n- 一条\n\n## [1.5.0] - 2026-09-27\n- 历史\n"
+_CASES = [
         # (name, tag, commits, bullets, md, expect_bad)
         ("正例：3 commit/1 feat 且已登记", "v1.5.0",
-         [("feat: a", "2026-09-27T10:00:00+08:00"), ("docs: b", "x"), ("fix: c", "x")], 4, good, False),
+         [("feat: a", "2026-09-27T10:00:00+08:00"), ("docs: b", "x"), ("fix: c", "x")], 4, _GOOD_MD, False),
         ("反例①：feat 超上限", "v1.5.0",
-         [("feat: f%d" % i, "x") for i in range(7)], 7, good, True),
-        ("反例②：有 feat 零 bullet", "v1.5.0", [("feat: f", "x")], 0, good, True),
-        ("反例③：有 bullet 零 commit", "v1.5.0", [], 5, good, True),
-        ("反例④：tag 无版本段", "v1.9.9", [("feat: f", "x")], 1, good, True),
-        ("反例⑤：缺 Unreleased 段", "v1.5.0", [("feat: f", "x")], None, good, True),
+         [("feat: f%d" % i, "x") for i in range(7)], 7, _GOOD_MD, True),
+        ("反例②：有 feat 零 bullet", "v1.5.0", [("feat: f", "x")], 0, _GOOD_MD, True),
+        ("反例③：有 bullet 零 commit", "v1.5.0", [], 5, _GOOD_MD, True),
+        ("反例④：tag 无版本段", "v1.9.9", [("feat: f", "x")], 1, _GOOD_MD, True),
+        ("反例⑤：缺 Unreleased 段", "v1.5.0", [("feat: f", "x")], None, _GOOD_MD, True),
         # R2c：bullet 数非零也挡不住漏记 —— 存量 bullet 会把没写的那几轮盖过去（首跑实测形态）
         ("反例⑥：旧轮次 bullet 掩盖新轮次漏记", "v1.5.0",
          [("feat(r41): 单测", "x"), ("feat(r42): 无障碍", "x"), ("docs(r40): 旧", "x")],
@@ -335,8 +335,12 @@ def selftest():
         ("正例③：docs/chore 尾巴免登记", "v1.4.3",
          [("feat(r38): 护栏", "x"), ("chore(r38 台账): 刷新", "x"), ("docs(r38 收口): 报告", "x")],
          3, "## [Unreleased]\n### Added（r38 · 护栏）\n- r38 的说明\n\n## [1.4.3] - r38 续\n- 历史\n", False),
-    ]
-    for name, tag, commits, bullets, md, want in cases:
+]
+
+
+def selftest():
+    ok, fail = 0, []
+    for name, tag, commits, bullets, md, want in _CASES:
         bad, _w, _n = judge(tag, commits, bullets, md)
         got = bool(bad)
         if got == want:
@@ -344,7 +348,7 @@ def selftest():
         else:
             fail.append("%s want_bad=%s got=%s bad=%s" % (name, want, got, bad))
     # 边界 A：取不到 tag 必须走"不判绿"，且不得静默返回空问题
-    bad, _w, _n = judge("", [], 0, good)
+    bad, _w, _n = judge("", [], 0, _GOOD_MD)
     if bad and "R0" in bad[0]:
         ok += 1
     else:
@@ -356,7 +360,7 @@ def selftest():
     else:
         fail.append("边界B 段内计数得 %s（应为 2）" % n)
     # 边界 C：bullet=0 且 commit=0（刚切完版）必须是干净的，防判据自己咬住空档期
-    bad, _w, _n = judge("v1.5.0", [], 0, good)
+    bad, _w, _n = judge("v1.5.0", [], 0, _GOOD_MD)
     if not bad:
         ok += 1
     else:
@@ -469,7 +473,7 @@ def selftest():
         ok += 1
     else:
         fail.append("边界R 未涉及新轮次的正例被 R2c 新口径误伤：%s/%s" % (_br, _wr))
-    total = len(cases) + 12 + r7_sites + r2_sites
+    total = len(_CASES) + 12 + r7_sites + r2_sites
     for x in fail:
         print("  SELFTEST-FAIL " + x)
     print("RELEASE-GOV-SELFTEST: %d/%d" % (ok, total))

@@ -180,34 +180,59 @@ def peers_side(metrics):
             "doc_perf_raw_keys": sorted(dp)[:8] if isinstance(dp, dict) else []}
 
 
+def _latest(prefix):
+    """台账按**日期**命名（probe 脚本每次写新文件），故取最新一份而不是写死文件名。
+    r94 一手：写死 `peer-quality-tooling-2026-09-28.json` 的后果是——重采已经落了
+    `…-2026-10-03.json`，rollup 却还在读 09-28 那份，并在报告里标「含旧 letta 行」。
+    """
+    cands = sorted(DATA.glob(prefix + "*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return cands[0] if cands else None
+
+
 def qt_side():
-    f = DATA / "peer-quality-tooling-2026-09-28.json"
-    if not f.exists():
+    f = _latest("peer-quality-tooling-")
+    if f is None or not f.exists():
         return {"available": False}
     d = json.loads(f.read_text("utf-8"))
     rows = [r for r in d.get("rows", []) if r.get("repo") and not r["repo"].startswith("[self]")]
     have = sum(1 for r in rows if "js_test_file" in (r.get("struct") or []) or "java_test_file" in (r.get("struct") or []))
     ci_unit = sum(1 for r in rows if "unit" in (r.get("ci") or []))
-    return {"available": True, "ts": f.name.replace("peer-quality-tooling-", "").replace(".json", ""),
+    # r94：stale 不再是硬编码字符串 —— 改为**按台账实际内容**判定（是否含已换址的旧 letta 行）。
+    # 硬编码的 stale 有一个坏处：重采之后它还写着 stale，读者会以为台账不能用（而真读数已换址）。
+    stale = None
+    if any("letta-ai/letta" == r.get("repo") for r in d.get("rows", [])):
+        stale = "含已换址的旧 letta 行 letta-ai/letta（该仓已退化为 landing 页，权威实现迁 letta-code）"
+    return {"available": True, "file": f.name,
+            "ts": f.name.replace("peer-quality-tooling-", "").replace(".json", ""),
             "generated_by": d.get("generated_by", ""),
             "denominator": d.get("counted"), "have_test_struct": have, "ci_unit_step": ci_unit,
-            "note": d.get("ceiling", ""), "stale": "含已换址的旧 letta 行（ts 2026-09-28）"}
+            "note": d.get("ceiling", ""), "stale": stale}
 
 
 def repro_side():
-    f = DATA / "peer-repro-2026-09-27.json"
-    if not f.exists():
+    f = _latest("peer-repro-")
+    if f is None or not f.exists():
         return {"available": False}
     d = json.loads(f.read_text("utf-8"))
     repos = d.get("repos") or {}
     lock = sum(1 for v in repos.values() if (v.get("tree") or {}).get("locks"))
-    return {"available": True, "ts": d.get("ts"), "denominator": d.get("denominator"),
-            "with_lockfile": lock, "stale": "含已换址的旧 letta 行（ts 2026-09-26）"}
+    stale = None
+    if any("letta-ai/letta" == k for k in repos):
+        stale = "含已换址的旧 letta 行 letta-ai/letta（权威实现已迁 letta-code）"
+    return {"available": True, "file": f.name, "ts": d.get("ts"), "denominator": d.get("denominator"),
+            "with_lockfile": lock, "stale": stale}
 
 
 def build(paths=None, metrics=None):
     paths = paths if paths is not None else ls_files()
-    metrics = metrics or json.loads((DATA / "benchmark-metrics-r93.json").read_text("utf-8"))
+    # r94：默认输入改为「取最新的 benchmark-metrics-*.json」，避免每轮都要改这里的文件名
+    #（上一轮写死 r93 的后果就是：本轮产物 r94 落盘后，rollup 仍在读 r93 的旧读数）。
+    if metrics is None:
+        cands = sorted(DATA.glob("benchmark-metrics-*.json"),
+                       key=lambda p: p.stat().st_mtime, reverse=True)
+        if not cands:
+            raise FileNotFoundError("benchmark-metrics-*.json 一份都没有 ⇒ 无源可用（不得回退去读旧台账）")
+        metrics = json.loads(cands[0].read_text("utf-8"))
     return {"generated_by": "_test/bench_rollup.py",
             "dim_a_testing_repro": {"self": self_side(paths), "peers_quality_tooling": qt_side(),
                                     "peers_repro": repro_side()},
@@ -235,11 +260,11 @@ def render(roll):
     L.append("| typecheck 门 | 无（零构建无 TS） | %d/%s（另 %d 未验） | 同上 |"
              % (g["quality_gate_classes"].get("typecheck_gate", {}).get("yes", 0), g.get("repo_count"),
                 g["quality_gate_classes"].get("typecheck_gate", {}).get("unverified", 0)))
-    L.append("| 有测试结构的 peer | — | %s/%s（ts=%s） | peer-quality-tooling-2026-09-28.json |"
-             % (q.get("have_test_struct"), q.get("denominator"), q.get("ts")))
+    L.append("| 有测试结构的 peer | — | %s/%s（ts=%s） | %s |"
+             % (q.get("have_test_struct"), q.get("denominator"), q.get("ts"), q.get("file", "—")))
     L.append("| CI 跑 unit 的 peer | — | %s/%s | 同上 |" % (q.get("ci_unit_step"), q.get("denominator")))
-    L.append("| 有 lockfile 的 peer | — | %s/%s（ts=%s） | peer-repro-2026-09-27.json |"
-             % (p.get("with_lockfile"), p.get("denominator"), p.get("ts")))
+    L.append("| 有 lockfile 的 peer | — | %s/%s（ts=%s） | %s |"
+             % (p.get("with_lockfile"), p.get("denominator"), p.get("ts"), p.get("file", "—")))
     L.append("| 前端构建链配置 | %d（零构建=%s） | 未取数 | git ls-files |" % (len(b["frontend_build_configs"]), b["zero_build"]))
     L.append("| 平台函数依赖清单 | %d（%s） | 未取数 | git ls-files |"
              % (len(b["platform_function_manifests"]),
@@ -284,21 +309,24 @@ def selftest():
 
 def main():
     ap = argparse.ArgumentParser(description="r93 两新增维度汇总（只读、零网络、数字带来源）")
-    ap.add_argument("--out", default=str(OUT))
+    ap.add_argument("--out", default="", help="产物路径；缺省按输入台账的轮次名自动命名")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     if args.selftest:
         return selftest()
-    snap = DATA / "benchmark-metrics-r93.json"
-    if not snap.exists():
-        print("ROLLUP-UNVERIFIED: 缺源 %s（先跑 benchmark_metrics 落盘，缺源不是 0）" % snap.name)
+    # r94：输入/产物都不再写死 r93 —— 取最新一份 metrics，产物名跟随它的轮次号。
+    src_metrics = _latest("benchmark-metrics-")
+    if src_metrics is None or not src_metrics.exists():
+        print("ROLLUP-UNVERIFIED: 缺源 benchmark-metrics-*.json（先跑 benchmark_metrics 落盘，缺源不是 0）")
         return 2
+    out_path = args.out or str(DATA / ("benchmark-rollup-%s.json"
+                                       % src_metrics.stem.replace("benchmark-metrics-", "")))
     try:
         roll = build()
     except Exception as e:
         print("ROLLUP-FAIL: 读数不可用：%s" % str(e)[:160])
         return 1
-    out = Path(args.out)
+    out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(roll, ensure_ascii=False, indent=2), encoding="utf-8")
     print("自测面：git HEAD（与 benchmark_metrics 同面，禁止混工作树）")

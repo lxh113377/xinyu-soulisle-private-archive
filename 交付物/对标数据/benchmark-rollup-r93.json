@@ -29,20 +29,20 @@
     },
     "peers_quality_tooling": {
       "available": true,
-      "ts": "2026-09-28",
+      "ts": "2026-10-03",
       "generated_by": "peer_quality_tooling_probe.py",
       "denominator": 16,
-      "have_test_struct": 6,
+      "have_test_struct": 7,
       "ci_unit_step": 5,
       "note": "只出结构化在册证据；不得据此比较代码质量/缺陷率（覆盖率不在取数面内）",
-      "stale": "含已换址的旧 letta 行（ts 2026-09-28）"
+      "stale": null
     },
     "peers_repro": {
       "available": true,
       "ts": "2026-09-26T23:19:36Z",
       "denominator": 16,
       "with_lockfile": 10,
-      "stale": "含已换址的旧 letta 行（ts 2026-09-26）"
+      "stale": "含已换址的旧 letta 行 letta-ai/letta（权威实现已迁 letta-code）"
     }
   },
   "dim_b_zero_build_cost": {

@@ -28,6 +28,7 @@ import json
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 import sys
 import urllib.error
 import urllib.request
@@ -355,8 +356,8 @@ def main():
              "search 端点受 secondary rate limit 影响实测不可用，已弃用）",
              "note": "声明面(tree)与平台面(profile)与行为面(dependabot PR)三路独立取数，"
                      "任一缺失记 NA，禁与 0 混同；漏洞告警开关仅对本仓可查(需管理权)，peers 侧不可见",
-             "ts": subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"],
-                                  capture_output=True, text=True).stdout.strip()},
+             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
+
             ensure_ascii=False, indent=1).encode("utf-8"))
         print("快照 -> " + a.json)
     if a.self_only:

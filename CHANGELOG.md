@@ -5,6 +5,51 @@
 
 ## [Unreleased]
 
+### Changed + Fixed（r94 · loc 门修尺并转 enforce + 两份台账重采 + CI 口径统一）
+- **loc 门先修尺、再转 enforce（本轮最重要的一手发现）**：r93 首次实测报「22/158 文件超限」，
+  其中**14 项是误判** —— 判据把 **Java 类**（`class Xxx {`）与 **JS IIFE 模块包装**
+  （`window.X = (function () {`）当成函数。照单治理就会逼人去**拆类、拆模块**（破坏 `src/` 运行时代码、
+  撞同步红线）—— 害处来自尺而不是代码。现改为：只取 `func` 块；类归 `class`、IIFE 归 `module`（不计函数长，
+  行数照常计入文件行数）；并**改为测量任意嵌套层的块**，此前只看 depth==0 ⇒ IIFE 内部函数完全不可见。
+  超限读数由 22 降到 8（一手实测），面板新增「已排除类 N 个 / 模块包装 N 个」。
+- **超限清零 ⇒ 门正式有牙**：`loc_guard_check.py` 默认从 report-only 改为 **enforce**（超限即 rc=1，
+  已进电池）；新增**接线自证** `wiring_report()`：enforce 模式下必须确认电池 SUITES 里那一条带
+  `--enforce`，否则 rc=2（否则日后有人删掉 `--enforce`，门还在跑、还印读数、rc 恒 0 ⇒「有门」没「有牙」，
+  与 r78「有配置≠有门」同族、只是这次发生在自家身上）。`--selftest` 由 9 条扩到 **17 条**。
+- **7 个判据文件按 AST 切点拆分（超限 22 → 0）**：`deliverable_inventory_check.fixture_legs`、
+  `release_governance_check.selftest`（用例表提到模块级）、`headers_csp_check.run_local`、
+  `docker_image_sim_check.main`（try 体整体下移）、`offline_shell_check.run_runtime`（R2 探针 JS 提模块级 +
+  try 体下移）、`repo_config_check.selftest`（三段）、`repo_config_check.main`（三段）、`a11y_check.main`
+  （键盘探针 JS 提模块级 + `with` 块下移）、`benchmark_metrics.selftest`（六段）与 `main`（四段）。
+  切点由 AST 求（段内 ≤140 行且跨段变量最少），不靠目测；`benchmark_metrics.selftest` 拆分后
+  **`--selftest` 输出与 HEAD 版逐字相同（960 字符，rc=0）**，是真等价而非「看着像」。
+- **CI 口径统一（r92 遗留的「双读数」查清了）**：`self_metrics()` 原有一个叫 `ci_workflows` 的字段，
+  实际数的是 **ci.yml 里的 job 条数**（连 `perf-baseline.yml` 都没算），而 peers 侧 `ci_workflows` 是
+  GitHub API 的 workflow 总数 ⇒ **同名不同义**。现 self 侧分列 `ci_jobs_in_ci_yml` 与 `ci_workflow_files`
+  并写死定义域，peers 侧键名**不动**（横向对账依赖它）；加不变式断言（workflow 文件数 ≥ ci.yml job 数，
+  否则记 hard_fail）。
+- **两份peers 辅助台账重采**：`peer-quality-tooling-2026-10-03.json`（16 仓，重新采到
+  「有测试结构 7/16」，此前 6/16 因旧 letta 行被算作无测试结构）与 `peer-repro-2026-10-03.json`。
+  `bench_rollup.py` 同步改为：输入取**最新一份**（原来写死 `…-2026-09-28.json` / `…-2026-09-27.json`，
+  重采落地后它仍在读旧读数）、stale 标记**按台账内容判定**（原来硬编码，重采后仍写着 stale）、
+  产物名跟随输入轮次，不再写死 `r93`。
+- **8 个 peers probe 的 `date -u` 跨平台缺陷（Fixed，本轮一手）**：它们都用
+  `subprocess.run(["date", "-u", ...])` 取时间戳，**Windows 上没有这个命令** ⇒
+  `peer_repro_probe` 跑完 16 仓、打印全部统计，**产物却没落盘**（FileNotFoundError）。
+  不看 stderr 会误判「重采成功」。已全部换成 `datetime.now(timezone.utc)`（零依赖、跨平台）。
+- **首跑电池抓到的三处回归（Fixed）**：`offline_shell._run_checks` 搬块时漏 `return results`
+  ⇒ 收尾 `for r in results` TypeError；`a11y` 的 `from playwright…import sync_playwright`
+  是 `main` 的局部名、随 with 块搬走后 NameError；`loc_guard` 默认改enforce 后 `--enforce`
+  这个参数名消失、电池条目仍传它 ⇒ argparse usage 退出、门静默失声（现保留为 no-op 兼容参数）。
+  教训：**搬块前要问「这个名字原来从哪来」**（函数内 import / 闭包变量 / 模块级常量命运不同）；
+  **改门禁 CLI 契约要一起改调用方**（否则表现为 ENV-UNVERIFIED，看着像环境问题其实是接线断了）。
+- **`backup_online` B2 的 Playwright 导航竞态（Fixed）**：电池里红 1 次，失败形态是
+  `Page.evaluate: Execution context was destroyed`（页面在 evaluate 期间导航），单独复跑 2 次全绿。
+  给该腿加**有界重试一次**（1.2s 后重读同一份 localStorage，第二次仍红照判）——修竞态不是放宽判据。
+- **loc 门第一次对真实回归亮红（门有牙的实证）**：补 `return results` 时 accompanying 的注释把
+  `_run_checks` 顶到 155 行 ⇒ `loc_guard` 当场 `LOC-FAIL` rc=1；压缩后恢复 `LOC-PASS`。
+  在此之前这条门只印读数、从不拦人 —— 这就是「有门」与「门有牙」的分界线。
+
 ### Added + Fixed（r93 · 对标轮：loc 门 + 两新增维度 + corpus 归档 + 一处假绿修复）
 - **行数/函数长守卫（新）**：`_test/loc_guard_check.py`，对标 opensoul 的 `check:loc`
   （实测坐实其 `package.json`：`node --import tsx scripts/check-tsmax-loc.ts --max 2000 --max-function 150`，

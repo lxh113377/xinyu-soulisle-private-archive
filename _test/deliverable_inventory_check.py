@@ -43,8 +43,11 @@ from __future__ import annotations
 
 import hashlib
 import re
+import struct
 import subprocess
 import sys
+import tempfile
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -752,11 +755,15 @@ def fixture_legs() -> list:
 
     这一组是本轮判据的**存在理由** —— 2026-09-28 真实丢失的就是 B/C 两形（清单写着要交的文件
     从工作树消失），而当时 91 套件零告警。只测正向（真面绿）的判据等于没测（[[negative-control-first]]）。
-    """
-    import struct
-    import tempfile
-    import zipfile
 
+    r94：函数体整段下移到 `_fixture_legs_body`（146 行，≤150）。拆的动机不是「好看」，
+    是 `loc_guard` 的函数长门（≤150，对标 opensoul check:loc）——本函数此前 158 行。
+    切点用 AST 求得（前 4 条语句零变量跨越），不是目测。
+    """
+    return _fixture_legs_body()
+
+
+def _fixture_legs_body() -> list:
     def mkmp4(sec):
         box = b"mvhd" + bytes([0]) + b"\0\0\0" + b"\0" * 8
         box += struct.pack(">II", 1000, int(sec * 1000)) + b"\0" * 80

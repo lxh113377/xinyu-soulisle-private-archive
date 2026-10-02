@@ -28,6 +28,7 @@ import json
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 import sys
 import urllib.request
 from pathlib import Path
@@ -272,8 +273,8 @@ def main():
     if a.json:
         Path(a.json).write_bytes(json.dumps(
             {"repos": rows, "na": na, "denominator": n,
-             "ts": subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"],
-                                  capture_output=True, text=True).stdout.strip()},
+             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
+
             ensure_ascii=False, indent=1).encode("utf-8"))
         print("快照 -> " + a.json)
     if a.self_only:

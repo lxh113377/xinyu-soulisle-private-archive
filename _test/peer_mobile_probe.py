@@ -25,6 +25,7 @@ import json
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 import sys
 import urllib.request
 from pathlib import Path
@@ -339,8 +340,8 @@ def main():
             {"repos": rows, "na": na, "denominator": n, "blind": blind,
              "out_of_scope": out_of_scope, "usable": n - blind - len(out_of_scope),
              "ceiling_note": "本探针只出结构与声明证据；对手触控几何未测，不得据此下体验结论",
-             "ts": subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"],
-                                  capture_output=True, text=True).stdout.strip()},
+             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
+
             ensure_ascii=False, indent=1).encode("utf-8"))
         print("快照 -> " + a.json)
     if a.self_only:

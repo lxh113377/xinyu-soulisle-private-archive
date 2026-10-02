@@ -98,7 +98,6 @@ BLIND_PROBES = {
     "e2e_browser": ((".py", ".js", ".ts"), ("sync_playwright", "from playwright", "chromium.launch")),
 }
 
-
 def _blind_probe_hit(root, rel, needles):
     pass
 
@@ -327,7 +326,6 @@ def offline_signal_class(text):
     # 故意**不设兜底**：兜底会把"任何 offline 措辞"升格成某种能力，而这条通道的用途只是复核，
     # 宁可漏计对手（与文件名法同为下限），也不许凭空造出一格能力。
     return "none", ""
-
 
 def _snippet(t, m):
     s = re.sub(r"\s+", " ", t[max(0, m.start() - 60):m.end() + 60]).strip()
@@ -1047,8 +1045,7 @@ def coverage_hits(rows):
     hits = {c: sum(1 for r in usable if c in (r.get("caps") or [])) for c in CAP_RULES}
     return hits, usable, blind
 
-
-def selftest():
+def _st_selftest_1(st):  # r94 拆出的第 1 段（切点由 AST 求得，跨段量经 st 显式传递）
     """合成两份快照：动 stars / pushed_at / **caps / docs**（r21 新增两键），断言 diff 恰好抓到。"""
     base = [{"repo": "lobehub/lobehub", "stars": 100, "pushed_at": "2026-09-01",
              "latest_release": "v1", "ci_workflows": 3, "caps": ["container"], "docs": ["README.md"]},
@@ -1189,9 +1186,11 @@ def selftest():
         if blind_spot_caps(troot, ["src/chat.js"], {"streaming"}):
             print("SELFTEST-FAIL: 文件名匹配器已看见的能力仍进盲区名单（重复计数）")
             return 1
-    # r71：self 行的取数面必须是 git HEAD ⇒ 人口由 ls-tree 给出，未入库的件**结构上**不在人口里。
-    # 反例的专属输入面：往合成人口里塞一件 `*_check.py` 形状的"在途件"，先证计数器真的会数它
-    # （否则"它没被数"只是因为计数器恒零），再证从人口里去掉它 ⇒ 计数恰好少一。
+    st.update(got=got, noise=noise, sub=sub, want=want)
+    return 0
+
+def _st_selftest_2(st):  # r94 拆出的第 2 段（切点由 AST 求得，跨段量经 st 显式传递）
+    got, want = st['got'], st['want']
     pop = ["src/js/app.js", "src/index.html", "_test/foo_check.py", "_test/j2_chat_contract.py", "README.md"]
     n_all, srcs_all, scripts_all = summarize_self_paths(pop)
     n_wo, srcs_wo, scripts_wo = summarize_self_paths([x for x in pop if x != "_test/foo_check.py"])
@@ -1320,7 +1319,10 @@ def selftest():
             _g91["RE_E2E"] = _o_e2e
     finally:
         _g91["git_ls_tree"], _g91["git_blob"] = _o_ls, _o_blob
-    # 能力匹配器本体（r70）：`rag` 裸子串会把 storage/coverage 白送成一格能力 ⇒ 两向都验
+    st['got'] = got
+    return 0
+
+def _st_selftest_3(st):  # r94 拆出的第 3 段（切点由 AST 求得，跨段量经 st 显式传递）
     _vm = CAP_RULES["vector_memory"]
     _must_red = ["src/storage/db.js", "test/coverage.py", "_test/plan_pdf_coverage_check.py",
                  "src/fragment/pool.py", "docs/average-note.md", "docs/drag-drop.md"]
@@ -1404,6 +1406,11 @@ def selftest():
     if not _tx(_t_good)["readme_thorough"]:
         print("SELFTEST-FAIL: 合规长 README（6 标题+徽章+截图+Install）未判 thorough")
         return 1
+    st.update(_e1=_e1, _must_green=_must_green, _must_red=_must_red, _t_good=_t_good, _t_long_only=_t_long_only, _t_marketing=_t_marketing, _tx=_tx)
+    return 0
+
+def _st_selftest_4(st):  # r94 拆出的第 4 段（切点由 AST 求得，跨段量经 st 显式传递）
+    _e1, _t_good, _t_long_only, _t_marketing, _tx = st['_e1'], st['_t_good'], st['_t_long_only'], st['_t_marketing'], st['_tx']
     if _tx(_t_long_only)["readme_thorough"]:
         print("SELFTEST-FAIL: 只有长度没有结构信号被判成好文档（营销文混进来）")
         return 1
@@ -1502,7 +1509,11 @@ def selftest():
     if _g3["coverage_gate"] is not None or not _u3:
         print("SELFTEST-FAIL: 候选正文没取到时塌缩成了 False 且没记 unverified：%s %s" % (_g3, _u3))
         return 1
-    # r75 修正的两条专属腿：① CI 面没取全时**不得**判"没有门"（首跑我只取 3 个 workflow 而 lobehub 有 31 个）
+    st.update(_q_pom=_q_pom, _s=_s)
+    return 0
+
+def _st_selftest_5(st):  # r94 拆出的第 5 段（切点由 AST 求得，跨段量经 st 显式传递）
+    _q_pom = st['_q_pom']
     _gpartial, _ep, _up = qg_classify({"lint_gate": [".eslintrc.json"]}, {}, "nothing relevant", ci_complete=False)
     if _gpartial["lint_gate"] is not None or not _up:
         print("SELFTEST-FAIL: CI 面未取全却判成「无门」（取数面塌缩当结论）：%s %s" % (_gpartial, _up))
@@ -1621,11 +1632,10 @@ def selftest():
             return 1
     finally:
         _g95["git_ls_tree"], _g95["git_blob"] = _orig_ls75, _orig_blob75
-    # ---- A9（r82 新增，静态接线腿）：`classify_drift` 的**每一个**调用点都必须按四档解包 ----
-    # 立此腿的一手：r79-D 把返回从 3 值加到 4 值，9 处调用点改了 8 处，**唯独生产路径 main() 那一处漏了**
-    # ⇒ `--selftest` 全绿而真面每次跑到收口就 `ValueError: too many values to unpack`（本轮实测 rc=1，
-    #   采数全部印完才崩，漂移一条都没落进台账）。这是 R238「用单测掩盖接线错误」的又一形态：
-    #   签名变更的爆炸半径只在**没人跑的那条路**上显形。数一下有几个 `=` 是结构判定，不靠人记得改了几处。
+    return 0
+
+def _st_selftest_6(st):  # r94 拆出的第 6 段（切点由 AST 求得，跨段量经 st 显式传递）
+    _must_green, _must_red, _s, got, noise, sub = st['_must_green'], st['_must_red'], st['_s'], st['got'], st['noise'], st['sub']
     _src_self = Path(__file__).read_text(encoding="utf-8", errors="replace")
     _call_sites = re.findall(r"^(\s*)([A-Za-z_,\s]*?)=\s*classify_drift\(", _src_self, re.M)
     if len(_call_sites) < 2:
@@ -1674,6 +1684,30 @@ def selftest():
           "另一侧反例＝CI 里只有步骤名/注释提「无密钥」而执行行是 java -jar ⇒ 必须判无（防升格）；"
           "摘掉该路由正例即回 False（变异腿）、还原即回 True")
     return 0
+    return 0
+
+
+def selftest():
+    """r94：只留调度——六段断言体已下移到 `_st_selftest_1..6`。
+
+    跨段变量走显式 `st` 字典（段首解包 / 段尾收集），不靠闭包或 globals；
+    任一段 `return 1` 即整轮失败（与拆分前「首腿失败即停」同语义）。
+    """
+    st = {}
+    if _st_selftest_1(st):
+        return 1
+    if _st_selftest_2(st):
+        return 1
+    if _st_selftest_3(st):
+        return 1
+    if _st_selftest_4(st):
+        return 1
+    if _st_selftest_5(st):
+        return 1
+    if _st_selftest_6(st):
+        return 1
+    return 0
+
 
 
 def shown_path(p):
@@ -1686,8 +1720,7 @@ def shown_path(p):
     except ValueError:
         return str(pp).replace("\\", "/")
 
-
-def main():
+def _main_p1(st):  # r94 拆出的第 1 段（切点由 AST 求得，跨段量经 st 显式传递）
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--offline-audit", action="store_true",
@@ -1741,6 +1774,18 @@ def main():
             print(f"  ⚠️ 分母不全（{len(unv)} 仓未取到：{'、'.join(unv)}）⇒ **不得**据全零下差异结论")
         for k in shell + local:
             print(f"    ▶ {k} [{audit[k]['class']}] {audit[k]['evidence'][:90]}")
+    st['args'] = args
+    st['audit'] = locals().get('audit')
+    st.update(cur=cur, hard_fail=hard_fail)
+    st['hist'] = locals().get('hist')
+    st.update(own=own, path=path)
+    st['prev_repos'] = locals().get('prev_repos')
+    st['run'] = run
+    st['unv'] = locals().get('unv')
+    return 0
+
+def _main_p2(st):  # r94 拆出的第 2 段（切点由 AST 求得，跨段量经 st 显式传递）
+    args, audit, cur, run, unv = st['args'], st['audit'], st['cur'], st['run'], st['unv']
     if args.cap_channel:
         chan = cap_channel_audit(cur)
         run["cap_channel"] = chan
@@ -1798,6 +1843,15 @@ def main():
         if unv:
             print(f"  ⚠️ 同址尺分母不全（{len(unv)} 仓两路皆空：{'、'.join(unv)}）"
                   f"⇒ 不得据「peers 全零」下否定结论")
+    st['c'] = locals().get('c')
+    st['e'] = locals().get('e')
+    st['members'] = locals().get('members')
+    st['sv'] = locals().get('sv')
+    st['unv'] = locals().get('unv')
+    return 0
+
+def _main_p3(st):  # r94 拆出的第 3 段（切点由 AST 求得，跨段量经 st 显式传递）
+    args, c, cur, e, hist, members, own, path, prev_repos, run, sv, unv = st['args'], st['c'], st['cur'], st['e'], st['hist'], st['members'], st['own'], st['path'], st['prev_repos'], st['run'], st['sv'], st['unv']
     if args.quality_gates:
         qg = quality_gate_audit(cur)
         qg_self = self_quality_gates()
@@ -1873,6 +1927,11 @@ def main():
     print(f"  能力覆盖率(有效分母 {len(usable)}/{len(cur)} 仓): " + " ".join(f"{k}={v}" for k, v in hit.items()))
     if blind:
         print(f"  ⚠️ 盲区点名（这些仓的 caps 不计入分母，全零不可解读为「对手没有」）: " + " ; ".join(blind))
+    st.update(blind=blind, drift=drift)
+    return 0
+
+def _main_p4(st):  # r94 拆出的第 4 段（切点由 AST 求得，跨段量经 st 显式传递）
+    blind, drift, hard_fail, prev_repos = st['blind'], st['drift'], st['hard_fail'], st['prev_repos']
     if prev_repos:
         if drift:
             # r82 修：`classify_drift` 自 r79-D 起返回**四档**（实质/抖动/补录/取数失败），
@@ -1905,6 +1964,22 @@ def main():
         return 1
     print("BENCHMARK-METRICS-PASS")
     return 0
+    return 0
+
+
+def main():
+    """r94：只留调度——各段已下移到 `_main_p1..4`（跨段量走显式 `st`）。"""
+    st = {}
+    if _main_p1(st):
+        return 1
+    if _main_p2(st):
+        return 1
+    if _main_p3(st):
+        return 1
+    if _main_p4(st):
+        return 1
+    return 0
+
 
 
 if __name__ == "__main__":

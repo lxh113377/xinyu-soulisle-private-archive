@@ -28,6 +28,7 @@ import json
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 import sys
 import urllib.request
 from pathlib import Path
@@ -375,7 +376,8 @@ def main():
     if blind:
         print("  BLIND 明细：" + "; ".join(blind))
     if a.json:
-        ts = subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True).stdout.strip()
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
         Path(a.json).write_bytes(json.dumps(
             {"repos": rows, "blind": blind, "denominator": n, "usable": usable, "ts": ts},
             ensure_ascii=False, indent=1).encode("utf-8"))
