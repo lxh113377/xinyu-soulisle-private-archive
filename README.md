@@ -198,7 +198,7 @@ CloudBase 注意事项（实测得来）：
 
 > **现状（与机器逐条对账，别手抄）**：GitHub Actions 四条门禁（`.github/workflows/ci.yml` 的 job 数；
 > 另有独立的性能基线工作流 `.github/workflows/perf-baseline.yml`，周常复跑）｜
-> ★ 全量电池（112 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
+> ★ 全量电池（116 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
 > 这三处数字由 `repo_config_check.py` 的 **G2 / G4 / G14** 当场等值对账，写错即红。
 >
 > **判据清单与逐条口径全文见 [docs/quality-gates.md](docs/quality-gates.md)**（r39 起从 README 迁出）。这里只留四个『现在到底是多少』的复算入口：
@@ -233,8 +233,9 @@ CI 的浏览器 job 与本地电池跑同一套（`playwright install chromium` 
 | [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md) | 第三方资产逐文件授权清单（GSAP 非 MIT 这一事实的正式边界声明），由 `repo_config_check.py` G6/G7 保证不漏登记 |
 | [docs/openapi.yaml](docs/openapi.yaml) | 11 条接口的**唯一机器可读契约**，由 `api_contract_check.py` 与控制器/前端/运行态三方对账 |
 | [ROADMAP.md](ROADMAP.md) | 公开路线图（对标差距 → 已完成 / 进行中 / 计划 / 明确不做，含"为什么不做"） |
-| [交付物/对标分析报告-2026-09-24.md](交付物/对标分析报告-2026-09-24.md) | 与 LobeChat / Open-LLM-VTuber / SillyTavern 的七维度对标与差距清单 |
-| [交付物/对标分析报告-2026-09-24-v2.md](交付物/对标分析报告-2026-09-24-v2.md) | 第二轮：14 仓实测指标横向对账（含同体量垂类项目）+ 本轮已落地项与实证 |
+| [交付物/对标总览-合并索引-2026-10-02.md](交付物/对标总览-合并索引-2026-10-02.md) | **46 轮对标的合并索引**（每轮一行 + 核心结论），历史报告原件在 `交付物/_历史轮次-对标/` |
+| [交付物/_历史轮次-对标/对标分析报告-2026-09-24.md](交付物/_历史轮次-对标/对标分析报告-2026-09-24.md) | 与 LobeChat / Open-LLM-VTuber / SillyTavern 的七维度对标与差距清单（首轮） |
+| [交付物/_历史轮次-对标/对标分析报告-2026-09-24-v2.md](交付物/_历史轮次-对标/对标分析报告-2026-09-24-v2.md) | 第二轮：14 仓实测指标横向对账（含同体量垂类项目）+ 本轮已落地项与实证 |
 | `memory/` | 项目交接记忆（目标/结构/技术栈/决策记录/验收标准），工程过程档案 |
 
 ---

@@ -14,6 +14,10 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - [ ] 🟠 [推荐:R83-02] **共享环境隔离待老大**：陪聊 / iCAN 门店 / 医 同居一个 CloudBase env，
       子目录避让只是止血；命名空间或独立 env 属跨项目决定，本轮未擅动。`part92` §②
 - [ ] **同族坑收口**：台账 `part18`/`part20`；G9 常驻 `repo_config_check`。
+- [ ] 🟠 [r93 新] **loc 门超限治理（P1，22/156 文件超限）**：本轮新增 `loc_guard_check.py`
+      （report-only，对标 opensoul 2000/150）；**清零后才切 `--enforce` 并挂 CI 步**。
+      最大 offender `_test/benchmark_metrics.py`（1913 行 / 最长函数 628 行，成本在 selftest 逐腿堆叠）。
+      触发条件与分档见 `part106` §④。
 - [ ] 🟠 [R90 新] **CI 全绿契约前提变了**：`greencheck.py bootstrap --repo-dir .` 实测 `checks=[]`（本仓门禁=自写电池非标准配置）
       ⇒ **禁造空契约**；须手写 `.ci/contract.json` blocking 清单，再加 step 并
       `--sweep` 复扫到 `matched==declared`。前提：`python D:/global_skills/A-project-handoff/scripts/greencheck.py bootstrap --repo-dir .`
@@ -44,4 +48,6 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - **卷9** `07-next-steps.part102.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷10** `07-next-steps.part103.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷11** `07-next-steps.part104.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷12** `07-next-steps.part106.md` — **r93 对标轮**：r92 遗留三项销账、loc 门/rollup 两个新判据、
+  corpus 归档（含分母46→46 声明）、r94 入口、方法论留档
 

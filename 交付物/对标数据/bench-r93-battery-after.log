@@ -1,0 +1,121 @@
+SELF-HOST: reuse ｜ 8123 已有健康服务 ⇒ 复用，**不会**停掉不是我起的进程｜jar=未取数
+preflight              rc=0   0.2s | PREFLIGHT-PASS: jar=fat(bytes=28448572 libs=46,新于源码) 夹具=5/5 最新源码=pom.xml ｜ 服务 status=UP webRoot=C:\Users\37533
+perf_baseline          rc=0   1.5s | PERF-BASELINE-PASS（4 个目标在预算内｜实测峰值 p95=27.4ms，最紧余量 373ms｜吞吐 1830.6 rps｜口径=本地无外网 + 危机路径不调 LLM；这是自身棘轮不是跨项目对比）
+perf_baseline_selftest rc=0   0.1s | SELFTEST-PASS: 百分位/空样本/恒慢/缺面/口径漂移 六向正确
+disclaimer_forensics   rc=0   0.1s | DISCLAIMER-CLEAN: 报告 46 份（分母从目录现读：交付物 0 + 交付物/_历史轮次-对标 46），缺取证 0 处｜对标分析报告-2026-09-24-v2.md=0、对标分析报告-2026-09-24
+disclaimer_forensics_selftest rc=0   0.1s | DISCLAIMER-SELFTEST-PASS（8 类桩 + 恒绿守卫 + 双面分母 2 腿）
+ci_watch_selftest      rc=0   0.2s | CI-WATCH-SELFTEST-PASS（6 态判定 + NO_RUN 宽限双向 + 恒红守卫 + 取数失败/无 run 分档 + stderr 带回）
+battery_lock_selftest  rc=0   0.1s | BATTERY-SELFTEST-PASS（锁 ok ＋ 折叠 ok ＋ 计费分档 ok ＋ 台账写入 ok ＋ 自管决策 ok）
+plan_pdf_coverage      rc=0   0.5s | PLAN-PDF-COVERAGE-PASS: 官方九项全覆盖（9/9）｜页数 20 ≤ 20（pypdf）｜文本层 10783 字符（pypdf）｜分母取自大纲
+plan_pdf_coverage_selftest rc=0   0.1s | PLAN-PDF-COVERAGE-SELFTEST-PASS（九向：误伤 1 / 漏报 4 / 读空气 2 / 取数形状 2）
+deploy_sync            rc=0   0.1s | DEPLOY-SYNC-PASS  (src→deploy/xinyu 三类归零：missing=0 diff=0 extra=0(白名单外))
+eol_parity             rc=0  44.3s | EOL-PARITY-PASS（text=443 binary=28 total=471；工作树字节 == blob 字节 ⇒ 与机器无关）
+eol_parity_selftest    rc=0   0.1s | EOL-PARITY-SELFTEST-PASS: 8 类样本各归各位（合规文本放行 / 工作树 CRLF 判红 / binary 的 0D0A 放行与不要求 / 未声明 binary 的 0D0A 判红 / 仓库侧 C
+size_budget            rc=0   0.1s | BUDGET-PASS: 22 文件 + 总预算全在限内（total=848,879）
+size_budget_selftest   rc=0   0.1s | ✅ SELFTEST-PASS：压缩预算逐项报红 + 漏登记文件被 coverage 抓到 ⇒ 两判据非恒真
+emotion_wiring         rc=0   7.9s | EMOTION-WIRING-PASS
+emotion_wiring_selftest rc=0   0.2s | SELFTEST-PASS: 3 类篡改全部被抓到、原样零问题
+vendor_freshness       rc=0   0.1s | VENDOR-FRESHNESS-PASS
+vendor_freshness_selftest rc=0   0.1s | SELFTEST-PASS: 5 类篡改全部被抓到、原样零问题
+benchmark_selftest     rc=0   0.2s | SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（4 条）；分档正确（实质 3 / 抖动 1）且纯抖动场景零实质；分母证明正确（1 有效 /
+measure_entry          rc=0   1.9s | MEASURE-ENTRY-PASS: 要跑的尺全部解析得动且归属清楚（点名 15 件｜解析坏 0｜归属失明 0｜管道吞rc 扫 2 件命中 0｜全量体检 rc=0）
+measure_entry_selftest rc=0   1.1s | MEASURE-ENTRY-SELFTEST-PASS（10 类文本桩 + 1 条元数钉 + 1 条真面自证｜管道腿=扫 2 件命中 0）
+testasset_selftest     rc=0   0.2s | TESTASSET-SELFTEST: 16/16
+a11y_probe_selftest    rc=0   0.1s | A11Y-SELFTEST: 31/31（路径 13＝正6/反7｜依赖 8＝正5/反3｜README 7＝正5/反2｜边界 3）
+repro_probe_selftest   rc=0   0.1s | REPRO-SELFTEST: 19/19（路径 10＝正6/反4｜钉版 6｜边界 3）
+api_contract           rc=0   1.7s | API-CONTRACT-PASS
+api_contract_selftest  rc=0   0.2s | SELFTEST-PASS: 删文档/加幽灵/偷调用/缺键/抹标注/手册三面漂移 八类样本均被抓到、原样零问题
+patch_apply_selftest   rc=0   0.1s | SELFTEST-PASS: 锚点失配/歧义/同义/插入/正常/缺失 + 行尾两侧 八类行为均正确
+settings_panel         rc=0   2.0s | SETTINGS-PANEL-PASS
+settings_panel_selftest rc=0   6.8s | SELFTEST-PASS: 注入反例全部被抓到（Key 回显 / 洗 Key / 预设未填 / 取消仍写 / 空徽章 / 落盘竞态 / 保存不关窗）—— 条数以本函数实际反例为准，正文不抄数字
+offline_shell          rc=0  10.8s | OFFLINE-SHELL-PASS
+offline_shell_selftest rc=0   0.1s | SELFTEST-PASS: 13 类注入反例全部被抓到、原样零问题；header_rules 正/反两侧均正确（vendor 戳复算=ca0f2b633c）
+pdf_leak_scan          rc=0   1.8s | PDF-LEAK-CLEAN（输入非空已证：可抽文本 4242850 B）
+pdf_leak_selftest      rc=0   0.1s | SELFTEST-PASS: 正例零误报（含字体噪声串）/ 违规样本 5 类全抓 / 零输入不判命中 / 12356 与 %@P 不被误抓
+tracked_secret         rc=0   3.1s | SECRET-SCAN-PASS（跟踪文件 471 个，0 命中；正则与 CI 同源）
+tracked_secret_selftest rc=0   0.1s | SELFTEST-PASS: 该抓的都抓到（拼接样本 / 40 位长串），该放的都放行（正则文本 / 短串 / 空输入）
+remote_tree            rc=0   2.7s | REMOTE-TREE-AUDIT-PASS（远端 main：471 个 blob，deny-list 7 条零命中；放行侧 .env.example 与零密钥 demo-config 不误伤）
+remote_tree_selftest   rc=0   0.2s | SELFTEST-PASS: 禁用 8 类全命中、放行 2 类不误伤、空分母不判脏
+ci_status              rc=0  18.7s | CI-STATUS-PASS
+ci_status_selftest     rc=0   0.1s | SELFTEST-PASS: ENV/CODE/PASS 三态判定正确，且去掉账单措辞后立刻翻判 CODE（分类器非恒真）
+repo_config            rc=0   1.0s | REPO-CONFIG-PASS（实跑 17 项检查，覆盖 18 个判据号：G1 G2 G3 G4 G6 G7 G8 G9 G10 G11 G12 G13 G14 G15 G16 G17 G18 G19）
+repo_config_selftest   rc=0   0.9s | SELFTEST-PASS: 80 条合成篡改断言全部被抓到、原样零问题（CI 实跑 116 套件 / 豁免 3）
+engine_consistency     rc=0   0.3s | ✅ ENGINE-CONSISTENCY-PASS：JS 与 Java 两侧词表 + 逐条预测 + 汇总指标全等 + D 层危机短路契约
+java_test_guard        rc=0   0.1s | JAVA-TEST-GUARD-PASS（in-build 单测 11 件 / 88 用例，CI java-build 构建步未跳测，覆盖率门 在位｜LINE 0.90 / BRANCH 0.90｜链上 是）
+java_test_guard_selftest rc=0   0.5s | JAVA-TEST-GUARD-SELFTEST: 38/38
+strategy               rc=0   0.1s | ✅ STRATEGY-CHECK-PASS：策略表与词表键序一致、覆盖完备、危机话术与分类器提示词自洽
+strategy_selftest      rc=0   0.1s | ✅ SELFTEST-PASS：注入分叉后报出 2 个问题 ⇒ 判据非恒真
+ux_guards              rc=0  27.5s | UX-GUARDS-PASS
+a11y                   rc=0  37.2s | A11Y-PASS 审计面=12项(状态6 x 主题2) 违规节点=0 passes最小=18 规则集=wcag21aa+1 对比度量不出=23(<= 30) 动效降档=0.0倍 反例自证=OK 未验=0
+a11y_selftest          rc=0   0.1s | A11Y-SELFTEST: 12/12（像素 3｜动效 4｜标签 5）
+data_rights            rc=0   6.6s | DATA-RIGHTS-PASS 披露随模式翻转+删除有回执并复核归零+导出含两份且与计数对齐 全绿
+data_rights_selftest   rc=0   0.1s | DATA-RIGHTS-SELFTEST: 9/9（披露 4｜回执 5）
+data_rights_probe_selftest rc=0   0.1s | DATARIGHTS-SELFTEST: 10/10（路径 7｜README 2｜边界 1）
+mobile                 rc=0 123.7s | MOBILE-PASS: 读数 8 组（4 视口 x 默认/展开两态）零横向溢出｜交互目标 116 个：独占型全部 ≥44px、等效控件豁免 4 个（label ≥24px 才成立，计数不静默）｜文本输入 ≥16px｜v
+mobile_selftest        rc=0   0.1s | MOBILE-SELFTEST: 14/14
+mobile_peer_selftest   rc=0   0.2s | MOBILE-PEER-SELFTEST: 11/11
+community_probe_selftest rc=0   0.1s | COMMUNITY-SELFTEST: 17/17
+fault_injection        rc=0  65.4s | FAULT-PASS: 注入 6 类故障如实降级且徽章同帧（hang 兜底 21.3s ≤ 25s 预算；分相：fetch 2 腿、两腿间隔 6.0s、已归因 21.0s／实测 21.3s）｜输入框未卡死｜未捕获异常 0
+fault_injection_selftest rc=0   0.1s | FAULT-SELFTEST: 26/26
+fault_peer_selftest    rc=0   0.1s | FAULTPEER-SELFTEST: 6/6
+memory_recall          rc=0  12.5s | RECALL-PASS: 记忆已回灌模型且清库即消失（用例 5 类=cleared,crisis,empty,reload,seeded，未捕获异常 0）
+memory_recall_selftest rc=0   0.1s | RECALL-SELFTEST: 9/9
+memory_peer_selftest   rc=0   0.1s | MEMPEER-SELFTEST: 11/11
+readme_troubleshooting rc=0   0.1s | READMETS-PASS: README 排障段与代码标签双向逐字一致（正向 8 条标签全部在册 ｜ 反向 13 条码全部可追溯）
+readme_troubleshooting_selftest rc=0   0.1s | READMETS-SELFTEST: 5/5
+context_budget         rc=0   8.8s | CTXBUDGET-PASS: 覆盖率 0.385（窗口内送 10 条／发前 26 条，窗口=10）｜截断 16 条已由概要注意送达且条数对账｜system 357 字符 ≤ 上限 1600｜首轮零注入｜原话泄漏 0 条
+context_budget_selftest rc=0   0.1s | CTX-SELFTEST: 10/10
+headers_csp            rc=0   5.8s | HEADSEC-PASS: CSP 逐条声明==逐条回放（路径 5）｜严格面无放宽｜CSP 下应用可用（五幕=5 对话=True 异常=0）｜内联 script=0｜拦截探针真拦下
+headers_csp_selftest   rc=0   0.1s | HEADSEC-SELFTEST: 13/13
+sec_headers_peer_selftest rc=0   0.1s | SECPEER-SELFTEST: 6/6
+release_probe_selftest rc=0   0.1s | RELEASE-SELFTEST: 13/13（semver 6｜lag 3｜CHANGELOG 3）
+license_probe_selftest rc=0   0.1s | LICENSE-SELFTEST: 21/21
+release_governance     rc=0   0.3s | RELEASE-GOV-PASS: v1.7.0 之后 feats=2（上限 5 余量 3）｜commits=31 unreleased_bullets=37｜提交通道=git-log R3 版本段在册｜R4 滞后只报不
+release_governance_selftest rc=0   0.1s | RELEASE-GOV-SELFTEST: 27/27
+clean_clone            rc=0  18.5s | CLEAN-CLONE-PASS 从 HEAD(1fb0178) 克隆可跑：页面真加载+离线链路通+未知报错0；已登记缺口 1 条（命中 js/demo-config.js=1）
+clean_clone_selftest   rc=0   0.1s | CLEAN-CLONE-SELFTEST: 5/5（误报 1｜漏报 3｜边界 1）
+j2_chat_contract       rc=0  25.1s | J2-CONTRACT-PASS
+j4_memory              rc=0  40.0s | J4-MEMORY-PASS
+j4_remote_down         rc=0  13.8s | J4-FUSE-PASS
+stream_contract        rc=0  35.6s | STREAM-CONTRACT-PASS
+safety_guard           rc=0  14.7s | SAFETY-GUARD-PASS: 21 例断言全过（注入 6 例双向 + 正常 6 例不误伤 + 危机句不误伤 + 超长/高危/流式各 1 例）
+safety_guard_selftest  rc=0   0.1s | SELFTEST-PASS: header 解析四向正确、误报反例成形，且状态码四形分档含 502 反向自证
+voice                  rc=0   5.2s | VOICE-PASS
+voice_selftest         rc=0   0.2s | VOICE-SELFTEST-PASS: 5 个边界用例全过（含本机不降级与权限类不降级两个反向方向）
+browser_check          rc=0  32.7s | ALL-ASSERT-PASS
+pixel_dual             rc=0  60.5s | LIT-COLOR-CHECK-PASS
+lightshow              rc=0  19.1s | LIGHTSHOW-CHECK-PASS
+online_check           rc=0   6.3s | ONLINE-ALL-PASS
+public_check           rc=0  36.5s | PUBLIC-ONLINE-ALL-PASS
+live_sync              rc=0  13.8s | LIVE-SYNC-PASS
+live_sync_alt          rc=0   7.2s | LIVE-SYNC-PASS
+backup_online          rc=0  13.1s | BACKUP-ONLINE-PASS: B1–B4 全过（备用线由『如实标注的离线降级』改判真实在线）
+emotion_eval_js        rc=0   0.0s | }
+js_unit                rc=0   0.2s | JS-UNIT-PASS: 7 用例全过（文件 1 个：emotion-engine.unit.test.mjs）｜跨 realm 归一在位
+js_unit_selftest       rc=0   0.1s | JS-UNIT-SELFTEST-PASS（7 类桩 + 恒绿守卫）
+quality_peer_selftest  rc=0   0.1s | QUALITYPEER-SELFTEST-PASS（7 类桩 + 恒真守卫）
+deliverable_inventory  rc=0   1.0s | DELIVERABLE-INVENTORY-PASS: 清单声明⇄磁盘⇄口径⇄入库面四方对账全等（声明 5 条｜受检 3｜品牌在册比对 1｜未登记交付物 1｜入库件在位 108｜搬卷 45｜未验 0｜分母根 2（arch
+deliverable_inventory_selftest rc=0   0.9s | DELIVERABLE-INVENTORY-SELFTEST-PASS（实跑 40 条断言：纯函数夹具 + 取数解析腿含独立通道对账 + 端到端反向腿含真 git mv 往返）
+api_egress_headers     rc=0   0.2s | APIEGRESS-PASS: 6 条出口 5 类安全头齐、状态码逐条同契约、部署副本与权威源逐字节等（no-key=500/bad-json=400/sse=200/passthrough=200/upstream-e
+api_egress_headers_selftest rc=0   0.1s | APIEGRESS-SELFTEST-PASS（7 腿：正例 + 摘头×2 + 缺出口 + 状态码 + 错误体 + SSE 语义）
+js_syntax              rc=0   1.5s | JS-SYNTAX-PASS: 两面 28 个 js 逐文件 node --check 通过 28 失败 0｜覆盖面=语法与严格模式可解析性(script/module 双目标，module 走临时 .mjs)；不覆盖面
+js_syntax_selftest     rc=0   0.5s | JS-SYNTAX-SELFTEST: 7/7（坏文件点名 + 未闭合字符串 + 合规正例 + 零输入 + 枚举下限 + ESM 不误判 + 坏 ESM 仍红）
+storage_resilience     rc=0  39.5s | STORAGE-RESILIENCE-PASS: 4 种存储故障下均零未捕获异常、界面计数==数据源计数、星雾仍点亮、清空回执如实报失败（用例 5 条）
+storage_resilience_selftest rc=0   1.3s | STORAGE-RESILIENCE-SELFTEST-PASS（12 腿：合规正例 + 六形必红 + 坏页端到端 + 零读数 + 门面行渲染 + pending 未收敛点名）
+suite_census           rc=0   0.2s | CENSUS-PASS: 证据面 116/116 全覆盖，分桶恒等式成立
+suite_census_selftest  rc=0   0.1s | CENSUS-SELFTEST-PASS（11/11 类桩）
+hook_wiring            rc=0   0.2s | HOOK-WIRING-PASS: pre-commit 源与副本同字节、sh -n 通过、被拦判据三态在位（源=在位 装=一致 未验=0）
+hook_wiring_selftest   rc=0   1.4s | HOOK-WIRING-SELFTEST-PASS: 15 腿全过（含「副本漂一字节必须红」「CI 不判红」「硬崩不并入未验」与端到端删件真被拦四向）
+brand_consistency      rc=0   0.1s | BRAND-PASS: 24 个门面面零旧作品名 + 品牌位在场（技术标识豁免 6 类）
+brand_consistency_selftest rc=0   0.1s | BRAND-SELFTEST-PASS: 旧名被抓/技术标识不误伤/混排不放过
+run_logged_selftest    rc=0   0.5s | RUN-LOGGED-SELFTEST-PASS: 8 腿全过（转发真 rc／stderr 落盘／零输入与落点坏都判未验）
+ci_perf_wiring         rc=0   0.2s | CIPW-PASS: .github/workflows/perf-baseline.yml 真跑 _test/perf_baseline_check.py（java -jar + 等 health）｜README pu
+ci_perf_wiring_selftest rc=0   0.1s | CIPW-SELFTEST-PASS: 11 条用例（1 正例 + 9 反例 + 零输入恒真守护）
+loc_guard              rc=0   0.2s | （report-only：本条不阻断电池，仅登记读数；切 --enforce 前先把超限清零）
+loc_guard_selftest     rc=0   0.1s | LOC-SELFTEST-PASS（9/9 条）
+bench_rollup           rc=0   1.9s | ROLLUP-PASS
+bench_rollup_selftest  rc=0   0.1s | ROLLUP-SELFTEST-PASS（5/5 条）
+============================================================
+LEDGER-OK full ｜ 台账 交付物/对标数据/battery-timing.json ｜ 指纹 sha256=424ef45c1647ba1b bytes=8526
+耗时 top5(秒): mobile=123.7, fault_injection=65.4, pixel_dual=60.5, eol_parity=44.3, j4_memory=40.0 ｜ 合计 794s ｜ 全量分布在台账里（116 条，并行方案只能在这个读数存在之后才提）
+BATTERY: 116/116 rc=0 ALL-GREEN

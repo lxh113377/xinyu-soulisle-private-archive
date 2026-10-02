@@ -5,13 +5,44 @@
 
 ## [Unreleased]
 
+### Added + Fixed（r93 · 对标轮：loc 门 + 两新增维度 + corpus 归档 + 一处假绿修复）
+- **行数/函数长守卫（新）**：`_test/loc_guard_check.py`，对标 opensoul 的 `check:loc`
+  （实测坐实其 `package.json`：`node --import tsx scripts/check-tsmax-loc.ts --max 2000 --max-function 150`，
+  仓内留有 `.check-loc-report.json`）。本门取 git HEAD 面、零依赖、三态（0/1/2），
+  **report-only 进电池**（只出超限清单与排名，rc 不阻断），并同时打印既有更严约束
+  （`size_budget` 字节预算、行为 Core P0.8 函数 ≤50 行）防「门更松所以通过」的误读。
+  本轮实测：156 个代码文件/ 32,926 行，**超限 22 个**（最大 `_test/benchmark_metrics.py` 1913 行、
+  最长函数 628 行）。`--selftest` 9 条（含两条阈值放大变异腿 + 零文件必判 UNVERIFIED）。
+  电池 112 → **116**。
+- **两个新增维度的可复算读数（新）**：`_test/bench_rollup.py`（只读、零网络、数字带来源）——
+  ①测试与可复现性：self 116 套件 / 11 个 Java 测试类 / 88 个 `@Test` / jacoco LINE≥0.90∧BRANCH≥0.90
+  ⇄ peers 同址尺 `coverage_gate` **0/16**、有测试结构 6/16、CI 跑 unit 5/16、有 lockfile 10/16；
+  ②零构建成本-收益：**前端构建链配置 0 个**（真零构建）＋ 平台函数依赖清单 1 份单列
+  （`deploy/cloudbase/functions/chat/package.json` 属云函数依赖元数据，不算前端构建链）、
+  首屏预算 22 文件/888,474 B、CI 2 workflow/5 job、**副本同步点 1 条**。
+  peers 成本项**未取数即写「未取数」**，不塌缩成 0。`--selftest` 5 条。
+- **peers 名册换址（Fixed）**：`letta-ai/letta` → `letta-ai/letta-code`。实测旧址已退化
+  （`lang=None` / `pushed 2026-09-10` / workflows 2 / release 0.16.8），权威实现迁TS/Bun 的
+  letta-code（`pushed 2026-10-02` / workflows 21 / release v0.34.2）。**分母保持 16**（换址不换人口）。
+- **一处假绿修复（Fixed，本轮一手）**：`_test/j2_chat_contract.py` 原本结尾只 `print`、**无退出码**
+  ⇒ 印出 `J2-CONTRACT-FAIL` 而电池记`rc=0`，长期把失败读成通过。现补真退出码，
+  并让 `JS_ERRORS` 参与判定；修第一版写成顶层 `sys.exit` 又被 `repo_config_check` G9
+  （import-safe）当场抓红，改为 `main() + __main__` 守卫。反向控制：服务端不可达 ⇒ rc=1。
+- **corpus 归档（体量治理，Changed）**：见下方 r93 归档段（分母46 → 46，仅来源变双根）。
+- **搬卷判据两处真缺陷（Fixed，本轮一手）**：`deliverable_inventory_check.py` 的
+  `RENAME_STATUS_RE` 状态字符类漏了 `A`（新增）与 `B`，且解析器遇到非 `R` 记录即 `unparsed+=1; break`
+  ⇒ **「归档搬卷 + 同时新增文件」的提交会让同批合法 R100 搬卷全部作废**，pre-commit 判
+  「入库件从工作树消失」（r93 首次提交被拦，45 条违规）。已修并补夹具 ㉒b（真提交形态）。
+  另：原夹具 ㉒ 因 R 后少一条路径，修复前后结果相同 ⇒ **把 bug 写成了期望值**，
+  与该文件 ⑫「夹具自证不了自己」同族，已在夹具注释里写明。
+
 ### Added（r91 · 性能步进CI + 同址对标）
 - **性能步周常化**：新增 `.github/workflows/perf-baseline.yml` 独立性能工作流 +
   `ci_perf_wiring_check` 常驻判据（正/反例），电池 110→**112**；README 落实测性能数字
   （p95 峰值 28.6ms / 1013.9 rps，同机棘轮）。
 - **同址对标满格**：`self_cap_channel()` 与 peers 同一把尺测 self，`streaming`/`e2e_browser`
   双标确认 self 两格都在；`ci_perf_step`/`published_numbers` 由"行业共同缺失"翻成我方 1/16，
-  同址尺 self 7/7。报告 `交付物/对标分析报告-2026-10-02-r91.md`
+  同址尺 self 7/7。报告 `交付物/_历史轮次-对标/对标分析报告-2026-10-02-r91.md`
   （peers 现采 16/16，ts `2026-10-01 17:50 UTC`；取数面=git HEAD `5f83c76`）。
 
 ### Added + Fixed（r90 · 归档前提破解 + 发布留痕两处真缺陷）
@@ -31,6 +62,17 @@
   `archive/交付物-历史轮次/` ⇒ 交付物 184.8 → **129.5 MB**，两件仍被 git 跟踪且仍受 ④ 腿守。
   对标 corpus 43 份**判定不搬**：实测它是 `disclaimer_forensics_lint --all` 的分母
   （门面行印「报告 43 份（分母从目录现读）」），搬走即静默失去覆盖而体积只省 ~0.5 MB。
+  - **r93 改判（推翻上一行的「不搬」，并同时消掉它担心的静默失去覆盖）**：
+    ① 先把 `disclaimer_forensics_lint.py` 的扫描面从**单目录** `交付物/对标分析报告-*.md`
+    扩为**双目录**（`交付物` ∪ `交付物/_历史轮次-对标`），门面行分别印两个分母与合计；
+    ② 再用 `git mv` 把 46 份历史报告逐份搬进 `交付物/_历史轮次-对标/`（目录名与
+    `deliverable_inventory_check.py` selftest 里已写死的搬卷落点同名，不另造名）。
+    实测回执：`DISCLAIMER-CLEAN: 报告 46 份（分母从目录现读：交付物 0 + 交付物/_历史轮次-对标 46），
+    缺取证 0 处`；`DELIVERABLE-INVENTORY-PASS … 搬卷 45｜未验 0`。
+    **分母变化声明**：本轮之前分母 46 份（全在根），本轮之后仍是 46 份（0 + 46）——
+    覆盖面**未缩小**，可复核的只有门面行的分母来源从单根变双根。
+    体积收益诚实标注 ≈0.5 MB（与上一轮判断一致）；真正的收益是「46 份散落在交付物根」
+    变成「一份合并索引 + 一个归档目录」，结论可查性提升。
   `心屿SoulIsle-作品提交-20260930.zip` 不动（它是 09-30 提交定版件本身，provenance）。
 - **R7 新判据（发布留痕，中）**：`release_governance_check.py` 加一条「一个版本号只许有一个
   `## [x.y.z]` 段」。盘面实测 `## [1.7.0]` 出现两次（第 57 行装 r83续/r84/r85、第 102 行装切版主文），
@@ -70,12 +112,12 @@
 - **peers 复采**：`benchmark_metrics.py --cap-channel --doc-perf --quality-gates` 现采 16/16 仓
   （ts `2026-10-01 17:31 UTC`），与 10-01 快照比漂移 8 处 = 实质 1（lobehub release canary.34→.35）+ ★抖动 7。
   能力分布与三维通道读数与 r89 逐项相同（vector_memory 7/16、api_spec 1/16、CI 性能步与公开数字 0/16）
-  ⇒ 报告 §1 的差距结论不因本轮复采改变。报告 `交付物/对标分析报告-2026-10-02-r90.md`。
+  ⇒ 报告 §1 的差距结论不因本轮复采改变。报告 `交付物/_历史轮次-对标/对标分析报告-2026-10-02-r90.md`。
 
 ### Added + Fixed（r89 · 对标八维复采 + 三处"写了但没人量"的一致性收口）
 - **对标复采（peers 侧不再引用旧台账）**：`benchmark_metrics.py` 现采 16/16 仓（ts `2026-10-01 06:02 UTC`），
   与 09-30 快照比漂移 6 处 = 实质 2（lobehub pushed→10-01、sapphire pushed→09-30）+ ★抖动 4。
-  self 侧同轮现测：p95=30.4ms / 1565.8rps、src(除 vendor) 2,558 行、CI 4 job 全绿。报告 `交付物/对标分析报告-2026-10-01-r89.md`。
+  self 侧同轮现测：p95=30.4ms / 1565.8rps、src(除 vendor) 2,558 行、CI 4 job 全绿。报告 `交付物/_历史轮次-对标/对标分析报告-2026-10-01-r89.md`。
 - **对上轮"待办清单"做行为对账，两条不成立**：r87 §3 的「SSE 排 P1」与「`node --check` 语法门待排期」——
   前者三处代码 r88 已核实在册，后者 `_test/js_syntax_check.py` 自 r67 起就在电池里。
   另发现 r87 总览表把 peers 取数时刻写成 09-28，而台账最新 run 是 09-30 ⇒ 本轮起总览表只附**现采 ts**。
@@ -167,7 +209,7 @@
 ## [1.7.0] - 2026-09-30 — 对标轮 r53–r83 收口（自 `v1.6.1` 起的全部在制增量随版发布）
 
 > 切版动因（机器判据 R1）：距 `v1.6.1` 攒下的 feat 已远超上限 5（红因原文 `feats=17/5`，
-> 逐轮读数见 `交付物/对标分析报告-2026-09-2*r*.md` 的「唯一残留红，等切版授权」）。
+> 逐轮读数见 `交付物/_历史轮次-对标/对标分析报告-2026-09-2*r*.md` 的「唯一残留红，等切版授权」）。
 > 本段正文由 `[Unreleased]` **逐字节搬运**（标题集只增不减，R6 盯的就是这件事），不是重写。
 
 ### Added（r83 · 交付面在位闸接成提交面 + 国内备用链接换成逐字节可核对的子目录）

@@ -61,3 +61,39 @@
 - 流式中途打断（需 WebSocket 或取消语义）→ 决策 #6 重评触发条件
 - `tick()` 每帧 CPU 侧遍历 2600 粒子 → GPU 侧/分帧着色 + 真机 FPS 实测
 - 危机干预事件服务端留痕（只留时间戳+类别，不留原文）
+
+---
+
+# 任务卡 · 对标轮 r93（2026-10-02，自动化执行轮）
+
+## 本轮目标
+八维对标（功能/架构/实现/性能/可扩展/维护/文档/场景）+ 落地四项改进：loc 门、两个新增维度量化、corpus 归档、peers 全量重采落工作区。执行边界＝含运行时改动（老大逐题确认），实际改动**全部落在判据层与文档层**，`src/` 与 `server/` 零改动。
+
+## 验收判据（全部要求当场跑出）
+1. `benchmark_metrics.py --cap-channel --doc-perf --quality-gates` rc=0，产物落 `交付物/对标数据/benchmark-metrics-r93.json`，日志落工作区（**禁落 %TEMP%**）
+2. `loc_guard_check.py --selftest` PASS，且 report-only rc=0 / `--enforce` rc=1
+3. `bench_rollup.py --selftest` PASS 且主流程 rc=0
+4. `disclaimer_forensics_lint --all` 分母 46 = 归档前 46（覆盖面不缩）
+5. `deliverable_inventory_check` 认搬卷 45 且未验 0
+6. `repo_config_check` 17 项 0 红（含 G4 套件数、G16 脚本登记、G9 import-safe）
+7. 收口全量电池 116 全绿
+
+## 备选方案与取舍
+| 决策点 | 选了 | 否掉的 | 理由 |
+|---|---|---|---|
+| 归档判据 vs 搬文件顺序 | **先扩判据双面分母，再搬** | 直接搬 | 直接搬会让 `--all` 分母归零 ⇒ 电池那条从 PASS 变 rc=2，CI 电池跟着红 |
+| 归档目录名 | `交付物/_历史轮次-对标/` | 另造名 | `deliverable_inventory_check` 的搬卷 selftest 夹具已把该名字写死 |
+| loc 门是否直接阻断 | report-only | 直接 enforce | 阈值 2000/150 比既有纪律**更松**，直接阻断＝用更松的尺卡已在位的纪律；先记读数 |
+| corpus 是否连历史报告一起搬 | 搬（46 份） | 只出索引不搬 | 老大选定方向④；CHANGELOG 原「判定不搬」的前提是单目录 glob，扩面后前提已变，本轮改判并显式声明分母 46→46 |
+| letta 换址 vs 加新仓 | 换址（分母仍 16） | 加 letta-code 变 17 仓 | 换址不换人口，横向分母稳定 |
+
+## to-do
+① 全通道重采落工作区 ✅ ② loc 门 ✅ ③ rollup 两维度 ✅ ④ corpus 归档 + 合并索引 ✅ ⑤ r93 报告 ✅ ⑥ 连带修 G4/G16/G9 ✅ ⑦ 收口三绿 ⏳ ⑧ 台账回写 + pathspec 提交 + CI 回执
+
+## 回滚预案
+- 判据层改动（4 个 .py + docs）＝单文件可 revert；corpus 搬卷 `git revert` 即可整批回退（判据认 R100 搬卷，回退后分母回到单根 46）。
+- `src/` 与 `server/` 本轮未动 ⇒ 演示期红线不受影响。
+
+## 本轮新发现（一手，值得单列）
+`j2_chat_contract.py` 印 `J2-CONTRACT-FAIL` 却 `exit 0`，电池长期记 PASS —— **判据主动报绿**。修复时又踩 G9（顶层 `sys.exit` 破坏 import-safe），当场被 `repo_config_check` 抓红，改成 `main() + __main__` 守卫。教训：「补一行退出码」在本仓要连带守住 import-safe 与文档登记两条线。
+

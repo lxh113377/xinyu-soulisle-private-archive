@@ -50,6 +50,30 @@ def scan_file(path):
     return lint_lines(path.read_text("utf-8", errors="replace").splitlines())
 
 
+# r93（体量治理·先改判据再搬文件）：归档历史对标报告后，原来的**单目录** glob 会把分母打成 0
+# ⇒ rc=2 UNVERIFIED，电池里这条从 PASS 变未验，CI 电池随之传导。
+# CHANGELOG 曾明文记过「搬走即静默失去覆盖，体积只省 ~0.5MB」——那条判断在**单目录 glob** 下成立；
+# 扩成双目录后，「覆盖面不缩小」与「文件可归档」就不再互斥，故本轮据此改口径并显式声明分母变化。
+# 目录名 `_历史轮次-对标` 与 `deliverable_inventory_check.py` selftest 里已写死的搬卷落点同名，不另造名。
+SCAN_ROOTS = ("交付物", "交付物/_历史轮次-对标")
+CORPUS_GLOB = "对标分析报告-*.md"
+
+
+def collect(root_map):
+    """纯函数：{面名: [Path,...]} → [(面名, path)]，跨面**去重**后按 (面名, 文件名) 排序。
+    去重是必需的：两个面若有交集（未来把归档目录挪进交付物根就会交），同一份报告只能计一次，
+    否则「份数」会虚高——那正是本判据分母最容易被悄悄改坏的地方。"""
+    seen, out = set(), []
+    for label, paths in root_map.items():
+        for p in paths:
+            key = str(p.resolve()) if p.exists() else str(p)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((label, p))
+    return sorted(out, key=lambda t: (t[0], t[1].name))
+
+
 STUBS = [
     # (名称, 行列表, 期望命中数)
     ("漏报侧 裸边界结论", ["### 3.3 性能表现", "- 各参照仓公开性能数字仍无可比口径 ⇒ 只讲机制有无。"], 1),
@@ -72,7 +96,14 @@ def selftest():
     # 反向自证：判据若恒不命中（正则被改坏），必须被"漏报侧"用例抓到 ⇒ 上面 3 条即其守卫
     if not lint_lines(["- 受限于 X，无法做到 Y。"]):
         bad.append("判据恒绿：最裸的边界结论都没命中，正则已失效")
-    print("DISCLAIMER-SELFTEST-%s（%d 类桩 + 恒绿守卫）"
+    # r93：双面分母的两条腿（缺了它们，「扩面」这件事本身是恒真的）
+    two = collect({"交付物": [Path("a.md"), Path("b.md")],
+                   "交付物/_历史轮次-对标": [Path("c.md")]})
+    if len(two) != 3 or [p.name for _, p in two] != ["a.md", "b.md", "c.md"]:
+        bad.append("双面收集失真：%r" % (two,))
+    if collect({}) != []:
+        bad.append("空面不得凭空收出文件（零分母必须由主流程判 UNVERIFIED）")
+    print("DISCLAIMER-SELFTEST-%s（%d 类桩 + 恒绿守卫 + 双面分母 2 腿）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(STUBS)))
     return 1 if bad else 0
 
@@ -81,7 +112,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--file", default="")
     ap.add_argument("--all", action="store_true",
-                    help="扫 交付物/对标分析报告-*.md 全集（分母从目录现读，不手抄清单）")
+                    help="扫 对标报告全集（分母从目录现读：%s，不手抄清单）" % " + ".join(SCAN_ROOTS))
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -89,13 +120,16 @@ def main():
     if a.all:
         # 为什么要有这条：判据原先钉死单个文件名，出新报告后**它扫的还是上一份**
         # ⇒ "报告都有取证"这句话对新产物不成立（r41 发现自己踩的正是这一族）。
-        base = Path(__file__).resolve().parents[1] / "交付物"
-        files = sorted(base.glob("对标分析报告-*.md"))
-        if not files:
-            print("DISCLAIMER-UNVERIFIED: 目录里没有对标报告 ⇒ 空分母不判绿")
+        repo = Path(__file__).resolve().parents[1]
+        root_map = {}
+        for r in SCAN_ROOTS:
+            root_map[r] = sorted((repo / r).glob(CORPUS_GLOB)) if (repo / r).is_dir() else []
+        pairs = collect(root_map)
+        if not pairs:
+            print("DISCLAIMER-UNVERIFIED: 两个面都没有对标报告（%s）⇒ 空分母不判绿" % " + ".join(SCAN_ROOTS))
             return 2
         bad, rows = [], []
-        for f in files:
+        for label, f in pairs:
             hits = scan_file(f)
             rows.append((f.name, len(hits)))
             for no, word, text in hits:
@@ -103,8 +137,9 @@ def main():
         for line in bad:
             print("  " + line)
         detail = "、".join("%s=%d" % r for r in rows)
-        print("DISCLAIMER-%s: 报告 %d 份（分母从目录现读），缺取证 %d 处｜%s"
-              % ("CLEAN" if not bad else "FAIL", len(files), len(bad), detail))
+        per_face = " + ".join("%s %d" % (r, len(root_map[r])) for r in SCAN_ROOTS)
+        print("DISCLAIMER-%s: 报告 %d 份（分母从目录现读：%s），缺取证 %d 处｜%s"
+              % ("CLEAN" if not bad else "FAIL", len(pairs), per_face, len(bad), detail))
         return 0 if not bad else 1
     p = Path(a.file) if a.file else None
     if p is None or not p.is_file():

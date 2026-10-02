@@ -225,6 +225,16 @@ SUITES = [
     # workflow 可以空、可以起了 jar 不等 health（恒未验的假门）、README 数字可以手写 ⇒ 五条接线常驻。
     ("ci_perf_wiring", [sys.executable, "_test/ci_perf_wiring_check.py"]),
     ("ci_perf_wiring_selftest", [sys.executable, "_test/ci_perf_wiring_check.py", "--selftest"]),
+    # r93 对标轮改进项 #4：对标 opensoul 的 `pnpm check:loc`（文件 ≤2000 行 / 函数 ≤150 行）。
+    # 本项目已有更严的既有约束（size_budget 逐文件字节预算、行为 Core P0.8 函数 ≤50 行），
+    # 故本门**只登记读数不阻断**（report-only）：先把「行数/函数长」变成在册数字，
+    # 等超限清零再切 --enforce 并挂 CI 步。若现在就阻断，等于用一把更松的尺去卡已经在位的纪律。
+    ("loc_guard", [sys.executable, "_test/loc_guard_check.py"]),
+    ("loc_guard_selftest", [sys.executable, "_test/loc_guard_check.py", "--selftest"]),
+    # r93 改进项 #2/#3：把「测试与可复现性」「零构建成本-收益」两个新增维度变成可复算读数
+    # （只读本地台账 + git HEAD 面，零网络；缺源判 rc=2 不塌缩成 0）。
+    ("bench_rollup", [sys.executable, "_test/bench_rollup.py"]),
+    ("bench_rollup_selftest", [sys.executable, "_test/bench_rollup.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），

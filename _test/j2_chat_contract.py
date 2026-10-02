@@ -10,6 +10,12 @@
 判据两条（含对照，避免恒真）：
   A 生效路径：proxy=/api/chat      → 气泡必须出现「在线大模型生成」（mode=model）
   B 对照组  ：proxy=不可达端点     → 必须回落「离线共情模板」，且**不得**出现「在线大模型生成」
+
+r93 修**假绿**（本轮一手实测）：本脚本原本结尾只 `print`，**没有 sys.exit** ⇒ 无论
+FAIL-A/FAIL-B2 命中与否，进程都 exit 0，电池把它记成 PASS（实测 2026-10-02：
+A 腿已红「LLM 精判失败 → 词典兜底」，印出 `J2-CONTRACT-FAIL`，电池那行仍是 `rc=0`）。
+「状态与事实相反」是判据最坏的一种坏法：不是漏报，是**主动报绿**。
+现补：① 判红 ⇒ rc=1；② `errors` 非空也判红（原本只打印 JS_ERRORS 计数，从不参与判定）。
 """
 import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
@@ -47,29 +53,42 @@ def run(browser, proxy):
     return online, (msgs[-1] if msgs else "")
 
 
-with sync_playwright() as p:
-    try:
-        browser = p.chromium.launch()
-    except Exception:
-        browser = p.chromium.launch(channel="msedge")
-    a_online, a_last = run(browser, "/api/chat")
-    b_online, b_last = run(browser, "http://127.0.0.1:18123/api/chat")
-    browser.close()
+def main():
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch()
+        except Exception:
+            browser = p.chromium.launch(channel="msedge")
+        a_online, a_last = run(browser, "/api/chat")
+        b_online, b_last = run(browser, "http://127.0.0.1:18123/api/chat")
+        browser.close()
 
-print("A_ONLINE:", a_online)
-print("A_LAST  :", a_last[:220])
-print("B_ONLINE:", b_online)
-print("B_LAST  :", b_last[:220])
+    print("A_ONLINE:", a_online)
+    print("A_LAST  :", a_last[:220])
+    print("B_ONLINE:", b_online)
+    print("B_LAST  :", b_last[:220])
 
-ok = True
-if "在线大模型生成" not in a_last:
-    print("FAIL-A: 走 Java /api/chat 应命中在线大模型（mode=model）")
-    ok = False
-if "在线大模型生成" in b_last:
-    print("FAIL-B: 对照组不可达端点不应命中在线 → 判据恒真")
-    ok = False
-if "离线共情模板" not in b_last:
-    print("FAIL-B2: 对照组应回落离线模板")
-    ok = False
-print("JS_ERRORS:", len(errors))
-print("J2-CONTRACT-PASS" if ok else "J2-CONTRACT-FAIL")
+    ok = True
+    if "在线大模型生成" not in a_last:
+        print("FAIL-A: 走 Java /api/chat 应命中在线大模型（mode=model）")
+        ok = False
+    if "在线大模型生成" in b_last:
+        print("FAIL-B: 对照组不可达端点不应命中在线 → 判据恒真")
+        ok = False
+    if "离线共情模板" not in b_last:
+        print("FAIL-B2: 对照组应回落离线模板")
+        ok = False
+    print("JS_ERRORS:", len(errors))
+    if errors:
+        print("FAIL-C: 契约路径上出现 JS 报错 %d 条：%s" % (len(errors), errors[:3]))
+        ok = False
+    print("J2-CONTRACT-PASS" if ok else "J2-CONTRACT-FAIL")
+    # r93：判据必须有真退出码（详见文件头「假绿」段）。裸跑完就是 exit 0 ⇒ 判红也报绿。
+    return 0 if ok else 1
+
+
+# r93：入口必须带 __main__ 守卫——`repo_config_check` G9 判「import 即执行」为违规。
+# 本轮第一次补退出码时写成顶层 `sys.exit(...)`，当场被 G9 抓红（89 脚本扫出
+# 「第 86 行顶层入口调用且无 __main__ 守卫」）。门禁自己抓住了新引入的回归，这正是它存在的意义。
+if __name__ == "__main__":
+    sys.exit(main())

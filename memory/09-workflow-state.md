@@ -44,6 +44,10 @@
 | VOL-CF954 | P2 | 体量治理[L3 产物] 交付物/心屿SoulIsle-作品提交-20260930.zip — 拆分或归档（禁直删） | todo | - | - | 2026-10-01 03:57 | - |
 | VOL-AGG-20261001 | P2 | 体量治理[L3 产物] 体量余量聚合（15 项） — 另有 15 项待判断，合计 103704007 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-01 03:57 | - |
 | WF-r90-sync状态词滞留 | P2 | flow --sync 只翻勾选位、不改登记行的「状态: todo」尾注 ⇒ 同一行 [x] 与 todo 自相矛盾（r90 实测 07.part62 VOL-FC486） | todo | - | - | 2026-10-02 01:45 | - |
+| WF-r93-对标轮 | P1 | r93 八维对标 + 四项改进（loc 门 / rollup 两新增维度 / corpus 归档 / peers 全量重采落工作区） | doing | - | - | 2026-10-02 22:10 | 报告 交付物/对标分析报告-2026-10-02-r93.md；BENCHMARK-METRICS-PASS；DISCLAIMER-CLEAN 46 份(0+46)；搬卷 45/未验 0；REPO-CONFIG-PASS 17 项 |
+| WF-r93-loc超限治理 | P2 | loc 门 22/156 文件超限（最大 benchmark_metrics.py 1913 行/最长函数 628 行）⇒ 清零后切 --enforce 并加 CI 接线判据 | todo | WF-r93-对标轮 | - | 2026-10-02 22:10 | _test/loc_guard_check.py（report-only，超限清单在盘） |
+| WF-r93-辅助台账重采 | P2 | peer-quality-tooling / peer-repro 两份台账分母 16 仍含已换址的旧 letta 行 ⇒ rollup 已标 stale，需重采 | todo | - | - | 2026-10-02 22:10 | 交付物/对标数据/benchmark-rollup-r93.json（stale 字段在产物里） |
+| WF-r93-cijob双读数 | P2 | ci_job数两个读数并存（benchmark_metrics ci_workflows=4 文件数 vs bench_rollup ci_jobs=5 job 条数）⇒ 统一口径或写清定义域 | todo | - | - | 2026-10-02 22:10 | 两读数均已登记在 r93 报告 §2B |
 
 ## 推进记录
 
@@ -61,6 +65,7 @@
 - [2026-10-02 01:44] VOL-FC486 todo → doing
 - [2026-10-02 01:44] VOL-FC486 doing → done
 - [2026-10-02 01:45] WF-r90-sync状态词滞留 新增（P2，todo）
+- [2026-10-02 22:10] WF-r93-对标轮 新增（P1，doing）＋ WF-r93-loc超限治理 / WF-r93-辅助台账重采 / WF-r93-cijob双读数 新增（P2，todo）
 
 ## 分卷目录
 

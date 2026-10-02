@@ -107,6 +107,10 @@ python _test/peer_quality_tooling_probe.py   # r58 对标探针：lint／类型�
 python _test/peer_quality_tooling_probe.py --selftest  # r58 探针桩：7 类桩 + 恒真守卫（含「NOISE 不得滤掉 tests 目录」反例）
 python _test/ci_perf_wiring_check.py          # r91 性能接线面：C-IPW-1..5（workflow 名被 RE_CI_PERF 认下／正文真调 perf_baseline_check／java -jar 且等 /api/health 就绪／README 命中 published_numbers 且引用基线文档／README 与 PERF-BASELINE 的 p95 不超预算且不分叉）；正则从 benchmark_metrics 同源 import，不内联
 python _test/ci_perf_wiring_check.py --selftest  # r91 判据桩：11 条（正例 + 删 workflow／空正文／不调判据／不等 health／README 抽数字／抽基线引用／两处数量级分叉／超预算／基线失联 九反例 + 零输入恒真守护）
+python _test/loc_guard_check.py                # r93 行数/函数长（对标 opensoul `pnpm check:loc`：文件 ≤2000 行／函数 ≤150 行）。**report-only**：只登记超限清单与排名，rc 不阻断；零输入/取数面读不到判 rc=2。面板同时打印既有更严约束（size_budget 字节预算、行为 Core P0.8 函数 ≤50 行），防「门更松所以通过」的误读。加 --enforce 才阻断
+python _test/loc_guard_check.py --selftest      # r93 判据桩：9 条（超限样本必报行数/函数长超限／未超限不误报／等值边界不判红／两条阈值放大变异腿／零文件不产生任何结论／零文件必须被判 UNVERIFIED／合成面超限清单非空）
+python _test/bench_rollup.py                   # r93 两新增维度汇总（只读、零网络、数字带来源）：①测试与可复现性（self 现测 116 套件／11 个 Java 测试类／88 个 @Test／jacoco LINE≥0.90∧BRANCH≥0.90 ⇄ peers 同址尺 coverage_gate 0/16）②零构建成本-收益（前端构建链配置 0 个 ⇒ 零构建成立；平台函数依赖清单 1 份单列；首屏预算 22 文件/888,474 B；CI 2 workflow/5 job）。peers 成本项**未取数**即写「未取数」，不得塌缩成 0
+python _test/bench_rollup.py --selftest         # r93 判据桩：5 条（缺源检出／合成样本出表／成本项未取数不得写成 0／job 计数不得把 job 内保留键算成 job／无 jobs 块时不得凭空数出 job）
 ```
 
 > 前置：多数判据需 fat jar 起在 8123（`java -jar server/target/soulisle-server.jar --server.port=8123`，
@@ -115,7 +119,7 @@ python _test/ci_perf_wiring_check.py --selftest  # r91 判据桩：11 条（正�
 GitHub Actions 四条门禁（`.github/workflows/ci.yml`）：同步守卫+评测+策略表+体积+**vendor 供给链**+密钥扫描、Java 构建+**词表一致性红线**（此前只写在 `memory/AGENTS.md` 靠人记，现已机器化）、浏览器回归（runner 无 GPU，强制 SwiftShader）、公网新鲜度。
 四条 job 都挂在 `main` push 上真跑；浏览器 job 首轮就抓到本机看不到的真实缺陷：`src/js/demo-config.js` 被 gitignore，全新 clone 下 `<script>` 静态引它 → 首屏 3 个 404 打破「console 0 报错」。修法＝CI 自动用公网零密钥 stub 补占位（本地按 `CONTRIBUTING.md` 第一步手工补一次）。
 
-**受理面状态以远端为准，不在本文件写死**：`python _test/ci_status_check.py`（HEAD 最近一次 run 三态分类：PASS / CODE_FAIL / ENV_BLOCKED）。r35（2026-09-26）实测到一次"本机 37 条全绿、CI 两条 job 真红"的分叉，三条根因与修法见 `交付物/对标分析报告-2026-09-26.md` §2；同类分叉已封成常驻判据（密钥扫描两侧同源 + `voice_selftest` + settings 落盘完成态等待）。
+**受理面状态以远端为准，不在本文件写死**：`python _test/ci_status_check.py`（HEAD 最近一次 run 三态分类：PASS / CODE_FAIL / ENV_BLOCKED）。r35（2026-09-26）实测到一次"本机 37 条全绿、CI 两条 job 真红"的分叉，三条根因与修法见 `交付物/_历史轮次-对标/对标分析报告-2026-09-26.md` §2；同类分叉已封成常驻判据（密钥扫描两侧同源 + `voice_selftest` + settings 落盘完成态等待）。
 
 最近实测（2026-09-26 对标轮 r35）：全量电池 **47 条套件实跑全绿**（该计数已被 r41 的 58 与 r42 的 61 取代，现行值由 `repo_config_check` 的 G10 恒等式当场复算，本行只保留 r35 当时的取证事实）（r36 增 `eol_parity`±自证：工作树字节 == 仓库 blob 字节，于是本仓「逐字节 / SHA256 / 字节预算」类主张在任何机器 clone 上可复算），且远端 HEAD run `36220200506` 四条 job 逐项 `success`（r35 收口，2026-09-26 实测）。前置探针 `preflight` 打头：被测服务没起时收口行写 `ENV-UNVERIFIED` 而不是判红）（含受理面体检 ci_status，在 CI 内部自动 SKIP）；情绪评测 **73 条 / 98.6% / 危机 6-6**（JS ↔ Java 逐项全等）；`emotion_wiring_check` 9/9（后端路径实测生效 + 不可达即熔断不伪装 + 危机未经后端）；gsap 3.15.0 升级后 `browser_check`/`lightshow`/`pixel_dual` 全绿；首屏关键路径 831,152 B（预算 858,752 B 内；r36 行尾归一后从 832,382 降为现值，复算 `python _test/size_budget_check.py`）；公网已重新部署并 `LIVE-SYNC-PASS`。
 

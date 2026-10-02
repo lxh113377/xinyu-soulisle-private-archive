@@ -1,9 +1,9 @@
 {
  "generated_by": "_test/run_all_suites.py",
- "written_at": "2026-09-29 14:35:44",
+ "written_at": "2026-10-02 22:15:30",
  "coverage": "full",
- "suites": 101,
- "total_s": 695.4,
+ "suites": 116,
+ "total_s": 793.8,
  "rows": [
   {
    "suite": "preflight",
@@ -12,7 +12,7 @@
   },
   {
    "suite": "perf_baseline",
-   "seconds": 1.3,
+   "seconds": 1.5,
    "rc": 0
   },
   {
@@ -32,7 +32,7 @@
   },
   {
    "suite": "ci_watch_selftest",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "rc": 0
   },
   {
@@ -57,17 +57,17 @@
   },
   {
    "suite": "eol_parity",
-   "seconds": 21.1,
-   "rc": 1
+   "seconds": 44.3,
+   "rc": 0
   },
   {
    "suite": "eol_parity_selftest",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "rc": 0
   },
   {
    "suite": "size_budget",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "rc": 0
   },
   {
@@ -77,12 +77,12 @@
   },
   {
    "suite": "emotion_wiring",
-   "seconds": 4.1,
+   "seconds": 7.9,
    "rc": 0
   },
   {
    "suite": "emotion_wiring_selftest",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "rc": 0
   },
   {
@@ -97,12 +97,22 @@
   },
   {
    "suite": "benchmark_selftest",
-   "seconds": 0.1,
+   "seconds": 0.2,
+   "rc": 0
+  },
+  {
+   "suite": "measure_entry",
+   "seconds": 1.9,
+   "rc": 0
+  },
+  {
+   "suite": "measure_entry_selftest",
+   "seconds": 1.1,
    "rc": 0
   },
   {
    "suite": "testasset_selftest",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "rc": 0
   },
   {
@@ -117,12 +127,12 @@
   },
   {
    "suite": "api_contract",
-   "seconds": 0.3,
+   "seconds": 1.7,
    "rc": 0
   },
   {
    "suite": "api_contract_selftest",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "rc": 0
   },
   {
@@ -132,17 +142,17 @@
   },
   {
    "suite": "settings_panel",
-   "seconds": 1.7,
+   "seconds": 2.0,
    "rc": 0
   },
   {
    "suite": "settings_panel_selftest",
-   "seconds": 6.5,
+   "seconds": 6.8,
    "rc": 0
   },
   {
    "suite": "offline_shell",
-   "seconds": 13.3,
+   "seconds": 10.8,
    "rc": 0
   },
   {
@@ -152,7 +162,7 @@
   },
   {
    "suite": "pdf_leak_scan",
-   "seconds": 1.6,
+   "seconds": 1.8,
    "rc": 0
   },
   {
@@ -162,28 +172,28 @@
   },
   {
    "suite": "tracked_secret",
-   "seconds": 0.6,
+   "seconds": 3.1,
    "rc": 0
   },
   {
    "suite": "tracked_secret_selftest",
-   "seconds": 0.0,
-   "rc": 0
-  },
-  {
-   "suite": "remote_tree",
-   "seconds": 7.2,
-   "rc": 0
-  },
-  {
-   "suite": "remote_tree_selftest",
    "seconds": 0.1,
    "rc": 0
   },
   {
+   "suite": "remote_tree",
+   "seconds": 2.7,
+   "rc": 0
+  },
+  {
+   "suite": "remote_tree_selftest",
+   "seconds": 0.2,
+   "rc": 0
+  },
+  {
    "suite": "ci_status",
-   "seconds": 26.5,
-   "rc": 1
+   "seconds": 18.7,
+   "rc": 0
   },
   {
    "suite": "ci_status_selftest",
@@ -192,12 +202,12 @@
   },
   {
    "suite": "repo_config",
-   "seconds": 0.8,
+   "seconds": 1.0,
    "rc": 0
   },
   {
    "suite": "repo_config_selftest",
-   "seconds": 0.4,
+   "seconds": 0.9,
    "rc": 0
   },
   {
@@ -212,7 +222,7 @@
   },
   {
    "suite": "java_test_guard_selftest",
-   "seconds": 0.3,
+   "seconds": 0.5,
    "rc": 0
   },
   {
@@ -222,7 +232,7 @@
   },
   {
    "suite": "strategy_selftest",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "rc": 0
   },
   {
@@ -232,7 +242,7 @@
   },
   {
    "suite": "a11y",
-   "seconds": 38.9,
+   "seconds": 37.2,
    "rc": 0
   },
   {
@@ -242,12 +252,12 @@
   },
   {
    "suite": "data_rights",
-   "seconds": 6.7,
+   "seconds": 6.6,
    "rc": 0
   },
   {
    "suite": "data_rights_selftest",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "rc": 0
   },
   {
@@ -257,7 +267,7 @@
   },
   {
    "suite": "mobile",
-   "seconds": 124.1,
+   "seconds": 123.7,
    "rc": 0
   },
   {
@@ -267,7 +277,7 @@
   },
   {
    "suite": "mobile_peer_selftest",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "rc": 0
   },
   {
@@ -277,7 +287,7 @@
   },
   {
    "suite": "fault_injection",
-   "seconds": 64.6,
+   "seconds": 65.4,
    "rc": 0
   },
   {
@@ -292,12 +302,12 @@
   },
   {
    "suite": "memory_recall",
-   "seconds": 12.0,
+   "seconds": 12.5,
    "rc": 0
   },
   {
    "suite": "memory_recall_selftest",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "rc": 0
   },
   {
@@ -307,17 +317,17 @@
   },
   {
    "suite": "readme_troubleshooting",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "rc": 0
   },
   {
    "suite": "readme_troubleshooting_selftest",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "rc": 0
   },
   {
    "suite": "context_budget",
-   "seconds": 8.3,
+   "seconds": 8.8,
    "rc": 0
   },
   {
@@ -327,7 +337,7 @@
   },
   {
    "suite": "headers_csp",
-   "seconds": 5.2,
+   "seconds": 5.8,
    "rc": 0
   },
   {
@@ -352,8 +362,8 @@
   },
   {
    "suite": "release_governance",
-   "seconds": 0.2,
-   "rc": 1
+   "seconds": 0.3,
+   "rc": 0
   },
   {
    "suite": "release_governance_selftest",
@@ -362,7 +372,7 @@
   },
   {
    "suite": "clean_clone",
-   "seconds": 11.1,
+   "seconds": 18.5,
    "rc": 0
   },
   {
@@ -372,27 +382,27 @@
   },
   {
    "suite": "j2_chat_contract",
-   "seconds": 24.8,
+   "seconds": 25.1,
    "rc": 0
   },
   {
    "suite": "j4_memory",
-   "seconds": 39.7,
+   "seconds": 40.0,
    "rc": 0
   },
   {
    "suite": "j4_remote_down",
-   "seconds": 13.4,
+   "seconds": 13.8,
    "rc": 0
   },
   {
    "suite": "stream_contract",
-   "seconds": 0.1,
-   "rc": 1
+   "seconds": 35.6,
+   "rc": 0
   },
   {
    "suite": "safety_guard",
-   "seconds": 0.3,
+   "seconds": 14.7,
    "rc": 0
   },
   {
@@ -402,7 +412,7 @@
   },
   {
    "suite": "voice",
-   "seconds": 4.7,
+   "seconds": 5.2,
    "rc": 0
   },
   {
@@ -412,37 +422,47 @@
   },
   {
    "suite": "browser_check",
-   "seconds": 32.2,
+   "seconds": 32.7,
    "rc": 0
   },
   {
    "suite": "pixel_dual",
-   "seconds": 60.1,
+   "seconds": 60.5,
    "rc": 0
   },
   {
    "suite": "lightshow",
-   "seconds": 18.8,
+   "seconds": 19.1,
    "rc": 0
   },
   {
    "suite": "online_check",
-   "seconds": 4.6,
-   "rc": 1
+   "seconds": 6.3,
+   "rc": 0
   },
   {
    "suite": "public_check",
-   "seconds": 36.9,
-   "rc": 1
+   "seconds": 36.5,
+   "rc": 0
   },
   {
    "suite": "live_sync",
-   "seconds": 27.3,
-   "rc": 1
+   "seconds": 13.8,
+   "rc": 0
+  },
+  {
+   "suite": "live_sync_alt",
+   "seconds": 7.2,
+   "rc": 0
+  },
+  {
+   "suite": "backup_online",
+   "seconds": 13.1,
+   "rc": 0
   },
   {
    "suite": "emotion_eval_js",
-   "seconds": 0.1,
+   "seconds": 0.0,
    "rc": 0
   },
   {
@@ -462,12 +482,12 @@
   },
   {
    "suite": "deliverable_inventory",
-   "seconds": 0.7,
+   "seconds": 1.0,
    "rc": 0
   },
   {
    "suite": "deliverable_inventory_selftest",
-   "seconds": 0.3,
+   "seconds": 0.9,
    "rc": 0
   },
   {
@@ -482,22 +502,22 @@
   },
   {
    "suite": "js_syntax",
-   "seconds": 1.2,
+   "seconds": 1.5,
    "rc": 0
   },
   {
    "suite": "js_syntax_selftest",
-   "seconds": 0.3,
+   "seconds": 0.5,
    "rc": 0
   },
   {
    "suite": "storage_resilience",
-   "seconds": 38.6,
+   "seconds": 39.5,
    "rc": 0
   },
   {
    "suite": "storage_resilience_selftest",
-   "seconds": 1.0,
+   "seconds": 1.3,
    "rc": 0
   },
   {
@@ -507,6 +527,61 @@
   },
   {
    "suite": "suite_census_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "hook_wiring",
+   "seconds": 0.2,
+   "rc": 0
+  },
+  {
+   "suite": "hook_wiring_selftest",
+   "seconds": 1.4,
+   "rc": 0
+  },
+  {
+   "suite": "brand_consistency",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "brand_consistency_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "run_logged_selftest",
+   "seconds": 0.5,
+   "rc": 0
+  },
+  {
+   "suite": "ci_perf_wiring",
+   "seconds": 0.2,
+   "rc": 0
+  },
+  {
+   "suite": "ci_perf_wiring_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "loc_guard",
+   "seconds": 0.2,
+   "rc": 0
+  },
+  {
+   "suite": "loc_guard_selftest",
+   "seconds": 0.1,
+   "rc": 0
+  },
+  {
+   "suite": "bench_rollup",
+   "seconds": 1.9,
+   "rc": 0
+  },
+  {
+   "suite": "bench_rollup_selftest",
    "seconds": 0.1,
    "rc": 0
   }

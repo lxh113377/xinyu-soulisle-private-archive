@@ -33,7 +33,12 @@ PEERS = [
     {"repo": "SillyTavern/SillyTavern", "tier": "A", "why": "头部角色扮演聊天前端，persona/扩展生态参照"},
     {"repo": "Open-LLM-VTuber/Open-LLM-VTuber", "tier": "B", "why": "情绪→可视化映射 + 语音陪伴，与心屿同题"},
     {"repo": "morettt/my-neuro", "tier": "B", "why": "桌宠 + 记忆型陪伴，活跃迭代参照"},
-    {"repo": "letta-ai/letta", "tier": "D", "why": "stateful agent 长期记忆（J4 记忆叙事同构先例）"},
+    # r93 换址（接续 r92 §2④ 遗留 #5）：原行 letta-ai/letta 已退化为 landing 页——本轮实测
+    # lang=None / pushed_at=2026-09-10 / workflows=2（仅 issue-guard+dependabot）/ release 0.16.8，
+    # 继续采它会把"V1 归档、实现迁仓"读成"停更"。权威实现现居 letta-code（TS/Bun）：
+    # 本轮实测 pushed_at=2026-10-02 / workflows=21 / release v0.34.2。
+    # 分母保持 16（换址不换人口）；旧址读数留档在 r93 报告，不删历史。
+    {"repo": "letta-ai/letta-code", "tier": "D", "why": "stateful agent 长期记忆（J4 记忆叙事同构先例，TS/Bun 实现仓）"},
     {"repo": "hello-diana/MASCOT", "tier": "C", "why": "多智能体社交认知陪伴（EMNLP 2026）"},
     {"repo": "ddxfish/sapphire", "tier": "C", "why": "垂类陪伴 agent，Python + Web UI"},
     {"repo": "v2rockets/Loyal-Elephie", "tier": "C", "why": "带 RAG 记忆的陪伴（停更反面教材）"},

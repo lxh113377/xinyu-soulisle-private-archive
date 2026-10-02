@@ -1,13 +1,13 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 112,
+ "suites": 116,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
   "jar8123": {
    "n": 39,
-   "seconds": 531.0,
+   "seconds": 532.6,
    "members": [
     "preflight",
     "perf_baseline",
@@ -51,8 +51,8 @@
    ]
   },
   "free": {
-   "n": 71,
-   "seconds": 164.1,
+   "n": 75,
+   "seconds": 214.3,
    "members": [
     "disclaimer_forensics",
     "disclaimer_forensics_selftest",
@@ -124,7 +124,11 @@
     "hook_wiring_selftest",
     "brand_consistency",
     "brand_consistency_selftest",
-    "run_logged_selftest"
+    "run_logged_selftest",
+    "loc_guard",
+    "loc_guard_selftest",
+    "bench_rollup",
+    "bench_rollup_selftest"
    ]
   },
   "jar8123+port:18123": {
@@ -1226,6 +1230,34 @@
    "exclusive": [
     "jar8123"
    ]
+  },
+  {
+   "suite": "loc_guard",
+   "target": "_test/loc_guard_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "loc_guard_selftest",
+   "target": "_test/loc_guard_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "bench_rollup",
+   "target": "_test/bench_rollup.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "bench_rollup_selftest",
+   "target": "_test/bench_rollup.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
   }
  ]
 }

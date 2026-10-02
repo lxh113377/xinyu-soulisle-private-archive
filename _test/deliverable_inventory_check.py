@@ -57,7 +57,12 @@ BRAND_AUTHORITY = ROOT / "src" / "index.html"
 # 若允许搬到面外，55 MB 打包件搬出后就不再被 ④ 腿守着（搬 = 换个没人看的地方放着），
 # 而若分母含某面却不认搬到那儿，归档动作会被判成丢失 —— 07 在册的 🟠 R89-01 卡点正是这个。
 ARCHIVE_ROOTS = ("交付物", "archive/交付物-历史轮次")
-RENAME_STATUS_RE = re.compile(r"^[RCMDTUX]\d*$")
+# r93 修（本轮一手）：字符类原本漏了 `A`（新增）与 `B`（broken pairing）。后果不是「解析不出来」，
+# 而是「**新增件一进暂存面，整条搬卷判定当场作废**」——`staged_renames()` 返回未验，
+# pre-commit 于是把同一提交里所有合法 R100 搬卷判成「入库件从工作树消失」（2026-10-02 实测拦下 r93 提交）。
+# 触发条件很普通：任何一次「归档 + 同时新增文件」的提交都会踩到，也就是体量治理的常规动作。
+# 与 r70「`rag` 裸子串」同族：尺的匹配面比它自称的窄 ⇒ 结论偏得比看上去更严重。
+RENAME_STATUS_RE = re.compile(r"^[ABCMDTUXR]\d*$")
 ASSERT_COUNT = [0]  # selftest 实跑断言数（门面行据此打印，禁把条数硬写进文案 —— 抄一次就漂一次）
 
 # 交付物形状：只有这些后缀才算「要交出去的东西」，脚本/图片/中间件不参与未登记判定
@@ -292,6 +297,19 @@ def parse_name_status_z(raw: bytes):
         if not RENAME_STATUS_RE.match(st):
             unparsed += 1
             break
+        if st[0] != "R":
+            # r93 修（本轮一手）：非 R 记录（`M`/`A`/`D`…）是**正常记录**，按「状态+路径」两步走。
+            # 原实现在这里直接 `unparsed+=1; break`，于是「搬卷 + 任何其他文件同提交」时
+            # 解析器在第一个 `M` 上就停 ⇒ staged_renames 返回未验 ⇒ pre-commit 把
+            # 45 条合法 R100 搬卷全部判成「入库件从工作树消失」（实测 2026-10-02 r93 提交被拦）。
+            # 下方 `else: i += 2` 那一支此前是**死代码**（永远到不了），与本仓 `--slice` 开关
+            # 那次「配了但没生效」同族。真正该记 unparsed 的是「形状真的对不上」的记录
+            # （首字段不是状态、或状态后面缺路径），不是「这条不是搬卷」。
+            if i + 1 >= len(toks):
+                unparsed += 1
+                break
+            i += 2
+            continue
         if st[0] == "R":
             if i + 2 >= len(toks):
                 unparsed += 1
@@ -685,8 +703,14 @@ def name_status_legs(root: Path, archived: str) -> list:
        len(m1) == 1 and u1 == 0
        and m1["交付物/对标分析报告-2026-09-24.md"][1] == 100)
     m2, u2 = parse_name_status_z(b"M\x00a.txt\x00R100\x00b.txt\x00")
-    ck("㉒非 R 记录按 状态+路径 两步走；被截断的 R 必须计入 unparsed 而非静默丢: %s/%d" % (m2, u2),
+    ck("㉒被截断的 R 必须计入 unparsed 而非静默丢（M 记录本身不该让解析提前中止）: %s/%d" % (m2, u2),
        len(m2) == 0 and u2 == 1)
+    # r93 新增腿：真提交形态 = 「搬卷 + 其他文件同提交」。这一腿在修之前是**测不出来的**——
+    # 旧夹具的流里 R 后面少一条路径，解析器在更前面的 `M` 上就已经 break，两种实现都给出
+    # 同样的 (0, 1)，于是夹具把bug 写成了期望值（与本文件 ⑫ 那条「夹具自证不了自己」同族）。
+    m2b, u2b = parse_name_status_z(b"A\x00new.py\x00M\x00README.md\x00R100\x00old.md\x00new2.md\x00")
+    ck("㉒b 搬卷与其他文件同提交必须全部解析出（R100 认下、unparsed=0）: %s/%d" % (m2b, u2b),
+       len(m2b) == 1 and u2b == 0 and "old.md" in m2b and m2b["old.md"][0] == "new2.md")
     m3, u3 = parse_name_status_z(b"not-a-status\x00x\x00")
     ck("㉓首字段不是状态 ⇒ unparsed=1（调用方据此不替任何搬迁背书）: %s/%d" % (m3, u3),
        not m3 and u3 == 1)
