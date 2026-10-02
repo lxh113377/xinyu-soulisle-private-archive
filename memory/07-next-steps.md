@@ -17,10 +17,8 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - [ ] 🟠 [R90 新] **CI 全绿契约前提变了**：`greencheck.py bootstrap --repo-dir .` 实测 `checks=[]`（本仓门禁=自写电池非标准配置）
       ⇒ **禁造空契约**；须手写 `.ci/contract.json` blocking 清单，再加 step 并
       `--sweep` 复扫到 `matched==declared`。前提：`python D:/global_skills/A-project-handoff/scripts/greencheck.py bootstrap --repo-dir .`
-- [ ] 🟠 [R90 续测] **推平要等 r91 收口**（10-02 复跑）：本地领先远端 **5** 提交（我方 4 ＋
-      r91 的 `5f83c76`），远端仍 `2d34e7b`（CI `36907471857` 4/4 success 已回读）。唯一真红 = R2c 点名
-      **r91 无自己的 `### ` 小节**（`grep -c '^### .*r91' CHANGELOG.md`=0；661eff0 起散文不算登记）
-      ⇒ **不代推**；对方补小节后一条 `bash _test/push_and_watch.sh` 推平。
+- [x] ✅ **推平完成**（本轮代收口）：补r91小节R2c转绿→`1354466`→直推`2d34e7b..1354466`
+      →`CI-WATCH-GREEN（2条）`。本地==远端。
 - [ ] 🟢 [R89+R90 已收] 门面旧名归零（`brand_consistency` 常驻）｜归档前提已解：判据读
       `git diff --cached -M` 认「逐字节等价搬卷」＋分母=`ARCHIVE_ROOTS` ⇒ 交付物 184.8→**129.5 MB**
       （corpus 全量不搬，分母由 `disclaimer_forensics_lint --all` 现读）｜C7/G19/R7｜电池 **112**
