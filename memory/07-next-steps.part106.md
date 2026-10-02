@@ -46,6 +46,13 @@
 4. 仍需老大在场的旧项不变：目标机器（IP/登录/安全组）、共享 CloudBase env 隔离决策、
    品牌一句话、曾进过会话输出的明文 Key 撤销。
 
+## ④-1 收口回执（真实数字）
+
+- 本地：BATTERY 116/116 rc=0 ALL-GREEN（794s）｜DEPLOY-SYNC-PASS｜mvn verify Tests run 88 BUILD SUCCESS｜REPO-CONFIG-PASS 17 项｜EOL-PARITY-PASS（text 461 / binary 28）
+- 提交 1846cf3，已推 origin/main（本地 == 远端）
+- 远端 CI run 37023508041：首跑 3/4（浏览器回归红在 backup_online，71.7s）→ gh run rerun --failed → 4/4 全绿，该套件重跑 rc=0 11.4s；远端电池 111/113 rc=2 ENV-UNVERIFIED（java_test_guard/hook_wiring，与上一轮绿 run 同档）
+- 归因：本机两次复跑 PASS + 备用线 URL 本机 GET=200 + 本轮零改 deploy/ 与 src/ ⇒ 判为 runner↔CloudBase 瞬态，非内容回归
+
 ## ⑤ 本轮方法论留档（值得复用）
 
 - **判据主动报绿 > 判据漏报**：`j2_chat_contract` 印FAIL 却 rc=0，属"状态与事实相反"，
