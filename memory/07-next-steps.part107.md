@@ -25,6 +25,19 @@
 4. **验真要比运行结果，不能比源码文本**：比对 `--selftest` 时曾用正则去源码里抓 PASS 行，
    抓到的是 print 语句里的 f-string 源码（13379 字符）⇒ 比对无意义。正解是实跑 HEAD 副本逐字比。
 
+## ②-1 本轮第三个判据盲区（一手，`eol_parity` 只查 HEAD 面）
+
+- **现象**：本轮入库的一批 `_r94_*.py` 在**工作树里是 CRLF**，而提交时 git 归一为 LF 存入 blob
+  ⇒ 提交后 `eol_parity` 判红「工作树字节 != blob 字节」。但**提交前跑它是绿的**。
+- **根因**：`eol_parity` 的扫描面是 `git ls-tree HEAD`（git HEAD 面）⇒ **未入库的新文件在入库前完全不被检查**。
+  同一分钟内我写文件 → 归一 → 提交，顺序上没问题；但**提交后**工作树与 blob 的字节关系变了，门才变红。
+- **含义**：这道门有个时间窗——「刚写完、还没入库」的窗口是盲区。**入库后必须再跑一次归一**，
+  否则 CI/下一次本地跑就会红，而红因看起来像「我明明归一过了」。
+- **处置**：本轮已归一（归一后与 HEAD 零差异，证实**入库 blob 一直是 LF，正确的**），
+  并把「写文档/脚本 → 归一 → 提交 → **再归一一次**」固化为流程。
+  下轮可考虑给 `eol_parity` 加一条 `--worktree` 面（含未入库文件），或至少在门面行印出
+  「本门只查 HEAD 面，未入库文件不在内」。
+
 ## ③ 下一轮入口（r95）
 
 1. 8 个 probe 的写盘段只验了 `peer_repro_probe --self-only --json` 真落盘，其余 7 个未实跑 ——
@@ -40,4 +53,7 @@
 - `BENCHMARK-METRICS-PASS`（16/16 仓，产物 `benchmark-metrics-r94.json`）
 - 两份台账落盘 + `ROLLUP-PASS`（产物 `benchmark-rollup-r94.json`，轮次名自动跟随）
 - 8 个 probe 的 `date -u` 修复：编译过 + `--self-only --json` 实跑落盘
-- 收口全量电池：见 r94 报告 §0 收口行
+- **收口全量电池：第 5 轮 `116/116 rc=0 ALL-GREEN`**（`交付物/对标数据/bench-r94-battery5.log`，合计 919s，台账指纹 `sha256=f874b118…`）。前 4 轮各红 1–2 条且**各不相同**，逐条归因见报告 §2.6。
+- 门禁面复核（收口时现跑）：`LOC-PASS`（enforce 身份）｜`EOL-PARITY-PASS`（text 461 / binary 28）｜`REPO-CONFIG-PASS` 17 项 18 判据号｜`DELIVERABLE-INVENTORY-PASS`｜`DISCLAIMER-CLEAN` 48 份（交付物 2 + _历史轮次-对标 46）0 缺口｜`BRAND-PASS`。
+- **提交 `1de2a9a`**（已推 `origin/main`，本地 == 远端）；CI run 在后台，收口后补回执。
+- 唯一未纳入提交的三项（按铁律排除）：`memory/AGENTS.md`（并行会话在途）、`.ci/`（r90 遗留，未做 `--sweep` 复扫到 `matched==declared`，不在未验状态替他入库）、`memory/07-next-steps.part105.md`。
