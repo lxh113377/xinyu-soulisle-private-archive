@@ -1,0 +1,145 @@
+{
+ "window_days": 30,
+ "taken_at": "2026-10-04T18:26:54.075404+00:00",
+ "self": {
+  "commits_30d": 314,
+  "history_days": 13,
+  "tags": 9,
+  "window_full": false,
+  "rate_per_day": 10.47
+ },
+ "peers": {
+  "lobehub/lobehub": {
+   "commits_30d_paged": 877,
+   "commits_30d_search": 877,
+   "via": "link-rel-last",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 29.23
+  },
+  "SillyTavern/SillyTavern": {
+   "commits_30d_paged": 9,
+   "commits_30d_search": 9,
+   "via": "link-rel-last",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 0.3
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "commits_30d_paged": 0,
+   "commits_30d_search": 0,
+   "via": "single-page(len)",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 0.0
+  },
+  "morettt/my-neuro": {
+   "commits_30d_paged": 62,
+   "commits_30d_search": 62,
+   "via": "link-rel-last",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 2.07
+  },
+  "letta-ai/letta-code": {
+   "commits_30d_paged": 377,
+   "commits_30d_search": 377,
+   "via": "link-rel-last",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 12.57
+  },
+  "hello-diana/MASCOT": {
+   "commits_30d_paged": 0,
+   "commits_30d_search": 0,
+   "via": "single-page(len)",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 0.0
+  },
+  "ddxfish/sapphire": {
+   "commits_30d_paged": 60,
+   "commits_30d_search": 60,
+   "via": "link-rel-last",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 2.0
+  },
+  "v2rockets/Loyal-Elephie": {
+   "commits_30d_paged": 0,
+   "commits_30d_search": 0,
+   "via": "single-page(len)",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 0.0
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "commits_30d_paged": 4,
+   "commits_30d_search": 4,
+   "via": "link-rel-last",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 0.13
+  },
+  "Lum1104/MER-Factory": {
+   "commits_30d_paged": 0,
+   "commits_30d_search": 0,
+   "via": "single-page(len)",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 0.0
+  },
+  "CheaperjamRen/leemo": {
+   "commits_30d_paged": 0,
+   "commits_30d_search": 0,
+   "via": "single-page(len)",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 0.0
+  },
+  "NJX-njx/opensoul": {
+   "commits_30d_paged": 0,
+   "commits_30d_search": 0,
+   "via": "single-page(len)",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 0.0
+  },
+  "s-nagaev/chibi": {
+   "commits_30d_paged": 9,
+   "commits_30d_search": 9,
+   "via": "link-rel-last",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 0.3
+  },
+  "29-Cu/succhia": {
+   "commits_30d_paged": 0,
+   "commits_30d_search": 0,
+   "via": "single-page(len)",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 0.0
+  },
+  "zeroa234/ryza-ai-revive": {
+   "commits_30d_paged": 55,
+   "commits_30d_search": 55,
+   "via": "link-rel-last",
+   "verdict": "verified",
+   "why": "两腿逐字相等",
+   "rate_per_day": 1.83
+  },
+  "Bwcx-songyu/MoodChat": {
+   "commits_30d_paged": 2,
+   "commits_30d_search": 1,
+   "via": "link-rel-last",
+   "verdict": "unverified",
+   "why": "两腿不等（分页法=2 / search法=1）⇒ 该格不可用，不取平均",
+   "rate_per_day": 0.07
+  }
+ },
+ "unverified": [
+  "Bwcx-songyu/MoodChat(两腿不等（分页法=2 / search法=1）⇒ 该格不可用，不取平均)"
+ ],
+ "denominator": 16
+}

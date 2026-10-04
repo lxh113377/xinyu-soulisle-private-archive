@@ -64,6 +64,7 @@
 退出码：0=REPO-CONFIG-PASS 1=任一判据失败 2=环境异常（缺 PyYAML / --online 但 gh 不可用）
 """
 import argparse
+import ast
 import json
 import re
 import subprocess
@@ -423,6 +424,21 @@ def eval_counts(seg):
 ENTRY_RE = re.compile(r"^(sys\.exit\(|main\(|raise SystemExit)")
 
 
+def _top_entry_stmts(tree):
+    """纯函数：模块**顶层语句**中的入口调用 → [(行号, 反解析文本)]。
+
+    只取 `tree.body` 的直接子节点（Expr(Call) / Raise），与旧行扫描的覆盖面一致
+    （旧尺的 `^sys.exit(` 也只认 col 0 起手的行），区别是**字符串字面量不再算语句**。
+    """
+    out = []
+    for node in tree.body:
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            out.append((node.lineno, ast.unparse(node.value)))
+        elif isinstance(node, ast.Raise):
+            out.append((node.lineno, "raise " + (ast.unparse(node.exc) if node.exc else "")))
+    return out
+
+
 def import_safety(text):
     """G9 纯函数：判据脚本必须 import-safe —— 顶层入口调用须落在 __main__ 守卫之后。
 
@@ -430,14 +446,26 @@ def import_safety(text):
     `import` 它 = 直接跑一遍 16 仓联网采集然后 `exit 0`，**反例压根没执行却看起来像通过**。
     判据脚本会被互相 import（`--only` 自查、CI 复用、聚合 runner 对账），无守卫就等于
     "一 import 就跑全套/跑网络"，而退出码还是 0。
+
+    r95 取数面由「文本行」换成「AST 顶层语句」（一手：`verdict_exit_parity_check.py` 的自检样本
+    `GOOD_EXPLICIT` 是三引号字符串，串内 col-0 的 `sys.exit(0 if ok else 1)` 被旧尺当成真入口
+    ⇒ 一件本来 import-safe 的判据被判红）。旧尺的分子里混着「字符串内容」，属**取数面比它自称的
+    语义宽**；新尺按语句取，字符串结构性看不见。解析不动时**退回行扫描**（语法错由
+    `py_syntax_hygiene` 单独点名，本函数不吞掉它）。
     """
-    lines = text.splitlines()
-    guard = next((i for i, l in enumerate(lines) if l.startswith("if __name__")), None)
-    bad = []
-    for i, l in enumerate(lines):
-        if ENTRY_RE.match(l) and (guard is None or i < guard):
-            bad.append(f"第 {i + 1} 行顶层入口调用且无 __main__ 守卫（import 即执行）：{l[:44]}")
-    return bad
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        lines = text.splitlines()
+        gl = next((i for i, l in enumerate(lines) if l.startswith("if __name__")), None)
+        return [f"第 {i + 1} 行顶层入口调用且无 __main__ 守卫（import 即执行）：{l[:44]}"
+                for i, l in enumerate(lines)
+                if ENTRY_RE.match(l) and (gl is None or i < gl)]
+    guard = next((n.lineno for n in tree.body
+                  if isinstance(n, ast.If) and "__name__" in ast.unparse(n.test)), None)
+    return [f"第 {ln} 行顶层入口调用且无 __main__ 守卫（import 即执行）：{txt[:44]}"
+            for ln, txt in _top_entry_stmts(tree)
+            if ENTRY_RE.match(txt) and (guard is None or ln < guard)]
 
 
 REQ_ALIAS = {"pyyaml": "yaml", "pillow": "PIL"}   # 发行名 → import 名（清单写 PyYAML/Pillow，代码 import yaml/PIL）
@@ -1089,6 +1117,19 @@ def _st_mut_b(bad):
         bad.append("篡改⑬c（清单里的幽灵依赖，没人 import）未被 G11 抓到")
     if not r_run:
         bad.append("篡改⑬ 反例组失效：CI 里根本没解析到跑判据的 job（G11 在读空气）")
+    # 篡改㉕a..c（r95）：G9 的取数面由「文本行」换成「AST 顶层语句」，两侧都要验。
+    #   一手代价：`verdict_exit_parity_check.py` 的自检样本 GOOD_EXPLICIT 是三引号字符串，串内那行
+    #   col-0 的 `sys.exit(0 if ok else 1)` 让一件**本来 import-safe** 的判据被判红（假阳）。
+    #   腿放在本段而非 `_st_mut_a`：后者是 r94 拆出来的 149 行段，加 9 行就撞 loc 门的函数长 150。
+    if import_safety("SAMPLE = '''\nimport sys\nsys.exit(1)\n'''\nOK = True\n"):
+        bad.append("篡改㉕a（字符串字面量内的 sys.exit 被当成顶层入口）⇒ 取数面仍是文本行而非 AST 语句")
+    if not import_safety("import sys\nsys.exit(1)\n"):
+        bad.append("篡改㉕b（同形态摘掉引号成真顶层调用后未判红）⇒ ㉕a 是空腿，证不了任何东西")
+    # ㉕c 已知软面（**故意不判红**，钉成用例而非留给下一个人重新发现）：顶层 `if <非 __name__ 条件>:`
+    #   体内的入口调用缩进 >0，旧尺（col 0）与新尺（tree.body 直接子节点）都看不见 ⇒
+    #   本尺只判「直写顶层」这一形，不作终审；j4 那类整篇顶层脚本亦在此面内（见 r95 报告 §5）。
+    if import_safety("import sys\nif len(sys.argv) > 1:\n    sys.exit(1)\n"):
+        bad.append("篡改㉕c（顶层 if 体内的缩进入口被判红）⇒ 与旧尺覆盖面不一致，本次改动越界")
     # 篡改⑭：版本断言三源对账（r35 一手实证 —— ROADMAP 停在 v1.3.0 而 tag/pom 已是 1.4.0）
 
 

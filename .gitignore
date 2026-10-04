@@ -61,3 +61,8 @@ memory/sessions/
 
 # 动态工作流引擎的本仓项目级配置（活跃工具运行态，R269 例外：不迁 _trash，gitignore 命中即降级 quarantine）
 wflow.toml
+
+# 「CI 全绿契约」的**工具运行态**（greencheck 的 OWN_RUNTIME_PATHS 明列 .ci/ci_failures.json 为可再生缓存）。
+# 注意分工：`.ci/contract.json` **必须入库**（契约=要执行什么命令，等价于代码；pre-push 钩子与 greencheck
+# 都按"未被跟踪即拒绝执行"处理），r90~r94 四轮把它连同缓存一起晾在未跟踪面 ⇒ 钩子在他人 clone 上根本跑不起来。
+.ci/ci_failures.json

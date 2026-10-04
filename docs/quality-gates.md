@@ -40,6 +40,9 @@ python _test/ux_guards_check.py          # TTS 朗读 / 对话窗口化 / 响应
 python _test/size_budget_check.py        # 首屏体积预算 + 「新文件必须登记」覆盖判据（漏登记即红）
 python _test/vendor_freshness_check.py   # vendor 完整性哈希 + 版本对账；--check-upstream 报上游漂移
 python _test/benchmark_metrics.py        # 对标源数据台账（16 仓指标 + 与上次快照逐字段漂移）；联网采集，人工轮次跑
+python _test/bench_quality_gates.py      # ↑ 的「质量门同址尺」子系统（r95 整块迁出，14 节点 ast.dump 全等）：五类「能不能让构建失败」+ CI 面相关性取样 `qg_ci_pick` + 三值门面行 `qg_gate_line`。不是电池条目（无 main），由 benchmark_metrics 的 `--quality-gates` 通道调用；变异腿必须改 **本模块** 的全局名（改 benchmark_metrics 的同名变量=空腿，本轮实测两条腿各踩过一次）
+python _test/peer_maintenance_probe.py   # 「维护状态」维的同址尺：**30 天提交率**（r95 立）。分腿=分页 Link 的 `page=(\d+)` 正则 / 独立路径=`search/commits` 计数，两腿不等即该格判不可用（不取平均）；self 侧走 `git rev-list` 并印**历史跨度**（本仓仅 13 天 ⇒ 30d 读数无横比资格，写明不横比）。联网采集，人工轮次跑；`--self-only` 零网络、`--selftest` 14 条（含 Link 字段序颠倒 / `+` 未编码 / 对账非恒真 三条变异腿）
+python "D:/global_skills/A-project-handoff/scripts/greencheck.py" run --repo-dir .   # 跨项目「CI 全绿契约」执行体（**在受管根 global_skills 内，不是本仓文件**；本仓这一侧只有 .ci/contract.json）。pre-push 钩子跑它；契约未入库 ⇒ 恒回 UNKNOWN ⇒ 钩子恒放行（2026-10-05 实测坐实），故本仓另立 _test/ci_contract_check.py 盯契约本身
 python _test/measure_entry.py            # r82 取数入口前置自证：peers 尺全集 ast 解析 + HEAD 归属（坏在未入库改动/坏在已入库 两种红因分开报）+ 并跑 repo_config_check
 python _test/live_sync_check.py          # 线上 `/` 与 deploy/xinyu 逐字节比对（部署未跟进即红）
 python _test/safety_guard_check.py        # 输入侧护栏行为验证：注入 6 例必须点名 + 正常 6 例不得误伤（含 --selftest）
@@ -111,6 +114,10 @@ python _test/ci_perf_wiring_check.py --selftest  # r91 判据桩：11 条（正�
  python _test/loc_guard_check.py --selftest      # r94 判据桩：17 条（超限必报／未超限不误报／等值边界／两条阈值放大变异腿／零文件不产生结论且必判 UNVERIFIED／合成面超限非空／类 300 行与 IIFE 包装**不得**判函数超限而其内部 200 行函数必红／接线三腿：当前电池条目带 --enforce、摘掉后判否、只动一处不误伤）
  python _test/bench_rollup.py                   # r93 起提供两新增维度的只读汇总（只读、零网络、数字带来源）：①测试与可复现性（self 套件数／Java 测试类与 @Test 数／jacoco LINE≥0.90∧BRANCH≥0.90 ⇄ peers 同址尺 coverage_gate 等）②零构建成本-收益（前端构建链配置 0 个 ⇒ 零构建成立；平台函数依赖清单单列；首屏预算；CI workflow 文件数与 job 条数）。**r94 起输入/产物都不写死轮次号**：自动取最新 `benchmark-metrics-*.json` 与 `peer-quality-tooling-*.json`／`peer-repro-*.json`，产物名跟随输入轮次；stale 标记按台账内容判定（含旧 letta 行才标 stale，不再硬编码）
  python _test/bench_rollup.py --selftest         # r94 判据桩：5 条（缺源检出／合成样本出表／成本项未取数不得写成 0／job 计数不得把 job 内保留键算成 job／无 jobs 块时不得凭空数出 job）
+ python _test/verdict_exit_parity_check.py      # r94 发现、r95 接线的**判据的判据**：门面印 `XXX-FAIL/-RED/判红` 却没有任何非零退出路径的套件 ⇒ DEFECT。取数面 `_test/*.py` 全量现读（分母不手抄），分四档：OK-explicit（有 sys.exit/raise）／OK-exception（纯 assert 型，靠未捕获异常转 rc=1，**合法不判红**）／N/A（不印门面行）／DEFECT。电池按 rc 记账，所以这一族坏一次就等于「验收判据报红而记绿」：r93 抓到 `j2_chat_contract`（只修那一件），r94 类扫 90 套件又抓到 `j4_memory_check`（AC-OBS-10 的判据）。零网络零浏览器，可进任意档
+ python _test/verdict_exit_parity_check.py --selftest  # r95 判据桩：10 条（三形态正例／无门面行／软面钉死：assert 不在 FAIL 分支 ⇒ 归 OK-exception 不判红，只作趋势读数／反例印 FAIL 无退出必判 DEFECT／同形态修好必转绿／两个变异体各翻一侧／坏语法单独成档不判绿）
+ python _test/ci_contract_check.py                  # r95 立：「CI 全绿契约」本身的**结构性**门。9 条腿：契约已入库（未入库 ⇒ greencheck run 恒 UNKNOWN ⇒ pre-push 钩子恒放行，实测已坐实）／checks 非空／blocking name 唯一／每条 blocking 有 cmd+timeout_s+cost_ms+cost_source／声明的总预算 == 各条之和（可复算）／blocking 合计 <= 20s pre-push 预算／**接线自证**（每条 blocking 的脚本或 `-m` 模块在 CI workflow 与电池里都有执行位，否则"列了但没人跑"）／deferred 必带 reason 且 reason 必须点名承接面。**不调用 greencheck run**（会递归），静态零网络零浏览器；同时进电池与契约 blocking 自身
+ python _test/ci_contract_check.py --selftest      # r95 判据桩：15 条（3 正例含 `python -m 模块` 形态／8 反例逐条注入一手形态／结构腿空契约／变异体补上执行位后必须转绿／变异体两者皆无必须点名）—— 正例腿是必须的：第一版把 `any(s in x for x in (集合,集合))` 写成对容器做成员判定，恒 False，14 条合法 blocking 全被误报"没人跑"，只有正例腿抓得到
 ```
 
 > 前置：多数判据需 fat jar 起在 8123（`java -jar server/target/soulisle-server.jar --server.port=8123`，

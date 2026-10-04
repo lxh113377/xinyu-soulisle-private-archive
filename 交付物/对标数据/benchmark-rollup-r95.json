@@ -3,7 +3,7 @@
   "dim_a_testing_repro": {
     "self": {
       "face": "git HEAD",
-      "regression_suites": 118,
+      "regression_suites": 120,
       "java_test_files": 11,
       "java_test_cases": 88,
       "jacoco_minimum": {
@@ -50,7 +50,7 @@
   "dim_b_zero_build_cost": {
     "self_cost": {
       "face": "git HEAD",
-      "regression_suites": 118,
+      "regression_suites": 120,
       "java_test_files": 11,
       "java_test_cases": 88,
       "jacoco_minimum": {
@@ -76,7 +76,7 @@
     },
     "peers_build_gates": {
       "repo_count": 16,
-      "ts": "2026-10-02 17:22 UTC",
+      "ts": "2026-10-04 17:59 UTC",
       "quality_gate_classes": {
         "coverage_gate": {
           "yes": 0,
@@ -89,9 +89,9 @@
           "unverified": 0
         },
         "lint_gate": {
-          "yes": 2,
+          "yes": 3,
           "no": 13,
-          "unverified": 1
+          "unverified": 0
         },
         "typecheck_gate": {
           "yes": 0,

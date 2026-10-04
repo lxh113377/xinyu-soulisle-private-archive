@@ -231,6 +231,16 @@ SUITES = [
     # 等超限清零再切 --enforce 并挂 CI 步。若现在就阻断，等于用一把更松的尺去卡已经在位的纪律。
     ("loc_guard", [sys.executable, "_test/loc_guard_check.py", "--enforce"]),
     ("loc_guard_selftest", [sys.executable, "_test/loc_guard_check.py", "--selftest"]),
+    # r94 类扫发现、r95 接线：「印 FAIL 门面行却无非零退出路径」这一族已发生两次（r93 j2、r94 j4）。
+    # 修例不修类 ⇒ 常驻判据。静态零网络零浏览器，可进任意档；电池按 rc 记账，本件正是给 rc 记账本身兜底。
+    ("verdict_exit_parity", [sys.executable, "_test/verdict_exit_parity_check.py"]),
+    ("verdict_exit_parity_selftest", [sys.executable, "_test/verdict_exit_parity_check.py", "--selftest"]),
+    # r95：「CI 全绿契约」的**结构性**门。它必须同时进电池和契约自身 blocking ——
+    #   契约第一条就是「契约是否入库」，那正是 greencheck/pre-push 能不能生效的前提，
+    #   门必须站在门里面；只放电池里则 pre-push 恒放行时无人知情。
+    #   静态零网络零浏览器。注意本件**不调用 greencheck run**（那会递归）。
+    ("ci_contract", [sys.executable, "_test/ci_contract_check.py"]),
+    ("ci_contract_selftest", [sys.executable, "_test/ci_contract_check.py", "--selftest"]),
     # r93 改进项 #2/#3：把「测试与可复现性」「零构建成本-收益」两个新增维度变成可复算读数
     # （只读本地台账 + git HEAD 面，零网络；缺源判 rc=2 不塌缩成 0）。
     ("bench_rollup", [sys.executable, "_test/bench_rollup.py"]),

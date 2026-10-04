@@ -1,0 +1,219 @@
+{
+  "schema": "fenjue-ci-green-contract-v1",
+  "repo": "lxh113377/xinyu-soulisle-private-archive",
+  "branch": "main",
+  "refresh_days": 7,
+  "_provenance": {
+    "authored_by": "hand-written (r95)",
+    "why_not_bootstrap": [
+      "greencheck.py bootstrap --repo-dir . 实测 checks=[]（2026-10-05 复现）—— 本仓门禁是自写电池，不是 package.json/pom.xml/Makefile 里的标准门，bootstrap 的探测器结构上认不出 ⇒ 自动生成只会得到空契约（空契约 = 零保护还像成功了）。",
+      "07-next-steps.md P0 的处置就是「禁造空契约；须手写 blocking 清单」。本文件即那份手写清单。",
+      "r95 之前的 .ci/contract.json 有三个实测缺陷：① checks 只有 4 条且含 2 组同名（bootstrap 按 workflow step 名命名，一个 step 内多条命令就撞名）；② 最重的两条（mvn verify / 全量电池）全在 deferred，契约拦不住 CI 里最重的两道；③ cost_ms 全部写死 5000（assumed），无一条实测。",
+      "路径一律正斜杠：greencheck 用 shlex.split(posix=True) 切 argv，反斜杠会被当转义吃掉。"
+    ],
+    "cost_ms_method": "本机 PowerShell Stopwatch 单次实测（非 assumed）；合计见 blocking_total_cost_ms",
+    "budget_note": "pre-push 累计预算 20s（greencheck --blocking-budget-s 默认）；本清单合计 ~9.9s，留 2 倍余量给机器负载。",
+    "structural_gate": "_test/ci_contract_check.py 盯本文件（已入库 / checks 非空 / name 唯一 / 每条 blocking cmd 在 CI 或电池里有执行位 / deferred 必带 reason）"
+  },
+  "blocking_total_cost_ms": 10021,
+  "checks": [
+    {
+      "name": "ci-contract-self",
+      "cmd": "python _test/ci_contract_check.py",
+      "timeout_s": 120,
+      "blocking": true,
+      "cost_ms": 200,
+      "cost_source": "assumed",
+      "priority": 1,
+      "priority_source": "keyword",
+      "_why": "契约自身的结构性门。放进 blocking 而不是留在电池里：pre-push 钩子的 greencheck 会拒跑未入库契约，而「契约是否入库 / 是否为空 / 是否重名」正是钩子能不能生效的前提 —— 门必须站在门里面。"
+    },
+    {
+      "name": "repo-config-selfconsistency",
+      "cmd": "python _test/repo_config_check.py",
+      "timeout_s": 300,
+      "blocking": true,
+      "cost_ms": 1210,
+      "cost_source": "measured",
+      "priority": 1,
+      "priority_source": "keyword",
+      "_why": "17 项 G1-G19 全仓配置自洽（CI job 数 / 电池套件数 / 文档双向对账 / 判据 import-safe / 判据挂在真会走的路径上）。它红 = 文档或接线与代码脱节，而这类红在受理面上要等 CI 才发现。"
+    },
+    {
+      "name": "loc-guard-enforce",
+      "cmd": "python _test/loc_guard_check.py",
+      "timeout_s": 120,
+      "blocking": true,
+      "cost_ms": 140,
+      "cost_source": "measured",
+      "priority": 1,
+      "priority_source": "keyword",
+      "_why": "r94 起默认 enforce（超限即 rc=1）。电池里带 --enforce 参数名，本条用默认形态（两者等价，--enforce 保留为 no-op 兼容参数）。"
+    },
+    {
+      "name": "verdict-exit-parity",
+      "cmd": "python _test/verdict_exit_parity_check.py",
+      "timeout_s": 120,
+      "blocking": true,
+      "cost_ms": 440,
+      "cost_source": "measured",
+      "priority": 1,
+      "priority_source": "keyword",
+      "_why": "r95 新增的「判据的判据」：门面印 XXX-FAIL 却无非零退出路径 ⇒ 验收判据报红而记绿。已发生两次（r93 j2_chat_contract、r94 j4_memory_check）。"
+    },
+    {
+      "name": "secret-scan-tracked",
+      "cmd": "python _test/tracked_secret_scan.py",
+      "timeout_s": 300,
+      "blocking": true,
+      "cost_ms": 3436,
+      "cost_source": "measured",
+      "priority": 1,
+      "priority_source": "keyword",
+      "_why": "密钥零入库是红线，且历史上「被跟踪文件里写了密钥形态字面量」只有 CI 红、本机全绿（r35 实测）。"
+    },
+    {
+      "name": "bench-rollup-readonly",
+      "cmd": "python _test/bench_rollup.py",
+      "timeout_s": 120,
+      "blocking": true,
+      "cost_ms": 2312,
+      "cost_source": "measured",
+      "priority": 2,
+      "priority_source": "keyword",
+      "_why": "只读、零网络，聚合对标两新增维度（测试与可复现性 / 零构建成本-收益）。成本最高的一条但仍在预算内，因为它是「台账 stale 就红」的唯一执行位。"
+    },
+    {
+      "name": "deliverable-inventory",
+      "cmd": "python _test/deliverable_inventory_check.py",
+      "timeout_s": 300,
+      "blocking": true,
+      "cost_ms": 1172,
+      "cost_source": "measured",
+      "priority": 1,
+      "priority_source": "keyword",
+      "_why": "已入库交付件不得从工作树消失（09-28 / 09-29 两次实测 7 件含参赛成片无声消失，全部判据零告警）。pre-commit 已跑同一条，契约再排一次是为覆盖 --no-verify 与 worktree-only 路径。"
+    },
+    {
+      "name": "compileall-test",
+      "cmd": "python -m compileall -q _test",
+      "timeout_s": 180,
+      "blocking": true,
+      "cost_ms": 622,
+      "cost_source": "measured",
+      "priority": 1,
+      "priority_source": "keyword",
+      "_why": "r28 教训：聚合器自己写了只有 Python 3.12 能解析的 f-string，本机绿、CI pin 3.11 直接炸在 import 之前。版本兼容差必须在最小失败面暴露。"
+    },
+    {
+      "name": "deploy-sync-sha256",
+      "cmd": "python _test/deploy_sync_check.py",
+      "timeout_s": 180,
+      "blocking": true,
+      "cost_ms": 73,
+      "cost_source": "measured",
+      "priority": 1,
+      "priority_source": "keyword",
+      "_why": "同步红线（src/ → deploy/xinyu/ SHA256 三类归零）。曾差点把带缺陷的引擎部署上线。"
+    },
+    {
+      "name": "size-budget-firstscreen",
+      "cmd": "python _test/size_budget_check.py",
+      "timeout_s": 120,
+      "blocking": true,
+      "cost_ms": 52,
+      "cost_source": "measured",
+      "priority": 2,
+      "priority_source": "keyword",
+      "_why": "首屏零构建优势是核心卖点，回涨即红。中文注释按 3 B/字计，多写解释在本仓是直接花预算的动作。"
+    },
+    {
+      "name": "vendor-freshness",
+      "cmd": "python _test/vendor_freshness_check.py",
+      "timeout_s": 120,
+      "blocking": true,
+      "cost_ms": 71,
+      "cost_source": "measured",
+      "priority": 2,
+      "priority_source": "keyword",
+      "_why": "vendor 完整性哈希 + 版本声明对账 + 漏登记即红（GSAP 非 MIT，授权边界不能含糊）。"
+    },
+    {
+      "name": "inline-style-guard",
+      "cmd": "python _test/inline_style_check.py",
+      "timeout_s": 120,
+      "blocking": true,
+      "cost_ms": 87,
+      "cost_source": "measured",
+      "priority": 2,
+      "priority_source": "keyword",
+      "_why": "本地无 CSP 头，browser_check 看不见「标记层内联样式被 style-src 拦」这类破坏（r81 一手：线上 8 条 Applying inline style，强度条 width 实际失效）。"
+    },
+    {
+      "name": "strategy-pairing",
+      "cmd": "python _test/strategy_check.py",
+      "timeout_s": 120,
+      "blocking": true,
+      "cost_ms": 56,
+      "cost_source": "measured",
+      "priority": 2,
+      "priority_source": "keyword",
+      "_why": "共情策略表 ↔ 词表成对性门禁。"
+    },
+    {
+      "name": "benchmark-metrics-selftest",
+      "cmd": "python _test/benchmark_metrics.py --selftest",
+      "timeout_s": 120,
+      "blocking": true,
+      "cost_ms": 150,
+      "cost_source": "measured",
+      "priority": 3,
+      "priority_source": "keyword",
+      "_why": "只跑 selftest（联网采集属人工轮次动作，不在 pre-push 面）。作用是保证漂移判据非恒真 —— 判据本身坏掉时台账就是假绿。"
+    }
+  ],
+  "deferred": [
+    {
+      "name": "java-verify",
+      "cmd": "mvn -B -ntp -f server/pom.xml verify",
+      "reason": "环境面缺失（需 JDK 17 + Maven + 出网；本机 JAVA_HOME 默认是 JDK 8）⇒ 由 CI java-build 作业承接（那里覆盖率门绑在 verify 相位）。挪进 blocking 只会得到 SPAWN-FAILED 假红。",
+      "_source": "workflow:ci.yml",
+      "timeout_s": 900
+    },
+    {
+      "name": "battery-full",
+      "cmd": "python _test/run_all_suites.py --exclude-llm",
+      "reason": "实测 690s，远超 20s pre-push 预算（超 34 倍）。由 _test/push_and_watch.sh 与 CI browser-regression 作业承接；契约里只保留其 4 条元判据（loc/verdict/repo_config/rollup）作为便宜的代理。",
+      "_source": "workflow:ci.yml",
+      "timeout_s": 1200
+    },
+    {
+      "name": "eol-parity",
+      "cmd": "python _test/eol_parity_check.py",
+      "reason": "实测 71.6s，超 20s 预算 3.6 倍（它要对 555 个跟踪文件做双面字节比对）。由电池与 CI 承接。注意它有 HEAD 面盲区：未入库文件入库后必须再归一一次（r94 事故留档）。",
+      "_source": "battery",
+      "timeout_s": 300
+    },
+    {
+      "name": "emotion-eval-node",
+      "cmd": "node _test/emotion_eval.js",
+      "reason": "需 node 在 PATH（54ms 很快，但契约用 shlex+which 解析裸命令名，机器没 node 会变 SPAWN-FAILED 假红）。由 CI frontend-checks 作业的评测集门禁承接。",
+      "_source": "workflow:ci.yml",
+      "timeout_s": 120
+    },
+    {
+      "name": "live-sync",
+      "cmd": "python _test/live_sync_check.py",
+      "reason": "需公网可达（pages.dev），且对应 CI job 本身是 continue-on-error（漂移告警不阻塞）⇒ 与 blocking 语义相反。",
+      "_source": "workflow:ci.yml",
+      "timeout_s": 180
+    },
+    {
+      "name": "docker-build-runtime",
+      "cmd": "docker build -f server/Dockerfile -t xinyu-soulisle:contract .",
+      "reason": "本机未安装 Docker（03-tech-stack.md 已登记「Docker 本机未实测」）。由 CI java-build 作业的容器起服自证承接。",
+      "_source": "workflow:ci.yml",
+      "timeout_s": 900
+    }
+  ]
+}

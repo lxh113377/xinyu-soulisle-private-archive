@@ -1,0 +1,72 @@
+  第二通道（内容法，仅供复核，不改 caps）：
+    streaming: token_stream=2 media_stream=1 data_infra=0 none=12 unverified=0 ｜ 文件名法 caps=2/15 ⇒ 内容法只用于判断「文件名法是不是下限」
+      ▶ [token_stream] Bwcx-songyu/MoodChat :: 晴对话空间 ## 项目简介 前后端分离AI心理咨询系统，基于Spring AI对接大模型，采用Reactor Flux+SSE实现流式对话，支持AI心理疏导、情绪日记、心理知识
+      ▶ [token_stream] ddxfish/sapphire :: **Avatar** - 3D animated avatar with environment scenes and SSE-driven reactions. - **Im
+      ▶ [media_stream] morettt/my-neuro :: ytri53](https://github.com/jonnytri53) 资金赞助开发，特此感谢） - [ ] 国外直播平台的接入 - [x] 直播功能：可在哔哩哔哩平台直
+    e2e_browser: test_e2e=1 browser_tool_feature=1 none=13 unverified=0 ｜ 文件名法 caps=3/15 ⇒ 内容法只用于判断「文件名法是不是下限」
+      ▶ [test_e2e] NJX-njx/opensoul :: npm test` - Additional configs: `vitest.config.ts`, `vitest.e2e.config.ts`, `vitest.gate
+      ▶ [browser_tool_feature] s-nagaev/chibi :: (or build your own): - GitHub (PRs, issues, code review) - Browser automation - Docker /
+    self(HEAD, 同尺): streaming=token_stream e2e_browser=test_e2e  ｜仅 README blob（peers 另有 description+homepage ⇒ self 输入更窄，未命中≠没有）
+      ▶ [self/streaming] 生成共情回复；本机 `localStorage` 持久化，服务端持久化可选开启（`cfg.remote`） | | **逐字流式输出** | `stream:true` → 同
+      ▶ [self/e2e_browser] thon _test/ci_perf_wiring_check.py` 常驻盯（改动后两处数字分叉即红）。 **端到端浏览器回归**：`_test/browser_check.
+  同址尺（文档维/性能维；peers 与 self 同一套规则，不改 caps）：
+    [文档] docs_site          peers 有=10/15 无=5 未验=0 self(HEAD)=✅有  例：CheaperjamRen/leemo、Lum1104/MER-Factory、NJX-njx/opensoul
+    [文档] agent_facing_doc   peers 有=7/15 无=8 未验=0 self(HEAD)=✅有  例：CheaperjamRen/leemo、Lum1104/MER-Factory、NJX-njx/opensoul
+    [文档] changelog_root     peers 有=3/15 无=12 未验=0 self(HEAD)=✅有  例：NJX-njx/opensoul、lobehub/lobehub、s-nagaev/chibi
+    [文档] readme_thorough    peers 有=6/15 无=9 未验=0 self(HEAD)=✅有  例：Open-LLM-VTuber/Open-LLM-VTuber、SillyTavern/SillyTavern、ddxfish/sapphire
+    [性能] bench_script       peers 有=4/15 无=11 未验=0 self(HEAD)=✅有  例：NJX-njx/opensoul、ddxfish/sapphire、letta-ai/letta-code
+    [性能] ci_perf_step       peers 有=1/15 无=14 未验=0 self(HEAD)=✅有  例：lobehub/lobehub
+    [性能] published_numbers  peers 有=0/15 无=15 未验=0 self(HEAD)=✅有  例：—
+    self 面：face=HEAD paths=555 README=11831字符 classes=['agent_facing_doc', 'bench_script', 'changelog_root', 'ci_perf_step', 'docs_site', 'published_numbers', 'readme_thorough']
+      ▶ self 证据 [docs_site] docs/API.md
+      ▶ self 证据 [agent_facing_doc] AGENTS.md
+      ▶ self 证据 [changelog_root] CHANGELOG.md
+      ▶ self 证据 [readme_thorough] len=11831 signals=4/4
+      ▶ self 证据 [bench_script] _test/perf_baseline_check.py
+      ▶ self 证据 [ci_perf_step] .github/workflows/perf-baseline.yml
+      ▶ self 证据 [published_numbers] P95=28.6ms（四目标全在 400ms 预算内，最紧余量 371ms）、吞吐 1013.9 rps，且 `llm_used=False`（危机路径不调 L
+  质量门同址尺（五类「能不能让构建失败」；不改 caps）：
+    coverage_gate     peers 有门=0/15（未验0，人口15） self=✅有  例：—
+    mutation_gate     peers 有门=0/15（未验0，人口15） self=❌无  例：—
+    lint_gate         peers 有门=2/14（未验1，人口15） self=❌无  例：SillyTavern/SillyTavern、letta-ai/letta-code
+      ⚠️ 该类不得写成「1 仓无门」——它们是**取数面未验**：lobehub/lobehub
+    typecheck_gate    peers 有门=0/13（未验2，人口15） self=❌无  例：—
+      ⚠️ 该类不得写成「2 仓无门」——它们是**取数面未验**：letta-ai/letta-code、lobehub/lobehub
+    secret_scan_gate  peers 有门=1/13（未验2，人口15） self=✅有  例：NJX-njx/opensoul
+      ⚠️ 该类不得写成「2 仓无门」——它们是**取数面未验**：letta-ai/letta-code、lobehub/lobehub
+    self 面：face=HEAD CI 正文取数=2/2 步骤数=31（候选={'coverage_gate': 'server/pom.xml', 'mutation_gate': 'server/pom.xml', 'lint_gate': '—', 'typecheck_gate': '—', 'secret_scan_gate': '—'}）
+    天花板（本尺只认标准工具文件名，自写判据形态的门**结构性看不见**，故下列步骤名单独列出、不参与两侧对照）：
+      ▷ self 自写门：判据脚本语法自检（compileall，锁 CI 的 Python 
+      ▷ self 自写门：标记层内联样式守卫（CSP style-src 'self' 前提；
+      ▷ self 自写门：静态资源体积预算守卫（首屏优势不回涨，含 --selftest 防恒
+      ▷ self 自写门：vendor 供给链守卫（完整性哈希 + 版本声明对账 + 漏登记即
+      ▷ self 自写门：情绪评测集门禁（accuracy ≥ 95% 且危机全召回）
+      ▷ self 自写门：共情策略表 ↔ 词表成对性门禁（含 --selftest 防判据恒真
+      ▷ self 自写门：密钥零入库扫描（判据与本地电池同源，正则不再内联）
+      ▷ self 自写门：校验 fat jar 产物（防"瘦 jar 冒充 fat jar"）
+      ▶ self 证据 [coverage_gate] server/pom.xml :: minimum
+      ▶ self 证据 [lint_gate] 无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）
+      ▶ self 证据 [typecheck_gate] 无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）
+      ▶ self 证据 [secret_scan_gate] 自写门禁 ∧ CI 真调用：python _test/tracked_secret_scan.py --selftest
+采集: 15/16 仓 | 快照 交付物/对标数据/benchmark-metrics-r95.partial.json｜⚠️ 降级：权威台账未覆写，基线仍取上一次完整采集 | 历史 2 次
+  [A] lobehub/lobehub                            ★82965   pushed 2026-10-03 rel=v2.2.19-canary.37  wf=51 caps=api_spec,container,deps_autoupdate,e2e_browser,i18n_locale,streaming,vector_memory
+  [A] SillyTavern/SillyTavern                    ★34051   pushed 2026-10-02 rel=1.19.0             wf=15 caps=container,e2e_browser,i18n_locale,pwa_manifest,vector_memory
+  [B] Open-LLM-VTuber/Open-LLM-VTuber            ★13975   pushed 2026-05-15 rel=v1.2.1             wf=13 caps=-
+  [B] morettt/my-neuro                           ★1387    pushed 2026-10-01 rel=v6.7.5             wf=4 caps=i18n_locale,vector_memory
+  [D] letta-ai/letta-code                        ★3507    pushed 2026-10-03 rel=v0.34.2            wf=21 caps=container
+  [C] hello-diana/MASCOT                         ★671     pushed 2026-08-24 rel=-                  wf=1 caps=-
+  [C] ddxfish/sapphire                           ★290     pushed 2026-09-30 rel=v2.13.1            wf=3 caps=container,pwa_manifest,vector_memory
+  [C] Rogendo/Mental-health-Chatbot              ★214     pushed 2026-09-08 rel=-                  wf=1 caps=-
+  [D] Lum1104/MER-Factory                        ★119     pushed 2026-03-13 rel=v0.1.2             wf=1 caps=-
+  [C] CheaperjamRen/leemo                        ★101     pushed 2026-08-27 rel=v0.1.10            wf=1 caps=pwa_manifest,streaming,vector_memory
+  [C] NJX-njx/opensoul                           ★58      pushed 2026-06-04 rel=v0.2.4             wf=13 caps=container,deps_autoupdate,e2e_browser,pwa_manifest,vector_memory
+  [C] s-nagaev/chibi                             ★56      pushed 2026-10-02 rel=v1.18.0.dev202610020803 wf=5 caps=container
+  [C] 29-Cu/succhia                              ★83      pushed 2026-07-25 rel=-                  wf=0 caps=-
+  [C] zeroa234/ryza-ai-revive                    ★201     pushed 2026-09-22 rel=v1.2.22            wf=0 caps=-
+  [C] Bwcx-songyu/MoodChat                       ★1       pushed 2026-09-09 rel=-                  wf=0 caps=-
+  [self] 心屿 src(除vendor)=2558 行/19 文件 电池套件=116(判据脚本文件=52，两口径不同源即登记) CI job=4 docs=9/9 caps=api_spec,container,deps_autoupdate,emotion_backend_wired,pwa_manifest,pwa_offline（盲区点名：e2e_browser,streaming = 内容里有证据但文件名匹配器看不见，不计入 caps 以免与参照仓双标）
+  能力覆盖率(有效分母 15/15 仓): pwa_offline=0 pwa_manifest=4 i18n_locale=3 streaming=2 vector_memory=6 container=6 e2e_browser=3 deps_autoupdate=2 api_spec=1
+漂移: 0 处（与上一次快照完全一致）
+BENCHMARK-FAIL: 取数不全是环境原因以外的失败，禁止当通过
+  ! v2rockets/Loyal-Elephie: gh api repos/v2rockets/Loyal-Elephie/releases -> Get "https://api.github.com/repos/v2rockets/Loyal-Elephie/releases": unexpected EOF
+BENCH-R95-FULL_RC=1

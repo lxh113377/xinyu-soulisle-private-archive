@@ -7,7 +7,7 @@
  "buckets": {
   "jar8123": {
    "n": 39,
-   "seconds": 713.9,
+   "seconds": 623.8,
    "members": [
     "preflight",
     "perf_baseline",
@@ -52,7 +52,7 @@
   },
   "free": {
    "n": 75,
-   "seconds": 399.6,
+   "seconds": 294.4,
    "members": [
     "disclaimer_forensics",
     "disclaimer_forensics_selftest",
@@ -133,7 +133,7 @@
   },
   "jar8123+port:18123": {
    "n": 2,
-   "seconds": 0.5,
+   "seconds": 0.4,
    "members": [
     "suite_census",
     "suite_census_selftest"

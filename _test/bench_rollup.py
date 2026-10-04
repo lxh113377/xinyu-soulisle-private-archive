@@ -252,14 +252,19 @@ def render(roll):
     L.append("|---|---|---|---|")
     L.append("| 回归套件数 | %s | 未取数 | `run_all_suites.py --list` |" % a["regression_suites"])
     L.append("| Java 测试类 / @Test | %d / %d | 见 peers 行 | git ls-files + @Test 计数 |" % (a["java_test_files"], a["java_test_cases"]))
-    L.append("| 覆盖率门 | LINE≥%.2f ∧ BRANCH≥%.2f | coverage_gate 有门 %s | server/pom.xml（同址尺 quality_gate_channel） |"
-             % (a["jacoco_minimum"].get("LINE", 0), a["jacoco_minimum"].get("BRANCH", 0),
-                "%d/%s" % (g["quality_gate_classes"].get("coverage_gate", {}).get("yes", 0), g.get("repo_count"))))
-    L.append("| lint 门 | 无标准配置门（有自写 js_syntax 判据） | %d/%s | 同上 |"
-             % (g["quality_gate_classes"].get("lint_gate", {}).get("yes", 0), g.get("repo_count")))
-    L.append("| typecheck 门 | 无（零构建无 TS） | %d/%s（另 %d 未验） | 同上 |"
-             % (g["quality_gate_classes"].get("typecheck_gate", {}).get("yes", 0), g.get("repo_count"),
-                g["quality_gate_classes"].get("typecheck_gate", {}).get("unverified", 0)))
+    # r95 finding③：五类质量门一律印三值 `有门=已验口径（未验N，人口M）`，已验=人口−未验。
+    #   旧形态 `0/16` 把「没测到」折进分母，读者得到「16 个对手都没有」；lint 行更连未验都没印。
+    def _gate(cls):
+        c = g["quality_gate_classes"].get(cls) or {}
+        yes, unv = c.get("yes", 0), c.get("unverified", 0)
+        pop = g.get("repo_count") or 0
+        return "有门 %d/%d（未验%d，人口%d）" % (yes, max(pop - unv, 0), unv, pop)
+    L.append("| 覆盖率门 | LINE≥%.2f ∧ BRANCH≥%.2f | coverage_gate %s | server/pom.xml（同址尺 quality_gate_channel） |"
+             % (a["jacoco_minimum"].get("LINE", 0), a["jacoco_minimum"].get("BRANCH", 0), _gate("coverage_gate")))
+    L.append("| lint 门 | 无标准配置门（有自写 js_syntax 判据） | lint_gate %s | 同上 |"
+             % _gate("lint_gate"))
+    L.append("| typecheck 门 | 无（零构建无 TS） | typecheck_gate %s | 同上 |"
+             % _gate("typecheck_gate"))
     L.append("| 有测试结构的 peer | — | %s/%s（ts=%s） | %s |"
              % (q.get("have_test_struct"), q.get("denominator"), q.get("ts"), q.get("file", "—")))
     L.append("| CI 跑 unit 的 peer | — | %s/%s | 同上 |" % (q.get("ci_unit_step"), q.get("denominator")))
@@ -274,6 +279,12 @@ def render(roll):
     L.append("| CI 工作流 / job | %d / %d | workflow 数见总览表 | git HEAD .github/workflows |"
              % (b["ci_workflow_files"], b["ci_jobs"]))
     return "\n".join(L)
+
+
+def dump_bytes(roll):
+    """台账的**唯一写出面**：LF 锁死 + UTF-8。写盘的 main 与自测腿都调本函数（两处各写一份
+    序列化 = 迟早漂移；与 AGENTS.md「静态页直读 src 不复制第三份」同一取舍）。"""
+    return json.dumps(roll, ensure_ascii=False, indent=2).replace("\r\n", "\n").encode("utf-8")
 
 
 def selftest():
@@ -301,6 +312,29 @@ def selftest():
              "    steps:\n      - run: echo\n  b:\n    steps:\n      - run: echo\npermissions: read-all\n")
     cases.append(("反例 job 内保留键不得算成 job", count_jobs(synth) == 2, True))
     cases.append(("边界 无 jobs 块时不得凭空数出 job", count_jobs("name: t\non: push\n") == 0, True))
+    # r95 finding③：质量门行必须三值（已验/人口−未验），未验不得折进分母。
+    _g_roll = json.loads(json.dumps(roll))          # 深拷贝，避免污染上面的用例
+    _gb = _g_roll["dim_b_zero_build_cost"]["peers_build_gates"]
+    _gb["quality_gate_classes"]["typecheck_gate"] = {"yes": 0, "no": 14, "unverified": 2}
+    _gb["quality_gate_classes"]["lint_gate"] = {"yes": 2, "no": 13, "unverified": 1}
+    _md3 = render(_g_roll)
+    _tc_line = next((l for l in _md3.splitlines() if "typecheck_gate" in l), "")
+    cases.append(("三值展示：未验 2 时 typecheck 行须为 0/14 且带未验人口",
+                  "有门 0/14（未验2，人口16）" in _tc_line and "0/16" not in _tc_line, True))
+    _lint_line = next((l for l in _md3.splitlines() if "lint_gate" in l), "")
+    cases.append(("三值展示：lint 行同样扣未验（旧写法连未验都没印）",
+                  "有门 2/15（未验1，人口16）" in _lint_line, True))
+    _gz = json.loads(json.dumps(roll))
+    _gz["dim_b_zero_build_cost"]["peers_build_gates"]["quality_gate_classes"] = {
+        "coverage_gate": {"yes": 0, "no": 0, "unverified": 16}}
+    _cov_line = next((l for l in render(_gz).splitlines() if "coverage_gate" in l), "")
+    cases.append(("全未验：已验分母归零而不是负数/16", "有门 0/0（未验16，人口16）" in _cov_line, True))
+    # 写出面腿（r95）：`dump_bytes` 的**行分隔符必须是裸 LF** —— Windows 上 `write_text` 会把
+    # `\n` 译成 `\r\n`，而 `.gitattributes` 钉 eol=lf ⇒ 每跑一次 rollup，`eol_parity` 就红一次
+    # （本轮实测：跑完 rollup 后台账工作树 120 处 CRLF）。注：JSON 会把字符串内的换行转义成
+    # `\r\n` 两字符，所以真正的风险面只有 indent 产生的行分隔符，本腿量的就是它。
+    _db = dump_bytes(roll)
+    cases.append(("写出面行分隔符为裸 LF（不含 \\r）", b"\r" not in _db and b"\n" in _db, True))
     bad = [n for n, got, want in cases if got != want]
     print("ROLLUP-SELFTEST-%s（%d/%d 条）" % ("PASS" if not bad else "FAIL: " + "; ".join(bad),
                                               len(cases) - len(bad), len(cases)))
@@ -328,7 +362,15 @@ def main():
         return 1
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(roll, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 按字节写死 LF（唯一出口 `dump_bytes`）：`Path.write_text` 在 Windows 上会把 `\n` 译成
+    # `\r\n`，而 `.gitattributes` 钉 `eol=lf` ⇒ 入库是 LF、工作树是 CRLF，`eol_parity` 每跑一次
+    # rollup 就红一次（r94/r95 两轮各踩一次）。根因在**产物的写出面**，不在归一脚本。
+    out.write_bytes(dump_bytes(roll))
+    _wb = out.read_bytes()
+    if b"\r\n" in _wb:
+        print("ROLLUP-FAIL: 产物写出面含 CRLF（%d 处）⇒ 落盘没锁 newline，eol_parity 下一轮必红"
+              % _wb.count(b"\r\n"))
+        return 1
     print("自测面：git HEAD（与 benchmark_metrics 同面，禁止混工作树）")
     print(render(roll))
     print("产物：%s" % out.relative_to(ROOT))

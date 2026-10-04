@@ -116,3 +116,10 @@ if b["emotions"] != 0 or b["messages"] != 0:
     print("FAIL-B: 默认关闭时服务端不应收到任何记录 → 判据恒真")
     ok = False
 print("J4-MEMORY-PASS" if ok else "J4-MEMORY-FAIL")
+# 电池按 rc 记账，而本件此前只印结论不转退出码 ⇒ 印 FAIL 也记绿（r93 在 j2_chat_contract
+# 上抓到同型并修了那一件；r94 类扫 90 套件仍只有本件漏网，AC-OBS-10 的验收判据不能报红而记绿）。
+# 守卫形态 = G9 `import_safety` 的要求（顶层入口调用须在 `if __name__` 之后）。本件正文仍是顶层
+# 脚本形态（与 browser_check/pixel_dual 等同族），import 会执行到 print 那行才停 —— 已知软面，
+# 记在 r95 报告 §5，不假装本件已全量 import-safe。
+if __name__ == "__main__":
+    sys.exit(0 if ok else 1)

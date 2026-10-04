@@ -156,9 +156,20 @@ RE_BENCH_PATH = re.compile(r"(^|/)(bench|benchmarks|benchmark|perf|performance|l
 # 本仓 `_test/benchmark_metrics.py` 与 leemo 的 `aggregate_benchmark.py`）——同名不同事，必须显式否掉，
 # 否则这条尺会把自己的采集器记成"我们有性能装置"。规则对 peers 与 self 同样生效（同址）。
 BENCH_DENY = re.compile(r"(bench|benchmark)[\w-]*(_?metrics?|_?collect|_?aggregat|_?report|_?summary)", re.I)
-RE_CI_PERF = re.compile(r"^\.github/workflows/(?:[\w.-]*[-_])?(perf|bench|benchmark|load[-_]?test|stress)"
-                        r"[\w.-]*\.ya?ml$", re.I)
+RE_CI_PERF = re.compile(r"^\.github/workflows/(?:[\w.-]*[-_])?"
+                        r"(perf|bench|benchmark|load[-_]?test|stress"
+                        r"|lighthouse|lhci|web[-_]?vitals"
+                        r"|bundle[-_]?(?:analyzer|size)|size[-_]?check|budget"
+                        r"|k6|artillery|locust)[\w.-]*\.ya?ml$", re.I)
 # r74 首跑抓到 `deploy-workbench.yml` 被裸 `bench` 认成性能步 ⇒ 名字边界必须是分隔符或行首（workbench 不算）
+# r95 修（一手：lobehub `.github/workflows/lighthouse.yml` 与 `bundle-analyzer.yml` 一直存在，
+# 但 alternatives 里没有这两个词 ⇒ `ci_perf_step` 对 lobehub 恒判无）。
+# 两个刻意约束：① **前缀**沿用 r74 的分隔符约束、**后缀保持自由** `[\w.-]*`（与旧尺逐字同构）。
+#   本轮第一版曾顺手把后缀收成 `(?:[-_][\w.-]*)?`，被自己的拒绝侧样本 `bench-notes.yml` 否证 ——
+#   旧尺下它一直判有，r74 只收紧过前缀 ⇒ 那是改动越界（改了没人要求的维度），不是旧尺的洞。
+# ② 命中即「有性能/包体**测量步**」，不等于「有门」。判"门"还须执行位+会失败的阈值形态：
+#   lobehub `lighthouse.yml` 实为 Lighthouse Badger（`fail-fast: false`、全文无 assert/budget）⇒ 属
+#   advisory 徽章。故本格的口径写死为「测量步」，对外结论不得据它说"全池唯一有性能门"（见 §11 修订）。
 RE_PERF_KW = re.compile(r"(benchmark|latency|throughput|\bp\d{2}\b|qps|req/s|\brps\b|tokens?/s|tok/s"
                         r"|\bttft\b|首字|吞吐|压测|实测|measured)", re.I)
 RE_PERF_NUM = re.compile(r"\d+(\.\d+)?\s*(ms|µs|μs|req/s|tokens/s|tok/s|qps|rps|tps)\b|\d+(\.\d+)?\s*倍|P\d{2}=\d")
@@ -458,244 +469,19 @@ def self_cap_channel(rev="HEAD"):
     return c
 
 
-# ── r75：**质量门**的同址尺——问的是"这道检查能不能让构建失败"，不是"有没有这个配置文件"。
-#     起因（本轮只读枚举，非凭印象）：`_test/peer_quality_tooling_probe.py`（r58）自己写明了天花板
-#     ——「覆盖率与缺陷率都不在本轮取数面内」，它量的是**配置在不在、测试文件在不在、CI 有没有执行位**；
-#     而 self 侧实测 `grep -n "jacoco\|coverage" server/pom.xml` = 0 命中（surefire 在，跑用例但**无门槛**）。
-#     同一件"质量工程"的两个半边：一只尺量"有没有装"，另一只量"装了之后会不会拦人"——后者从没量过，
-#     正是「把现成的尺换到没人量的那一半」。判据形状按类分两种，**不许混用**：
-#       · coverage / mutation 这类是**阈值型**：配置文件在 ≠ 有门，必须见到"低于阈值即失败"的形状
-#         （`fail_under` / `--cov-fail-under` / `check-coverage` / `thresholds.break` / jacoco 的 `<rule><limit><minimum>`）；
-#       · lint / typecheck / secret-scan 这类是**执行型**：退出码天然非零，门槛＝"配置 ∧ CI 真跑它"。
-#     与 r73/r74 通道同源：不参与 caps、不设兜底、取不到内容一律 `unverified`（不得写成"该仓没有门"）。
-QG_CLASSES = ("coverage_gate", "mutation_gate", "lint_gate", "typecheck_gate", "secret_scan_gate")
-QG_CANDIDATES = {
-    "coverage_gate": re.compile(r"(^|/)(jacoco[\w.-]*\.xml|\.coveragerc|coverage\.cfg|setup\.cfg"
-                                r"|codecov\.ya?ml|\.nycrc[\w.-]*|pyproject\.toml|vitest\.config\.[\w]+|jest\.config\.[\w]+"
-                                r"|pom\.xml$|build\.gradle(\.kts)?$)"
-                                r"|(^|/)(tests?|benchmarks?)/?cov[\w.-]*\.yml$", re.I),
-    "mutation_gate": re.compile(r"(^|/)(stryker[\w.-]*\.(js|ts|cjs|mjs|json)|mutmut\.cfg|setup\.cfg"
-                                r"|infection[\w.-]*\.(json|dist)|pitest[\w.-]*|pom\.xml)$", re.I),
-    "lint_gate": re.compile(r"(^|/)(\.eslintrc[\w.-]*|eslint\.config\.[\w]+|\.pylintrc|ruff\.toml"
-                            r"|\.flake8|biome\.json(?:c)?|\.standard-json|golangci\.yml)$", re.I),
-    "typecheck_gate": re.compile(r"(^|/)(tsconfig[\w.-]*\.json|mypy\.ini|pyrightconfig\.json"
-                                 r"|\.pylintrc|typed\.py)$", re.I),
-    "secret_scan_gate": re.compile(r"(^|/)(\.gitleaks\.toml|\.secrets\.baseline|\.pre-commit-config\.yaml"
-                                   r"|\.secretlintrc[\w.-]*|\.trufflehog|detect_secrets[\w.-]*)$", re.I),
-}
-# 阈值型类的"会让构建失败"形状（正文面；只在这些候选文件里找，避免全仓正文爆炸）
-QG_THRESHOLD_SHAPE = {
-    "coverage_gate": re.compile(r"(fail_under|cov-fail-under|check-coverage|thresholds?[^\n]{0,40}?\b(lines|functions|statements)"
-                                r"|<rule>|<limit>|minimum|coverage[^\n]{0,24}?(8|9)\d(\.\d+)?%)", re.I),
-    "mutation_gate": re.compile(r"(mutationScoreThreshold|mutationThreshold|<mutationScale|failure_under"
-                                r"|min-msi|mutator[\s\S]{0,30}?(coverage|mutation)|thresholds[\s\S]{0,24}break"
-                                r"|\b(pitest|stryker|mutmut|infection)\b[\s\S]{0,60}?(threshold|limit|break|msi))",
-                               re.I),
-}
-QG_CI_EXEC_SHAPE = re.compile(r"(eslint|biome|flake8|ruff|pylint|mypy|pyright|tsc\s+--noEmit|gitleaks"
-                              r"|trufflehog|detect-secrets|secretlint|jacoco|codecov|nyc|vitest\s+--coverage"
-                              r"|pytest[^\n]{0,40}--cov)", re.I)
-# 执行型类的 CI 形状**按工具词**匹配（本轮 selftest 的正例抓到一处自欺：早期版本拿"文件名正则"去搜 CI 正文，
-# 于是 `npm run lint: eslint . --max-warnings 0` 这种真在拦人的步被判成"CI 没跑" ⇒ 假阴性）。
-QG_EXEC_TOKENS = {
-    "lint_gate": re.compile(r"(eslint|biome|flake8|ruff|pylint|standard\b|rubocop|clippy|golint|revive"
-                            r"|风格|规范检查|代码检查|代码风格)", re.I),
-    "typecheck_gate": re.compile(r"(mypy|pyright|tsc\s+--noEmit|tsc\s+-p|flow\s+check|typescript\s+--noEmit"
-                                 r"|类型检查|静态类型)", re.I),
-    "secret_scan_gate": re.compile(r"(gitleaks|trufflehog|detect[-_]?secrets|secretlint|git-secrets|snyk\s+code"
-                                   r"|checkov|semgrep|密钥[^\n]{0,12}(扫描|检查|零入库)|零密钥)", re.I),
-}
-# CI 面的取样上限：**取不全时不得判"没有"**（blindness is not zero）。wf_fetched < wf_total 且没找到执行位
-# ⇒ 该类记 None（unverified），而不是 False。r75 首跑就是因为只取 3 个 workflow 而 lobehub 有 31 个，
-# 把整面读成"peers 一律无门"——那是我的取数面塌缩，不是对手的事实。
-QG_CI_FETCH_CAP = 12
-
-
-def qg_ci_face(paths):
-    """从清单里挑出 workflow 文件（返回全部路径与条数，由调用方决定取多少并如实报覆盖率）。"""
-    wf = [p for p in (paths or []) if p.startswith(".github/workflows/") and p.endswith((".yml", ".yaml"))]
-    return wf
-
-
-# r78 第二条路由：**自写门禁**。旧 `qg_classify` 对执行型三类的第一句是 `if not files: out=False`，
-# 而 `files` 只来自"标准工具文件名"清单（.gitleaks.toml / eslint.config.* / mypy.ini…）⇒
-# 本仓的密钥门 `_test/tracked_secret_scan.py` 明明被 CI 每一步跑着（ci.yml 现读第 56 行确有该步骤），
-# 却被这把尺读成「self=❌无」，r77 总览表因此带了一条**假缺口**；同法对 peers 也失效，
-# 那一格的分子分母从来就不是对手的事实。
-# 与 r75「有配置≠有门」互为对偶：那条防"假阳"，这条防"假阴"。
-QG_RUN_CMD = re.compile(r"^(?:-\s*)?(?:run:\s*)?(?:[\w./-]*/)?(?:npx|npm\s+run|yarn|pnpm|uvx?|pipx|"
-                        r"python3?|bash|sh|go|cargo|make|gradle|mvn|deno|bun)\b")
-QG_INVOKED_TOKENS = {
-    "lint_gate": re.compile(r"\b(eslint|biome|flake8|ruff|pylint|rubocop|clippy|golint|revive)\b"
-                            r"|[\w./-]*(?:lint|eslint)[\w.-]*\.(?:py|sh|js|ts)", re.I),
-    "typecheck_gate": re.compile(r"\b(mypy|pyright|pytype)\b|\btsc\s+(?:-p|--noEmit)\b"
-                                 r"|[\w./-]*(?:typecheck|tsc|mypy|pyright)[\w.-]*\.(?:py|sh|js|ts)", re.I),
-    "secret_scan_gate": re.compile(r"\b(gitleaks|trufflehog|secretlint|git-secrets|detect[-_]secrets)\b"
-                                   r"|[\w./-]*(?:secret|gitleaks|trufflehog)[\w.-]*\.(?:py|sh|js|ts)", re.I),
-}
-
-
-def qg_invoked_line(cls, ci_text):
-    """纯函数：找 CI 里"执行行真调用了一个带该类工具词的可执行体"的第一行。
-
-    只认执行行（`run:` 之后或以解释器/构建工具开头的行）——**注释与步骤名不算**，
-    否则 `起 fat jar（无密钥，仅情绪接口）` 这种描述性文字会把"没门"读成"有门"。
-    """
-    rx = QG_INVOKED_TOKENS.get(cls)
-    if not rx:
-        return ""
-    for line in (ci_text or "").splitlines():
-        s = line.strip()
-        if not s or s.startswith("#") or s.startswith("- name:") or s.startswith("name:"):
-            continue
-        if not QG_RUN_CMD.search(s):
-            continue
-        if rx.search(s):
-            return s[:120]
-    return ""
-
-
-def qg_exec_verdict(cls, files, ci_text, ci_complete):
-    """执行型类的三态判定：True=找到执行位 / False=CI 面读全了且确实没有 / None=面没读全，不得下结论。
-
-    两条路由任一命中即 True：① 标准配置文件 ∧ CI 执行位（r75 原口径）；
-    ② 无标准配置但 CI 执行行真调用了带该类工具词的可执行体（r78 新增，覆盖自写门禁）。
-    """
-    if files:
-        m = QG_EXEC_TOKENS[cls].search(ci_text or "")
-        if m:
-            return True, "%s ∧ CI 执行位=%s" % (files[0], m.group(0)[:40])
-    inv = qg_invoked_line(cls, ci_text)
-    if inv:
-        return True, "自写门禁 ∧ CI 真调用：%s" % inv
-    if not ci_complete:
-        return None, "%s CI 面未取全 ⇒ 不得判「无门」" % ("%s 在，但" % files[0] if files else "")
-    return False, ("%s 在而 CI 面取全后未见执行位" % files[0]) if files \
-        else "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
-
-
-def qg_tree_candidates(paths):
-    """结构面：每个类挑出候选文件（只证"有这个东西"，不证它有牙）。"""
-    cand = {}
-    for cls, rx in QG_CANDIDATES.items():
-        cand[cls] = [p for p in (paths or []) if len(p) < 300 and rx.search(p)]
-    return cand
-
-
-def qg_classify(cand, blobs, ci_text, ci_complete=True):
-    """纯函数：候选文件 + 这些文件的正文 + workflow 文本 → 五类的"能不能拦人"。
-
-    阈值型类必须有**失败形状**才算 gate；执行型类必须有**配置 ∧ CI 执行位**。
-    候选存在但正文没取到 ⇒ 该类记 `unverified`（不得塌缩成 False）；
-    CI 面没取全（`ci_complete=False`）而没找到执行位 ⇒ 同样记 None，**不得判"没有门"**。
-    """
-    out, ev, unv = {}, {}, []
-    for cls in QG_CLASSES:
-        files = cand.get(cls) or []
-        if cls in QG_THRESHOLD_SHAPE:
-            if not files:
-                out[cls] = False
-                continue
-            read = [f for f in files if f in blobs]
-            if not read:
-                unv.append("%s(候选 %s 正文未取到)" % (cls, files[0]))
-                out[cls] = None
-                continue
-            hit = next(((f, QG_THRESHOLD_SHAPE[cls].search(blobs[f])) for f in read
-                        if QG_THRESHOLD_SHAPE[cls].search(blobs[f] or "")), None)
-            out[cls] = bool(hit)
-            if hit:
-                ev[cls] = "%s :: %s" % (hit[0], hit[1].group(0)[:60])
-        else:
-            # r78：执行型三类**不得**因为"没有标准配置文件"就直接判无——自写门禁只看 CI 执行行
-            v, why = qg_exec_verdict(cls, files, ci_text, ci_complete)
-            out[cls] = v
-            ev[cls] = why
-            if v is None:
-                unv.append("%s(CI 面未取全)" % cls)
-    return out, ev, unv
-
-
-def self_quality_gates(rev="HEAD"):
-    """self 侧走同一函数：清单=ls-tree，正文=pom/配置 blob，CI 文本=`.github/workflows/*.yml` blob。"""
-    paths = git_ls_tree(rev)
-    cand = qg_tree_candidates(paths)
-    want = sorted({f for files in cand.values() for f in files})[:8]
-    blobs = {}
-    errs = []
-    for f in want:
-        try:
-            blobs[f] = git_blob(f, rev)
-        except Exception as e:
-            errs.append("%s:%s" % (f, str(e)[:40]))
-    ci_all = qg_ci_face(paths)
-    ci_take = ci_all[:QG_CI_FETCH_CAP]
-    ci_text, errs2 = "", []
-    for f in ci_take:
-        try:
-            ci_text += git_blob(f, rev) + "\n"
-        except Exception as e:
-            errs2.append("ci:%s" % str(e)[:40])
-    cls, ev, unv = qg_classify(cand, blobs, ci_text, ci_complete=(len(ci_all) <= len(ci_take)))
-    # 天花板自证：本尺认两形——① 标准工具配置（.gitleaks.toml / eslint.config.* / jacoco `<limit>`…）
-    #   ∧ CI 执行位；② r78 补：**无标准配置但 CI 执行行真调用了一个带该类工具词的可执行体**（自写门禁）。
-    #   两侧同一函数 ⇒ 同法；注释与步骤名不计（防"提到关键词就算有门"）。
-    # `ci_steps_homegrown` 继续带出全部自写步骤名，供人核"名册 vs 判定"是否同源，只作说明不参与对照。
-    step_names = re.findall(r"(?m)^\s*-\s+name:\s*(.+)$", ci_text)
-    return {"classes": cls, "evidence": ev, "unverified": unv + errs, "ci_face": "%d/%d" % (len(ci_take), len(ci_all)),
-            "candidates": {k: v[:3] for k, v in cand.items()}, "face": rev,
-            "ci_step_count": len(step_names),
-            "ci_steps_homegrown": [s.strip()[:34] for s in step_names
-                                   if re.search(r"守卫|门禁|红线|校验|扫描|自检|对账|预算|一致性", s)],
-            "partial_errors": "; ".join(errs + errs2)}
-
-
-def quality_gate_audit(repos, max_fetch=4):
-    """peers 侧：tree 挑候选 → 只取候选文件正文（≤max_fetch/仓）→ 同一 qg_classify。"""
-    out = {}
-    for r in repos:
-        full = r["repo"]
-        branch = r.get("default_branch") or "HEAD"
-        errs, paths, ci_text = [], [], ""
-        try:
-            tr = gh("repos/%s/git/trees/%s?recursive=1" % (full, branch), timeout=90)
-            paths = [e["path"] for e in tr.get("tree", []) if e.get("type") == "blob"]
-            if tr.get("truncated"):
-                errs.append("tree_truncated")
-        except Exception as e:
-            errs.append("tree:" + str(e)[:60])
-            out[full] = {"classes": {}, "evidence": {}, "unverified": ["tree 取不到：" + str(e)[:60]]}
-            continue
-        cand = qg_tree_candidates(paths)
-        blobs = {}
-        for cls, files in cand.items():
-            for f in files[:max_fetch]:
-                if f in blobs:
-                    continue
-                try:
-                    d = gh("repos/%s/contents/%s?ref=%s" % (full, f, branch), timeout=40)
-                    blobs[f] = base64.b64decode((d.get("content") or "").strip()).decode("utf-8", errors="replace")
-                except Exception as e:
-                    errs.append("%s:%s" % (f, str(e)[:40]))
-        ci_all = qg_ci_face(paths)
-        ci_take = ci_all[:QG_CI_FETCH_CAP]
-        for p in ci_take:
-            if p in blobs:
-                continue
-            try:
-                d = gh("repos/%s/contents/%s?ref=%s" % (full, p, branch), timeout=40)
-                blobs[p] = base64.b64decode((d.get("content") or "").strip()).decode("utf-8", errors="replace")
-            except Exception as e:
-                errs.append("ci:%s" % str(e)[:40])
-        ci_text = "\n".join(blobs[p] for p in ci_take if p in blobs)
-        cls, ev, unv = qg_classify(cand, blobs, ci_text, ci_complete=(len(ci_all) <= len(ci_take)))
-        out[full] = {"classes": cls, "evidence": ev, "unverified": unv,
-                     "ci_face": "%d/%d" % (len(ci_take), len(ci_all)),
-                     "candidates": {k: v[:3] for k, v in cand.items()},
-                     "partial": bool(errs), "partial_errors": "; ".join(errs)[:160]}
-    return out
-
-
+# ── r95：质量门同址尺整块迁至 `bench_quality_gates.py`（loc 门 2000 行红线，且本轮
+#     finding(3) 还要加长）。被迁 14 个节点的 ast.dump() 迁前后全等；名字在此重绑，
+#     调用方（main / selftest / 门面打印）零改动。
+#     另留模块别名 `_bqg`：selftest 的**变异腿必须改被审对象所在模块的全局名**——迁块后
+#     `globals()` 指向本模块，改这里对被迁函数无效（实测 ③-d 腿当场判红自证了这一点）。
+import bench_quality_gates as _bqg
+from bench_quality_gates import (QG_CLASSES, QG_CANDIDATES, QG_THRESHOLD_SHAPE,
+                                 QG_CI_EXEC_SHAPE, QG_EXEC_TOKENS, QG_CI_FETCH_CAP,
+                                 QG_RUN_CMD, QG_INVOKED_TOKENS, qg_ci_face, qg_ci_pick,
+                                 QG_CI_PRIORITY, QG_CI_EXACT, qg_ci_score, qg_gate_line,
+                                 qg_tree_candidates,
+                                 qg_invoked_line, qg_exec_verdict, qg_classify,
+                                 self_quality_gates, quality_gate_audit)
 
 def blind_spot_caps(root, tracked, caps_found):
     """返回"内容里有证据、但 CAP_RULES 按文件名没看见"的能力名列表（只对本项目算）。"""
@@ -1394,6 +1180,34 @@ def _st_selftest_3(st):  # r94 拆出的第 3 段（切点由 AST 求得，跨�
     if doc_perf_tree_class([".github/workflows/deploy-workbench.yml"])[0]["ci_perf_step"]:
         print("SELFTEST-FAIL: deploy-workbench.yml 仍被当成 CI 性能步（lobehub 首跑那处假阳没修住）")
         return 1
+    # r95 接纳侧（与上面拒绝侧成对）：本腿此前**不存在** ⇒ 尺只在没测的那一半上出错。
+    # 一手：lobehub lighthouse.yml / bundle-analyzer.yml 恒判无 → 曾据此写"全池唯一"。
+    _perf_yes = [".github/workflows/lighthouse.yml", ".github/workflows/bundle-analyzer.yml",
+                 ".github/workflows/run-lighthouse.yml", ".github/workflows/web-vitals.yml",
+                 ".github/workflows/size-check.yml", ".github/workflows/k6.yml",
+                 ".github/workflows/perf-baseline.yml", ".github/workflows/benchmark.yml"]
+    _perf_no = [".github/workflows/workbench.yml", ".github/workflows/testbench.yml",
+                ".github/workflows/sizey.yml", ".github/workflows/pr-checks.yml"]
+    _miss = [p for p in _perf_yes
+             if not doc_perf_tree_class([p])[0]["ci_perf_step"]]
+    if _miss:
+        print("SELFTEST-FAIL: 接纳侧漏判 %s ⇒ RE_CI_PERF 的 lighthouse/bundle/… 支路没生效" % _miss)
+        return 1
+    _fp = [p for p in _perf_no if doc_perf_tree_class([p])[0]["ci_perf_step"]]
+    if _fp:
+        print("SELFTEST-FAIL: 拒绝侧误判 %s ⇒ 前缀分隔符约束被放宽（r74 那处假阳会复发）" % _fp)
+        return 1
+    # 变异体：摘掉 lighthouse 支路 ⇒ 对应样本必须翻判（证明这条支路作用在被判对象上，不是恒真）
+    _mut = re.compile(r"^\.github/workflows/(?:[\w.-]*[-_])?"
+                      r"(perf|bench|benchmark|load[-_]?test|stress|lhci|web[-_]?vitals"
+                      r"|bundle[-_]?(?:analyzer|size)|size[-_]?check|budget"
+                      r"|k6|artillery|locust)[\w.-]*\.ya?ml$", re.I)
+    if _mut.search(".github/workflows/lighthouse.yml"):
+        print("SELFTEST-FAIL: 摘掉 lighthouse 支路仍判有 ⇒ 该用例是空腿")
+        return 1
+    if not _mut.search(".github/workflows/bundle-analyzer.yml"):
+        print("SELFTEST-FAIL: 变异体误伤 bundle 支路（改动面越界，本腿应只摘 lighthouse）")
+        return 1
     if doc_perf_text_class("- 曲线由控制页本地生成（250ms 步进的正弦/方波/斜坡），只有波形*规格*走网络"
                            "——丝滑程度与网络延迟无关。")[0]["published_numbers"]:
         print("SELFTEST-FAIL: 「与网络延迟无关」这类设计陈述被当成公开性能数字（succhia 首跑假阳）")
@@ -1554,7 +1368,7 @@ def _st_selftest_5(st):  # r94 拆出的第 5 段（切点由 AST 求得，跨�
     if any(bool(v) for v in _g4.values()) or _u4:
         print("SELFTEST-FAIL: 零输入升格成质量门（违反「零输入不得记 PASS」）：%s" % _g4)
         return 1
-    _g95 = globals()
+    _g95 = _bqg.__dict__      # r95：变异腿必须改**被审对象所在模块**的全局名（迁块后 globals() 已不对）
     # ③-d 变异腿（证明 ③ 的正例不是被别的腿喂绿的）：摘掉"自写门禁"路由 ⇒ 同一个输入必须回 False
     _orig_inv = dict(_g95["QG_INVOKED_TOKENS"])
     try:
@@ -1593,8 +1407,11 @@ def _st_selftest_5(st):  # r94 拆出的第 5 段（切点由 AST 求得，跨�
     finally:
         _g95["QG_THRESHOLD_SHAPE"]["coverage_gate"] = _orig_cov
     _asked75 = []
-    _orig_ls75, _orig_blob75 = _g95["git_ls_tree"], _g95["git_blob"]
+    _keys75 = ("gh", "git_blob", "git_ls_tree")
+    _orig75 = {k: _g95.get(k) for k in _keys75}      # 迁块后这三个不在 _bqg 里，restore 须能「装回无」
     try:
+        # 桩装在被审模块（_bqg.__dict__），self 侧一旦出公网就叫这条桩炸掉 ⇒ 顺带钉住「self 面零网络」
+        _g95["gh"] = lambda *a, **k: (_ for _ in ()).throw(AssertionError("self 侧质量门不得出公网"))
         _g95["git_ls_tree"] = lambda rev="HEAD": (_asked75.append(("ls", rev)),
                                                   ["server/pom.xml", ".eslintrc.json",
                                                    ".github/workflows/ci.yml"])[1]
@@ -1631,7 +1448,15 @@ def _st_selftest_5(st):  # r94 拆出的第 5 段（切点由 AST 求得，跨�
             print("SELFTEST-FAIL: self 侧未从 git HEAD 取清单/CI 正文（接线是假的）：%s" % _asked75[:4])
             return 1
     finally:
-        _g95["git_ls_tree"], _g95["git_blob"] = _orig_ls75, _orig_blob75
+        for _k75, _v75 in _orig75.items():
+            if _v75 is None:
+                _g95.pop(_k75, None)
+            else:
+                _g95[_k75] = _v75
+        _left = [k for k in _keys75 if _g95.get(k) is not _orig75[k]]
+        if _left:
+            print("SELFTEST-FAIL: 接线腿的桩没还原到位（残留/错值 %s）⇒ 后续腿会打到残桩上" % _left)
+            return 1
     return 0
 
 def _st_selftest_6(st):  # r94 拆出的第 6 段（切点由 AST 求得，跨段量经 st 显式传递）
@@ -1663,6 +1488,92 @@ def _st_selftest_6(st):  # r94 拆出的第 6 段（切点由 AST 求得，跨�
         if not isinstance(_s, str) or not _s:
             print(f"SELFTEST-FAIL: shown_path({_cand!r}) 返回空 ⇒ 门面行没读数")
             return 1
+    # ── r95 finding③：CI 面的**取样顺序**与展示面的**三值口径**（腿放在 PASS 行之前，
+    #    否则门面先印 SELFTEST-PASS、后面才失败 = 输出说谎）────────────────────
+    #    夹具**逐字取自数据面**（`gh api repos/lobehub/lobehub/git/trees/canary` 现读 33 个 workflow 名）。
+    #    上一版夹具是我手造的 33 个假名 ⇒ 接纳侧用例全绿，而**真对象上 test.yml 仍进不了面**
+    #    （本轮用 qg_ci_pick 复算 lobehub 实面才发现）。夹具来自假设＝用例只会自证。
+    _lobe33 = ("auto-i18n.yml", "auto-tag-release.yml", "bundle-analyzer.yml",
+               "claude-auto-e2e-testing.yml", "claude-auto-testing.yml", "claude-migration-support.yml",
+               "claude-pr-assign.yml", "claude-translate-comments.yml", "claude.yml",
+               "deploy-workbench.yml", "desktop-core-dry-run.yml", "e2e.yml",
+               "fts-search-mapping-history.yml", "lighthouse.yml", "manual-build-desktop.yml",
+               "pr-build-desktop.yml", "pr-build-docker.yml", "release-desktop-beta.yml",
+               "release-desktop-canary.yml", "release-desktop-core-ota.yml", "release-desktop-stable.yml",
+               "release-docker.yml", "release-model-bank.yml", "release-pr-version.yml", "release-sdk.yml",
+               "release.yml", "revalidate-docs.yml", "sync-database-schema.yml",
+               "sync-main-to-canary.yaml", "sync.yml", "test.yml", "verify-share.yml",
+               "verify-workbench.yml")
+    _wf33 = [".github/workflows/" + n for n in _lobe33]
+    if len(_wf33) != 33:
+        print("SELFTEST-FAIL: 夹具不是 33 个（真面复算的基数）⇒ 这条腿在打别的靶子")
+        return 1
+    _pick = qg_ci_pick(_wf33, cap=12)
+    if len(_pick) != 12:
+        print("SELFTEST-FAIL: qg_ci_pick 没把面截到 cap=12，实取 %d ⇒ 取数面失控" % len(_pick))
+        return 1
+    for _req in (".github/workflows/test.yml", ".github/workflows/lighthouse.yml",
+                 ".github/workflows/bundle-analyzer.yml", ".github/workflows/e2e.yml"):
+        if _req not in _pick:
+            print("SELFTEST-FAIL: 接纳侧失效，%s 仍进不了正文面（字母序截断那处洞没修住）" % _req)
+            return 1
+    # 拒绝侧必须单开一个 cap 小于相关件数的场景：33 个流里只有 6 个带门禁特征，cap=12 时
+    # 无关件按字母序**正当补位**（那不是排序失效）。只有相关件超 cap，0 分件才必须一个进不来。
+    _p4 = _bqg.qg_ci_pick(_wf33, cap=4)
+    if len(_p4) != 4 or any(s < 1 for s in map(_bqg.qg_ci_score, _p4)):
+        print("SELFTEST-FAIL: cap=4 时相关件没占满或混进无关件（分档没拉开）：%s" % _p4)
+        return 1
+    for _rej in (".github/workflows/release-desktop-beta.yml",
+                 ".github/workflows/sync-main-to-canary.yaml",
+                 ".github/workflows/claude-translate-comments.yml"):
+        if _rej in _p4:
+            print("SELFTEST-FAIL: 拒绝侧失效，发布/同步/翻译通道 %s 占了门禁位" % _rej)
+            return 1
+    _sc = [(n, _bqg.qg_ci_score(".github/workflows/" + n))
+           for n in ("test.yml", "claude-auto-testing.yml", "release-desktop-beta.yml",
+                     "deploy-workbench.yml", "e2e.yml", "verify-workbench.yml")]
+    if [s for _, s in _sc] != [2, 1, 0, 0, 2, 0]:
+        print("SELFTEST-FAIL: 相关性分档不符（2=整名即门禁名／1=名字含特征／0=无关；"
+              "workbench 按 r74 前缀纪律必须算 0，否则又把 test.yml 挤出面）：%s" % _sc)
+        return 1
+    if _bqg.qg_ci_pick(_wf33[:5], cap=12) != _wf33[:5]:
+        print("SELFTEST-FAIL: 人口≤cap 时发生了截断或重排（应原样全取）")
+        return 1
+    if qg_ci_pick(_wf33, cap=12) != _pick:
+        print("SELFTEST-FAIL: 同一输入两次取样结果不同 ⇒ 台账不可复算")
+        return 1
+    if qg_ci_pick(list(reversed(_wf33)), cap=12) != _pick:
+        print("SELFTEST-FAIL: 取样结果随 tree 返回顺序漂移 ⇒ 与字母序截断同病")
+        return 1
+    # 变异体：摘掉被审对象**所在模块**的两级相关性识别（分档 2 与特征 1）
+    # rebind 本模块同名变量不影响 bench_quality_gates 的 globals——那是一条会把自己判成
+    # "腿有效"的空腿（r95 实测两条腿各踩过一次：③-d 变异腿与这条）
+    _keep75 = (_bqg.QG_CI_PRIORITY, _bqg.QG_CI_EXACT)
+    try:
+        _bqg.QG_CI_PRIORITY = _bqg.QG_CI_EXACT = re.compile(r"(?!x)x")
+        _mp = _bqg.qg_ci_pick(_wf33, cap=12)
+        if ".github/workflows/test.yml" in _mp or _mp != sorted(_wf33, key=str.lower)[:12]:
+            print("SELFTEST-FAIL: 摘掉相关性识别后取样没退回字母序 ⇒ 本腿没作用在被判对象上")
+            return 1
+    finally:
+        _bqg.QG_CI_PRIORITY, _bqg.QG_CI_EXACT = _keep75
+    if ".github/workflows/test.yml" not in _bqg.qg_ci_pick(_wf33, cap=12):
+        print("SELFTEST-FAIL: 变异体没还原 ⇒ 后续断言在打自己改坏的对象")
+        return 1
+    # 展示面三值：分母必须扣掉未验；把未验折进分母的旧写法必须与新行**不同形**
+    _l = qg_gate_line("typecheck_gate", 0, 16, 2, "✅有")
+    if "有门=0/14" not in _l or "未验2" not in _l or "人口16" not in _l:
+        print("SELFTEST-FAIL: 门面行三值化没生效：%s" % _l)
+        return 1
+    if _l == "typecheck_gate    peers 有门=0/16 self=✅有":
+        print("SELFTEST-FAIL: 三值行与旧折叠写法同形 ⇒ 未验没被单列")
+        return 1
+    if "有门=0/16" in _l:
+        print("SELFTEST-FAIL: 未验仍被折进分母（Unavailable is not zero）：%s" % _l)
+        return 1
+    if "有门=0/0" not in qg_gate_line("x", 0, 2, 2, "⚠️未验"):
+        print("SELFTEST-FAIL: 全未验时已验分母没归零：%s" % qg_gate_line("x", 0, 2, 2, "⚠️未验"))
+        return 1
     print("SELFTEST-PASS: 合成快照 4 处改动（stars·pushed_at·caps·docs）全部抓到、全等对照零误报（"
           f"{len(got)} 条）；分档正确（实质 {len(sub)} / 抖动 {len(noise)}）且纯抖动场景零实质；"
           "分母证明正确（1 有效 / 2 盲区点名，健康仓不误踢）；"
@@ -1682,8 +1593,12 @@ def _st_selftest_6(st):  # r94 拆出的第 6 段（切点由 AST 求得，跨�
           "（13/16 与 16/16 两侧都验）；"
           "r78 口径翻转：**自写门禁（无标准配置、CI 执行行真调用）必须认出且点名那一行**，"
           "另一侧反例＝CI 里只有步骤名/注释提「无密钥」而执行行是 java -jar ⇒ 必须判无（防升格）；"
-          "摘掉该路由正例即回 False（变异腿）、还原即回 True")
-    return 0
+          "摘掉该路由正例即回 False（变异腿）、还原即回 True；"
+          "r95 CI 面取样：夹具逐字取自 lobehub 真面 33 个流，截到 12 时 test/lighthouse/bundle-analyzer/e2e 必入面、"
+          "发布与同步通道必不入面、相关性分档 2/1/0 各验一侧（workbench 算 0 承 r74 前缀纪律）、"
+          "两次与乱序输入同结果、人口≤cap 不截断、摘掉被审模块两级正则即退回字母序（变异腿改 _bqg 不改本模块）；"
+          "r95 展示面三值：五类质量门与 rollup 表的分母扣未验（0/16 折成 0/14(未验2)），全未验时已验分母归零；"
+          "r95 迁块：质量门尺整块迁 bench_quality_gates.py，14 节点 ast.dump 全等（12 逐字 + 2 仅多一行 _fetch 绑定）")
     return 0
 
 
@@ -1862,9 +1777,11 @@ def _main_p3(st):  # r94 拆出的第 3 段（切点由 AST 求得，跨段量�
             members = sorted(k for k, v in qg.items() if (v.get("classes") or {}).get(c) is True)
             unv = sorted(k for k, v in qg.items() if (v.get("classes") or {}).get(c) is None)
             sv = qg_self["classes"].get(c)
-            print(f"    {c:<17} peers 有门={len(members)}/{len(qg)} 未验={len(unv)} "
-                  f"self={'✅有' if sv is True else ('❌无' if sv is False else '⚠️未验')}"
-                  f"  例：{'、'.join(members[:3]) or '—'}")
+            # r95 finding③：分母只算**真读过正文的仓**（人口−未验），未验单列不折算成 0。
+            #   旧形态 `有门=0/16` 让读者得到「16 个对手都没有」，实际是「14 个测过没有、2 个没测到」。
+            _mark = "✅有" if sv is True else ("❌无" if sv is False else "⚠️未验")
+            print("    " + qg_gate_line(c, len(members), len(qg), len(unv), _mark)
+                  + "  例：%s" % ("、".join(members[:3]) or "—"))
             if unv:
                 print(f"      ⚠️ 该类不得写成「{len(unv)} 仓无门」——它们是**取数面未验**：{'、'.join(unv[:4])}")
         print(f"    self 面：face={qg_self['face']} CI 正文取数={qg_self.get('ci_face')} "
