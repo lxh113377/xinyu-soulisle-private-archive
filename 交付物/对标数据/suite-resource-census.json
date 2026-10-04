@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 116,
+ "suites": 120,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
@@ -51,7 +51,7 @@
    ]
   },
   "free": {
-   "n": 75,
+   "n": 79,
    "seconds": 294.4,
    "members": [
     "disclaimer_forensics",
@@ -127,6 +127,10 @@
     "run_logged_selftest",
     "loc_guard",
     "loc_guard_selftest",
+    "verdict_exit_parity",
+    "verdict_exit_parity_selftest",
+    "ci_contract",
+    "ci_contract_selftest",
     "bench_rollup",
     "bench_rollup_selftest"
    ]
@@ -1243,6 +1247,38 @@
    "target": "_test/loc_guard_check.py",
    "mode": "stub",
    "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "verdict_exit_parity",
+   "target": "_test/verdict_exit_parity_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "verdict_exit_parity_selftest",
+   "target": "_test/verdict_exit_parity_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "ci_contract",
+   "target": "_test/ci_contract_check.py",
+   "mode": "real",
+   "facets": [
+    "build"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "ci_contract_selftest",
+   "target": "_test/ci_contract_check.py",
+   "mode": "stub",
+   "facets": [
+    "build"
+   ],
    "exclusive": []
   },
   {

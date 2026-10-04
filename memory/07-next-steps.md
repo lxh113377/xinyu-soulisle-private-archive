@@ -17,9 +17,12 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - [x] ✅ [r93 → r94 已收] **loc 门超限治理**：r94 先修尺（22→8，14 项为「Java 类 / JS IIFE 被当函数」的误判）
       → 拆 10 个真超限函数 → **超限 0（LOC-PASS）** → 切 `enforce` 并加接线自证（门有牙）。
       报告 `交付物/对标分析报告-2026-10-03-r94.md`；台账 `part107`
-- [ ] 🟠 [R90 新] **CI 全绿契约前提变了**：`greencheck.py bootstrap --repo-dir .` 实测 `checks=[]`（本仓门禁=自写电池非标准配置）
-      ⇒ **禁造空契约**；须手写 `.ci/contract.json` blocking 清单，再加 step 并
-      `--sweep` 复扫到 `matched==declared`。前提：`python D:/global_skills/A-project-handoff/scripts/greencheck.py bootstrap --repo-dir .`
+- [x] ✅ [R90 新 · r95 已收] **CI 全绿契约**：台账原文记的「须手写 `.ci/contract.json` blocking 清单，再加 step 并
+      `--sweep` 复扫」在 r95 查清**两处不成立**——`greencheck bootstrap` 实测 `checks=[]`（自写电池不是标准配置）、
+      `greencheck.py` **无 `--sweep` 子命令**（`--help` 实测仅 panel/run/show/bootstrap/ledger/--selftest）。
+      真因不是「没写清单」而是**契约从未入库** ⇒ `greencheck run` 恒 UNKNOWN ⇒ pre-push 钩子恒放行。
+      已改手写 blocking 14 条（实测 10021ms/20s）**并入库**，回执 `[greencheck] GREEN` rc=0 10.1s；
+      另立 `_test/ci_contract_check.py`（9 腿/自检 15 条）盯契约自身。`part108` §①②
 - [x] ✅ **推平完成**（本轮代收口）：补r91小节R2c转绿→`1354466`→直推`2d34e7b..1354466`
       →`CI-WATCH-GREEN（2条）`。本地==远端。
 - [ ] 🟢 [R89+R90 已收] 门面旧名归零（`brand_consistency` 常驻）｜归档前提已解：判据读
@@ -51,4 +54,11 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
   corpus 归档（含分母46→46 声明）、r94 入口、方法论留档
 - **卷13** `07-next-steps.part107.md` — **r94**：loc 门修尺并转 enforce（超限 0）、CI 口径统一、
   两份台账重采、8 个 probe 的 `date -u` 跨平台修复、r95 入口
+- **卷14** `07-next-steps.part108.md` — **r95①**：CI 全绿契约装了 5 轮一次没生效过（未入库 ⇒ greencheck
+  恒 UNKNOWN ⇒ pre-push 恒放行，实测坐实）+ 「门恒放行」这一族第三次撞上（r93 j2 / r94 j4 / r95 契约）
+- **卷15** `07-next-steps.part109.md` — **r95②**：30 天提交率尺 + **实测「★ 不是维护度的代理」**
+  （SillyTavern ★34,083/30天9次 vs my-neuro ★1,387/30天62次）+ 台账 SNAP 刷新（G17 漂移 −4→0）
+  + 两件判据自检抓到本件自己的 bug
+- **卷16** `07-next-steps.part110.md` — **r95③**：r96 入口（probe 写盘段遗留 / 提交率尺重采节奏 /
+  四项维持不立项的**触发条件写死** / 并发无读数 / 体量 E 维 23 项）
 

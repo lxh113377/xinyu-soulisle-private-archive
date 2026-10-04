@@ -5,6 +5,108 @@
 
 ## [Unreleased]
 
+### Changed + Fixed（r95 · CI 全绿契约手写重做并入库 + 契约自身结构门 + 30 天提交率尺）
+
+本轮主线**不是又一轮「对标读数」，而是把「门」从「在位」变成「有牙」**。八维读数随之刷新，
+但重心在下面三处一手发现。**`src/` 与 `server/` 零改动**，全部落在 `_test/`、`.ci/`、`docs/`、
+`README.md` 与 `交付物/对标数据/`。
+
+#### 🔴 Fixed（本轮最硬的一件）：CI 全绿契约装了 5 轮，一次都没真正生效过
+
+- **现象链（每一步本轮实跑）**：契约装了 pre-push 钩子（`greencheck` 通用模板 2378B）、
+  装了 schema，唯独 `.ci/contract.json` **本身从未被 git 跟踪** ⇒
+  `greencheck run --repo-dir .` 回 `[greencheck] UNKNOWN（契约未被 git 跟踪 ⇒ 拒绝执行）`；
+  而 `greencheck.py` 的 `main()` 对 `run` 模式走 `return 1 if res["verdict"] == "RED" else 0`
+  ⇒ **UNKNOWN 落进 `else 0` ⇒ rc=0** ⇒ 钩子打印「PASS: 契约内 blocking 检查全绿，放行推送」并 `exit 0`。
+- **即：钩子头注自称「找不到判据时**失败关闭**」，实测是恒放行**，且不抛异常、不打警告、不留痕。
+  `greencheck` 自己的硬规矩第 2 条（「契约必须被 git 跟踪」）早就写在文档里，r90 也把这条登记成 P0，
+  四轮过去只做了「生成」，没做「入库」。
+- **根因归属**：不是忘了 `git add`，而是**「有门」与「门有牙」分家** —— 与本仓已修过的
+  「判据印 FAIL 却无非零退出路径」同一个根（r93 抓到 `j2_chat_contract`、r94 抓到 `j4_memory_check`，
+  两次都是修例不修类 ⇒ 同族第三次）。r78 说过「有配置 ≠ 有门」，这轮发现同一句话在本仓自己身上又成立一次。
+- **修法**：手写 blocking **14 条**（本机 `Stopwatch` 逐条实测，合计 **10,021 ms** / 20s pre-push 预算），
+  `name` 唯一、每条带实测 `cost_source`、**声明总预算 == 各条之和（可复算）**、
+  **每条 blocking 的脚本都在 CI 或电池里有执行位**；`deferred` 6 条逐条写明承接面
+  （哪条由 CI 哪个作业接、哪条因本机缺 JDK 17 / Docker / node 而不拦）。
+  入库后实测：`[greencheck] GREEN`，14 条全绿，rc=0，**10.1s**。
+- **前一版契约的三个缺陷一并记进文件 `_provenance`**：`checks` 只 4 条且含 **2 组同名**
+  （bootstrap 按 workflow *step 名*命名，一个 step 内跑多条命令就撞名）；
+  CI 里最重的两条（`mvn verify` / 全量回归电池）**全被 defer**；`cost_ms` **全写死 5000（assumed）**，
+  无一条实测。
+
+#### Added：`_test/ci_contract_check.py`（契约的「判据的判据」，自检 15 条）
+
+9 条腿：契约**已入库** / `checks` 非空 / blocking `name` 唯一 / 每条 blocking 四要素齐全
+（`cmd`+`timeout_s`+`cost_ms`+`cost_source`）/ **声明总预算 == 各条之和（可复算）** /
+blocking 合计 ≤ 20s / **接线自证**（脚本名或 `-m` 模块必须在 CI workflow 与电池里有执行位，
+否则「列了但没人跑」）/ `deferred` 必带 `reason` 且 `reason` 必须点名承接面。
+静态、零网络、**不调用 `greencheck run`**（那会递归）。同时进 `run_all_suites.py` 与契约 blocking 自身
+（套件数 118 → **120**，README 同步，`repo_config_check` G4 等值对账当场抓红）。
+- **自检当场抓到本件自己的一个 bug**：`any(s in x for x in (ci_scripts, bat_scripts))`
+  是在两个 **set** 上迭代，做的是「`s` 是否是这两个 set 的成员」⇒ 恒 `False`
+  ⇒ **14 条合法 blocking 全被误报「没人跑」**。只有**正例腿**抓得到这类「尺恒假」缺陷
+  （变异体腿抓的是「尺恒真」，方向相反）。
+
+#### Added：`_test/peer_maintenance_probe.py`（「维护状态」维补上 30 天提交率，自检 14 条）
+
+前 94 轮的维护状态只读 `★ / pushed_at / release / workflows` —— 全是**状态快照**，问不出「近期动了多少」。
+按取证铁律补条五（「成熟度横比要取**同口径的 30 天窗口**」）补尺后，一手持读数：
+- 🔴 **★ 数不是维护度的代理**：`SillyTavern` ★**34,083** / 30 天 **9** 次（0.30/日）；
+  `morettt/my-neuro` ★**1,387** / 30 天 **62** 次（2.07/日）—— ★ 是它的 **24.6 倍**，提交是它的 **1/6.9**。
+- **16 仓 8 仓 30 天零提交**，其中 ★13,979 的 `Open-LLM-VTuber` 停滞 **143 天** ⇒ 按 ★ 排会把「停更标杆」排前面。
+- **self 侧印明「不横比」**：本仓首个 commit = 2026-09-21，**历史跨度 13 天 < 30 天窗口**
+  ⇒ 314 次/30 天无横比资格；只印率 10.47/日。窗口纪律由脚本自己执行，不靠人记。
+- **取数器的三个坑（全部实测复现，与补条七同族）**：① 分页 Link **按字段序 / `split('>')` 取页号**
+  会拿到 `1&per_page=1`，`int()` 抛错被 `except` 吞掉 ⇒ **14/16 仓取数失败而分母与计数均不受影响**
+  （静默塌成常数）；正解 `page=(\d+)` 正则取全部再取 max。② 查询串 `+` 未编码 ⇒ 检索恒 0（已进变异腿）。
+  ③ **双腿交叉验证**：分页法 vs `search/commits` 计数，16 仓 **15 仓逐字相等**，
+  `MoodChat` 差 1（索引滞后）⇒ 该格判 **unverified、不取平均、不择优、不猜**。
+
+#### Changed：r95 前一段（在途未收口）四件一并入库
+
+- `verdict_exit_parity_check.py`：**判据的判据** —— 门面印 `XXX-FAIL` 却无非零退出路径 ⇒
+  电池按 rc 记账时「验收判据报红而记绿」。已发生两次（r93 j2、r94 j4），本轮把族立成常驻判据
+  （93 套件 defect=0，自检 10 条）。
+- `bench_quality_gates.py`：`benchmark_metrics.py` 的「质量门同址尺」整块迁出（14 节点 `ast.dump` 全等，
+  变异腿必须改**本模块**的全局名 —— 改 `benchmark_metrics` 的同名变量等于空腿，本轮实测两条腿各踩过一次）。
+- `repo_config_check` **G9**：`import_safety` 取数面由「文本行」换成 **AST 顶层语句**。
+  旧尺的分子里混着**字符串内容** —— `verdict_exit_parity_check` 的自检样本 `GOOD_EXPLICIT` 是三引号字符串，
+  串内 col-0 的 `sys.exit(...)` 让一件**本来 import-safe** 的判据被判红（假阳）。解析不动时退回行扫描。
+- `j4_memory_check.py`：补 `sys.exit`（AC-OBS-10 的验收判据，r94 类扫 90 套件抓到的漏网件）。
+
+#### Changed：台账刷新与数字对齐
+
+- **权威 SNAP `benchmark-metrics.json` 自 2026-10-02 停滞 → 本轮重采**（16/16 仓，
+  `BENCHMARK-METRICS-PASS`）。`repo_config_check` **G17** 的台账漂移 **−4 → 0**
+  （此前「台账记 suites=112 vs HEAD 现算 116」）。
+- README 电池套件数 **118 → 120**（G4 等值对账当场抓红后修正，不是事后改文档凑绿）。
+- 对标报告 corpus **48 → 49** 份，`disclaimer_forensics_lint --all` 实测缺取证 **0** 处。
+
+#### 电池首跑 112/117 rc=1 的逐条归因（Fixed：1 条本轮引入，4 条负载下公网抖动）
+
+首跑红 5 条。逐条取失败形态 + 单独复跑 + **至少一条独立取数腿**（r94 纪律：flaky 必须逐条归因，
+不得整体重跑蒙过）：
+
+- 🔴 **`eol_parity`（本轮引入，已修）**：`bench-r95-battery.log` 与 `server-8123-r95.log` 两个
+  **未入库**件含 CRLF —— PowerShell `Out-File -Encoding utf8` 与 `java -jar` 重定向都写 CRLF。
+  处置 = 归一 + 把 `server-*.log/.err` 入 `.gitignore`（运行态，每次起服重写）。
+- ⚠️ **3 条共用一个根因**（`offline_shell` R9a / `public_check` / `backup_online` B3·B4）：
+  失败形态都是 `Page.goto … ERR_CONNECTION_CLOSED at https://xinyu-soulisle.pages.dev`。
+  **不是站点宕机**，三条独立腿互证：`curl -w` → **HTTP 200** 且 CSP/permissions 头齐全；
+  同一套件自己的 `R6b` 公网头实测 **4 路径全 PASS**（脚本的 HTTP 客户端能通）；
+  msedge 单独探针 → `example.com` / `pages.cloudflare.com` / `pages.dev` **三者皆 200**。
+  ⇒ 本机 Chromium 在电池负载下打不开公网。单独复跑三条**全绿**
+  （`OFFLINE-SHELL-PASS` 17/17、`PUBLIC-ONLINE-ALL-PASS` 含真实在线回复 2583ms + `KEY_LEAK: False`、
+  `BACKUP-ONLINE-PASS` B1–B4）。**处置：不放宽判据、不加有界重试**（真缺陷仍会被拦）。
+- ⚠️ **`voice` 的两种红分开记账**：不带 `BASE` 的失败是**用法错**（脚本默认端口 8125，
+  电池条目传 `BASE`=8123，r94 §2.6 已登记同一条）；带位置参数复跑 → `VOICE-PASS`（A1–A7 全过）。
+  电池里那条 13.1s 的红形态是 **A5「8s 内 `recording` 未移除」**即 r94 记录的时序预算问题。
+  **不改脚本默认端口**（改了会掩盖电池接线是否真的传对了 BASE）。
+
+**可复用结论**：①「站点宕机」与「本机浏览器打不开」必须先证站点再判，否则会去查一个不存在的部署事故；
+② 4 条红里 3 条同根 ⇒ 是**一个可指认的环境面**，不是 5 个独立 flaky；③ 用法错与判据红必须分账，
+避免把"我不会用"记成"门坏了"。
+
 ### Changed + Fixed（r94 · loc 门修尺并转 enforce + 两份台账重采 + CI 口径统一）
 - **loc 门先修尺、再转 enforce（本轮最重要的一手发现）**：r93 首次实测报「22/158 文件超限」，
   其中**14 项是误判** —— 判据把 **Java 类**（`class Xxx {`）与 **JS IIFE 模块包装**

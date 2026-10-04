@@ -71,3 +71,9 @@ wflow.toml
 .ci/ci_failures.json
 .ci/logs/
 .ci/check_times.json
+
+# 本地起服/收口的**运行态日志**（r95 新增）：java -jar 的 stdout/stderr 重定向件。
+# 理由同上：每次起服都重写，入库只会制造 diff 噪声，且 eol_parity 的「未入库面」会把它们算进去
+# （PowerShell `Out-File` 与 java 重定向都写 CRLF ⇒ 未入库即红，这是 r95 电池首跑抓到的 2 项之一）。
+交付物/对标数据/server-*.log
+交付物/对标数据/server-*.err
