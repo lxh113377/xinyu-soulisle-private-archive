@@ -65,4 +65,9 @@ wflow.toml
 # 「CI 全绿契约」的**工具运行态**（greencheck 的 OWN_RUNTIME_PATHS 明列 .ci/ci_failures.json 为可再生缓存）。
 # 注意分工：`.ci/contract.json` **必须入库**（契约=要执行什么命令，等价于代码；pre-push 钩子与 greencheck
 # 都按"未被跟踪即拒绝执行"处理），r90~r94 四轮把它连同缓存一起晾在未跟踪面 ⇒ 钩子在他人 clone 上根本跑不起来。
+#   2026-10-05 实测坐实：greencheck run 回 UNKNOWN ⇒ 钩子恒放行。已修（契约入库 + ci_contract_check 盯入库面）。
+# r95 追加：契约真正跑起来后每次执行都落 `.ci/logs/<name>.log` 与 `.ci/check_times.json`，
+#   两者同为可再生运行态（每次跑就重写），入库只会制造无意义的 diff 噪声。
 .ci/ci_failures.json
+.ci/logs/
+.ci/check_times.json
