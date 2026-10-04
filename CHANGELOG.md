@@ -107,6 +107,25 @@ blocking 合计 ≤ 20s / **接线自证**（脚本名或 `-m` 模块必须在 C
 ② 4 条红里 3 条同根 ⇒ 是**一个可指认的环境面**，不是 5 个独立 flaky；③ 用法错与判据红必须分账，
 避免把"我不会用"记成"门坏了"。
 
+#### 推送通道：本机裸 `bash` 是 WSL bash，铁律命令实跑挂死（Fixed by 改道，非改铁律）
+
+- **现场**：`bash _test/push_and_watch.sh origin main` 进程活着 20 分钟，但
+  `Get-CimInstance Win32_Process` 里**查不到 `git.exe` / `git-remote-https.exe` 子进程**，
+  `origin/main` 纹丝不动，末行输出是 WSL 的 localhost/NAT 警告。
+- **真因**：`Get-Command bash` → `C:\Windows\system32\bash.exe`（**WSL2**，内核
+  `6.6.114.1-microsoft-standard-WSL2`），WSL 里的 git 是 `/usr/bin/git`，配置与凭据与 Windows 侧各一套。
+  本仓铁律写的是「`bash`」，而本机的 `bash` 不是该脚本假定的那个 bash。
+- **处置**：走通道 ②（拆开跑），本轮实测 `rc=0`：
+  `git -c http.proxy= -c https.proxy= push origin main` → `d6525ab..ca1b6ec main -> main`，
+  再 `python _test/ci_watch.py --sha <HEAD> --timeout 1200`。
+  Git Bash 实际在 `C:\Program Files\Git\bin\bash.exe`，通道 ① 也可用。
+  **未改铁律条文**（改条文属老大裁决），但已在 `memory/AGENTS.md` 排障手册登记现象 + 判据 + 两条通道。
+- **推平的当场实证**：pre-push 钩子打印 `[pre-push] PASS: 契约内 blocking 检查全绿，放行推送`
+  并逐条列出 14 条 GREEN —— 这正是 r95 那条 P0 的**活证据**（修之前它会打印 PASS 却一条都没跑）。
+- **附带发现**：`git fetch` 偶发 `TLS connect error: unexpected eof`，而同一时刻 `curl` 直连 200、
+  `curl -x 127.0.0.1:7897` 也 200、7897 端口确实在听 ⇒ **不是代理没起**。单条命令内联
+  `-c http.proxy= -c https.proxy=` 即可，**不动 `~/.gitconfig`**（他人可见状态）。
+
 ### Changed + Fixed（r94 · loc 门修尺并转 enforce + 两份台账重采 + CI 口径统一）
 - **loc 门先修尺、再转 enforce（本轮最重要的一手发现）**：r93 首次实测报「22/158 文件超限」，
   其中**14 项是误判** —— 判据把 **Java 类**（`class Xxx {`）与 **JS IIFE 模块包装**
