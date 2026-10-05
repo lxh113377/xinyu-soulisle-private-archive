@@ -14,24 +14,10 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - [ ] 🟠 [推荐:R83-02] **共享环境隔离待老大**：陪聊 / iCAN 门店 / 医 同居一个 CloudBase env，
       子目录避让只是止血；命名空间或独立 env 属跨项目决定，本轮未擅动。`part92` §②
 - [ ] **同族坑收口**：台账 `part18`/`part20`；G9 常驻 `repo_config_check`。
-- [x] ✅ [r93 → r94 已收] **loc 门超限治理**：r94 先修尺（22→8，14 项为「Java 类 / JS IIFE 被当函数」的误判）
-      → 拆 10 个真超限函数 → **超限 0（LOC-PASS）** → 切 `enforce` 并加接线自证（门有牙）。
-      报告 `交付物/对标分析报告-2026-10-03-r94.md`；台账 `part107`
-- [x] ✅ [R90 新 · r95 已收] **CI 全绿契约**：台账原文记的「须手写 `.ci/contract.json` blocking 清单，再加 step 并
-      `--sweep` 复扫」在 r95 查清**两处不成立**——`greencheck bootstrap` 实测 `checks=[]`（自写电池不是标准配置）、
-      `greencheck.py` **无 `--sweep` 子命令**（`--help` 实测仅 panel/run/show/bootstrap/ledger/--selftest）。
-      真因不是「没写清单」而是**契约从未入库** ⇒ `greencheck run` 恒 UNKNOWN ⇒ pre-push 钩子恒放行。
-      已改手写 blocking 14 条（实测 10021ms/20s）**并入库**，回执 `[greencheck] GREEN` rc=0 10.1s；
-      另立 `_test/ci_contract_check.py`（9 腿/自检 15 条）盯契约自身。`part108` §①②
-- [x] ✅ [r96 已收] **两处「没有取证的话」被实测换掉**：「issue 响应速度不可测」被 12 仓实测证伪
-      （假 NA 产地 `peer_hygiene_probe.py:65-69` 已类修，NA 5→0）；r95 §1 印 rps / §5 称并发无读数的矛盾
-      由 C-IPW-6 封口 + `--ramp 8/16/32/64` 出曲线。报告 `交付物/对标分析报告-2026-10-05-r96.md`；详述 `part111`
 - [ ] 🔴 **r97 首务（可执行）**：**E2 棘轮降数** —— `browser_engine` 统一入口现 0/32 已接，逐个接走手写
       回退的套件；判据 `python _test/browser_engine_declare_check.py`（基线 32 只降不升），每改一个跑 AST 清点。`part111` §③
 - [ ] 🟠 **台账重采须错峰**：`ledger_age_check` 现 16/16 在 fuse 内、契约 fuse=7 天 ⇒ ~10-12 会再超龄；
       burst 重采本轮实测撞限流。判「降级」须比对 NA 相对上一份认可台账是否**增长**。`part111` §③-2
-- [x] ✅ **推平完成**（本轮代收口）：补r91小节R2c转绿→`1354466`→直推`2d34e7b..1354466`
-      →`CI-WATCH-GREEN（2条）`。本地==远端。
 - [ ] 🟢 [R89+R90 已收] 门面旧名归零（`brand_consistency` 常驻）｜归档前提已解：判据读
       `git diff --cached -M` 认「逐字节等价搬卷」＋分母=`ARCHIVE_ROOTS` ⇒ 交付物 184.8→**129.5 MB**
       （corpus 全量不搬，分母由 `disclaimer_forensics_lint --all` 现读）｜C7/G19/R7｜电池 **112**
@@ -77,3 +63,7 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
   **voice 由「在册 flaky」改判为产品真缺陷**（`stopped:1` 而 `ev` 无 `end` ⇒ 按钮卡"正在听"；CI 走 A4 SKIP 从未覆盖）
   ⇒ P1 待老大 + 本轮与计划的两处偏离（`ledger_age` 落 deferred 非 blocking / peers 未 burst 重采）
 - **卷20** `07-next-steps.part114.md` — **r96 受理面四轮链最终回执**：`3d99e9d` CI-WATCH-GREEN（124/126 零判红）+ 四条红逐轮归因去向 + r97 新增两条入口（改 md 必复跑 disclaimer_forensics / 时刻耦合普查）
+- **卷21** `07-next-steps.part115.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷22** `07-next-steps.part116.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷23** `07-next-steps.part117.md` — 07-next-steps 分卷（R199 自动拆卷）
+
