@@ -35,5 +35,6 @@
 
 - ⬜ 残余「本侧动作界 ≠ 有界时间界」：`start()` 后既不派 `end` 也不派 `error` 时需用户点一下才复原（详 `part120`）。
 - ⬜ `A4=SKIP|PASS` 在受理面仍无读数（r96 §2.9 更正注，两轮未做）。
+- ⬜ 🔴 共享工具缺陷：`flow . --sync` 写回 `part5` 时不查 4KB 单卷硬限（本轮顶到 4,609B ⇒ `savepoint` 判 `single_block`）。写入端未修；全文、复算命令与本轮自犯同款见 `07-next-steps.part123.md`。
 - ⬜ 口径不一致登记：`.ci/contract.json` 把 `live-sync` 列为 deferred，而 CI 电池不豁免它 —— 「本地 deferred、CI 阻断」并存。
   本轮**只登记不动手**（动它=改护栏）；要么 CI 显式跳过，要么契约升它进 blocking，二选一由下轮定。
