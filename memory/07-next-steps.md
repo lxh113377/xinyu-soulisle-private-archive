@@ -76,3 +76,4 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - **卷19** `07-next-steps.part113.md` — **r96 最终回执**：第八轮冻结树 `124/125 RED: voice`（**未取到 ALL-GREEN**）+
   **voice 由「在册 flaky」改判为产品真缺陷**（`stopped:1` 而 `ev` 无 `end` ⇒ 按钮卡"正在听"；CI 走 A4 SKIP 从未覆盖）
   ⇒ P1 待老大 + 本轮与计划的两处偏离（`ledger_age` 落 deferred 非 blocking / peers 未 burst 重采）
+- **卷20** `07-next-steps.part114.md` — **r96 受理面四轮链最终回执**：`3d99e9d` CI-WATCH-GREEN（124/126 零判红）+ 四条红逐轮归因去向 + r97 新增两条入口（改 md 必复跑 disclaimer_forensics / 时刻耦合普查）
