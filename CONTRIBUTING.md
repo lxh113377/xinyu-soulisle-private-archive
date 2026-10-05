@@ -14,7 +14,52 @@
 | JDK | **17**（必须显式设置 `JAVA_HOME`） | 系统默认可能是 JDK 8，Spring Boot 3 会编译失败 |
 | Maven | 3.9+ | `mvn -f server/pom.xml package` |
 | Node.js | 20+ | 跑情绪评测与前端一致性脚本 |
-| Python | 3.10+ | 回归脚本（仅标准库，无需 pip 安装） |
+| Python | 3.10+ | 回归判据脚本。**需要装依赖**：`pip install -r _test/requirements.txt`（playwright / PyYAML / pypdf / Pillow —— 单一清单，CI 与本地同源，由 `repo_config_check` G11 与 `_test/*.py` 的实际 import 对账） |
+
+> ⚠️ 更正注 r96（2026-10-05 一手实测）：本行原写「回归脚本（仅标准库，无需 pip 安装）」是**假的**。
+> 照它做 clone 后，第一批浏览器判据（`browser_check` / `public_check` / `pixel_dual_check` …）会直接
+> `ModuleNotFoundError: playwright` 而 rc=2 报「ENV-ERROR」，而 `_test/requirements.txt` 的注释里
+> 记着 CI 因为漏装 PyYAML 曾长期红着。这条比下面那节「浏览器版本不匹配」更致命，所以同笔改。
+> 现在由 `_test/browser_engine_declare_check.py` 的 **E5 腿**常驻盯着（正文出现该类虚报字样即红；
+> 唯一豁免是**同一行**带 `更正注` 三字——用于保留被推翻的原文，见该函数 docstring 的窄豁免说明）。
+
+## 浏览器判据与本机引擎（clone 必读）
+
+本仓有 32 个 `_test/*.py` 通过 Playwright 驱动浏览器做判据。**它们实际用的是哪台浏览器，会影响
+"本地全绿"这句话的含义**，所以写清楚：
+
+1. **症状**（本机 2026-10-05 实测原文，一字不改贴出来，方便新人一搜就到）：
+
+   ```
+   BrowserType.launch: Executable doesn't exist at
+   D:\playwright-cache\chromium_headless_shell-1223\chrome-headless-shell-win64\chrome-headless-shell.exe
+   ```
+
+   根因：`playwright 1.60.0` 的 `driver/package/browsers.json` 要 Chromium revision **1223**，
+   而本机 `D:\playwright-cache` 里只有 `chromium-1228 / chromium-1243`。
+
+2. **本仓的实际行为 = 回退系统 Edge**（实测 Edge 154.0.4258.53 可通）。⇒
+   **本地浏览器套件全绿 ≠ 受理面（CI ubuntu + 受管 chromium）全绿**，两侧不是同一台浏览器。
+   这条与本页「CI 会复跑同样判据」并列时须知：判据逻辑同源，**渲染引擎不同源**。
+
+3. **两条修复通道**（任选其一；第二条零下载）：
+
+   ```bash
+   playwright install chromium                        # 联网装受管版本，装完走 chromium
+   set XINYU_CHROMIUM_PATH=D:\playwright-cache\chromium-1243\chrome-win64\chrome.exe
+   #   实测该可执行体能起（Chromium 153.0.8010.12），拿到的是"真 chromium 面"而非 Edge 面
+   ```
+
+4. **自查命令**（跑它确认本机到底用了什么，以及本节的声明还活着）：
+
+   ```bash
+   python _test/browser_engine_declare_check.py --machine
+   ```
+
+   判据行会把引擎身份折进去（例：`BROWSER-ENGINE-PASS: … 本机面=msedge(154.0.4258.53)`）。
+   新增/改造浏览器套件时请 `from browser_engine import launch`（唯一实现），不要再手写
+   `try/except` 回退——`_test/browser_engine_declare_check.py` 的 **E2 腿**把"未接入数"钉成
+   只降不升的棘轮，新写一份回退会当场红。
 
 ## 五条红线（违反任一 = 拒收）
 

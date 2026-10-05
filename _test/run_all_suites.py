@@ -245,6 +245,24 @@ SUITES = [
     # （只读本地台账 + git HEAD 面，零网络；缺源判 rc=2 不塌缩成 0）。
     ("bench_rollup", [sys.executable, "_test/bench_rollup.py"]),
     ("bench_rollup_selftest", [sys.executable, "_test/bench_rollup.py", "--selftest"]),
+    # r96：对标台账的**龄期**尺。立因是一手实测——r95 报告 §1 维度 1/5 写着「16 仓同址尺」，
+    #   而底层 peer 台账按文件名日期有 12/15 族已 8–9 天没重采（契约自己声明 refresh_days=7）。
+    #   此前没有任何一把尺盯台账的龄，所以「现测」二字没人能对账。静态零网络，进契约 blocking。
+    ("ledger_age", [sys.executable, "_test/ledger_age_check.py"]),
+    ("ledger_age_selftest", [sys.executable, "_test/ledger_age_check.py", "--selftest"]),
+    # r96：三个探针的离线桩入链。r95 报告 §2.1 批评契约「列了但没人跑」，而本仓自己就有三个
+    #   探针**零接线**（SUITES 引用数 0）——含 r95 新立的那把尺。桩是纯本地的，网络面承 r37 口径仍不入电池。
+    ("hygiene_probe_selftest", [sys.executable, "_test/peer_hygiene_probe.py", "--selftest"]),
+    ("capsafe_probe_selftest", [sys.executable, "_test/peer_capability_safety_probe.py", "--selftest"]),
+    ("maintenance_probe_selftest", [sys.executable, "_test/peer_maintenance_probe.py", "--selftest"]),
+    # r96：浏览器面的「声明 ⇄ 实际用了哪台引擎」门。立因是实测：本机受管 chromium 版本不匹配
+    #   （playwright 1.60.0 要 1223，缓存只有 1228/1243），32 个套件各自回退系统 Edge，
+    #   而**没有任何一处打印过它用了什么** ⇒ "本地浏览器套件全绿"不可归因（CI 面是另一台浏览器）。
+    #   静态档零网络零浏览器进电池；`--machine` 档挂 CI 的 browser-regression job（那里拿到受管
+    #   chromium，两侧读数变成两行可对账）。E2 是棘轮：未接入统一入口数只降不升。
+    ("browser_engine_declare", [sys.executable, "_test/browser_engine_declare_check.py"]),
+    ("browser_engine_declare_selftest",
+     [sys.executable, "_test/browser_engine_declare_check.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），

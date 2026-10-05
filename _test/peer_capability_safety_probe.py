@@ -150,11 +150,58 @@ def probe_self():
     return out, dout, False, ""
 
 
+def selftest():
+    """离线判据桩（r96 立；此前本件无 `--selftest` ⇒ 一直进不了阻断链，
+    与本仓 r37 已入链的 testasset/a11y/repro 三探针同一形态补齐）。
+    正例 / 变异 / 边界三族，缺任一族即本件不合格。"""
+    cases = []
+
+    def eq(label, got, want):
+        cases.append((label, got, want))
+
+    # 正例腿（只有正例能抓「尺恒假」）
+    eq("产品里的危机词表文件必须被认成 crisis 能力",
+       bool(CLS["crisis"].search("src/safety/crisis_words.json")), True)
+    eq("中文路径也认（求助/危机）", bool(CLS["crisis"].search("docs/求助热线.md")), True)
+    eq("评测集文件认成 evalset", bool(CLS["evalset"].search("data/golden_set.csv")), True)
+    eq("自身安全判据文件不是产品能力（TOOLISH 排除）", is_tool("_test/safety_probe.py"), True)
+    eq("README 正文里的评测句认成 evalset",
+       bool(DOC_CLS["evalset"].search("We run an evaluation over 73 samples")), True)
+    eq(" shields 徽章认成可信度件", bool(TRUST["badge"].search("img.shields.io/badge/ci-passing")), True)
+    # 变异腿：摘掉 TOOLISH 排除 ⇒ 我写的探针必须给自己凭空加能力位（证明这条排除在咬）
+    keep = globals()["TOOLISH"]
+    globals()["TOOLISH"] = re.compile(r"(?!x)x")
+    eq("变异体 摘掉 TOOLISH 后 safety_probe.py 被当成产品能力", is_tool("_test/safety_probe.py"),
+       False)
+    globals()["TOOLISH"] = keep
+    eq("还原后重新排除（证明上面动的是尺不是期望值）", is_tool("_test/safety_probe.py"), True)
+    # 边界腿
+    eq("边界 判据词不得误伤 JS 的 Array.filter（guardrail 收紧过）",
+       bool(CLS["guardrail"].search("src/util/arrayFilter.js")), False)
+    eq("边界 dependency injection 不算 guardrail（re.I 下 injection 需带 prompt 前缀）",
+       bool(CLS["guardrail"].search("docs/dependency-injection.md")), False)
+    eq("边界 .py 不是数据扩展名（探针自身语言不当评测数据）",
+       bool(DATA_EXT.search("scripts/probe.py")), False)
+    eq("边界 .jsonl 是数据扩展名", bool(DATA_EXT.search("data/eval.jsonl")), True)
+    eq("边界 三分类都在 CLS 里（缺一类即该面结构性失明）",
+       sorted(CLS), sorted(["crisis", "evalset", "guardrail"]))
+
+    bad = [(n, g, w) for n, g, w in cases if g != w]
+    for n, g, w in bad:
+        print("  用例不符: %s ｜ got=%r want=%r" % (n, g, w))
+    print("CAPSAFE-SELFTEST-%s（%d/%d 条）"
+          % ("PASS" if not bad else "FAIL", len(cases) - len(bad), len(cases)))
+    return 1 if bad else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", default="")
     ap.add_argument("--self-only", action="store_true")
+    ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
+    if a.selftest:
+        return selftest()          # 必须排在鉴权之前：离线桩不能因为没有 token 而拿不到读数
     token = os.environ.get("GITHUB_TOKEN") or ""
     if not token:
         r = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True)

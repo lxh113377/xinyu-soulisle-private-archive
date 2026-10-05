@@ -6,13 +6,27 @@
   C 工程治理：dependabot / SECURITY.md / LICENSE / 贡献者数（上限 100，超限记 ≥100）
 纪律（M5⑦ / R247 同族）：**每个字段独立取数，失败记 NA(原因) 并入 unverified 计数**，
 禁止把"没取到"印成 0；分母（应测仓数）与"有效/未验"由本脚本自印，不手抄。
+
+⚠️ r96 改判两处（都是本件自己的缺陷，一手实测坐实）：
+  1. **假 NA（样本陈述写成总体陈述）**。原 B 面只取 `issues?state=closed&per_page=20&sort=updated`
+     这 **20 条样本**，客户端排掉 PR 后若样本里恰好没有真 issue，就写 `NA(无真issue)` ——
+     那说的是"我这 20 条没抓到"，不是"这仓没有"。今日用服务端 `search/issues?q=repo:X type:issue
+     is:closed` 复算人口：`morettt/my-neuro` **实有 102 条已关闭 issue**、`s-nagaev/chibi` 7 条，
+     两份台账（peer-hygiene-2026-09-26.json）里却都记着 `NA(无真issue)`；该格共有 5 个 NA，
+     至少 2 个是这么造出来的。⇒ 现在**人口单独取数**（`closed_issue_total`），
+     样本落空只许写 `NA(sample-miss …)`，`NA(no-closed-issue)` 仅当**人口真为 0** 时才允许出现。
+  2. **self 从没被这把尺量过**。`SELF` 常量自 r37 定义在 `:23` 却**没有任何使用点**
+     （模块 docstring 写着"同一把尺量自己，M5⑧"，代码里没兑现）。⇒ 现在 self 进入被测集合，
+     `--self-only` 只跑 self 一面。
 用法：python _test/peer_hygiene_probe.py [--repo <owner/name> ...] [--json out.json]
-退出码：0=全部面取到 1=存在取数失败（如实点名，不判仓库好坏） 2=无 gh / 鉴权失败
+                                        [--self-only] [--selftest]
+退出码：0=全部面取到 1=存在取数失败/假 NA 防不住（如实点名，不判仓库好坏） 2=无 gh / 鉴权失败
 """
 import argparse
 import json
 import subprocess
 import sys
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,8 +38,20 @@ SELF = "lxh113377/xinyu-soulisle-private-archive"   # = origin 远端（同一�
 RECENT_DAYS = 90
 
 
+_MIN_CALL_INTERVAL_S = 0.35   # r96 加：本件 17 仓 × ~28 次调用是**紧循环**，burst 会撞 GitHub
+                              # secondary rate limit（本轮一手实测：12/17 行的 closed 人口取数
+                              # 全部返回 "You have exceeded a secondary rate limit"）。
+                              # 与 r50 那次「search 限流把 15/16 打成 NA 并塌缩成假结论」同族。
+_last_call = [0.0]
+
+
 def gh(*args):
     """返回 (ok, data_or_reason)。失败绝不静默成空值。"""
+    import time
+    gap = time.time() - _last_call[0]
+    if gap < _MIN_CALL_INTERVAL_S:
+        time.sleep(_MIN_CALL_INTERVAL_S - gap)
+    _last_call[0] = time.time()
     p = subprocess.run(["gh", "api"] + [str(a) for a in args],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
@@ -42,6 +68,33 @@ def days_ago(iso):
         return None
     dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
     return (datetime.now(timezone.utc) - dt).days
+
+
+def closed_issue_total(repo):
+    """服务端取**已关闭真 issue 的人口数**（不是样本数）。
+    查询串必须 urlencode：`>=` / `+` 不编码时服务端按字面匹配、恒 0 命中（本仓 排障表同族）。
+    返回 (ok, int|原因)。"""
+    q = urllib.parse.urlencode({"q": "repo:%s type:issue is:closed" % repo, "per_page": 1})
+    ok, d = gh("search/issues?" + q)
+    if not ok:
+        return False, d
+    if not isinstance(d, dict) or not isinstance(d.get("total_count"), int):
+        return False, "无 total_count 字段"
+    return True, d["total_count"]
+
+
+def classify_issue_recency(real, total_ok, total, sample_n=20):
+    """**纯函数**：把「样本里有没有」和「仓里有没有」分成两件事说。
+    real=样本排掉 PR 后的真 issue 列表；total=服务端人口数（取不到传 None）。
+    三态不得塌缩：有读数 / 样本落空（人口>0）/ 人口真为 0。
+    —— 这条函数就是 r96 假 NA 的封口：`no-closed-issue` 只有在**人口为 0** 时才可达。"""
+    if real:
+        return days_ago(real[0].get("closed_at"))
+    if not total_ok:
+        return "NA(人口取数失败:%s)" % total
+    if total == 0:
+        return "NA(no-closed-issue 人口=0)"
+    return "NA(sample-miss 样本%d条无真issue 但人口=%d)" % (sample_n, total)
 
 
 def probe(repo):
@@ -62,12 +115,16 @@ def probe(repo):
     else:
         out["rel_90d"] = "NA(%s)" % rs
 
+    ok_t, total = closed_issue_total(repo)
+    out["closed_issue_total"] = total if ok_t else "NA(%s)" % total
     ok, iss = gh("repos/%s/issues?state=closed&per_page=20&sort=updated&direction=desc" % repo)
     if ok and isinstance(iss, list):
         real = [i for i in iss if "pull_request" not in i]     # 排除 PR，否则"响应"是假的
-        out["issue_closed_days"] = days_ago(real[0].get("closed_at")) if real else "NA(无真issue)"
+        out["issue_closed_days"] = classify_issue_recency(real, ok_t, total if ok_t else None)
+        out["issue_sample_real_n"] = len(real)
     else:
-        out["issue_closed_days"] = "NA(%s)" % iss
+        out["issue_closed_days"] = "NA(样本取数失败:%s)" % iss
+        out["issue_sample_real_n"] = "NA"
 
     ok, cl = gh("repos/%s/contributors?per_page=100&anon=false" % repo)
     if ok and isinstance(cl, list):
@@ -105,16 +162,75 @@ def probe(repo):
     return out
 
 
+# ── 自检：正例 / 变异 / 边界三族（r96 立；此前本件无离线桩 ⇒ 一直进不了阻断链）──────
+def selftest():
+    cases = []
+
+    def eq(label, got, want):
+        cases.append((label, got, want))
+
+    def iss(n, closed="2026-09-01T00:00:00Z"):
+        return [{"number": i, "closed_at": closed} for i in range(n)]
+
+    # 正例腿（只有正例能抓「尺恒假」）
+    eq("样本有真 issue ⇒ 出一个天数读数",
+       isinstance(classify_issue_recency(iss(3), True, 102), int), True)
+    eq("人口数与样本落空是两件事：population 字段独立存在",
+       closed_issue_total.__doc__.startswith("服务端取"), True)
+    eq("空列表 + 人口>0 ⇒ 写 sample-miss 并带上人口数（不是 NA(无真issue)）",
+       classify_issue_recency([], True, 102).startswith("NA(sample-miss"), True)
+    eq("且 sample-miss 里带着人口数，读者一眼看得出「有 102 条只是没抓到」",
+       "人口=102" in classify_issue_recency([], True, 102), True)
+    eq("人口=0 ⇒ 才允许出现 no-closed-issue",
+       classify_issue_recency([], True, 0), "NA(no-closed-issue 人口=0)")
+    # 变异腿：把「人口=0 才可写 no-closed-issue」这条闸摘掉 ⇒ 必须还能被抓住
+    keep = globals()["classify_issue_recency"]
+
+    def lie(real, total_ok, total, sample_n=20):
+        return "NA(无真issue)" if not real else days_ago(real[0].get("closed_at"))
+    globals()["classify_issue_recency"] = lie
+    eq("变异体 用旧写法时 my-neuro 这类仓会得 NA(无真issue)（这就是 5 个假 NA 的产地）",
+       classify_issue_recency([], True, 102), "NA(无真issue)")
+    globals()["classify_issue_recency"] = keep
+    eq("还原后同一入参改为 sample-miss（证明上面动的是尺不是期望值）",
+       classify_issue_recency([], True, 102).startswith("NA(sample-miss"), True)
+    # 边界腿
+    eq("边界 人口取数失败 ⇒ NA 里写明是人口失败、不冒充样本落空",
+       classify_issue_recency([], False, "403").startswith("NA(人口取数失败"), True)
+    eq("边界 closed_at 缺失的样本 ⇒ 不把 None 当 0 天",
+       classify_issue_recency([{"number": 1}], True, 5), None)
+    eq("边界 days_ago(None) ⇒ None 而非 0", days_ago(None), None)
+    enc = urllib.parse.urlencode({"q": "repo:a/b type:issue is:closed"})
+    eq("边界 查询串里空格已编码（裸空格会让 gh 参数错位）", " " in enc, False)
+    eq("边界 self 在分母里（r37–r95 期间 SELF 常量定义了却零使用点）",
+       SELF not in [p["repo"] for p in PEERS] and bool(SELF), True)
+
+    bad = [(n, g, w) for n, g, w in cases if g != w]
+    for n, g, w in bad:
+        print("  用例不符: %s ｜ got=%r want=%r" % (n, g, w))
+    print("HYGIENE-SELFTEST-%s（%d/%d 条）"
+          % ("PASS" if not bad else "FAIL", len(cases) - len(bad), len(cases)))
+    return 1 if bad else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", action="append", default=[])
     ap.add_argument("--json", default="")
+    ap.add_argument("--self-only", action="store_true",
+                    help="只跑 self 一面（本件 A/B/C 三面都在平台侧，故仍需 gh 鉴权；无鉴权判 rc=2）")
+    ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
+    if a.selftest:
+        return selftest()
     ok, _ = gh("user")
     if not ok:
         print("HYGIENE-PROBE-ENV-ERROR: gh 未鉴权（%s）" % _)
         return 2
-    repos = a.repo or [p["repo"] for p in PEERS]
+    if a.self_only:
+        repos = [SELF]
+    else:
+        repos = a.repo or ([SELF] + [p["repo"] for p in PEERS])
     rows, unverified = {}, []
     for r in repos:
         d = probe(r)
@@ -124,14 +240,20 @@ def main():
         elif any(isinstance(v, str) and v.startswith("NA(") for v in d.values()):
             unverified.append("%s(部分字段)" % r)
         print("%-38s ★%-7s issues=%-6s pushed=%-4sd rel90d=%-4s relLast=%-5s assets=%-3s "
-              "issueClosed=%-6s contrib=%-5s 一键=%-12s 治理=%s"
+              "closed人口=%-7s 样本真n=%-4s issueClosed=%-8s contrib=%-5s 一键=%-12s 治理=%s"
               % (r, d.get("stars"), d.get("open_issues"), d.get("pushed_days"),
                  d.get("rel_90d"), d.get("rel_last_days"), d.get("rel_assets"),
+                 d.get("closed_issue_total"), d.get("issue_sample_real_n"),
                  d.get("issue_closed_days"), d.get("contributors"),
                  d.get("one_click"), d.get("gov")))
     print("-" * 150)
+    false_na = [r for r, d in rows.items()
+                if isinstance(d.get("issue_closed_days"), str)
+                and "无真issue" in d["issue_closed_days"]]
     hdr = "应测 %d 仓 ｜ 整仓取数失败 %d ｜ 含 NA 字段 %d" % (
         len(repos), sum(1 for v in rows.values() if "_fatal" in v), len(unverified))
+    if false_na:
+        print("  🔴 旧形态假 NA 复现（人口>0 却写成无真 issue）：" + "; ".join(false_na))
     if unverified:
         print("  未验项（不得据其结论）：" + "; ".join(unverified))
     if a.json:
