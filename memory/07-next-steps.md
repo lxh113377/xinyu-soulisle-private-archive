@@ -73,3 +73,5 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - **卷28** `07-next-steps.part122.md` — 人工拆卷承接 `part5` 尾部三个已完成条目（2026-09-23 评测集扩条 / NEG·DEG 覆盖缺陷 / 语音输入真机验证）；动因是 `flow --sync` 把 P1 镜像写回 part5 后达 4,609B 越过 4KB 硬限、savepoint 判 `single_block` 拒自动拆（逐字节对账已证原文未改）
 - **卷27** `07-next-steps.part121.md` — **r97 收口**：冻结树整跑 `124/126 RED: live_sync,live_sync_alt`（同因=公网还跑 v1.8.0 语音模块，curl 两面实测 4148B）；备用线 `tcb hosting deploy` 后 `LIVE-SYNC-PASS 21/21`；Pages 面拦在凭据（第三次同款）⇒ **v1.8.1 不推送**，解封只差 CF API Token
 - **卷26** `07-next-steps.part120.md` — **r97 语音退出态修复 + v1.8.1 切版**：未修树先验 RED（A8/A10 三条判红、A9 对照腿绿）⇒ 修 `src/js/voice.js` ⇒ 带 base 复算 11 轮全 rc=0（未修树先验红）；体积上限 4,355→5,038（实测 4,798 ×1.05；先把自写注释 5,039→4,798 B 再登记）；三源 pom/ROADMAP/CHANGELOG 同步 + fat jar 内嵌 1.8.1；收口链（电池 / greencheck / tag / ci_watch / Release）待办**带前提命令**
+- **卷30** `07-next-steps.part124.md` — 07-next-steps 分卷（R199 自动拆卷）
+
