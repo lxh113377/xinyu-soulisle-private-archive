@@ -5,7 +5,48 @@
 
 ## [Unreleased]
 
-*(自 `v1.7.0` 起的在制增量 r94–r96 已随 **v1.8.0** 发布；下面这一节登记的是 **tag 之后**又落在 main 上的 r96 受理面修复，尚未随版发布。)*
+*(自 `v1.7.0` 起的在制增量 r94–r96 已随 **v1.8.0** 发布；`v1.8.0` 之后的 r96 受理面修复与 r97 语音退出态修复已随 **v1.8.1** 发布。本段暂无条目 —— 「有 bullet 而 `tag..HEAD` 零 commit」正是 `release_governance` R2b 要拦的文案先行形态。)*
+
+## [1.8.1] - 2026-10-06 — 语音输入退出态真缺陷修复（r94/r95/r96 三轮挂账项落地）
+
+> **切版动因**：本版含一处 **`src/` 行为码修复**，而它正是 `v1.8.0` 发布后挂账的那一项（报告 §3 #9 /
+> `memory/07-next-steps.part113.md` 的 P1 待决项：「修复属 `src/` 行为码且 v1.8.0 已发布 ⇒ 本轮不擅自执行」）。
+> 经老大拍板「修它要动 `src/` ⇒ 需切 v1.8.1」，故切版。版本内容 = 下面 r97 / r96 两段；
+> r96 那段的 `### ` 标题**原位承接**自 `[Unreleased]`、一字未改（R6 盯的就是这件事）。
+
+### Fixed（r97 · 语音输入：`stop()` 后浏览器不派发 `end` 时按钮永久卡在「正在听」，且再点只能重复 `stop()`）
+
+- **一手复现读数（改判依据，非推断）**：未修树上 `python _test/voice_check.py http://127.0.0.1:8123`
+  确定性判红 3 条 —— `A8 卡在监听态（class='ghost-btn voice-btn recording' evt=['start']）`、
+  `A10 卡在监听态：rec.start() 抛异常后按钮仍留在 class=…`、`A10 约束2 违背：异常逃逸成 pageerror
+  ['InvalidStateError: recognition already started']`；同一轮里对照腿 `A9 PASS / A9b PASS` ⇒ 三条腿有判别力，不是恒红。
+- **真机侧今晚是必现**：修复后连跑 5 轮（run1–run5 全 rc=0），每轮 `hook(final)` 都报
+  `ev=['start','audiostart']`、`stopped:1` 且**没有 `end`** —— r96 记的是 3 次里 1 次，本轮 5 次里 5 次。
+- **根因两处、同一出口**：`src/js/voice.js` 里 `listening` 与 `class="recording"` 只由 `rec.onend`/`onerror`
+  清除，而浏览器不保证在 `stop()` 后派发 `end` ⇒ 卡态；卡住后 `if (listening) { rec.stop(); return; }`
+  让后续每次点击只是再调一次 `stop()`，识别器到刷新前点不回来。另一处 `rec.start()` 没有 try 包裹，
+  抛错时同样把按钮留在监听态并把异常甩给页面 —— 直接违反本文件头部自陈的约束 2「任何异常一律吞掉，
+  绝不把主对话链路带崩」。
+- **修复 = 一处根因，不是加超时**：新增闭包内 `leaveListening()`（清标记 + 还原按钮，幂等），
+  退出分支改为「`try { rec.stop(); }` 后**本侧立即复位**」（不再把 UI 交给浏览器的事件），
+  `start()` 用 try 包住、抛错即 `leaveListening()`；`onend`/`onerror` 复用同一函数。
+  未放宽任何判据：`_test/voice_check.py` 的 A5 8s 预算一字未动（r96 已证它有牙）。
+- **判据新增三条桩化腿（A8/A9/A10，`_test/voice_check.py`）**：把 `window.SpeechRecognition` 整体替换为可控桩，
+  于是「无 `end`」「正常派发 `end`（对照）」「`start()` 抛异常」三种形状都**与环境无关**、CI 里也必须判，
+  不参与 `no_input_device` 的 SKIP 降级（r96 那条「受理面从未覆盖」的缺口由此补上：CI 之前只能 SKIP）。
+  每条腿自带前置断言，防「桩没生效却判通过」；A8/A9 各带一条「判据失效」反例腿（桩实际派发到了 `end` /
+  没派发 `result` 时点名判红）。
+- 🔴 **本轮自己踩到的一根时序耦合（写下来防下轮重踩）**：A9 第一版先轮询 class、再读 `evt`，
+  而修好后 class 是**同步**复位的 ⇒ 抢在桩的 30ms `end` 定时器之前读数，把对照腿误判成
+  `A9 判据失效`（实测 `VOICE_rc=1`）。正解是先等被派发的对象到场（≤2s 轮询 `end`）再断言复位，
+  而不是把预算加到 class 轮询上 —— 与 r96 的 `settle_wait` 同一族：**等待的必须是所断言事实的到场信号**。
+- ⚠️ **实现形态与本项登记原句的差（诚实标注）**：报告 §3 #9 原句要求「**有界时间**内没等到 `end`/`error` 也必须摘 `recording`」，本版做的是「**本侧动作界**复位」—— 第二次点击立即 `stop()` + 复位，**没有**给 `start()` 挂定时器。理由：拿不到 `end` 时无法区分「浏览器还在听」与「已静默结束」，固定 timer 会在**真在听**的时候谎报未听（比原缺陷更坏）。残余：自然结束且不派 `end` 时需用户点一下才复原 —— 从「只能刷新页面」收敛为「一次点击」，但**没做到**「零操作自动复原」。
+- **体积预算随之一记**（本仓口径：改预算必须写清理由）：`src/js/voice.js` 上限 4,355 → 5,038（实测 4,798 ×1.05）。
+  登记前先把自己新写的注释从 5,039 B 压到 4,798 B（−241 B）—— 沿用 r47/r51 的「先压注释再登记」口径，
+  **不是装不下就抬上限**；理由记在 `_test/size_budget_check.py` 表内注释。TOTAL 849,529 仍在 858,752 限内，
+  `size_budget_selftest` 的「压缩预算逐项报红 + 漏登记被 coverage 抓」两腿实测仍绿（`rc=0`）。
+- 改动面：`src/js/voice.js` + `deploy/xinyu/js/voice.js`（同步后 `DEPLOY-SYNC-PASS … missing=0 diff=0 extra=0(白名单外)`）
+  + `_test/voice_check.py` + 本段文档；`server/` 行为码零改动，`_test/` 套件数不变（129 条，未新增套件只新增腿）。
 
 ### Changed + Fixed（r96 · 受理面修复轮：`ledger_age` 的 mtime 交叉腿在全新 clone 下无区分度 ⇒ 逐条降档）
 

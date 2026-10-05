@@ -12,7 +12,9 @@
  *      否则 `ChatAgent.setCfg()` 换模型清历史时会被牵连（当初就踩过，故留此注）。
  *
  * 判据：`_test/ux_guards_check.py` U1（构造计数实测 speak 真被调用 + 关得掉 + 不支持即隐藏）、
- *       `_test/voice_check.py` A1/A2（ASR 构造与按钮可见）。切分前后同一套判据必须都绿。
+ *       `_test/voice_check.py` A1/A2（ASR 构造与按钮可见）
+ *       + A8/A9/A10（桩化退出态：`stop()` 后不派 `end`、正常派 `end` 的对照、`start()` 抛错 —— 三条都必须复位）。
+ *       切分前后同一套判据必须都绿。
  */
 window.Voice = (function () {
   const $ = (s) => document.querySelector(s);
@@ -68,13 +70,29 @@ window.Voice = (function () {
     rec.interimResults = true;
     rec.continuous = false;
     let listening = false;
+    /** 退出监听态（幂等：事件与点击两条路都走这里） */
+    const leaveListening = () => {
+      listening = false;
+      btn.classList.remove("recording");
+      btn.setAttribute("aria-pressed", "false");
+      btn.textContent = "🎤";
+    };
     btn.addEventListener("click", () => {
-      if (listening) { rec.stop(); return; }
+      if (listening) {
+        // 退出态不等 `end`：真机实测 stop() 后可能不派发 ⇒ 等它就把按钮永久卡在监听态，后续点击只再调 stop()
+        try { rec.stop(); } catch { /* 识别已自行结束，照常复位 */ }
+        leaveListening();
+        return;
+      }
       listening = true;
       btn.classList.add("recording");
       btn.setAttribute("aria-pressed", "true");
       btn.textContent = "●";
-      rec.start();
+      try {
+        rec.start();
+      } catch {
+        leaveListening();  // start 抛错不得留在监听态（约束 2）
+      }
     });
     rec.onresult = (e) => {
       let t = "";
@@ -82,12 +100,7 @@ window.Voice = (function () {
       const input = $("#chat-input");
       if (input) input.value = t.slice(0, 500);
     };
-    rec.onend = rec.onerror = () => {
-      listening = false;
-      btn.classList.remove("recording");
-      btn.setAttribute("aria-pressed", "false");
-      btn.textContent = "🎤";
-    };
+    rec.onend = rec.onerror = leaveListening;
   }
 
   return {

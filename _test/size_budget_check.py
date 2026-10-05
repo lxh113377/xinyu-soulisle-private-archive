@@ -50,7 +50,14 @@ BUDGETS = {
     #    即"注入更多上下文"这件事本身被预算管住，不是无限往上堆。
     "src/js/emotion-engine.js": 5_598,
     "src/js/emotion-remote.js": 4_679,
-    "src/js/voice.js": 4355,
+    # src/js/voice.js：r97 上调 4,355→实测 4,798 +5%。动因是修「`recognition.stop()` 后浏览器不派发 `end`
+    #    ⇒ 语音按钮永久卡在监听态、之后每次点击只是再调 `stop()`（ASR 到刷新前点不回来）」——即 r94/r95/r96
+    #    三轮挂账、报告 §3 #9 那处 `src/` 行为码缺陷。判据未放宽：`voice_check.py` A5 的 8s 预算一字未动，
+    #    且修复前先在**未修树**上验过新增的 A8/A10 两条桩化腿确实会红（对照腿 A9 同轮绿 ⇒ 不是恒红）。
+    #    增量 = 幂等 `leaveListening()` + 两处 try 包裹 + 3 行 WHY 注释；登记前先把自己写的注释从 5,039B
+    #    压到 4,798B（−241B，沿用 r47/r51 的「先压注释再登记」口径，不是装不下就抬上限）。
+    #    TOTAL 复核 849,529 仍在 858,752 限内；牙未动：`size_budget_selftest` 的「压缩预算逐项报红」腿照在。
+    "src/js/voice.js": 5_038,
     "src/js/chart.js": 3969,
     "src/js/chat-window.js": 5845,
     "src/js/settings.js": 3000,

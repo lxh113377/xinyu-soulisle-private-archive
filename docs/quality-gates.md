@@ -82,7 +82,7 @@ python _test/ci_watch.py                 # push 后的 CI 回执看守（把"看
 python _test/lightshow_check.py          # 一键点亮验收：清屏（UI 让位）+ 六色各自可见 + 铺得够满够散 + 播完不自动跳回
 python _test/pixel_dual_check.py         # 星雾「是不是真的变彩色了」——像素级回归（判断据不看内部数组）
 python _test/server_preflight.py         # 被测服务前置探针（r35）—— 把"服务没起"与"代码有缺陷"分开报
-python _test/voice_check.py              # 语音输入（Web Speech API）实测：只认真实发生过的事实（API 在否/start 真被调用/监听态出现过/能恢复）
+python _test/voice_check.py              # 语音输入（Web Speech API）实测：只认真实发生过的事实（API 在否/start 真被调用/监听态出现过/能恢复）。r97 起另加三条**桩化腿** A8/A9/A10：把 `window.SpeechRecognition` 整体换成可控桩，分别测「`stop()` 后不派发 `end`」「正常派发 `end` 的对照」「`start()` 直接抛异常」三种形状，退出态必须复位。这三条与环境无关 ⇒ CI 里也必须判、不许走 `no_input_device` 的 SKIP（r96 的缺口是「退出态只在有麦克风的机器上才可能被撞到」；⚠️ A4 自身走哪个分支在受理面仍无读数，那是另一把尺）
 python _test/peer_a11y_probe.py          # 对标 r42 探针：无障碍与制度化（a11y）（16 仓 + self，三通道同尺）
 python _test/peer_community_probe.py     # 对标 r50 探针：协作治理与健康度的制度化程度（16 仓 + self，三通道同尺）
 python _test/peer_license_probe.py       # 对标 r46 探针：许可与供给链合规（16 仓 + self，双通道同尺）
