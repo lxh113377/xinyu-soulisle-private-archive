@@ -1,0 +1,16 @@
+# 项目级噪声豁免清单（由 A-project-handoff/scripts/noise_lint.py 读取）
+# 格式：`<根部一层的名字> | reason=<为什么不是散射>`；一行一项；`#` 起头为注释。
+# 四条硬规则（少一条就等于把门禁改成大赦）：
+#   ① 生效的必须是 **HEAD 里那一份** —— 工作树改了没提交不生效（谁都不能在本地悄悄开门）；
+#   ② 精确名匹配，不支持 glob / 前缀；
+#   ③ 只准根部一层的名字（含 `/` 或 `\` 的行会被拒）；
+#   ④ 命中"临时/备份/迁移"命名形（`*_bak`、`*.tmp`、`*_old`、`*backup*` …）的行会被拒 ——
+#      豁免不许给散落物发通行证。
+# 被拒的行会在 noise 输出里点名；本文件自身由判据固定判 ok（否则加这条通道会立刻造出一个新 VIOL）。
+
+# CI 全绿契约本体：`.ci/contract.json` 必须入库（pre-push 钩子与 greencheck 都读它，等价于代码）。
+# 该目录同时装着运行态产物（`.ci/logs/`、`check_times.json`、`ci_failures.json`，已在 .gitignore 里），
+# 于是 noise_lint 按"目录含已入库文件 ⇒ 禁迁 _trash"判 VIOL，导致 ⑦ savepoint 恒被拒。
+# 不走 .gitignore 那条腿：`.ci` 命中即降 quarantine = 把契约本体踢出版本控制，与目的相反（同 R313 记录）。
+# 也不迁 _trash：那等于删掉受理面定义。⇒ 正确处置是本项目显式声明豁免，而非改共享 allowlist。
+.ci | reason=CI 全绿契约本体（.ci/contract.json 必须入库，pre-push 钩子与 greencheck 读它）
