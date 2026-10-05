@@ -67,3 +67,4 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - **卷22** `07-next-steps.part116.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷23** `07-next-steps.part117.md` — 07-next-steps 分卷（R199 自动拆卷）
 
+- **卷24** `07-next-steps.part118.md` — **r96「终点」口径**：回执只描述更早的提交 ⇒ 实质工作终点=41d2de5（第九轮 126/126 ALL-GREEN），1583903 及后为台账承载提交，其受理面由下轮 `ci_status_check` 取；另记 remote_tree 环境性未验 + "python 找不到文件也回 rc=2" 的伪装形
