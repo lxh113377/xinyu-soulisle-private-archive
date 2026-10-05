@@ -5,6 +5,100 @@
 
 ## [Unreleased]
 
+### Changed + Fixed（r96 · 补上从未被测的「issue 响应速度」+ 并发口径封口 + 台账龄期尺 + 引擎面归因 + 凭据面类修）
+
+本轮抓手是**实测推翻了 r95 报告里一句被继承了 74 轮的断言**，并顺它挖出四类结构性缺陷。
+**`src/` 与 `server/`、`deploy/` 零改动**，全部落在 `_test/`、`.ci/`、`docs/`、`CONTRIBUTING.md`、
+`README.md`、`memory/` 与 `交付物/`。电池 **120 → 128 套件**。
+
+#### 🔴 Fixed（本轮最硬的一件）：「issue 响应速度不可测」是一句没有取证的断言，且它是假的
+
+- r95 报告 `:10-11` 与 `:241-242` 两次写「公开数据上不可测——多数仓的已关闭 issue 无人工评论痕迹」。
+  本轮 grep 证实：**r21→r95 从未为这一维建过任何探针** —— 那句话是断言，不是实验。
+- 立 `_test/peer_issue_response_probe.py` 实测 12 仓各取最近 30 条已关闭真 issue，
+  `with_comments` = **30/30、27/30、26/30、28/30、25/30、29/29…**，唯一真零 issue 的仓是
+  `CheaperjamRen/leemo`（人口 0）⇒ **该断言为假**。
+- **假 NA 的产地**：`_test/peer_hygiene_probe.py:65-69` 的 B 面只取 `per_page=20` 的 closed 样本，
+  客户端排掉 PR 后样本落空就写 `NA(无真issue)` —— 把"我这 20 条没抓到"写成了"这仓没有"。
+  用服务端 `search/issues?q=repo:X type:issue is:closed` 取**人口**复算：`morettt/my-neuro` 实有
+  **102** 条、`s-nagaev/chibi` 7 条，而旧台账两处都记 NA（该族 5 个 NA，至少 2 个由此而来）。
+  类修后 **NA 5 → 0**，`chibi` 现记 `NA(sample-miss 样本20条无真issue 但人口=7)`。
+- **这句话为什么能活 74 轮**：`disclaimer_forensics_lint.py:24` 的 `BOUNDARY` 词表拦"做不到"类结论，
+  但**不含「不可测」三个字**。加词后（改尺不改数据）49 份 corpus 只新增 **1 处红，正好命中 r95:241**。
+- **加词过程撞出判据自己的既有缺陷**：`FORENSIC` 白名单里有裸子串 `实测`，而 `未实测` 含它
+  ⇒ **一句"自称没测"的话反而拿到了取证白名单**。正解是否定前瞻 `(?<!未)(?<!待)实测`，
+  并把 selftest 加到带豁免/不带豁免两向各一条腿。
+
+#### 🔴 Fixed：r95 报告在「并发」上自相矛盾，根因是数字没带口径
+
+- r95 §1 维度 4 印 `吞吐 1013.9 rps`，§5 又写「并发维度仍无读数」（依据是全仓 grep
+  `k6|locust|jmeter` = 0 命中）。**两句话各自都对**，错在 `perf_baseline_check.py:39` 的
+  `CONC={threads:8,per_thread:6}` 这个档**从没被印出来过**（`:194` 的 PASS 行只有 rps 没有 N）。
+- 两处封口：① PASS 行现自带档标 `吞吐 并发8线程×48请求=2481.2 rps`；
+  ② `ci_perf_wiring_check.py` 新腿 **C-IPW-6** —— README 与 `docs/PERF-BASELINE.md` 里任何写了 `rps`
+  的行必须同行带并发档，缺即红。首跑就抓出 **README 1 行 + 基线文档 3 行**裸数字，
+  其中一处是我本轮自己刚写进去的那句引用 ⇒ **门对自己也咬，才是它有用**。
+- 单点扩成曲线：`--ramp 8,16,32,64`（默认关，CI `perf-baseline.yml` 显式开）。实测
+  health **2368.0 / 2041.8 / 2609.9 / 2630.6 rps**，p95 4.8→16.1ms，四档 `llm_used=False`、breach=[]
+  ⇒ **8→64 路没有塌方点**。边界同时写明：本机单实例 H2 file + 回环 + 无外网，
+  这不是容量规划结论，64 以上未压、上限不做推测。
+- **否决了我自己原拟的"给 peers 补一把并发探针"**：`benchmark_metrics.py:151-163` 已认
+  `locustfile.py|k6*.js|*.jmx|wrk*.lua|load_tests` 与 workflow 名，而 `published_numbers` 现值
+  **0/16** ⇒ "公开带并发档的吞吐数"按构造就是 0/16，再建即第二把尺（同一事实只许一处判）。
+
+#### 🔴 Fixed：台账超 fuse 的真实根因，是三件探针在本机结构性取不到凭据
+
+- `peer_memory_probe.py:358` / `peer_sec_headers_probe.py:212` / `peer_community_probe.py:283`
+  只读 `GITHUB_TOKEN`/`GH_TOKEN`，**从不回落 `gh auth token`**。本机是 gh 钥匙串登录
+  ⇒ 三件稳定报 `无 GitHub token` rc=2 ⇒ 这三族台账因此长期不刷新。
+  **判据（本轮新立的 `ledger_age_check`）报的"数据旧"，根因在取数件的凭据面只有一条。**
+- 抽 `_test/gh_cred.py` 单点取凭据（先例在本仓 `peer_maintenance_probe.gh_token()`），
+  接入后 memory / sec-headers 双双 **rc=2 → rc=0**。
+- 新增 `_test/ledger_age_check.py`：只做「龄期」这一件没人做的事（「哪份最新」「内容是否过时」
+  归 `bench_rollup` 所有，不另立）。fuse **读 `.ci/contract.json` 的 `refresh_days`** 不抄数字；
+  龄期以**文件名日期**为权威 —— 同批台账 mtime 全是 09-28（一次批量重写留痕），按 mtime 算龄=7
+  恰在线内 ⇒ **取数源一换红绿翻面**，故另设「mtime 最新 ⇄ 文件名最新」交叉腿。
+  首跑 `LEDGER-AGE-FAIL（15 族 ≤fuse 3｜超 fuse 12）` ⇒ 重采后 `LEDGER-AGE-PASS（16 族 ≤fuse 16｜超 0）`。
+
+#### Added：浏览器面可归因 + CONTRIBUTING 两处假 + 交付面卫生
+
+- 本机受管 chromium 版本不匹配（playwright 1.60.0 要 revision 1223，缓存只有 1228/1243），
+  **32 个套件**各自手写 `try/except` 回退 `channel="msedge"`，而**没有一处打印过实际用了哪台引擎**
+  ⇒ "本地浏览器套件全绿"不可归因（CI 面跑的是另一台浏览器）。
+  新增 `_test/browser_engine.py`（唯一实现）+ `_test/browser_engine_declare_check.py` 五腿门。
+  **E2 用棘轮（基线取实测 32，只降不升）而不是批量改 32 个文件** —— 那是本仓排障手册
+  「`Edit` 吞 `def` 行而 `py_compile`/`--selftest` 全过」的一手事故面。
+- **顺带量出第三条通道**（r95 把选项写成"二选一"，实际三选一）：
+  `XINYU_CHROMIUM_PATH` 指 `chromium-1243\…\chrome.exe` 实测可起，Chromium 153.0.8010.12，**零下载**。
+- `CONTRIBUTING.md:17` 原称回归脚本「仅标准库，无需 pip 安装」，与 `_test/requirements.txt`
+  （playwright/PyYAML/pypdf/Pillow）及 G11 直接矛盾 ⇒ 新人照做 clone 后**第一批浏览器判据全
+  `ModuleNotFoundError`**。同笔修 + E5 腿常驻（豁免只按行、且要求同行带 `更正注`，
+  按 R236 白名单排除法保留被推翻的原文，而不是删掉自曝那句以求绿）。
+- 交付面：`交付物/对标数据/` 里 42 个一次性补丁脚本搬入 `对标数据/_superseded/r94-patch-scripts/`。
+  **选目录内搬而非跨根 `archive/`**：跨根会让 `入库件在位 207｜分母根 2（archive=2 交付物=205）`
+  变成 `163/44`，"分母没变"这句话就得重新解释；目录内搬则三个读数逐字未变。
+  负控制实测：搬一份 `.md` 出 `SCAN_ROOTS` ⇒ 报告份数必须 49→48，改回 49。
+
+#### 过程账：本轮新件自检抓到自己的 6 个 bug + 一次误判
+
+`stem_of` 先切后缀致正则 lookahead 失效（**17 族冒充 15 族**）／`by_mtime` 是 tuple 却与 Path 比较
+（背离列**恒真**，真值 0）／`--fuse-days 0` 被 `if a.fuse_days` 当"没传"／`search_count` 返回整个响应
+对象而非整数（下游当场 `TypeError`）／`--repo` 声明了却没读（**本仓 r95 §2.1 批评的"列了但没人跑"
+在我自己新件上第三次复发**）／变异腿还原写成自我赋值。另：误把 `peer-community` 的 5 个**结构性 NA**
+判成降级 —— 据此立规则：**降级由 NA 相对上一份认可台账是否增长来判，不能看 NA 个数或 rc=1**；
+误判代价是该族永久失去新鲜度而判据只显示"它超龄了"。
+
+#### 本轮没做的（附理由）
+
+-  peers 侧**未做 burst 重采**：SNAP 是 r95 今日所采（龄 0 天，`ledger_age` 认其在 fuse 内），
+  同轮再叠只会产出降级台账（本轮已实测撞限流）。
+- `ledger-age-fuse` **进 deferred 而非 blocking**：实测 61ms 成本放得进，但"它红的时候唯一能变绿
+  的动作是重采 15 族 peers"，那不是"一次正常提交"能做的事 ⇒ 一次正常提交变不了绿的判据没资格当闸。
+- `07-next-steps.part` 族 111 份 > 阈 30 与 `_trash/` 10 件：前者 `family_apply_enabled=0`
+  且开它须名册许可（双闸），属授权项非工程项；后者需人工在场核。
+- E2 基线 32 **本轮接入 0 个**：现状是"未接入数被钉住不许上升"，**不是**"已统一"。
+
+
 ### Changed + Fixed（r95 · CI 全绿契约手写重做并入库 + 契约自身结构门 + 30 天提交率尺）
 
 本轮主线**不是又一轮「对标读数」，而是把「门」从「在位」变成「有牙」**。八维读数随之刷新，

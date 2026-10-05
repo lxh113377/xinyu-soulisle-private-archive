@@ -43,21 +43,20 @@
 | VOL-8EF30 | P2 | 体量治理[L3 产物] 交付物/提交包/demo_video_out/心屿MindIsle-演示视频.mp4 — 拆分或归档（禁直删） | todo | - | - | 2026-10-01 03:57 | - |
 | VOL-CF954 | P2 | 体量治理[L3 产物] 交付物/心屿SoulIsle-作品提交-20260930.zip — 拆分或归档（禁直删） | todo | - | - | 2026-10-01 03:57 | - |
 | VOL-AGG-20261001 | P2 | 体量治理[L3 产物] 体量余量聚合（15 项） — 另有 15 项待判断，合计 103704007 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-01 03:57 | - |
-| WF-r90-sync状态词滞留 | P2 | flow --sync 只翻勾选位、不改登记行的「状态: todo」尾注 ⇒ 同一行 [x] 与 todo 自相矛盾（r90 实测 07.part62 VOL-FC486） | todo | - | - | 2026-10-02 01:45 | - |
+| WF-r90-sync状态词滞留 | P2 | flow --sync 只翻勾选位、不改登记行的「状态: todo」尾注 ⇒ 同一行 [x] 与 todo 自相矛盾（r90 实测 07.part62 VOL-FC486） | blocked | - | 责任面在受管根 global_skills/A-project-handoff，本仓无执行位 | 2026-10-05 12:56 | - |
 | WF-r93-对标轮 | P1 | r93 八维对标 + 四项改进（loc 门 / rollup 两新增维度 / corpus 归档 / peers 全量重采落工作区） | done | - | - | 2026-10-02 23:10 | 报告 交付物/对标分析报告-2026-10-02-r93.md（提交 1846cf3/7ae33b9）；BENCHMARK-METRICS-PASS；DISCLAIMER-CLEAN 46 份(0+46)；搬卷 45/未验 0；REPO-CONFIG-PASS 17 项；BATTERY 116/116；CI run 37023508041/37027916208 绿 |
 | WF-r93-loc超限治理 | P2 | loc 门 22/156 文件超限（最大 benchmark_metrics.py 1913 行/最长函数 628 行）⇒ 清零后切 --enforce 并加 CI 接线判据 | done | WF-r93-对标轮 | - | 2026-10-03 01:40 | r94：先修尺（22→8，14 项为类/IIFE 误判）→ 拆 10 个真超限函数 → **超限 0（LOC-PASS）** → 切 enforce + 接线自证 wiring_report()；selftest 9→17 条 |
 | WF-r94-收口 | P1 | r94 收口：五轮电池取最终绿 + 门禁面复核 + 提交推送 + CI 回执 | done | - | - | 2026-10-03 02:40 | BATTERY 第5轮 116/116 ALL-GREEN（919s）｜LOC/eol/repo_config/inventory/disclaimer/brand 六门全绿｜提交 1de2a9a 已推 |
 | WF-r93-辅助台账重采 | P2 | peer-quality-tooling / peer-repro 两份台账分母 16 仍含已换址的旧 letta 行 ⇒ rollup 已标 stale，需重采 | done | - | - | 2026-10-03 01:40 | 两份 …-2026-10-03.json 在盘；有 lockfile 10→11/16、有测试结构 6→7/16；bench_rollup 改取最新+stale 按内容判定+产物名跟随 |
 | WF-r93-cijob双读数 | P2 | ci_job数两个读数并存（benchmark_metrics ci_workflows=4 文件数 vs bench_rollup ci_jobs=5 job 条数）⇒ 统一口径或写清定义域 | done | - | - | 2026-10-03 01:40 | r94 已统一：实为**同名不同义**（self 侧 ci_workflows 实为 ci.yml job 条数，与 peers 的 GitHub API workflow 总数不同源）⇒ self 分列 ci_jobs_in_ci_yml/ci_workflow_files + 定义域 + 不变式断言 |
-| WF-r93-loc超限治理 | P2 | loc 门 22/156 文件超限（最大 benchmark_metrics.py 1913 行/最长函数 628 行）⇒ 清零后切 --enforce 并加 CI 接线判据 | done | WF-r93-对标轮 | - | 2026-10-03 01:40 | r94：先修尺（22→8，14 项为类/IIFE 误判）→ 拆 10 个真超限函数 → **超限 0（LOC-PASS）** → 切 enforce + 接线自证 wiring_report()；selftest 9→17 条 |
-| WF-r93-辅助台账重采 | P2 | peer-quality-tooling / peer-repro 两份台账分母 16 仍含已换址的旧 letta 行 ⇒ rollup 已标 stale，需重采 | done | - | - | 2026-10-03 01:40 | 两份 …-2026-10-03.json 在盘；有 lockfile 10→11/16、有测试结构 6→7/16；bench_rollup 改取最新+stale 按内容判定+产物名跟随 |
-| WF-r94-probe落盘验证 | P2 | 8 个 peer_*_probe 的 `date -u` 已修（Windows 无此命令，致「跑完不写盘」），但只实跑验证了 repro 一个 | todo | - | - | 2026-10-03 01:40 | 编译全过；`peer_repro_probe --self-only --json` 实跑落盘已验；其余 7 个待用到时实跑。**r95 补一条实测**：新立的 `peer_maintenance_probe.py` 是第 9 个 probe，r95 已把它的写盘段真跑过（`--json 交付物/对标数据/peer-maintenance-2026-10-05.json` 落盘 + 内容回读），且带 `--self-only`/`--selftest` 两个离线面 ⇒ 下轮若再加 probe，按本件的形态立（`--self-only` 离线面 + `--selftest` 判据桩 + 双腿交叉验证），可把本条的遗留一次性收掉 |
-| WF-r95-对标轮 | P1 | r95 八维对标 + 五项改进（CI 契约入库/契约结构门/30 天提交率尺/台账 SNAP 刷新/电池 120） | doing | - | - | 2026-10-05 03:05 | 报告 `交付物/对标分析报告-2026-10-05-r95.md`；提交 5bd5bc3 + 6fe3d58；`[greencheck] GREEN` 14 条；CI-CONTRACT-PASS/SELFTEST 15/15；PEER-MAINT-PARTIAL 15/16 两腿一致；BENCHMARK-METRICS-PASS 16/16；G17 漂移 −4→0；DISCLAIMER-CLEAN 49 份。待：收口电池 120 + push + CI 回执 |
+| WF-r94-probe落盘验证 | P2 | 8 个 peer_*_probe 的 `date -u` 已修（Windows 无此命令，致「跑完不写盘」），但只实跑验证了 repro 一个 | done | - | - | 2026-10-05 12:56 | 15 份写盘回执见 bench-r96-*.log；结论在 r96 报告 §0/§2.4 |
+| WF-r95-对标轮 | P1 | r95 八维对标 + 五项改进（CI 契约入库/契约结构门/30 天提交率尺/台账 SNAP 刷新/电池 120） | done | - | - | 2026-10-05 12:56 | 报告 r95.md；提交 5bd5bc3/6fe3d58/fb7c6e7；CI-WATCH-GREEN 两次 |
 | WF-r95-契约入库 | P0 | `.ci/contract.json` 未入库 ⇒ greencheck 恒 UNKNOWN ⇒ pre-push 钩子恒放行（r90 登记 5 轮未动） | done | WF-r73-接入CI契约 | - | 2026-10-05 03:05 | 5bd5bc3：契约手写重做（blocking 14 条 / 实测 10021ms / name 唯一 / 总预算可复算 / deferred 逐条写明承接面）并入库；`[greencheck] GREEN` rc=0 |
 | WF-r95-契约自身结构门 | P1 | 契约会被后人改坏（同名/空清单/成本虚报/列了没人跑）⇒ 需常驻门 | done | WF-r95-契约入库 | - | 2026-10-05 03:05 | `_test/ci_contract_check.py` 9 腿 + 自检 15 条；同时进电池与契约 blocking 自身；套件 116→120。自检抓到本件自身 bug：`any(s in x for x in (集合,集合))` 对容器做成员判定恒 False ⇒ 14 条合法 blocking 全被误报 |
 | WF-r95-提交率尺 | P2 | 「维护状态」维只有状态快照（★/pushed/release），无 30 天同口径窗口；★ 与维护度反向已实测 | done | - | - | 2026-10-05 03:05 | `_test/peer_maintenance_probe.py`（两腿交叉验证 + 印历史跨度 + `--self-only`/`--selftest` 14 条）；台账 `peer-maintenance-2026-10-05.json` 在盘；MoodChat 两腿差 1 ⇒ 判不可用不取平均 |
 | WF-r95-台账SNAP刷新 | P2 | 权威 `benchmark-metrics.json` 自 10-02 停滞，G17 报「台账记 112 / HEAD 现算 116」 | done | - | - | 2026-10-05 03:05 | 本轮重采 16/16；G17 差值 −4 → 0；README 电池数 118→120（G4 抓红后改，不是事后凑绿） |
 | WF-r95-落后格触发条件 | P2 | lint 门（peers 3/16）/ vector 记忆（7/16）/ i18n（3/16）/ mutation 门（0/16）—— 全部维持不执行，但把触发条件写死 | todo | - | - | 2026-10-05 03:05 | 触发条件见 r95 报告 §3 #7/#8：lint = 引入前端构建链或 size_budget 预算容得下 node_modules；vector = ①跨会话语义召回需求 ②接受双运行时（决策 #1 重评）；mutation = 覆盖率门连续两轮无新增缺口 |
+| WF-r96-对标轮 | P1 | r96 八维对标 + 四项改造（issue响应尺/并发口径封口/龄期尺+探针接线/引擎面归因+交付卫生） | doing | - | - | 2026-10-05 12:57 | - |
 
 ## 推进记录
 
@@ -76,6 +75,11 @@
 - [2026-10-02 01:44] VOL-FC486 doing → done
 - [2026-10-02 01:45] WF-r90-sync状态词滞留 新增（P2，todo）
 - [2026-10-02 22:10] WF-r93-对标轮 新增（P1，doing）＋ WF-r93-loc超限治理 / WF-r93-辅助台账重采 / WF-r93-cijob双读数 新增（P2，todo）
+- [2026-10-05 12:56] WF-r94-probe落盘验证 todo → done
+- [2026-10-05 12:56] WF-r95-对标轮 doing → done
+- [2026-10-05 12:56] WF-r90-sync状态词滞留 todo → blocked（责任面在受管根 global_skills/A-project-handoff，本仓无执行位）
+- [2026-10-05 12:57] WF-r96-对标轮 新增（P1，todo）
+- [2026-10-05 12:57] WF-r96-对标轮 todo → doing
 
 ## 分卷目录
 

@@ -82,6 +82,11 @@ jobs:
           # 等不到 health 就直接让 job 红：这里的失败原因必须是"起服失败"而不是"性能退化"
           curl -sf http://127.0.0.1:8123/api/health
           python _test/perf_baseline_check.py --json /tmp/perf-baseline.json
+          # r96：阶梯并发曲线在受理面上也跑（本地默认关，是为了不推高电池 wall-clock）。
+          # 立因：r95 报告 §1 印 1013.9 rps 而 §5 称「并发维度仍无读数」——两句都对但口径没写在数字上。
+          # 这条同时是 docs/PERF-BASELINE.md 那张表的复算位。
+          python _test/perf_baseline_check.py --ramp 8,16,32,64 --ramp-budget 60 \
+            --json /tmp/perf-ramp.json
       # 判据自证必须和真跑同批：只跑不验的话，"恒慢样本会不会被判红"永远没人知道，
       # 而一条从不红的的性能门禁，和没有门禁在受理面上没有区别（r41 同族）。
       - name: 判据自证（恒慢/空样本/缺面/口径漂移必须红）

@@ -200,6 +200,13 @@ def selftest():
     eq("边界 closed_at 缺失的样本 ⇒ 不把 None 当 0 天",
        classify_issue_recency([{"number": 1}], True, 5), None)
     eq("边界 days_ago(None) ⇒ None 而非 0", days_ago(None), None)
+    # 检测器自身的两向腿：抓旧谎言的确切形态，且不得把新的诚实标签报成复发
+    eq("检测器抓到旧谎言确切形态",
+       detect_old_lie({"a/b": {"issue_closed_days": "NA(无真issue)"}}), ["a/b"])
+    eq("检测器**不得**把新的诚实标签报成旧形态复发（r96 实测踩过：chibi 被误报一次）",
+       detect_old_lie({"s-nagaev/chibi": {"issue_closed_days":
+                                          "NA(sample-miss 样本20条无真issue 但人口=7)"}}), [])
+    eq("边界 检测器对非 dict 行不崩", detect_old_lie({"x": "junk"}), [])
     enc = urllib.parse.urlencode({"q": "repo:a/b type:issue is:closed"})
     eq("边界 查询串里空格已编码（裸空格会让 gh 参数错位）", " " in enc, False)
     eq("边界 self 在分母里（r37–r95 期间 SELF 常量定义了却零使用点）",
@@ -211,6 +218,16 @@ def selftest():
     print("HYGIENE-SELFTEST-%s（%d/%d 条）"
           % ("PASS" if not bad else "FAIL", len(cases) - len(bad), len(cases)))
     return 1 if bad else 0
+
+
+def detect_old_lie(rows):
+    """挑出仍写**旧谎言确切形态** `NA(无真issue)` 的仓。
+    ⚠️ 不能用裸子串 `无真issue` 当标记：r96 实测撞出新的诚实标签
+    `NA(sample-miss 样本20条无真issue 但人口=7)` 也含那五个字 ⇒ 子串匹配会把
+    **正确记录**报成"旧形态复现"，骗下一轮去"修"一份本来没坏的台账（判据误报的代价
+    与漏报同级：它制造假工作项）。"""
+    return [r for r, d in rows.items() if isinstance(d, dict)
+            and d.get("issue_closed_days") == "NA(无真issue)"]
 
 
 def main():
@@ -247,9 +264,10 @@ def main():
                  d.get("issue_closed_days"), d.get("contributors"),
                  d.get("one_click"), d.get("gov")))
     print("-" * 150)
-    false_na = [r for r, d in rows.items()
-                if isinstance(d.get("issue_closed_days"), str)
-                and "无真issue" in d["issue_closed_days"]]
+    # 只认**旧谎言的确切形态** `NA(无真issue)`。不能拿裸子串 `无真issue` 当标记 ——
+    # r96 实测撞出：新的诚实标签 `NA(sample-miss 样本20条无真issue 但人口=7)` 也含那五个字，
+    # 用子串匹配会把**正确记录**报成"旧形态复现"，骗下一轮去"修"一份本来没坏的台账。
+    false_na = detect_old_lie(rows)
     hdr = "应测 %d 仓 ｜ 整仓取数失败 %d ｜ 含 NA 字段 %d" % (
         len(repos), sum(1 for v in rows.values() if "_fatal" in v), len(unverified))
     if false_na:
