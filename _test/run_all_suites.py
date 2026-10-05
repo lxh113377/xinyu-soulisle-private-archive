@@ -268,6 +268,7 @@ SUITES = [
     #   探针本体**不入电池**（16 仓 × search+comments+timeline 三层调用，承 r37「探针不入链」口径，
     #   且本轮已实测同轮 burst 重采会撞 GitHub secondary rate limit），只入零网络的判定桩。
     ("issue_probe_selftest", [sys.executable, "_test/peer_issue_response_probe.py", "--selftest"]),
+    ("settle_wait_selftest", [sys.executable, "_test/settle_wait.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），

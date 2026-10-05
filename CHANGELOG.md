@@ -28,6 +28,18 @@
   **受理面从未覆盖这条腿**，故"CI 全绿"在这条判据上不等于"验过"。修复属 `src/` 行为码且 v1.8.0 已发布
   ⇒ **本轮不擅自执行**，登记为报告 §3 #9 / `memory/07-next-steps.part113.md` 的 P1 待决项。
 - 🔴 **`j4_memory` 的定长 8s 等待改为"先见变化、再见静止"（收口提交 `d03e066` 在 CI 判红后的修复）**：CI run 37294500147 `BATTERY: 122/125 rc=1 RED: j4_memory`，而红因只有一行、不带数。本机逐 0.25s 采样实测：占位 `.msg.ai` 在 **0.05s** 就出现，服务端计数 **1.65s** 才落库 ⇒ 旧 `wait_for_timeout(8000)` 是把判据成败押在机器负载上（与 r60 修掉的 `storage_resilience` 同一形态，`j4_memory` 当时没一起改）。三处改：① `FAIL-A` 自带 `实测 emotions=… messages=…（起账 …/…）`；② 新增 `wait_quiescent(sid)`（≤25s；到点无变化 ⇒ `FAIL-A0` 判**取数失败**而非服务端错）；③ 新增 `FAIL-B0` 非空驱动守卫（对照组的"须全 0"此前在页面根本没提交时也会绿）。**断言阈值一字未改**；真跑 rc=0 + 两条变异腿各自点名 `FAIL-A0`/`FAIL-B0`（第二条第一版写成 `0 or …` 是空操作，换 `0 and …` 才咬 = "假反例"又一形）。报告 §2.10。
+- 🔴 **两条 CI 红升到一把公共尺 `_test/settle_wait.py`（修类不修例）**：修复提交 `90d4506` 之后 CI run 37299161773
+  换到 `data_rights` 判红（`j4_memory` 本次绿）—— 红因自带数 `server.messages 实得 2 / 期望 1`，
+  根因同族而出口不同：D3 先 `stats()` 后 `exportAll()`，**两次取数跨时刻**，比的根本不是同一个状态。
+  抽出唯一实现 `wait_quiescent` + `same_reading`，两件都改接；D3 加**同刻性守卫**（导出后再取一次 stats，
+  不等就记未验、既不判产品红也不判绿）。两条约束写进文件头且各有腿：等待条件禁现业务阈值；
+  `baseline` 必须在动作之前取（我第一版没传 ⇒ 本机把一次**成功**读成取数失败的假红，
+  selftest 补正反两腿，`SETTLE-SELFTEST-PASS（13/13）`）。顺带修掉一处存量 **rc 口径缺陷**：
+  `data_rights` 原写 `if bad or unv: return 1`，把「只有未验、零判红」也折成判红 ⇒ 现拆 `bad→1 / unv→2`
+  （变异腿注入一条未验，实测 `rc=2` 且门面词 `DATA-RIGHTS-UNVERIFIED`）。
+  接线同笔完成：SUITES 128→129（`settle_wait_selftest`）+ `docs/quality-gates.md` 一行 + README 计数同步；
+  `REPO-CONFIG-PASS` / `LOC-PASS` / `VERDICT-EXIT-PARITY-PASS defect=0` / `CI-CONTRACT-PASS 问题=0` 复跑均绿。
+  报告 §2.10 追记。**阈值一字未改、未加任何重试。**
 
 ## [1.8.0] - 2026-10-05 — 对标轮 r94–r96 收口（自 `v1.7.0` 起的全部在制增量随版发布）
 

@@ -24,6 +24,9 @@
 import json
 import os
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from settle_wait import wait_quiescent, same_reading
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 BASE = os.environ.get("XINYU_BASE", "http://127.0.0.1:8123")
@@ -113,23 +116,35 @@ def main():
             txt = pg.locator("#data-disclosure").inner_text()
             check("D1a 开远端时披露语讲清去向", disclosure_ok(txt, True), txt[:78])
             # D2 先造数据
+            base0 = stats("r44-probe")   # 动作**之前**的起账：静止判定要拿它当基线（见 settle_wait 文档）
             pg.fill("#chat-input", "今天被导师批评了，我很难受")
             pg.click("button[type=submit]")
             pg.wait_for_function("() => document.querySelectorAll('#chat-log .msg').length >= 2",
                                  timeout=30000)
-            pg.wait_for_timeout(1500)
+            # 旧写法是 `wait_for_timeout(1500)` 后立刻 stats() —— CI run 37299161773 因此拿到
+            # `server.messages 实得 2 / 期望 1`：快照与导出取自**两个不同时刻**，比的不是同一个状态。
+            # 改法与同轮 `j4_memory` 一致：先等"变化后静止"，再取这对必须同刻的读数（唯一实现 settle_wait.py）。
+            settled, last_q = wait_quiescent(lambda: stats("r44-probe"), budget_s=20.0, baseline=base0)
+            if not settled:
+                unverified("D2a/D3 服务端写入静止", "20s 内计数毫无变化，末次读数=%s" % (last_q,))
             st1 = stats("r44-probe")
             check("D2a 写入后服务端确有记录", st1["emotions"] > 0 and st1["messages"] > 0, str(st1))
             # D3 导出（在删除之前）
             bundle = pg.evaluate("() => window.MemoryStore.exportAll()")
+            st2 = stats("r44-probe")   # 导出之后再取一次：两次不同 ⇒ 这一对读数不可比，记未验而非判产品红
             srv = (bundle.get("source") or {}).get("server") or {}
             n_local = len((bundle.get("source") or {}).get("local") or [])
-            check("D3 导出含服务端与本机两份且与计数对齐",
-                  len(srv.get("emotions") or []) == st1["emotions"]
-                  and len(srv.get("messages") or []) == st1["messages"] and n_local > 0,
-                  "server.emotions=%s/%s messages=%s/%s local=%s mode=%s"
-                  % (len(srv.get("emotions") or []), st1["emotions"],
-                     len(srv.get("messages") or []), st1["messages"], n_local, bundle.get("mode")))
+            if same_reading(st1, st2, keys=("emotions", "messages")):
+                check("D3 导出含服务端与本机两份且与计数对齐",
+                      len(srv.get("emotions") or []) == st1["emotions"]
+                      and len(srv.get("messages") or []) == st1["messages"] and n_local > 0,
+                      "server.emotions=%s/%s messages=%s/%s local=%s mode=%s（快照同刻：是）"
+                      % (len(srv.get("emotions") or []), st1["emotions"],
+                         len(srv.get("messages") or []), st1["messages"], n_local, bundle.get("mode")))
+            else:
+                # 快照与导出之间服务端又动了 ⇒ 这一对数本来就不可比；判产品红是冤枉，判绿是自欺
+                unverified("D3 导出⇄快照同刻性",
+                           "取数期间服务端状态漂移 %s→%s ⇒ 本轮 D3 不作数" % (st1, st2))
             check("D4 导出/清除按钮均存在且 type=button",
                   pg.evaluate("() => ['btn-clear','btn-export'].every(i => {"
                               "const e=document.getElementById(i);"
@@ -174,9 +189,15 @@ def main():
     bad = [n for n, ok, d in results if ok is False]
     unv = [n for n, ok, d in results if ok is None]
     print("=" * 74)
-    if bad or unv:
+    # rc 口径与本件头注一致：0=全绿 1=判红 2=未验。
+    # 一手（r96）：原来写成 `if bad or unv: … return 1`，于是"判红=（空）未验=X"也回 1 ——
+    # 把没验过的面折算成判红，既污染红因归因，又让 CI 的 rc=1 名单里混进根本不是红的项。
+    if bad:
         print("DATA-RIGHTS-FAIL 判红=%s 未验=%s" % (",".join(bad), ",".join(unv)))
         return 1
+    if unv:
+        print("DATA-RIGHTS-UNVERIFIED 判红= 未验=%s（不得据其声称已验）" % ",".join(unv))
+        return 2
     print("DATA-RIGHTS-PASS 披露随模式翻转+删除有回执并复核归零+导出含两份且与计数对齐 全绿")
     return 0
 

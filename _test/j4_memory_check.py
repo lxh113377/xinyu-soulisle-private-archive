@@ -10,6 +10,9 @@
   B（对照组，默认关闭）：不设 remote → 服务端记录数必须为 0，判据非恒真。
 """
 import sys, io, json, time, urllib.request
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from settle_wait import wait_quiescent   # 静止等待的唯一实现（data_rights 同用一个）
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
 
@@ -52,31 +55,6 @@ def say(page):
     page.click("#chat-form button[type=submit]")
 
 
-def wait_quiescent(sid, budget_s=25.0, poll=0.25):
-    """等这一轮**写完并静止**：先看到服务端计数相对起账发生变化，再看到连续两次读数一致。
-    为什么不沿用定长 sleep（旧写法 `wait_for_timeout(8000)`）：本机实测落库时刻 1.65s
-    （探针逐 0.25s 采样：t=0.66s 仍 0/0，t≈1.65s 起 emotions=1 messages=2），
-    固定 8s 等于把判据的成败押在机器负载上 —— CI run 37294500147 就是这样判红的，
-    与 r60 在 `storage_resilience_check` 修掉的是同一形态。
-    静止判据**不预设断言阈值**（只问"变了吗 / 还在变吗"），所以它不是"等自己要证的数"：
-    服务端只写进 1 条时本函数照常返回 True，随后 FAIL-A 带着实测数字判红。
-    到点仍没变化 ⇒ False ⇒ 调用方判**取数失败**（红因点名"回合没落地"，不是"服务端错了"）。"""
-    base = stats(sid)
-    t0 = time.monotonic()
-    changed, prev = False, None
-    while time.monotonic() - t0 < budget_s:
-        cur = stats(sid)
-        if not changed:
-            if cur.get("messages") != base.get("messages") or cur.get("emotions") != base.get("emotions"):
-                changed, prev = True, cur
-        elif cur == prev:
-            return True
-        else:
-            prev = cur
-        time.sleep(poll)
-    return False
-
-
 def lit(page):
     return page.evaluate("() => window.ThreeScene.litInfo().lit")
 
@@ -101,7 +79,7 @@ with sync_playwright() as p:
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     boot(page, CFG_ON, SID_ON)
     say(page)
-    settled_on = wait_quiescent(SID_ON)
+    settled_on, last_a = wait_quiescent(lambda: stats(SID_ON), baseline=before_on)
     lit_local = lit(page)
     a = stats(SID_ON)
 
@@ -132,7 +110,7 @@ print("B_BEFORE:", before_off, "B_AFTER(须全 0):", b)
 
 ok = True
 if not settled_on:
-    print("FAIL-A0: 25s 内服务端计数毫无变化 ⇒ 本轮取数失败（不是服务端判红），先查页面/引擎面")
+    print("FAIL-A0: 25s 内服务端计数毫无变化 ⇒ 本轮取数失败（不是服务端判红），先查页面/引擎面；末次读数=%s" % (last_a,))
     ok = False
 if a["emotions"] < 1 or a["messages"] < 2:
     # 判据行必须自带读数：电池只保留含 FAIL 的红因行，上面 A_BEFORE/A_AFTER 那两行在 CI 上会被折掉
