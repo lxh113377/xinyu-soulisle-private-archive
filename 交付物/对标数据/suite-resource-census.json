@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 120,
+ "suites": 128,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
@@ -51,7 +51,7 @@
    ]
   },
   "free": {
-   "n": 79,
+   "n": 87,
    "seconds": 294.4,
    "members": [
     "disclaimer_forensics",
@@ -132,7 +132,15 @@
     "ci_contract",
     "ci_contract_selftest",
     "bench_rollup",
-    "bench_rollup_selftest"
+    "bench_rollup_selftest",
+    "ledger_age",
+    "ledger_age_selftest",
+    "hygiene_probe_selftest",
+    "capsafe_probe_selftest",
+    "maintenance_probe_selftest",
+    "browser_engine_declare",
+    "browser_engine_declare_selftest",
+    "issue_probe_selftest"
    ]
   },
   "jar8123+port:18123": {
@@ -1293,6 +1301,72 @@
    "target": "_test/bench_rollup.py",
    "mode": "stub",
    "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "ledger_age",
+   "target": "_test/ledger_age_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "ledger_age_selftest",
+   "target": "_test/ledger_age_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "hygiene_probe_selftest",
+   "target": "_test/peer_hygiene_probe.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "capsafe_probe_selftest",
+   "target": "_test/peer_capability_safety_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "maintenance_probe_selftest",
+   "target": "_test/peer_maintenance_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "browser_engine_declare",
+   "target": "_test/browser_engine_declare_check.py",
+   "mode": "real",
+   "facets": [
+    "browser"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "browser_engine_declare_selftest",
+   "target": "_test/browser_engine_declare_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "issue_probe_selftest",
+   "target": "_test/peer_issue_response_probe.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
    "exclusive": []
   }
  ]
