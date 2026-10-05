@@ -1,0 +1,262 @@
+{
+ "window_days": 180,
+ "window_start": "2026-04-08",
+ "taken_at": "2026-10-05T04:38:35.863971+00:00",
+ "self": "lxh113377/xinyu-soulisle-private-archive",
+ "rows": {
+  "lxh113377/xinyu-soulisle-private-archive": {
+   "na": "NA(no-closed-issue 人口=0)",
+   "open_backlog": 0,
+   "closed_window": 0
+  },
+  "lobehub/lobehub": {
+   "na": null,
+   "open_backlog": 389,
+   "closed_window": 1044,
+   "categories": {
+    "measured": 2,
+    "silent": 0,
+    "bot-only": 4,
+    "author-only": 2,
+    "unverified": 0
+   },
+   "close_lag_hours_median": 0.0,
+   "first_response_all_median": 16.21,
+   "first_response_agreed_median": 16.21,
+   "first_response_agreed_p90": 26.25,
+   "legs": {
+    "agreed": 2,
+    "contested": 0,
+    "single_leg": 0
+   },
+   "silent_close_rate": 0.0,
+   "responder_breadth": 1.0,
+   "sample_n": 8
+  },
+  "SillyTavern/SillyTavern": {
+   "na": null,
+   "open_backlog": 440,
+   "closed_window": 118,
+   "categories": {
+    "measured": 5,
+    "silent": 3,
+    "bot-only": 0,
+    "author-only": 0,
+    "unverified": 0
+   },
+   "close_lag_hours_median": 12.91,
+   "first_response_all_median": 4.48,
+   "first_response_agreed_median": 56.2,
+   "first_response_agreed_p90": 241.07,
+   "legs": {
+    "agreed": 3,
+    "contested": 0,
+    "single_leg": 2
+   },
+   "silent_close_rate": 0.375,
+   "responder_breadth": 0.2,
+   "sample_n": 8
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "na": null,
+   "open_backlog": 111,
+   "closed_window": 3,
+   "categories": {
+    "measured": 2,
+    "silent": 0,
+    "bot-only": 0,
+    "author-only": 1,
+    "unverified": 0
+   },
+   "close_lag_hours_median": 0.67,
+   "first_response_all_median": 0.65,
+   "first_response_agreed_median": 0.65,
+   "first_response_agreed_p90": 15.24,
+   "legs": {
+    "agreed": 2,
+    "contested": 0,
+    "single_leg": 0
+   },
+   "silent_close_rate": 0.0,
+   "responder_breadth": 0.5,
+   "sample_n": 3
+  },
+  "morettt/my-neuro": {
+   "na": null,
+   "open_backlog": 26,
+   "closed_window": 21,
+   "categories": {
+    "measured": 0,
+    "silent": 0,
+    "bot-only": 7,
+    "author-only": 1,
+    "unverified": 0
+   },
+   "close_lag_hours_median": 5.85,
+   "first_response_all_median": null,
+   "first_response_agreed_median": null,
+   "first_response_agreed_p90": null,
+   "legs": {
+    "agreed": 0,
+    "contested": 0,
+    "single_leg": 0
+   },
+   "silent_close_rate": 0.0,
+   "responder_breadth": null,
+   "sample_n": 8
+  },
+  "letta-ai/letta-code": {
+   "na": null,
+   "open_backlog": 182,
+   "closed_window": 342,
+   "categories": {
+    "measured": 0,
+    "silent": 1,
+    "bot-only": 7,
+    "author-only": 0,
+    "unverified": 0
+   },
+   "close_lag_hours_median": 0.0,
+   "first_response_all_median": null,
+   "first_response_agreed_median": null,
+   "first_response_agreed_p90": null,
+   "legs": {
+    "agreed": 0,
+    "contested": 0,
+    "single_leg": 0
+   },
+   "silent_close_rate": 0.125,
+   "responder_breadth": null,
+   "sample_n": 8
+  },
+  "hello-diana/MASCOT": {
+   "na": "NA(thin-sample n=2<3)",
+   "open_backlog": 1,
+   "closed_window": 2
+  },
+  "ddxfish/sapphire": {
+   "na": null,
+   "open_backlog": 2,
+   "closed_window": 10,
+   "categories": {
+    "measured": 8,
+    "silent": 0,
+    "bot-only": 0,
+    "author-only": 0,
+    "unverified": 0
+   },
+   "close_lag_hours_median": 238.17,
+   "first_response_all_median": 237.66,
+   "first_response_agreed_median": 322.6,
+   "first_response_agreed_p90": 2414.08,
+   "legs": {
+    "agreed": 3,
+    "contested": 0,
+    "single_leg": 5
+   },
+   "silent_close_rate": 0.0,
+   "responder_breadth": 0.12,
+   "sample_n": 8
+  },
+  "v2rockets/Loyal-Elephie": {
+   "na": "NA(no-closed-issue-in-window 全期人口=11)",
+   "open_backlog": 6,
+   "closed_window": 0
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "na": "NA(thin-sample n=1<3)",
+   "open_backlog": 2,
+   "closed_window": 1
+  },
+  "Lum1104/MER-Factory": {
+   "na": null,
+   "open_backlog": 0,
+   "closed_window": 5,
+   "categories": {
+    "measured": 5,
+    "silent": 0,
+    "bot-only": 0,
+    "author-only": 0,
+    "unverified": 0
+   },
+   "close_lag_hours_median": 3472.83,
+   "first_response_all_median": 0.18,
+   "first_response_agreed_median": 0.18,
+   "first_response_agreed_p90": 69.22,
+   "legs": {
+    "agreed": 3,
+    "contested": 0,
+    "single_leg": 2
+   },
+   "silent_close_rate": 0.0,
+   "responder_breadth": 0.2,
+   "sample_n": 5
+  },
+  "CheaperjamRen/leemo": {
+   "na": "NA(no-closed-issue 人口=0)",
+   "open_backlog": 0,
+   "closed_window": 0
+  },
+  "NJX-njx/opensoul": {
+   "na": "NA(no-closed-issue-in-window 全期人口=20)",
+   "open_backlog": 0,
+   "closed_window": 0
+  },
+  "s-nagaev/chibi": {
+   "na": "NA(no-closed-issue-in-window 全期人口=7)",
+   "open_backlog": 2,
+   "closed_window": 0
+  },
+  "29-Cu/succhia": {
+   "na": "NA(no-closed-issue 人口=0)",
+   "open_backlog": 0,
+   "closed_window": 0
+  },
+  "zeroa234/ryza-ai-revive": {
+   "na": null,
+   "open_backlog": 6,
+   "closed_window": 6,
+   "categories": {
+    "measured": 6,
+    "silent": 0,
+    "bot-only": 0,
+    "author-only": 0,
+    "unverified": 0
+   },
+   "close_lag_hours_median": 150.46,
+   "first_response_all_median": 10.0,
+   "first_response_agreed_median": 2.39,
+   "first_response_agreed_p90": 63.24,
+   "legs": {
+    "agreed": 3,
+    "contested": 0,
+    "single_leg": 3
+   },
+   "silent_close_rate": 0.0,
+   "responder_breadth": 0.5,
+   "sample_n": 6
+  },
+  "Bwcx-songyu/MoodChat": {
+   "na": "NA(no-closed-issue 人口=0)",
+   "open_backlog": 0,
+   "closed_window": 0
+  }
+ },
+ "na": [
+  "lxh113377/xinyu-soulisle-private-archive(NA(no-closed-issue 人口=0))",
+  "hello-diana/MASCOT(NA(thin-sample n=2<3))",
+  "v2rockets/Loyal-Elephie(NA(no-closed-issue-in-window 全期人口=11))",
+  "Rogendo/Mental-health-Chatbot(NA(thin-sample n=1<3))",
+  "CheaperjamRen/leemo(NA(no-closed-issue 人口=0))",
+  "NJX-njx/opensoul(NA(no-closed-issue-in-window 全期人口=20))",
+  "s-nagaev/chibi(NA(no-closed-issue-in-window 全期人口=7))",
+  "29-Cu/succhia(NA(no-closed-issue 人口=0))",
+  "Bwcx-songyu/MoodChat(NA(no-closed-issue 人口=0))"
+ ],
+ "denominator": 17,
+ "rules": {
+  "exclude_bots": true,
+  "exclude_author": true,
+  "min_sample": 3
+ }
+}

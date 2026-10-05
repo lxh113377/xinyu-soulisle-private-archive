@@ -37,6 +37,13 @@ BUDGETS = {
 }
 MIN_RPS = 50.0     # 实测 8×6=48 并发下 ~2200 rps ⇒ 地板只防"塌了"，不防抖动
 CONC = {"threads": 8, "per_thread": 6}
+# r96：单点并发**必须把档位写进读数本身**。立因是 r95 报告自相矛盾——§1 维度 4 印
+# `吞吐 1013.9 rps`，§5 又写「并发维度仍无读数」（依据是 grep k6/locust 全仓 0 命中）。
+# 两句话各自都对，错在**数字没带自己的口径**：1013.9 是 8 线程闭环 48 请求这一个点上量出来的，
+# 而"没有第三方压测工具"是另一件事。⇒ ① PASS 行现印档位；② 下面这套阶梯把单点变成曲线。
+DEFAULT_RAMP = (8, 16, 32, 64)
+RAMP_WORK = 4              # 每线程请求数 ⇒ 各档总请求 = 档位 × 4
+RAMP_BUDGET_S = 60         # 整段阶梯的硬上限；到点即停并把未跑档记 NA(budget-exhausted)
 
 
 def timed(fn):
@@ -127,6 +134,74 @@ def judge(m):
     return bad
 
 
+def measure_ramp(base, tiers, work, budget_s):
+    """阶梯并发：每档开 `n` 个线程、每线程 `work` 次闭环请求，打两条面
+    （health=纯服务端并发；emotion=危机短路句，仍要求不调 LLM）。
+    到 `budget_s` 即**停止加档**，未跑的档记 NA(budget-exhausted)——不缩档数、不降并发、
+    不加有界重试（放宽等于为绿而松尺，与本仓 voice 8s 预算 / coverage 门同宗纪律）。"""
+    out = {}
+    deadline = time.perf_counter() + budget_s
+    crisis_body = json.dumps({"text": CRISIS_TEXT}, ensure_ascii=False).encode("utf-8")
+    for n in tiers:
+        if time.perf_counter() > deadline:
+            out[n] = {"state": "NA(budget-exhausted)"}
+            continue
+        rec = {"state": "ok"}
+        for face, url, body in (("health", base + "/api/health", None),
+                                ("emotion", base + "/api/emotion", crisis_body)):
+            def hit(u=url, b=body):
+                return timed(lambda: get(u, b))
+            t0 = time.perf_counter()
+            try:
+                with ThreadPoolExecutor(max_workers=n) as ex:
+                    res = list(ex.map(lambda _: hit(), range(n * work)))
+            except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
+                rec[face] = {"state": "NA(fetch-failed:%s)" % getattr(e, "reason", e)[:50]}
+                continue
+            wall = time.perf_counter() - t0
+            lats = [x[0] for x in res]
+            last = res[-1][1][1] if isinstance(res[-1][1], tuple) else res[-1][1]
+            d = {"rps": round(len(lats) / wall, 1) if wall > 0 else None,
+                 "p95_ms": round(pct(lats, 95), 1), "max_ms": round(max(lats), 1),
+                 "n": len(lats), "threads": n}
+            if face == "emotion":
+                try:
+                    d["llm_used"] = bool(json.loads((last or b"").decode("utf-8", "replace")).get("llm"))
+                except Exception as e:                          # noqa: BLE001
+                    d["llm_used"] = None
+                    d["guard"] = "UNVERIFIED:%s" % type(e).__name__
+            rec[face] = d
+        rec["took_s"] = round(time.perf_counter() - t0, 2)
+        out[n] = rec
+    return out
+
+
+def judge_ramp(ramp, tiers):
+    """每档地板**只加不减**：rps ≥ MIN_RPS、p95 ≤ 400ms（沿用 BUDGETS 现值），
+    且每档都要证 `llm_used=False`。64 档若撑不住 ⇒ 是真读数，处置是撤档并在报告里写明
+    实测塌方点，**不是抬预算**。"""
+    bad, na = [], []
+    cap = BUDGETS["health"]["p95_ms"]
+    for n in tiers:
+        d = ramp.get(n)
+        if not d or d.get("state") != "ok":
+            na.append("%s:%s" % (n, (d or {}).get("state", "没跑")))
+            continue
+        for face in ("health", "emotion"):
+            f = d.get(face, {})
+            if not isinstance(f, dict) or "rps" not in f:
+                na.append("%s/%s:%s" % (n, face, f.get("state", "无样本")))
+                continue
+            if f["rps"] < MIN_RPS:
+                bad.append("并发@%d %s 吞吐 %.0f rps < 地板 %.0f" % (n, face, f["rps"], MIN_RPS))
+            if f["p95_ms"] > cap:
+                bad.append("并发@%d %s p95=%.0fms 超预算 %.0fms" % (n, face, f["p95_ms"], cap))
+            if face == "emotion" and f.get("llm_used") is not False:
+                bad.append("并发@%d 危机路径 llm_used=%s ⇒ 该档数字不是性能，是网络" % (
+                    n, f.get("llm_used")))
+    return bad, na
+
+
 def selftest():
     """自证判据自身不恒绿：慢样本必须超预算、空样本必须算未验、百分位不得插值造假数。"""
     bad = []
@@ -147,8 +222,38 @@ def selftest():
     llm_on["emotion_crisis"] = {"p95_ms": 1.0, "llm_used": True}
     if not judge(llm_on):
         bad.append("⑥危机路径走了 LLM 却没被抓到 ⇒ 口径被悄悄换掉")
-    print("SELFTEST-%s" % ("PASS: 百分位/空样本/恒慢/缺面/口径漂移 六向正确" if not bad
-                           else "FAIL: " + "; ".join(bad)))
+
+    # ── r96 阶梯三腿（正例 / 变异 / 边界）：judge_ramp 是新写的，没自证就是没接线 ──
+    def tier(n, rps, p95, llm=False):
+        return {"state": "ok",
+                "health": {"rps": rps, "p95_ms": p95, "n": n * 4, "threads": n},
+                "emotion": {"rps": rps, "p95_ms": p95, "n": n * 4, "threads": n,
+                            "llm_used": llm}}
+    tiers = (8, 16, 32, 64)
+    healthy = {n: tier(n, 900.0, 60.0) for n in tiers}
+    b, na = judge_ramp(healthy, tiers)
+    if b or na:
+        bad.append("⑦阶梯正例被误报（四档 900rps/60ms 应全绿）：%s %s" % (b, na))
+    slow_tier = dict(healthy)
+    slow_tier[64] = tier(64, 10.0, 9000.0)
+    b2, _ = judge_ramp(slow_tier, tiers)
+    # 一档塌方 ⇒ health 与 emotion **两个面各报 rps 与 p95 两条**，共 4 条。
+    # 期望值按"面数×地板数"算，不是按档数拍脑袋（少一条就是某面的地板没咬）。
+    if len(b2) != 4:
+        bad.append("⑧变异体失效：64 档两面的吞吐与 p95 共应报 4 条，实得 %d ⇒ 有地板没咬：%s"
+                   % (len(b2), b2))
+    llm_tier = dict(healthy)
+    llm_tier[32] = tier(32, 900.0, 60.0, llm=True)
+    b3, _ = judge_ramp(llm_tier, tiers)
+    if not any("llm_used" in x for x in b3):
+        bad.append("⑨变异体失效：某档走了 LLM 却没被点名 ⇒ 并发面口径可被偷换")
+    b4, na4 = judge_ramp({8: tier(8, 900.0, 60.0), 16: {"state": "NA(budget-exhausted)"}}, tiers)
+    if b4:
+        bad.append("⑩预算耗尽不该算判红（它该走 UNVERIFIED 分支）：%s" % b4)
+    if len(na4) != 3:
+        bad.append("⑪未跑的档必须逐档点名（期望 3 条 NA，实得 %d）⇒ 缺档会被读成『没有缺档』" % len(na4))
+    print("SELFTEST-%s" % ("PASS: 百分位/空样本/恒慢/缺面/口径漂移 + 阶梯 正例/双地板/LLM偷换/NA不冒充绿 九向正确"
+                           if not bad else "FAIL: " + "; ".join(bad)))
     return 1 if bad else 0
 
 
@@ -156,6 +261,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("base", nargs="?", default="http://127.0.0.1:8123")
     ap.add_argument("--reps", type=int, default=25)
+    ap.add_argument("--ramp", default="",
+                    help="阶梯并发档位，逗号分隔（如 8,16,32,64）；**默认关**——电池不因此变长，"
+                         "由 CI 的 perf-baseline 作业与人工轮次显式开启")
+    ap.add_argument("--ramp-work", type=int, default=RAMP_WORK)
+    ap.add_argument("--ramp-budget", type=int, default=RAMP_BUDGET_S)
     ap.add_argument("--json", default="")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -178,22 +288,57 @@ def main():
               % (name, d.get("n"), d.get("min_ms", "-"), d.get("p50_ms", "-"),
                  d.get("p95_ms", "-"), d.get("max_ms", "-"), extra))
     bad = judge(m)
+    tiers = tuple(int(x) for x in a.ramp.split(",") if x.strip())
+    ramp, ramp_bad, ramp_na = None, [], []
+    if tiers:
+        ramp = measure_ramp(a.base, tiers, a.ramp_work, a.ramp_budget)
+        ramp_bad, ramp_na = judge_ramp(ramp, tiers)
+        for n in tiers:
+            d = ramp[n]
+            h = d.get("health") or {}
+            e = d.get("emotion") or {}
+            print("  ramp@%-4s %-18s health: rps=%-8s p95=%-7s ｜ emotion: rps=%-8s p95=%-7s llm_used=%s"
+                  % (n, d.get("state"), h.get("rps", "-"), h.get("p95_ms", "-"),
+                     e.get("rps", "-"), e.get("p95_ms", "-"), e.get("llm_used", "-")))
     if a.json:
         Path(a.json).write_bytes(json.dumps({"base": a.base, "reps": a.reps, "samples": m,
                                              "budgets": {k: v["p95_ms"] for k, v in BUDGETS.items()},
-                                             "breach": bad}, ensure_ascii=False, indent=1).encode("utf-8"))
-    if bad:
-        for x in bad:
+                                             "concurrency": {"single_point_threads": CONC["threads"],
+                                                             "single_point_requests": CONC["threads"] * CONC["per_thread"]},
+                                             "ramp": ({"tiers": list(tiers), "work_per_thread": a.ramp_work,
+                                                       "budget_s": a.ramp_budget,
+                                                       "result": {str(k): v for k, v in (ramp or {}).items()}}
+                                                      if ramp else None),
+                                             "breach": bad + ramp_bad},
+                                            ensure_ascii=False, indent=1).encode("utf-8"))
+    allbad = bad + ramp_bad
+    if allbad:
+        for x in allbad:
             print("  FAIL", x)
-        print("PERF-BASELINE-FAIL: %d 项超预算/口径失效" % len(bad))
+        print("PERF-BASELINE-FAIL: %d 项超预算/口径失效" % len(allbad))
         return 1
+    if ramp_na:
+        print("PERF-RAMP-UNVERIFIED: 未跑全的档=%s ⇒ 阶梯这一半记未验（取数不全不得判绿）"
+              % "; ".join(ramp_na))
+        return 2
     # 实测值必须挤进这一行：电池只保留最后一条含判据词的 stdout，逐项明细行在 CI 里会被丢掉
     # ⇒ 判据是棘轮，看不见被检环境的数字就无从判断"该不该重定基线"（07 在册 P2）。
+    # r96：吞吐数**必须同行带并发档**（r95 那条矛盾就是这么产生的）。
     peak = max(d["p95_ms"] for k, d in m.items() if k in BUDGETS)
     tightest = min(BUDGETS[k]["p95_ms"] - d["p95_ms"] for k, d in m.items() if k in BUDGETS)
-    print("PERF-BASELINE-PASS（%d 个目标在预算内｜实测峰值 p95=%.1fms，最紧余量 %.0fms｜吞吐 %s rps｜"
-          "口径=本地无外网 + 危机路径不调 LLM；这是自身棘轮不是跨项目对比）"
-          % (len(BUDGETS), peak, tightest, m.get("throughput_health", {}).get("rps", "取不到")))
+    tp = m.get("throughput_health", {})
+    tier_note = ""
+    if ramp:
+        line = "｜".join("rps@%d=%s" % (n, (ramp[n].get("health") or {}).get("rps", "NA"))
+                        for n in tiers)
+        p95s = [(ramp[n].get("health") or {}).get("p95_ms") for n in tiers
+                if (ramp[n].get("health") or {}).get("p95_ms") is not None]
+        tier_note = "｜阶梯 %s｜p95@N 峰值 %sms" % (line, round(max(p95s), 1) if p95s else "-")
+    print("PERF-BASELINE-PASS（%d 个目标在预算内｜实测峰值 p95=%.1fms，最紧余量 %.0fms｜"
+          "吞吐 并发%d线程×%d请求=%s rps%s｜口径=本地无外网 + 危机路径不调 LLM；"
+          "这是自身棘轮不是跨项目对比）"
+          % (len(BUDGETS), peak, tightest, CONC["threads"], CONC["threads"] * CONC["per_thread"],
+             tp.get("rps", "取不到"), tier_note))
     return 0
 
 

@@ -1,0 +1,32 @@
+lxh113377/xinyu-soulisle-private-archive ★0       issues=4      pushed=0   d rel90d=5    relLast=7     assets=2   closed人口=0       样本真n=0    issueClosed=NA(no-closed-issue 人口=0) contrib=2     一键=Dockerfile   治理=dependabot,security,license,docs-dir,changelog
+lobehub/lobehub                        ★82987   issues=1022   pushed=0   d rel90d=94   relLast=0     assets=11  closed人口=6155    样本真n=2    issueClosed=7        contrib=>=100 一键=Dockerfile   治理=security,license,docs-dir,changelog
+SillyTavern/SillyTavern                ★34096   issues=636    pushed=2   d rel90d=1    relLast=20    assets=0   closed人口=2263    样本真n=15   issueClosed=2        contrib=>=100 一键=Dockerfile,compose 治理=security,license
+Open-LLM-VTuber/Open-LLM-VTuber        ★13979   issues=158    pushed=142 d rel90d=0    relLast=404   assets=4   closed人口=125     样本真n=2    issueClosed=123      contrib=27    一键=none         治理=license
+morettt/my-neuro                       ★1387    issues=33     pushed=0   d rel90d=14   relLast=3     assets=1   closed人口=102     样本真n=2    issueClosed=0        contrib=25    一键=none         治理=license,docs-dir
+letta-ai/letta-code                    ★3515    issues=491    pushed=0   d rel90d=98   relLast=0     assets=1   closed人口=446     样本真n=1    issueClosed=0        contrib=51    一键=Dockerfile   治理=license,docs-dir
+hello-diana/MASCOT                     ★677     issues=1      pushed=41  d rel90d=0    relLast=None  assets=0   closed人口=2       样本真n=2    issueClosed=40       contrib=1     一键=none         治理=license
+ddxfish/sapphire                       ★291     issues=3      pushed=1   d rel90d=1    relLast=10    assets=2   closed人口=29      样本真n=14   issueClosed=0        contrib=4     一键=compose,Dockerfile 治理=license,docs-dir
+v2rockets/Loyal-Elephie                ★352     issues=6      pushed=583 d rel90d=0    relLast=None  assets=0   closed人口=11      样本真n=11   issueClosed=684      contrib=2     一键=none         治理=license
+Rogendo/Mental-health-Chatbot          ★214     issues=2      pushed=26  d rel90d=0    relLast=None  assets=0   closed人口=13      样本真n=12   issueClosed=28       contrib=3     一键=none         治理=none
+Lum1104/MER-Factory                    ★119     issues=0      pushed=205 d rel90d=0    relLast=370   assets=0   closed人口=7       样本真n=7    issueClosed=176      contrib=3     一键=none         治理=license,docs-dir
+CheaperjamRen/leemo                    ★101     issues=0      pushed=38  d rel90d=9    relLast=38    assets=3   closed人口=0       样本真n=0    issueClosed=NA(no-closed-issue 人口=0) contrib=1     一键=none         治理=security,license,docs-dir
+NJX-njx/opensoul                       ★58      issues=5      pushed=122 d rel90d=0    relLast=216   assets=1   closed人口=20      样本真n=10   issueClosed=210      contrib=7     一键=compose,Dockerfile 治理=dependabot,security,license,docs-dir,changelog
+s-nagaev/chibi                         ★56      issues=5      pushed=0   d rel90d=17   relLast=2     assets=0   closed人口=7       样本真n=0    issueClosed=NA(sample-miss 样本20条无真issue 但人口=7) contrib=3     一键=Dockerfile   治理=license,docs-dir
+29-Cu/succhia                          ★84      issues=0      pushed=71  d rel90d=0    relLast=None  assets=0   closed人口=0       样本真n=0    issueClosed=NA(no-closed-issue 人口=0) contrib=1     一键=none         治理=license
+zeroa234/ryza-ai-revive                ★203     issues=7      pushed=12  d rel90d=5    relLast=12    assets=2   closed人口=6       样本真n=6    issueClosed=12       contrib=3     一键=none         治理=security,license,docs-dir
+Bwcx-songyu/MoodChat                   ★1       issues=0      pushed=25  d rel90d=0    relLast=None  assets=0   closed人口=0       样本真n=0    issueClosed=NA(no-closed-issue 人口=0) contrib=1     一键=none         治理=none
+------------------------------------------------------------------------------------------------------------------------------------------------------
+  🔴 旧形态假 NA 复现（人口>0 却写成无真 issue）：s-nagaev/chibi
+  未验项（不得据其结论）：lxh113377/xinyu-soulisle-private-archive(部分字段); CheaperjamRen/leemo(部分字段); s-nagaev/chibi(部分字段); 29-Cu/succhia(部分字段); Bwcx-songyu/MoodChat(部分字段)
+落盘 交付物/对标数据/peer-hygiene-2026-10-05.json
+应测 17 仓 ｜ 整仓取数失败 0 ｜ 含 NA 字段 5
+HYGIENE-PROBE-PARTIAL
+
+  · lxh113377/xinyu-soulisle-private-archive 一键起命中路径：server/Dockerfile
+  · lobehub/lobehub 一键起命中路径：./Dockerfile
+  · SillyTavern/SillyTavern 一键起命中路径：./Dockerfile / docker/docker-compose.yml
+  · letta-ai/letta-code 一键起命中路径：docker/Dockerfile
+  · ddxfish/sapphire 一键起命中路径：./docker-compose.yml / ./Dockerfile
+  · NJX-njx/opensoul 一键起命中路径：./docker-compose.yml / ./Dockerfile
+  · s-nagaev/chibi 一键起命中路径：./Dockerfile
+RC3-HYGIENE_RC=1

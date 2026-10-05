@@ -2,15 +2,34 @@
 
 > 口径：本地无外网 + 危机路径不调 LLM。这是**自身棘轮**（防退化），不是跨项目对比（全行业 0/16 公开可比数字，见对标 r87 §2 G5）。
 
-## 1. 本轮实测（2026-10-02 r91，jar 直读 src，端口 8123）
+## 1. 本轮实测（2026-10-05 r96，jar 直读 src，端口 8123，JDK 17.0.20.1）
 
-- 命令：起 `java -jar server/target/soulisle-server.jar --server.port=8123`，跑 `python _test/perf_baseline_check.py`。
-- 结果：`PERF-BASELINE-PASS` —— p95=28.6ms（static 16.2/vendor 28.6/health 17.0/crisis 15.8，四目标全预算内，最紧余量 371ms），吞吐 1013.9 rps。
-- 与上一轮（10-01：p95=30.2ms / 1801.0 rps）相差属**同机抖动量级**：吞吐那格受并发窗口与本机负载影响大，
-  判据盯的是 400ms 预算与 50 rps 地板（数量级退化），不是名次。
+- 命令：起 `java -jar server/target/soulisle-server.jar --server.port=8123`，跑
+  `python _test/perf_baseline_check.py http://127.0.0.1:8123 --ramp 8,16,32,64 --ramp-budget 60 --json 交付物/对标数据/perf-ramp-2026-10-05.json`
+- 结果：`PERF-BASELINE-PASS` —— p95=27.7ms（static 27.0 / vendor 27.7 / health 16.2 / crisis 25.4，四目标全预算内，最紧余量 372ms），
+  单点吞吐 2481.2 rps（并发 8 线程×48 请求，p95=4.3ms），四档 `llm_used=False`。
+- **阶梯并发曲线（r96 新增，此前只有 8 线程这一个点）**：
+
+  | 并发档 | health rps | health p95 | emotion rps | emotion p95 | llm_used |
+  |---|---|---|---|---|---|
+  | 8 线程 | 2368.0 | 4.8ms | 2190.5 | 3.6ms | False |
+  | 16 线程 | 2041.8 | 10.0ms | 2623.5 | 6.0ms | False |
+  | 32 线程 | 2609.9 | 11.2ms | 2331.8 | 12.6ms | False |
+  | 64 线程 | 2630.6 | 16.1ms | 2254.8 | 11.4ms | False |
+
+  ⇒ **8→64 路没有塌方点**（吞吐在 ~2.0k–2.6k rps 区间平台波动，p95 随档线性升到 16.1ms 仍远在 400ms 预算内）。
+  读这句话请注意它的边界：本机单实例 H2 file 库、本地回环、无外网，**测的是这台机器上这个 jar 的形状**，
+  不是容量规划结论；容量上限要压到 64 档以上才有意义，本轮没做（见对标 r96 报告 §5）。
+- 与上一轮（10-02 r91：p95=28.6ms / 1013.9 rps，8 线程×48 请求）的吞吐差 **2.4 倍**，属同机抖动量级还是真提升
+  **不做断言**——上一轮只量了一个点，没有曲线可对。本轮起有了四档，下一轮才能谈"漂移"。
 - 复算：同命令重跑即得；服务停后该脚本记 ENV-UNVERIFIED（未验证≠通过）。
 - CI 复跑位（r91 起）：`.github/workflows/perf-baseline.yml`（周常 + `server/`/`src/` 变动触发），
   接线与「README 数字 ⇄ 本文件数字」的一致性由 `_test/ci_perf_wiring_check.py` 常驻盯。
+  ⚠️ r96 起该件多一条 **C-IPW-6**：任何写了 `rps` 的行必须**同行带并发档**（`@N` / 并发N / N线程 / threads=N）。
+  立因是 r95 报告自己前后不一（§1 印 `1013.9 rps @ 并发 8 线程×48 请求`、§5 写「并发维度仍无读数」），两句各自都对，
+  错在数字没带口径 ⇒ 同一个数一会儿算读数一会儿不算。
+- 阶梯默认**不进电池**（`--ramp` 不传即不跑），由本文件的复算命令与 CI 的 perf 作业显式开启 ——
+  电池整跑已 ~800s，加档会把 wall-clock 推到调用方天花板之上。
 
 ## 2. 预算与判据
 

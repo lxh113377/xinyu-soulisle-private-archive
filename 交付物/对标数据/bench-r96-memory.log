@@ -1,0 +1,21 @@
+== r52 记忆与上下文管理面对标（16 仓 + self）==
+__self__                             记忆/上下文件 1/4 类｜README 无记忆声明｜引用边 none-in-sample(n=6)
+lobehub/lobehub                      记忆/上下文件 4/4 类｜声明:conversation_memory｜引用边 none-in-sample(n=6)
+SillyTavern/SillyTavern              记忆/上下文件 1/4 类｜声明:worldbook｜引用边 none-in-sample(n=6)
+Open-LLM-VTuber/Open-LLM-VTuber      记忆/上下文件 1/4 类｜声明:long_term_memory｜引用边 yes(import)(n=2)
+morettt/my-neuro                     记忆/上下文件 3/4 类｜声明:cn｜引用边 yes(member)(n=6)
+letta-ai/letta-code                  记忆/上下文件 3/4 类｜README 无记忆声明｜引用边 none-in-sample(n=6)
+hello-diana/MASCOT                   记忆/上下文件 0/4 类｜README 无记忆声明｜引用边 NA(n=6)
+ddxfish/sapphire                     记忆/上下文件 1/4 类｜声明:long_term_memory｜引用边 yes(import)(n=6)
+v2rockets/Loyal-Elephie              记忆/上下文件 1/4 类｜声明:rag｜引用边 none-in-sample(n=6)
+Rogendo/Mental-health-Chatbot        记忆/上下文件 0/4 类｜README 无记忆声明｜引用边 NA(n=0)
+Lum1104/MER-Factory                  记忆/上下文件 0/4 类｜README 无记忆声明｜引用边 NA(n=2)
+CheaperjamRen/leemo                  记忆/上下文件 2/4 类｜README 无记忆声明｜引用边 yes(import)(n=5)
+NJX-njx/opensoul                     记忆/上下文件 4/4 类｜声明:long_term_memory｜引用边 none-in-sample(n=6)
+s-nagaev/chibi                       记忆/上下文件 1/4 类｜声明:ctx_window,summarize_ctx｜引用边 none-in-sample(n=1)
+29-Cu/succhia                        记忆/上下文件 0/4 类｜README 无记忆声明｜引用边 NA(n=0)
+zeroa234/ryza-ai-revive              记忆/上下文件 1/4 类｜声明:conversation_memory｜引用边 none-in-sample(n=6)
+Bwcx-songyu/MoodChat                 记忆/上下文件 0/4 类｜README 无记忆声明｜引用边 NA(n=2)
+应测 17 ｜ NA/截断 0 ｜ 恒等式 usable+NA==total：OK
+快照 → 交付物/对标数据/peer-memory-2026-10-05.json
+RCP-MEMORY_RC=0

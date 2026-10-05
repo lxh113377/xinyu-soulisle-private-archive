@@ -214,6 +214,13 @@
       "reason": "本机未安装 Docker（03-tech-stack.md 已登记「Docker 本机未实测」）。由 CI java-build 作业的容器起服自证承接。",
       "_source": "workflow:ci.yml",
       "timeout_s": 900
+    },
+    {
+      "name": "ledger-age-fuse",
+      "cmd": "python _test/ledger_age_check.py",
+      "reason": "实测 61ms，成本上完全放得进 blocking（现 10021/20000ms）——**但不放**。理由不是钱，是「一次正常提交变不了绿的判据没资格当闸」：它红的时候，唯一让它变绿的动作是重采 15 族 peers 台账（本轮实测 ~20 分钟且撞过 GitHub secondary rate limit），那不是「一次正常提交」能做的事。承接面=电池常驻（套件 ledger_age / ledger_age_selftest，CI ci.yml 整跑电池时判），外加人工轮次的重采；pre-push 只拦「当场可修」的缺陷。",
+      "_source": "battery",
+      "timeout_s": 120
     }
   ]
 }

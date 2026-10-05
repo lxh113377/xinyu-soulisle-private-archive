@@ -1,0 +1,509 @@
+{
+ "repos": {
+  "lobehub/lobehub": {
+   "tier": "A",
+   "tree": {
+    "html": 16,
+    "css": 1,
+    "html_shallow": [
+     "index.auth.html"
+    ],
+    "css_largest": [
+     "src/components/Loading/BrandTextLoading/index.module.css"
+    ],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": false,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />"
+   },
+   "css": {
+    "media": 0,
+    "pointer_aware": 0,
+    "target44": 0,
+    "css_bytes": 1498
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "SillyTavern/SillyTavern": {
+   "tier": "A",
+   "tree": {
+    "html": 110,
+    "css": 58,
+    "html_shallow": [
+     "public/index.html"
+    ],
+    "css_largest": [
+     "public/style.css"
+    ],
+    "manifest": [
+     "public/manifest.json",
+     "public/scripts/extensions/assets/manifest.json"
+    ],
+    "sw": [
+     "public/lib/swiped-events.js",
+     "public/scripts/swipe-picker.js"
+    ],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": true,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width, viewport-fit=cover, initial-scale=1, maximum-scale=1.0, user-scalable"
+   },
+   "css": {
+    "media": 8,
+    "pointer_aware": 1,
+    "target44": 3,
+    "css_bytes": 144451
+   },
+   "readme": {
+    "mobile_claim": "3 处｜样本 'mobile-friendly'"
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "tier": "B",
+   "tree": {
+    "html": 1,
+    "css": 0,
+    "html_shallow": [
+     "web_tool/index.html"
+    ],
+    "css_largest": [],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": false,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+   },
+   "css": {},
+   "readme": {},
+   "truncated": false,
+   "err": "css:NA(仓内无 CSS 件)"
+  },
+  "morettt/my-neuro": {
+   "tier": "B",
+   "tree": {
+    "html": 7,
+    "css": 14,
+    "html_shallow": [
+     "live-2d/avatar-loading.html"
+    ],
+    "css_largest": [
+     "plugins-dlc/memos/memos_system/webui/lib/vis-9.1.2/vis-network.css"
+    ],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": false,
+    "device_width": false,
+    "scales_disabled": false,
+    "viewport_meta": ""
+   },
+   "css": {
+    "media": 0,
+    "pointer_aware": 0,
+    "target44": 0,
+    "css_bytes": 220163
+   },
+   "readme": {
+    "mobile_claim": "2 处｜样本 '手机'"
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "letta-ai/letta-code": {
+   "tier": "D",
+   "tree": {
+    "html": 0,
+    "css": 0,
+    "html_shallow": [],
+    "css_largest": [],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {},
+   "css": {},
+   "readme": {},
+   "truncated": false,
+   "err": "css:NA(仓内无 CSS 件)"
+  },
+  "hello-diana/MASCOT": {
+   "tier": "C",
+   "tree": {
+    "html": 1,
+    "css": 2,
+    "html_shallow": [
+     "index.html"
+    ],
+    "css_largest": [
+     "media/static/css/bulma.min.css"
+    ],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": false,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+   },
+   "css": {
+    "media": 252,
+    "pointer_aware": 0,
+    "target44": 0,
+    "css_bytes": 204030
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "ddxfish/sapphire": {
+   "tier": "C",
+   "tree": {
+    "html": 8,
+    "css": 20,
+    "html_shallow": [
+     "docs/index.html"
+    ],
+    "css_largest": [
+     "interfaces/web/static/style.css"
+    ],
+    "manifest": [
+     "interfaces/web/static/manifest.json"
+    ],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": false,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+   },
+   "css": {
+    "media": 22,
+    "pointer_aware": 0,
+    "target44": 12,
+    "css_bytes": 259123
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "v2rockets/Loyal-Elephie": {
+   "tier": "C",
+   "tree": {
+    "html": 0,
+    "css": 1,
+    "html_shallow": [],
+    "css_largest": [
+     "frontend/styles/globals.css"
+    ],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {},
+   "css": {
+    "media": 0,
+    "pointer_aware": 0,
+    "target44": 0,
+    "css_bytes": 59
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "tier": "C",
+   "tree": {
+    "html": 1,
+    "css": 1,
+    "html_shallow": [
+     "templates/index.html"
+    ],
+    "css_largest": [
+     "static/styles/style.css"
+    ],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": false,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+   },
+   "css": {
+    "media": 1,
+    "pointer_aware": 0,
+    "target44": 7,
+    "css_bytes": 10825
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "Lum1104/MER-Factory": {
+   "tier": "D",
+   "tree": {
+    "html": 5,
+    "css": 17,
+    "html_shallow": [
+     "docs/index.html"
+    ],
+    "css_largest": [
+     "docs/guide/assets/css/custom.css"
+    ],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": false,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />"
+   },
+   "css": {
+    "media": 1,
+    "pointer_aware": 0,
+    "target44": 0,
+    "css_bytes": 11300
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "CheaperjamRen/leemo": {
+   "tier": "C",
+   "tree": {
+    "html": 6,
+    "css": 19,
+    "html_shallow": [
+     "index.html"
+    ],
+    "css_largest": [
+     "src/renderer/start/StartShell.css"
+    ],
+    "manifest": [
+     "bundled-runtime/windows-mcp/release/manifest.json",
+     "bundled-skills/superpowers/release/manifest.json"
+    ],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": false,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />"
+   },
+   "css": {
+    "media": 7,
+    "pointer_aware": 0,
+    "target44": 12,
+    "css_bytes": 65605
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "NJX-njx/opensoul": {
+   "tier": "C",
+   "tree": {
+    "html": 12,
+    "css": 26,
+    "html_shallow": [
+     "docs/architecture.html"
+    ],
+    "css_largest": [
+     "apps/windows/publish/control-ui/assets/index-C1_D-Hl3.css"
+    ],
+    "manifest": [
+     "assets/chrome-extension/manifest.json"
+    ],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": false,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />"
+   },
+   "css": {
+    "media": 20,
+    "pointer_aware": 1,
+    "target44": 6,
+    "css_bytes": 132576
+   },
+   "readme": {},
+   "truncated": false,
+   "err": ""
+  },
+  "s-nagaev/chibi": {
+   "tier": "C",
+   "tree": {
+    "html": 0,
+    "css": 0,
+    "html_shallow": [],
+    "css_largest": [],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {},
+   "css": {},
+   "readme": {},
+   "truncated": false,
+   "err": "css:NA(仓内无 CSS 件)"
+  },
+  "29-Cu/succhia": {
+   "tier": "C",
+   "tree": {
+    "html": 1,
+    "css": 0,
+    "html_shallow": [
+     "web/succhia.html"
+    ],
+    "css_largest": [],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": true,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover\">"
+   },
+   "css": {},
+   "readme": {
+    "mobile_claim": "11 处｜样本 'iOS'"
+   },
+   "truncated": false,
+   "err": "css:NA(仓内无 CSS 件)"
+  },
+  "zeroa234/ryza-ai-revive": {
+   "tier": "C",
+   "tree": {
+    "html": 1,
+    "css": 1,
+    "html_shallow": [
+     "web/index.html"
+    ],
+    "css_largest": [
+     "web/css/app.css"
+    ],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": true,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover\">"
+   },
+   "css": {
+    "media": 2,
+    "pointer_aware": 0,
+    "target44": 5,
+    "css_bytes": 45689
+   },
+   "readme": {
+    "mobile_claim": "5 处｜样本 'Android'",
+    "install_cmd": "5 处｜样本 'APK'"
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "Bwcx-songyu/MoodChat": {
+   "tier": "C",
+   "tree": {
+    "html": 0,
+    "css": 0,
+    "html_shallow": [],
+    "css_largest": [],
+    "manifest": [],
+    "sw": [],
+    "mobile_shell": []
+   },
+   "html": {},
+   "css": {},
+   "readme": {},
+   "truncated": false,
+   "err": "css:NA(仓内无 CSS 件)"
+  },
+  "__self__": {
+   "tree": {
+    "html": 2,
+    "css": 2,
+    "html_shallow": [
+     "src/index.html"
+    ],
+    "css_largest": [
+     "deploy/xinyu/css/style.css"
+    ],
+    "manifest": [
+     "src/manifest.webmanifest"
+    ],
+    "sw": [
+     "src/js/sw-register.js",
+     "src/sw.js"
+    ],
+    "mobile_shell": []
+   },
+   "html": {
+    "has_viewport": true,
+    "device_width": true,
+    "scales_disabled": false,
+    "viewport_meta": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+   },
+   "css": {
+    "media": 6,
+    "pointer_aware": 1,
+    "target44": 5,
+    "css_bytes": 13071
+   },
+   "readme": {
+    "mobile_claim": "3 处｜样本 '手机'"
+   }
+  }
+ },
+ "na": [
+  "Open-LLM-VTuber/Open-LLM-VTuber(css:NA(仓内无 CSS 件))",
+  "29-Cu/succhia(css:NA(仓内无 CSS 件))"
+ ],
+ "denominator": 16,
+ "blind": 2,
+ "out_of_scope": [
+  "letta-ai/letta-code",
+  "v2rockets/Loyal-Elephie",
+  "s-nagaev/chibi",
+  "Bwcx-songyu/MoodChat"
+ ],
+ "usable": 10,
+ "ceiling_note": "本探针只出结构与声明证据；对手触控几何未测，不得据此下体验结论",
+ "ts": "2026-10-05T04:02:18Z"
+}

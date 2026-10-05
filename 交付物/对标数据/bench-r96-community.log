@@ -1,0 +1,26 @@
+[self] 心屿 SoulIsle                       health=71    dep件=True  开=8    合=3    治理件在册且 dependabot 真跑过（8 开/3 合）
+[A  ] lobehub/lobehub                   health=87    dep件=False 开=30   合=14   治理件在册且 dependabot 真跑过（30 开/14 合）
+[A  ] SillyTavern/SillyTavern           health=75    dep件=False 开=7    合=7    治理件在册且 dependabot 真跑过（7 开/7 合）
+[B  ] Open-LLM-VTuber/Open-LLM-VTuber   health=62    dep件=False 开=None 合=None 部分未取到(NA)
+[B  ] morettt/my-neuro                  health=71    dep件=False 开=0    合=0    仅文档件（无自动化）
+[D  ] letta-ai/letta-code               health=62    dep件=False 开=15   合=1    治理件在册且 dependabot 真跑过（15 开/1 合）
+[C  ] hello-diana/MASCOT                health=42    dep件=False 开=None 合=None 零治理件
+[C  ] ddxfish/sapphire                  health=57    dep件=False 开=0    合=0    仅文档件（无自动化）
+[C  ] v2rockets/Loyal-Elephie           health=42    dep件=False 开=0    合=0    零治理件
+[C  ] Rogendo/Mental-health-Chatbot     health=28    dep件=False 开=None 合=None 零治理件
+[D  ] Lum1104/MER-Factory               health=71    dep件=False 开=0    合=0    仅文档件（无自动化）
+[C  ] CheaperjamRen/leemo               health=85    dep件=False 开=0    合=0    仅文档件（无自动化）
+[C  ] NJX-njx/opensoul                  health=100   dep件=True  开=None 合=None 行为面未取到(NA)
+[C  ] s-nagaev/chibi                    health=57    dep件=False 开=0    合=0    仅文档件（无自动化）
+[C  ] 29-Cu/succhia                     health=42    dep件=False 开=0    合=0    零治理件
+[C  ] zeroa234/ryza-ai-revive           health=71    dep件=False 开=None 合=None 部分未取到(NA)
+[C  ] Bwcx-songyu/MoodChat              health=28    dep件=False 开=0    合=0    零治理件
+----------------------------------------------------------------------------------------------------------------------
+peers：CONTRIBUTING 10/16 ｜ SECURITY 5/16 ｜ CODEOWNERS 1/16 ｜ dependabot 件 1/16
+关键比值：**配了 dependabot 的 1 家 = 有行为回执 0 ｜ 确认零 PR 0 ｜ 未取到(NA) 1**
+   （三者互斥；NA 绝不并入「零 PR」——本轮就是被这条塌缩骗出过『0 家真跑过』的假结论）
+health_percentage：min 28 中位 62 max 100 ｜ NA 0
+  NA：Open-LLM-VTuber/Open-LLM-VTuber(http=403 {   "documentation_url": "https://docs.;行为面 NA); hello-diana/MASCOT(http=403 {   "documentation_url": "https://docs.;行为面 NA); Rogendo/Mental-health-Chatbot(http=403 {   "documentation_url": "https://docs.;行为面 NA); NJX-njx/opensoul(http=403 {   "documentation_url": "https://docs.;行为面 NA); zeroa234/ryza-ai-revive(http=403 {   "documentation_url": "https://docs.;行为面 NA)
+应测 16 ｜ NA 5 ｜ 恒等式 usable+NA==total：OK
+快照 -> 交付物/对标数据/peer-community-2026-10-05.json
+RCP-COMMUNITY_RC=1

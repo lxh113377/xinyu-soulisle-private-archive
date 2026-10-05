@@ -1,0 +1,21 @@
+== r54 安全响应头/CSP 制度化对标（16 仓 + self，仅结构+声明）==
+__self__                             结构 1/6 类｜README 无声明
+lobehub/lobehub                      结构 0/6 类｜README 无声明
+SillyTavern/SillyTavern              结构 0/6 类+helmet依赖(package.json)｜README 无声明
+Open-LLM-VTuber/Open-LLM-VTuber      结构 0/6 类｜README 无声明
+morettt/my-neuro                     结构 0/6 类｜README 无声明
+letta-ai/letta-code                  结构 0/6 类｜README 无声明
+hello-diana/MASCOT                   结构 0/6 类｜README 无声明
+ddxfish/sapphire                     结构 0/6 类｜README 无声明
+v2rockets/Loyal-Elephie              结构 0/6 类｜README 无声明
+Rogendo/Mental-health-Chatbot        结构 0/6 类｜README 无声明
+Lum1104/MER-Factory                  结构 0/6 类｜README 无声明
+CheaperjamRen/leemo                  结构 0/6 类｜README 无声明
+NJX-njx/opensoul                     结构 0/6 类｜README 无声明
+s-nagaev/chibi                       结构 0/6 类｜README 无声明
+29-Cu/succhia                        结构 0/6 类｜README 无声明
+zeroa234/ryza-ai-revive              结构 0/6 类｜README 无声明
+Bwcx-songyu/MoodChat                 结构 0/6 类｜README 无声明
+应测 17 ｜ NA 0 ｜ 恒等式 usable+NA==total：OK
+快照 → 交付物/对标数据/peer-sec-headers-2026-10-05.json
+RCP-SEC-HEADERS_RC=0

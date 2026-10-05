@@ -1,0 +1,28 @@
+[A] lobehub/lobehub                      树:evalset,guardrail | README:badge,live
+[A] SillyTavern/SillyTavern              树:evalset | README:badge,live
+[B] Open-LLM-VTuber/Open-LLM-VTuber      树:crisis | README:badge,live
+[B] morettt/my-neuro                     树:none | README:badge,live
+[D] letta-ai/letta-code                  树:guardrail | README:badge,live,media
+[C] hello-diana/MASCOT                   树:none | README:evalset,live
+[C] ddxfish/sapphire                     树:guardrail | README:badge,live
+[C] v2rockets/Loyal-Elephie              树:none | README:live
+[C] Rogendo/Mental-health-Chatbot        树:none | README:crisis,live
+[D] Lum1104/MER-Factory                  树:none | README:badge,evalset,live
+[C] CheaperjamRen/leemo                  树:evalset,guardrail | README:badge
+[C] NJX-njx/opensoul                     树:guardrail | README:badge,live
+[C] s-nagaev/chibi                       树:none | README:badge,guardrail,live
+[C] 29-Cu/succhia                        树:none | README:live
+[C] zeroa234/ryza-ai-revive              树:guardrail | README:live
+[C] Bwcx-songyu/MoodChat                 树:none | README:none
+[self] 心屿 SoulIsle                          树:evalset,guardrail | README:badge,crisis,evalset,guardrail,live
+------------------------------------------------------------------------------------------------------------------------
+crisis     树通道  1/16 ｜ README 通道  1/16 ｜ 两通道都命中  0
+evalset    树通道  3/16 ｜ README 通道  2/16 ｜ 两通道都命中  0
+guardrail  树通道  6/16 ｜ README 通道  1/16 ｜ 两通道都命中  0
+可信度件 badge    10/16
+可信度件 media     1/16
+可信度件 live     14/16
+应测 16 仓 ｜ NA/截断 0 ｜ self 树命中=['evalset', 'guardrail'] ｜ self README=['badge', 'crisis', 'evalset', 'guardrail', 'live']
+落盘 交付物/对标数据/peer-capability-safety-2026-10-05.json
+CAP-PROBE-COMPLETE
+RC-CAPABILITY-SAFETY_RC=0

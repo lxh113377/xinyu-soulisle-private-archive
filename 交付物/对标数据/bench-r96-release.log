@@ -1,0 +1,23 @@
+[A  ] lobehub/lobehub                      release=v2.2.18                semver=True  资产=20  lag=14.62  CHANGELOG=4
+[A  ] SillyTavern/SillyTavern              release=1.19.0                 semver=True  资产=0   lag=18.17  CHANGELOG=0
+[B  ] Open-LLM-VTuber/Open-LLM-VTuber      release=v1.2.1                 semver=True  资产=4   lag=261.94 CHANGELOG=0
+[B  ] morettt/my-neuro                     release=v6.7.5                 semver=True  资产=1   lag=2.62   CHANGELOG=0
+[D  ] letta-ai/letta-code                  release=v0.34.4                semver=True  资产=1   lag=-0.01  CHANGELOG=1
+[C  ] hello-diana/MASCOT                   release=无                      semver=False 资产=0   lag=None   CHANGELOG=0
+[C  ] ddxfish/sapphire                     release=v2.13.1                semver=True  资产=2   lag=8.87   CHANGELOG=3
+[C  ] v2rockets/Loyal-Elephie              release=无                      semver=False 资产=0   lag=None   CHANGELOG=0
+[C  ] Rogendo/Mental-health-Chatbot        release=无                      semver=False 资产=0   lag=None   CHANGELOG=0
+[D  ] Lum1104/MER-Factory                  release=v0.1.2                 semver=True  资产=0   lag=165.2  CHANGELOG=0
+[C  ] CheaperjamRen/leemo                  release=v0.1.10                semver=True  资产=3   lag=-0.0   CHANGELOG=0
+[C  ] NJX-njx/opensoul                     release=v0.2.4                 semver=True  资产=1   lag=94.24  CHANGELOG=4
+[C  ] s-nagaev/chibi                       release=v1.18.0                semver=True  资产=0   lag=3.03   CHANGELOG=1
+[C  ] 29-Cu/succhia                        release=无                      semver=False 资产=0   lag=None   CHANGELOG=0
+[C  ] zeroa234/ryza-ai-revive              release=v1.2.22                semver=True  资产=2   lag=0.0    CHANGELOG=0
+[C  ] Bwcx-songyu/MoodChat                 release=无                      semver=False 资产=0   lag=None   CHANGELOG=0
+[self] 心屿 SoulIsle                          release=v1.6.1                 semver=True  资产=2   lag=7.5    CHANGELOG=1 个｜tag 共 9
+----------------------------------------------------------------------------------------------------------------------
+peers：有公开 release 11/16 ｜ tag 合 semver 11/16 ｜ 有 CHANGELOG 类件 5/16 ｜发布滞后 >30 天 3/11
+  滞后天数分布：min=0 中位=8 max=261（阈值 30 天只是分类线，不是判据）
+应测 16 仓 ｜ 计入分母 16 ｜ BLIND 0 ｜ 恒等式：OK
+快照 -> 交付物/对标数据/peer-release-2026-10-05.json
+RC-RELEASE_RC=0

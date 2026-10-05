@@ -1,0 +1,226 @@
+{
+ "repos": {
+  "lobehub/lobehub": {
+   "tier": "A",
+   "release": {
+    "tag": "v2.2.18",
+    "published_at": "2026-09-20T13:11:30Z",
+    "assets": 20,
+    "prerelease": false
+   },
+   "pushed_at": "2026-10-05T04:00:59Z",
+   "changelog": [
+    "CHANGELOG.md",
+    "apps/server/src/routers/lambda/changelog.ts",
+    "apps/server/src/services/document/__tests__/history.integration.test.ts",
+    "apps/server/src/services/document/history.ts"
+   ],
+   "semver_tag": true,
+   "lag_days": 14.62
+  },
+  "SillyTavern/SillyTavern": {
+   "tier": "A",
+   "release": {
+    "tag": "1.19.0",
+    "published_at": "2026-09-14T18:05:11Z",
+    "assets": 0,
+    "prerelease": false
+   },
+   "pushed_at": "2026-10-02T22:05:54Z",
+   "changelog": [],
+   "semver_tag": true,
+   "lag_days": 18.17
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "tier": "B",
+   "release": {
+    "tag": "v1.2.1",
+    "published_at": "2025-08-26T08:47:08Z",
+    "assets": 4,
+    "prerelease": false
+   },
+   "pushed_at": "2026-05-15T07:18:04Z",
+   "changelog": [],
+   "semver_tag": true,
+   "lag_days": 261.94
+  },
+  "morettt/my-neuro": {
+   "tier": "B",
+   "release": {
+    "tag": "v6.7.5",
+    "published_at": "2026-10-01T20:27:12Z",
+    "assets": 1,
+    "prerelease": false
+   },
+   "pushed_at": "2026-10-04T11:25:05Z",
+   "changelog": [],
+   "semver_tag": true,
+   "lag_days": 2.62
+  },
+  "letta-ai/letta-code": {
+   "tier": "D",
+   "release": {
+    "tag": "v0.34.4",
+    "published_at": "2026-10-04T23:49:18Z",
+    "assets": 1,
+    "prerelease": false
+   },
+   "pushed_at": "2026-10-04T23:40:16Z",
+   "changelog": [
+    "src/skills/builtin/initializing-memory/scripts/history-coverage.mjs"
+   ],
+   "semver_tag": true,
+   "lag_days": -0.01
+  },
+  "hello-diana/MASCOT": {
+   "tier": "C",
+   "release": null,
+   "pushed_at": "2026-08-24T05:53:56Z",
+   "changelog": [],
+   "semver_tag": false,
+   "lag_days": null
+  },
+  "ddxfish/sapphire": {
+   "tier": "C",
+   "release": {
+    "tag": "v2.13.1",
+    "published_at": "2026-09-25T03:04:43Z",
+    "assets": 2,
+    "prerelease": false
+   },
+   "pushed_at": "2026-10-04T00:04:19Z",
+   "changelog": [
+    "core/chat/history.py",
+    "docs/CHANGELOG.md",
+    "plugins/discord/CHANGELOG.md"
+   ],
+   "semver_tag": true,
+   "lag_days": 8.87
+  },
+  "v2rockets/Loyal-Elephie": {
+   "tier": "C",
+   "release": null,
+   "pushed_at": "2025-02-28T23:12:59Z",
+   "changelog": [],
+   "semver_tag": false,
+   "lag_days": null
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "tier": "C",
+   "release": null,
+   "pushed_at": "2026-09-08T09:46:26Z",
+   "changelog": [],
+   "semver_tag": false,
+   "lag_days": null
+  },
+  "Lum1104/MER-Factory": {
+   "tier": "D",
+   "release": {
+    "tag": "v0.1.2",
+    "published_at": "2025-09-29T07:51:43Z",
+    "assets": 0,
+    "prerelease": false
+   },
+   "pushed_at": "2026-03-13T12:45:28Z",
+   "changelog": [],
+   "semver_tag": true,
+   "lag_days": 165.2
+  },
+  "CheaperjamRen/leemo": {
+   "tier": "C",
+   "release": {
+    "tag": "v0.1.10",
+    "published_at": "2026-08-27T21:20:27Z",
+    "assets": 3,
+    "prerelease": false
+   },
+   "pushed_at": "2026-08-27T21:18:40Z",
+   "changelog": [],
+   "semver_tag": true,
+   "lag_days": -0.0
+  },
+  "NJX-njx/opensoul": {
+   "tier": "C",
+   "release": {
+    "tag": "v0.2.4",
+    "published_at": "2026-03-02T13:35:34Z",
+    "assets": 1,
+    "prerelease": false
+   },
+   "pushed_at": "2026-06-04T19:27:54Z",
+   "changelog": [
+    "CHANGELOG.md",
+    "Swabble/CHANGELOG.md",
+    "extensions/matrix/CHANGELOG.md",
+    "extensions/msteams/CHANGELOG.md"
+   ],
+   "semver_tag": true,
+   "lag_days": 94.24
+  },
+  "s-nagaev/chibi": {
+   "tier": "C",
+   "release": {
+    "tag": "v1.18.0",
+    "published_at": "2026-10-01T21:51:57Z",
+    "assets": 0,
+    "prerelease": false
+   },
+   "pushed_at": "2026-10-04T22:40:18Z",
+   "changelog": [
+    "changelog.md"
+   ],
+   "semver_tag": true,
+   "lag_days": 3.03
+  },
+  "29-Cu/succhia": {
+   "tier": "C",
+   "release": null,
+   "pushed_at": "2026-07-25T19:41:19Z",
+   "changelog": [],
+   "semver_tag": false,
+   "lag_days": null
+  },
+  "zeroa234/ryza-ai-revive": {
+   "tier": "C",
+   "release": {
+    "tag": "v1.2.22",
+    "published_at": "2026-09-22T05:15:14Z",
+    "assets": 2,
+    "prerelease": false
+   },
+   "pushed_at": "2026-09-22T05:15:14Z",
+   "changelog": [],
+   "semver_tag": true,
+   "lag_days": 0.0
+  },
+  "Bwcx-songyu/MoodChat": {
+   "tier": "C",
+   "release": null,
+   "pushed_at": "2026-09-09T12:53:19Z",
+   "changelog": [],
+   "semver_tag": false,
+   "lag_days": null
+  },
+  "__self__": {
+   "release": {
+    "tag": "v1.6.1",
+    "published_at": "2026-09-27T15:25:15Z",
+    "assets": 2,
+    "prerelease": false
+   },
+   "pushed_at": "2026-10-05T11:31:06+08:00",
+   "changelog": [
+    "CHANGELOG.md"
+   ],
+   "tags_total": 9,
+   "semver_tag": true,
+   "lag_days": 7.5,
+   "err": ""
+  }
+ },
+ "blind": [],
+ "denominator": 16,
+ "usable": 16,
+ "stale_days_threshold": 30,
+ "ts": "2026-10-05T04:03:00Z"
+}

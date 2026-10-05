@@ -263,6 +263,11 @@ SUITES = [
     ("browser_engine_declare", [sys.executable, "_test/browser_engine_declare_check.py"]),
     ("browser_engine_declare_selftest",
      [sys.executable, "_test/browser_engine_declare_check.py", "--selftest"]),
+    # r96：「issue 响应速度」这一维 r21→r95 只有一句"不可测"，从未建过探针；本轮实测证伪了那句话
+    #   （12 仓各取最近 30 条已关闭真 issue，with_comments 30/30、27/30、26/30…）。
+    #   探针本体**不入电池**（16 仓 × search+comments+timeline 三层调用，承 r37「探针不入链」口径，
+    #   且本轮已实测同轮 burst 重采会撞 GitHub secondary rate limit），只入零网络的判定桩。
+    ("issue_probe_selftest", [sys.executable, "_test/peer_issue_response_probe.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），

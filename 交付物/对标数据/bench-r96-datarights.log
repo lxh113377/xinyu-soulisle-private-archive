@@ -1,0 +1,22 @@
+[A  ] lobehub/lobehub                      隐私件=0  迁移=363 导出/删除件=5  README=none
+[A  ] SillyTavern/SillyTavern              隐私件=0  迁移=0   导出/删除件=0  README=none
+[B  ] Open-LLM-VTuber/Open-LLM-VTuber      隐私件=0  迁移=0   导出/删除件=0  README=none
+[B  ] morettt/my-neuro                     隐私件=0  迁移=0   导出/删除件=0  README=none
+[D  ] letta-ai/letta-code                  隐私件=0  迁移=0   导出/删除件=0  README=none
+[C  ] hello-diana/MASCOT                   隐私件=0  迁移=0   导出/删除件=0  README=none
+[C  ] ddxfish/sapphire                     隐私件=1  迁移=0   导出/删除件=0  README=none
+[C  ] v2rockets/Loyal-Elephie              隐私件=0  迁移=0   导出/删除件=0  README=none
+[C  ] Rogendo/Mental-health-Chatbot        隐私件=0  迁移=0   导出/删除件=0  README=none
+[D  ] Lum1104/MER-Factory                  隐私件=0  迁移=0   导出/删除件=0  README=export_doc:1
+[C  ] CheaperjamRen/leemo                  隐私件=0  迁移=0   导出/删除件=0  README=none
+[C  ] NJX-njx/opensoul                     隐私件=0  迁移=0   导出/删除件=0  README=none
+[C  ] s-nagaev/chibi                       隐私件=0  迁移=0   导出/删除件=0  README=none
+[C  ] 29-Cu/succhia                        隐私件=0  迁移=0   导出/删除件=0  README=none
+[C  ] zeroa234/ryza-ai-revive              隐私件=0  迁移=0   导出/删除件=0  README=none
+[C  ] Bwcx-songyu/MoodChat                 隐私件=0  迁移=0   导出/删除件=0  README=none
+[self] 心屿 SoulIsle                          隐私件=0  迁移=0   导出/删除件=0  README=none
+----------------------------------------------------------------------------------------------------------------------
+peers：有隐私/数据文档 1/16 ｜ 有迁移工具 1/16 ｜ 有导出或删除命名件 1/16 ｜ README 写明导出 1/16、删除 0/16、留存期 0/16
+应测 16 仓 ｜ 计入分母 16 ｜ BLIND 0 ｜ 恒等式：OK
+快照 -> 交付物/对标数据/peer-datarights-2026-10-05.json
+RC-DATARIGHTS_RC=0

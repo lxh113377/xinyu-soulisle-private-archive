@@ -35,6 +35,11 @@ P95_BUDGET_MS = 400.0
 # 但**数量级分叉**（README 写 12ms、基线文档写 300ms）一定是有一边在编 ⇒ 必须红。
 MAX_RATIO = 3.0
 RE_P95_NUM = re.compile(r"[Pp]95\s*[=＝:：]\s*(\d+(?:\.\d+)?)\s*ms")
+# C-IPW-6 的两条尺：一条找"这行报了吞吐"，一条找"这行有没有说是在几路并发下量的"。
+# 判据词表刻意放宽（@N / 并发N / N 线程 / threads=N / xN请求 任一即算带档），
+# 因为要拦的是**完全没口径**的裸数字，不是"口径写法不合我意"——后者会变成逼人造假话的门。
+RE_RPS_NUM = re.compile(r"\d+(?:\.\d+)?\s*(?:rps|req/s|QPS)\b", re.I)
+RE_TIER_MARK = re.compile(r"@\s*\d+|并发\s*\d+|\d+\s*线程|threads?[ =]\d+|\d+\s*请求|concurrency[: =]\d+", re.I)
 
 
 def _import_same_source():
@@ -128,6 +133,20 @@ def evaluate(readme_text, perf_doc_text, wf_rel, wf_text, rx_ci_perf, doc_fn):
         if ratio > MAX_RATIO:
             red.append("C-IPW-5 两处 p95 相差 %.1f 倍 > %.1f ⇒ 数量级分叉，必有一边不是本轮实测"
                        % (ratio, MAX_RATIO))
+    # C-IPW-6（r96 立）：**任何 rps 数必须同行带并发档**。
+    # 动因是 r95 报告的自相矛盾：§1 维度 4 印 `吞吐 1013.9 rps`，§5 又写「并发维度仍无读数」。
+    # 两句话各自都对（前者是 8 线程闭环 48 请求的单点量，后者说的是"仓里没有第三方压测工具"），
+    # 错在**数字没带自己的口径** ⇒ 同一个数一会儿算读数、一会儿不算。
+    # 这条腿把"吞吐必须带档"钉成常驻判据：不封口，下一轮还会漂。
+    for face, txt in (("README", readme_text), ("docs/PERF-BASELINE.md", perf_doc_text)):
+        bad_lines = [ln.strip()[:70] for ln in (txt or "").splitlines()
+                     if RE_RPS_NUM.search(ln) and not RE_TIER_MARK.search(ln)]
+        if bad_lines:
+            red.append("C-IPW-6 %s 有 %d 行写了 rps 却没带并发档（@N / 并发N / N线程 / threads=N）"
+                       "：首个=%s" % (face, len(bad_lines), bad_lines[0]))
+        else:
+            ev["tier@" + face] = "%d 行 rps 全部带档" % len(
+                [ln for ln in (txt or "").splitlines() if RE_RPS_NUM.search(ln)])
     return red, ev
 
 
@@ -175,9 +194,11 @@ def selftest():
         "          done\n"
         "          python _test/perf_baseline_check.py --json /tmp/perf.json\n"
     )
-    good_readme = ("# T\n## ✅ 验证\n> **性能**：实测 P95=28.6ms（预算 400ms）、吞吐 1013.9 rps；"
+    good_readme = ("# T\n## ✅ 验证\n> **性能**：实测 P95=28.6ms（预算 400ms）、"
+                   "吞吐 1013.9 rps（并发 8 线程×48 请求）；"
                    "口径见 [docs/PERF-BASELINE.md](docs/PERF-BASELINE.md)。\n")
-    good_doc = "# PERF\n- 结果：`PERF-BASELINE-PASS` —— p95=28.6ms，吞吐 1013.9 rps。\n"
+    good_doc = ("# PERF\n- 结果：`PERF-BASELINE-PASS` —— p95=28.6ms，"
+                "吞吐 1013.9 rps @ 8 线程闭环 48 请求。\n")
     wf_rel = ".github/workflows/perf-baseline.yml"
     if not rx_ci_perf.search(wf_rel):
         print("SELFTEST-FAIL: 合规 workflow 名 %s 竟不被 RE_CI_PERF 认下 ⇒ 判据与采集器已失同源" % wf_rel)
@@ -203,6 +224,11 @@ def selftest():
                   red_of(doc=good_doc.replace("p95=28.6ms", "p95=900.0ms")), 1))
     cases.append(("反例⑨：基线文档取不到 p95（基线面失联）",
                   red_of(doc="# PERF\n- 结果：PASS。\n"), 1))
+    # r96 C-IPW-6：吞吐必须带并发档（r95 §1 印 rps / §5 称无读数 那条矛盾的永久封口）
+    cases.append(("反例⑩：README 写 rps 但不带并发档",
+                  red_of(rm=good_readme.replace("（并发 8 线程×48 请求）", "")), 1))
+    cases.append(("反例⑪：基线文档写 rps 但不带并发档",
+                  red_of(doc=good_doc.replace(" @ 8 线程闭环 48 请求", "")), 1))
 
     bad = []
     for name, got, want in cases:

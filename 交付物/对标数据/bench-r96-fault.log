@@ -1,0 +1,22 @@
+[A  ] lobehub/lobehub                   监控件=0  依赖=2  错误页=0  诊断=3  DSN=False 监控集成在册(sentry)+无排障文档
+[A  ] SillyTavern/SillyTavern           监控件=0  依赖=0  错误页=0  诊断=1  DSN=False 无监控集成证据+无排障文档
+[B  ] Open-LLM-VTuber/Open-LLM-VTuber   监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 监控集成在册(sentry)+无排障文档
+[B  ] morettt/my-neuro                  监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+[D  ] letta-ai/letta-code               监控件=0  依赖=0  错误页=0  诊断=2  DSN=False 无监控集成证据+无排障文档
+[C  ] hello-diana/MASCOT                监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+[C  ] ddxfish/sapphire                  监控件=0  依赖=0  错误页=0  诊断=3  DSN=False 无监控集成证据+无排障文档
+[C  ] v2rockets/Loyal-Elephie           监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+[C  ] Rogendo/Mental-health-Chatbot     监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+[D  ] Lum1104/MER-Factory               监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+[C  ] CheaperjamRen/leemo               监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+[C  ] NJX-njx/opensoul                  监控件=0  依赖=0  错误页=0  诊断=3  DSN=False 无监控集成证据+有排障文档
+[C  ] s-nagaev/chibi                    监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+[C  ] 29-Cu/succhia                     监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+[C  ] zeroa234/ryza-ai-revive           监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+[C  ] Bwcx-songyu/MoodChat              监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+[self] 心屿 SoulIsle                       监控件=0  依赖=0  错误页=0  诊断=0  DSN=False 无监控集成证据+无排障文档
+--------------------------------------------------------------------------------------------------------------------
+peers：有 error-monitoring 集成证据 2/16 ｜ README 有排障段 1/16
+应测 16 ｜ NA/截断 0 ｜ 恒等式 usable+NA==total：OK
+快照 -> 交付物/对标数据/peer-fault-2026-10-05.json
+RC-FAULT_RC=0

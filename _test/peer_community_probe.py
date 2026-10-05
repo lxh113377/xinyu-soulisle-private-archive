@@ -36,6 +36,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from benchmark_metrics import PEERS, ROOT   # 分母唯一真相源 = 台账池
+from gh_cred import gh_credential
 
 FILE_KEYS = {
     "contributing": re.compile(r"(^|/)(CONTRIBUTING|contributing)(\..+)?$", re.I),
@@ -280,7 +281,7 @@ def main():
     a = ap.parse_args()
     if a.selftest:
         return selftest()
-    token = os.environ.get("GITHUB_TOKEN") or ""
+    token = gh_credential()
     if not token:
         token = subprocess.run(["gh", "auth", "token"], capture_output=True,
                                text=True).stdout.strip()

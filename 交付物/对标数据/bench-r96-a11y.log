@@ -1,0 +1,23 @@
+[A  ] lobehub/lobehub                      命名件=0  README=none                   清单=4 依赖命中=none (ok)
+[A  ] SillyTavern/SillyTavern              命名件=1  README=none                   清单=4 依赖命中=none (ok)
+[B  ] Open-LLM-VTuber/Open-LLM-VTuber      命名件=0  README=none                   清单=3 依赖命中=none (ok)
+[B  ] morettt/my-neuro                     命名件=0  README=none                   清单=4 依赖命中=none (ok)
+[D  ] letta-ai/letta-code                  命名件=0  README=none                   清单=2 依赖命中=none (ok)
+[C  ] hello-diana/MASCOT                   命名件=0  README=none                   清单=1 依赖命中=none (ok)
+[C  ] ddxfish/sapphire                     命名件=0  README=none                   清单=4 依赖命中=none (ok)
+[C  ] v2rockets/Loyal-Elephie              命名件=0  README=none                   清单=2 依赖命中=none (ok)
+[C  ] Rogendo/Mental-health-Chatbot        命名件=0  README=none                   清单=1 依赖命中=none (ok)
+[D  ] Lum1104/MER-Factory                  命名件=0  README=none                   清单=3 依赖命中=none (ok)
+[C  ] CheaperjamRen/leemo                  命名件=0  README=none                   清单=4 依赖命中=none (ok)
+[C  ] NJX-njx/opensoul                     命名件=0  README=none                   清单=4 依赖命中=none (ok)
+[C  ] s-nagaev/chibi                       命名件=0  README=none                   清单=3 依赖命中=none (ok)
+[C  ] 29-Cu/succhia                        命名件=0  README=none                   清单=0 依赖命中=none (not_applicable(无通用清单))
+[C  ] zeroa234/ryza-ai-revive              命名件=0  README=none                   清单=1 依赖命中=none (ok)
+[C  ] Bwcx-songyu/MoodChat                 命名件=0  README=none                   清单=0 依赖命中=none (not_applicable(仅 JVM 清单))
+[self] 心屿 MindIsle                          命名件=8  README=a11y_claim             清单=2 依赖命中=none (ok)
+----------------------------------------------------------------------------------------------------------------------------
+peers：有 a11y 命名件 1/16 ｜ README 有无障碍声明 0/16 ｜ 清单真依赖 a11y 库 0/14（不适用/未取到 2 家：succhia(not_applicable(无通用清单)),MoodChat(not_applicable(仅 JVM 清单))）
+   SillyTavern/SillyTavern              命名件=1 ['public/scripts/a11y.js']
+应测 16 仓 ｜ 计入分母 16 ｜ BLIND 0 ｜ 恒等式 usable+blind==总数：OK
+快照 -> 交付物/对标数据/peer-a11y-2026-10-05.json
+RC-A11Y_RC=0

@@ -27,6 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from benchmark_metrics import PEERS, ROOT
+from gh_cred import gh_credential
 
 NOISE = re.compile(r"(^|/)(node_modules|\.venv|venv|dist|build|target|vendor|\.git|_shots|"
                    r"web_raw|video_raw|__pycache__|\.next|miniprogram_npm"
@@ -355,7 +356,7 @@ def main():
     a = ap.parse_args()
     if a.selftest:
         sys.exit(selftest())
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
+    token = gh_credential()
     if not token and not a.self_only:
         print("MEMPEER-UNVERIFIED: 无 GitHub token ⇒ 无法取 peers（不判 0，判环境未验）")
         sys.exit(2)

@@ -1,0 +1,32 @@
+[A  ] lobehub/lobehub                      in_build=3995 覆盖配置=5   wf带测试名=3  带外件=0    README=cov_badge
+[A  ] SillyTavern/SillyTavern              in_build=38   覆盖配置=1   wf带测试名=2  带外件=0    README=none
+[B  ] Open-LLM-VTuber/Open-LLM-VTuber      in_build=0    覆盖配置=0   wf带测试名=0  带外件=0    README=none
+[B  ] morettt/my-neuro                     in_build=7    覆盖配置=0   wf带测试名=0  带外件=0    README=none
+[D  ] letta-ai/letta-code                  in_build=955  覆盖配置=0   wf带测试名=1  带外件=0    README=none
+[C  ] hello-diana/MASCOT                   in_build=0    覆盖配置=0   wf带测试名=0  带外件=0    README=none
+[C  ] ddxfish/sapphire                     in_build=377  覆盖配置=1   wf带测试名=0  带外件=7    README=none
+[C  ] v2rockets/Loyal-Elephie              in_build=0    覆盖配置=0   wf带测试名=0  带外件=0    README=none
+[C  ] Rogendo/Mental-health-Chatbot        in_build=0    覆盖配置=0   wf带测试名=0  带外件=0    README=none
+[D  ] Lum1104/MER-Factory                  in_build=2    覆盖配置=0   wf带测试名=0  带外件=0    README=none
+[C  ] CheaperjamRen/leemo                  in_build=326  覆盖配置=1   wf带测试名=1  带外件=0    README=none
+[C  ] NJX-njx/opensoul                     in_build=1092 覆盖配置=2   wf带测试名=2  带外件=0    README=test_cmd,test_doc
+[C  ] s-nagaev/chibi                       in_build=92   覆盖配置=1   wf带测试名=0  带外件=8    README=none
+[C  ] 29-Cu/succhia                        in_build=0    覆盖配置=0   wf带测试名=0  带外件=0    README=none
+[C  ] zeroa234/ryza-ai-revive              in_build=0    覆盖配置=0   wf带测试名=0  带外件=0    README=test_doc
+[C  ] Bwcx-songyu/MoodChat                 in_build=1    覆盖配置=0   wf带测试名=0  带外件=0    README=none
+[self] 心屿 SoulIsle                          in_build=12   覆盖配置=0   带外件=100  README=none
+----------------------------------------------------------------------------------------------------------------------------
+peers：有 in-build 单测 10/16 ｜ 有覆盖率/测试框架配置 6/16
+   lobehub/lobehub                       3995 件 ['.agents/scripts/check/check.test.ts']
+   NJX-njx/opensoul                      1092 件 ['apps/android/app/src/test/java/ai/opensoul/android/NodeForegroundServiceTest.kt']
+   letta-ai/letta-code                    955 件 ['.github/scripts/contribution-guard.test.cjs']
+   ddxfish/sapphire                       377 件 ['plugins/coding-harness/tests/test_harness.py']
+   CheaperjamRen/leemo                    326 件 ['bundled-skills/default-enabled/baoyu-markdown-to-html/scripts/main.test.ts']
+   s-nagaev/chibi                          92 件 ['tests/providers/test_openai_responses_e2e.py']
+   SillyTavern/SillyTavern                 38 件 ['tests/byaf-import.test.js']
+   morettt/my-neuro                         7 件 ['live-2d/js/ai/reasoning-request.test.js']
+   Lum1104/MER-Factory                      2 件 ['test/test_ffmpeg.py']
+   Bwcx-songyu/MoodChat                     1 件 ['src/test/java/org/example/aispingbt/AiSpingBtApplicationTests.java']
+应测 16 仓 ｜ NA/截断 0 ｜ self in_build=12
+快照 -> 交付物/对标数据/peer-testassets-2026-10-05.json
+RC-TESTASSETS_RC=0

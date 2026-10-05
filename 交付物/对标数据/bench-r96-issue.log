@@ -1,0 +1,23 @@
+lxh113377/xinyu-soulisle-private-archive open=0     closed窗=0      样本=None measured=None silent=None botonly=None 首响中位=None     一致子集=None/None 沉默关闭率=None    响应人宽=None
+lobehub/lobehub                          open=389   closed窗=1044   样本=8    measured=2   silent=0   botonly=4   首响中位=16.21    一致子集=2/0 沉默关闭率=0.0     响应人宽=1.0
+SillyTavern/SillyTavern                  open=440   closed窗=118    样本=8    measured=5   silent=3   botonly=0   首响中位=4.48     一致子集=3/2 沉默关闭率=0.375   响应人宽=0.2
+Open-LLM-VTuber/Open-LLM-VTuber          open=111   closed窗=3      样本=3    measured=2   silent=0   botonly=0   首响中位=0.65     一致子集=2/0 沉默关闭率=0.0     响应人宽=0.5
+morettt/my-neuro                         open=26    closed窗=21     样本=8    measured=0   silent=0   botonly=7   首响中位=None     一致子集=0/0 沉默关闭率=0.0     响应人宽=None
+letta-ai/letta-code                      open=182   closed窗=342    样本=8    measured=0   silent=1   botonly=7   首响中位=None     一致子集=0/0 沉默关闭率=0.125   响应人宽=None
+hello-diana/MASCOT                       open=1     closed窗=2      样本=None measured=None silent=None botonly=None 首响中位=None     一致子集=None/None 沉默关闭率=None    响应人宽=None
+ddxfish/sapphire                         open=2     closed窗=10     样本=8    measured=8   silent=0   botonly=0   首响中位=237.66   一致子集=3/5 沉默关闭率=0.0     响应人宽=0.12
+v2rockets/Loyal-Elephie                  open=6     closed窗=0      样本=None measured=None silent=None botonly=None 首响中位=None     一致子集=None/None 沉默关闭率=None    响应人宽=None
+Rogendo/Mental-health-Chatbot            open=2     closed窗=1      样本=None measured=None silent=None botonly=None 首响中位=None     一致子集=None/None 沉默关闭率=None    响应人宽=None
+Lum1104/MER-Factory                      open=0     closed窗=5      样本=5    measured=5   silent=0   botonly=0   首响中位=0.18     一致子集=3/2 沉默关闭率=0.0     响应人宽=0.2
+CheaperjamRen/leemo                      open=0     closed窗=0      样本=None measured=None silent=None botonly=None 首响中位=None     一致子集=None/None 沉默关闭率=None    响应人宽=None
+NJX-njx/opensoul                         open=0     closed窗=0      样本=None measured=None silent=None botonly=None 首响中位=None     一致子集=None/None 沉默关闭率=None    响应人宽=None
+s-nagaev/chibi                           open=2     closed窗=0      样本=None measured=None silent=None botonly=None 首响中位=None     一致子集=None/None 沉默关闭率=None    响应人宽=None
+29-Cu/succhia                            open=0     closed窗=0      样本=None measured=None silent=None botonly=None 首响中位=None     一致子集=None/None 沉默关闭率=None    响应人宽=None
+zeroa234/ryza-ai-revive                  open=6     closed窗=6      样本=6    measured=6   silent=0   botonly=0   首响中位=10.0     一致子集=3/3 沉默关闭率=0.0     响应人宽=0.5
+Bwcx-songyu/MoodChat                     open=0     closed窗=0      样本=None measured=None silent=None botonly=None 首响中位=None     一致子集=None/None 沉默关闭率=None    响应人宽=None
+----------------------------------------------------------------------------------------------------------------------
+应测 17（peers 16 + self 1）｜ peers 有读数 8 ｜ NA/不可用 9 ｜ 恒等式 8+8==16：成立 ｜ 窗口 2026-04-08 起（180 天）｜ 预算耗尽=False
+  NA 明细（不得据其排名）: lxh113377/xinyu-soulisle-private-archive(NA(no-closed-issue 人口=0)); hello-diana/MASCOT(NA(thin-sample n=2<3)); v2rockets/Loyal-Elephie(NA(no-closed-issue-in-window 全期人口=11)); Rogendo/Mental-health-Chatbot(NA(thin-sample n=1<3)); CheaperjamRen/leemo(NA(no-closed-issue 人口=0)); NJX-njx/opensoul(NA(no-closed-issue-in-window 全期人口=20)); s-nagaev/chibi(NA(no-closed-issue-in-window 全期人口=7)); 29-Cu/succhia(NA(no-closed-issue 人口=0)); Bwcx-songyu/MoodChat(NA(no-closed-issue 人口=0))
+落盘 交付物/对标数据/peer-issue-response-2026-10-05.json
+PEER-ISSUE-PARTIAL
+R96-ISSUE_RC=1

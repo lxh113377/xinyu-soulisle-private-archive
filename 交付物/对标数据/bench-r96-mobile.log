@@ -1,0 +1,24 @@
+[A  ] lobehub/lobehub                   vp=True  禁缩放=False mq=0   指针适配=0  ≥44声明=0  PWA=False 壳=False 无 viewport
+[A  ] SillyTavern/SillyTavern           vp=True  禁缩放=True  mq=8   指针适配=1  ≥44声明=3  PWA=True  壳=False viewport+PWA 全套
+[B  ] Open-LLM-VTuber/Open-LLM-VTuber   vp=True  禁缩放=False mq=-1  指针适配=-1 ≥44声明=-1 PWA=False 壳=False 无 viewport
+[B  ] morettt/my-neuro                  vp=False 禁缩放=False mq=0   指针适配=0  ≥44声明=0  PWA=False 壳=False 无 viewport
+[D  ] letta-ai/letta-code               vp=NA    禁缩放=NA    mq=-1  指针适配=-1 ≥44声明=-1 PWA=False 壳=False 无 HTML 入口(非 Web 面)
+[C  ] hello-diana/MASCOT                vp=True  禁缩放=False mq=252 指针适配=0  ≥44声明=0  PWA=False 壳=False 无 viewport
+[C  ] ddxfish/sapphire                  vp=True  禁缩放=False mq=22  指针适配=0  ≥44声明=12 PWA=True  壳=False 无 viewport
+[C  ] v2rockets/Loyal-Elephie           vp=NA    禁缩放=NA    mq=0   指针适配=0  ≥44声明=0  PWA=False 壳=False 无 HTML 入口(非 Web 面)
+[C  ] Rogendo/Mental-health-Chatbot     vp=True  禁缩放=False mq=1   指针适配=0  ≥44声明=7  PWA=False 壳=False 无 viewport
+[D  ] Lum1104/MER-Factory               vp=True  禁缩放=False mq=1   指针适配=0  ≥44声明=0  PWA=False 壳=False 无 viewport
+[C  ] CheaperjamRen/leemo               vp=True  禁缩放=False mq=7   指针适配=0  ≥44声明=12 PWA=True  壳=False 无 viewport
+[C  ] NJX-njx/opensoul                  vp=True  禁缩放=False mq=20  指针适配=1  ≥44声明=6  PWA=True  壳=False 无 viewport
+[C  ] s-nagaev/chibi                    vp=NA    禁缩放=NA    mq=-1  指针适配=-1 ≥44声明=-1 PWA=False 壳=False 无 HTML 入口(非 Web 面)
+[C  ] 29-Cu/succhia                     vp=True  禁缩放=True  mq=-1  指针适配=-1 ≥44声明=-1 PWA=False 壳=False 无 viewport
+[C  ] zeroa234/ryza-ai-revive           vp=True  禁缩放=True  mq=2   指针适配=0  ≥44声明=5  PWA=False 壳=False 无 viewport
+[C  ] Bwcx-songyu/MoodChat              vp=NA    禁缩放=NA    mq=-1  指针适配=-1 ≥44声明=-1 PWA=False 壳=False 无 HTML 入口(非 Web 面)
+[self] 心屿 SoulIsle                       vp=True  禁缩放=False mq=6   指针适配=1  ≥44声明=5  PWA=True  壳=False viewport+PWA 全套
+------------------------------------------------------------------------------------------------------------------------
+peers：有 HTML 入口 12/16 ｜ 有 viewport 11 ｜ **禁缩放 3** ｜ 按指针类型适配 2 ｜ 有 manifest 4
+应测 16 ｜ 可用 10 ｜ NA/截断 2 ｜ 范围外(非 Web 面) 4 ｜ 恒等式：OK
+  范围外（无 HTML 入口，CSS 轴不适用）：letta-ai/letta-code; v2rockets/Loyal-Elephie; s-nagaev/chibi; Bwcx-songyu/MoodChat
+  NA/截断：Open-LLM-VTuber/Open-LLM-VTuber(css:NA(仓内无 CSS 件)); 29-Cu/succhia(css:NA(仓内无 CSS 件))
+快照 -> 交付物/对标数据/peer-mobile-2026-10-05.json
+RC-MOBILE_RC=1
