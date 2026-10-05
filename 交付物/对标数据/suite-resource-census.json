@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 128,
+ "suites": 129,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
@@ -51,7 +51,7 @@
    ]
   },
   "free": {
-   "n": 87,
+   "n": 88,
    "seconds": 294.4,
    "members": [
     "disclaimer_forensics",
@@ -140,7 +140,8 @@
     "maintenance_probe_selftest",
     "browser_engine_declare",
     "browser_engine_declare_selftest",
-    "issue_probe_selftest"
+    "issue_probe_selftest",
+    "settle_wait_selftest"
    ]
   },
   "jar8123+port:18123": {
@@ -1367,6 +1368,13 @@
    "facets": [
     "public_net"
    ],
+   "exclusive": []
+  },
+  {
+   "suite": "settle_wait_selftest",
+   "target": "_test/settle_wait.py",
+   "mode": "stub",
+   "facets": [],
    "exclusive": []
   }
  ]
