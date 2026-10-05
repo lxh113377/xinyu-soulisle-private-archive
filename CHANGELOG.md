@@ -1,11 +1,21 @@
-# Changelog
-
-本项目所有值得注意的变更都记录在此。
-格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
-
 ## [Unreleased]
 
-*(自 `v1.7.0` 起的在制增量 r94–r96 已随 **v1.8.0** 发布；`v1.8.0` 之后的 r96 受理面修复与 r97 语音退出态修复已随 **v1.8.1** 发布。本段暂无条目 —— 「有 bullet 而 `tag..HEAD` 零 commit」正是 `release_governance` R2b 要拦的文案先行形态。)*
+*(自 `v1.7.0` 起的在制增量 r94–r96 已随 **v1.8.0** 发布；`v1.8.0` 之后的 r96 受理面修复与 r97 语音退出态修复已随 **v1.8.1** 发布。)*
+
+### Changed（r97 收口 · 备用线已上线，Pages 面拦在凭据 ⇒ `v1.8.1` 暂不推送）
+
+- 冻结树整跑（`e103db0` + 本地 tag `v1.8.1`）：**`BATTERY: 124/126 rc=1 RED: live_sync,live_sync_alt`**（恒等式 126+3==129 ✓，合计 815s），
+  本轮改动的 `voice rc=0 9.3s | VOICE-PASS` 与 `voice_selftest` 均在电池里跑到；两条红同因且非代码缺陷 ——
+  判据自报 `js/voice.js(live=4148B local=4798B)`，curl 两面各实测 `bytes=4148 code=200`，即**公网还在跑 v1.8.0 的语音模块**。
+- 备用线（腾讯云 CloudBase）已发布并复验：`tcb hosting deploy ../xinyu /xinyu` ⇒ `LIVE-SYNC-PASS`，
+  `引用 21 项 | 逐字节相等 21 | 缺失 0 | 漂移 0`。两处文档纠正：README:186 的目标路径写的是 `/` 而云端实际键是 `xinyu/…`；
+  Git Bash 下必须 `MSYS_NO_PATHCONV=1`，否则 `/xinyu` 被改写为 `C:/Program Files/Git/xinyu`。
+- Pages 面**未发布**，拦在凭据（第三次同款，前两次见 `part95`⑨ 与 `part98`）：CF 三个环境变量全 unset、
+  `~/.wrangler` 不存在、`gh secret list` 与 `gh variable list` 均空、全局 wrangler 崩在 `miniflare → require workerd`。
+- ⇒ **决定不推 `main`/不推 tag/不建 Release**：CI 电池步 `--exclude-llm` **不豁免 live 面**，推上去必带一条 `live_sync` 判红并级联成下轮
+  `ci_status` 的红。本仓处置是「护栏拦住就别绕，如实报未发 + 拦在哪 + 失败面」——**没有**放宽判据、**没有**把 `rc=1` 洗成 `rc=2`、**没有**摘掉 live 套件。
+  解封只差一个 Cloudflare API Token（或一次交互式 `wrangler login`），随后按序 publish → 复跑 → 先推 tag 再推分支 → 取 CI 回执 → 建 Release。
+- 台账：`memory/07-next-steps.part121.md`（逐条读数 + 新状态「备用线比 `origin/main` 新」+ 下轮入口三条）。
 
 ## [1.8.1] - 2026-10-06 — 语音输入退出态真缺陷修复（r94/r95/r96 三轮挂账项落地）
 

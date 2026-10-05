@@ -9,6 +9,8 @@
 J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.9 环境实证（含 JAVA_HOME=JDK8 的坑）全文 `part17`。
 
 ## P0 — 必须做
+- [ ] WF-r97-v1.8.1发布链 推 main+tag v1.8.1+CI 回执+Release（Pages 面未发布，CI 电池不豁免 live 面）（由 flow 登记；状态: blocked）
+- [x] WF-r95-契约入库 `.ci/contract.json` 未入库 ⇒ greencheck 恒 UNKNOWN ⇒ pre-push 钩子恒放行（r90 登记 5 轮未动）（由 flow 登记；状态: done）
 
 - [ ] **J3/J4 变现** [推荐:R35-02]：① ② ③ 三件均已实测就绪 ⇒ **唯一阻塞 = 老大给目标机器**（IP/登录/安全组）。`part17`
 - [ ] 🟠 [推荐:R83-02] **共享环境隔离待老大**：陪聊 / iCAN 门店 / 医 同居一个 CloudBase env，
@@ -69,4 +71,5 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 
 - **卷24** `07-next-steps.part118.md` — **r96「终点」口径**：回执只描述更早的提交 ⇒ 实质工作终点=41d2de5（第九轮 126/126 ALL-GREEN），1583903 及后为台账承载提交，其受理面由下轮 `ci_status_check` 取；另记 remote_tree 环境性未验 + "python 找不到文件也回 rc=2" 的伪装形
 - **卷25** `07-next-steps.part119.md` — **⑦ savepoint 转通**：项目级豁免通道上线 + 本仓 `.noise-exempt`（点名 .ci）+ 提交前后端到端负控制（violation:1→0、exempt:0→1）+ 六条牙齿 + 下轮入口两条；遗留：global_skills 领先 3 提交未推平（github 443 拒连）
+- **卷27** `07-next-steps.part121.md` — **r97 收口**：冻结树整跑 `124/126 RED: live_sync,live_sync_alt`（同因=公网还跑 v1.8.0 语音模块，curl 两面实测 4148B）；备用线 `tcb hosting deploy` 后 `LIVE-SYNC-PASS 21/21`；Pages 面拦在凭据（第三次同款）⇒ **v1.8.1 不推送**，解封只差 CF API Token
 - **卷26** `07-next-steps.part120.md` — **r97 语音退出态修复 + v1.8.1 切版**：未修树先验 RED（A8/A10 三条判红、A9 对照腿绿）⇒ 修 `src/js/voice.js` ⇒ 带 base 复算 11 轮全 rc=0（未修树先验红）；体积上限 4,355→5,038（实测 4,798 ×1.05；先把自写注释 5,039→4,798 B 再登记）；三源 pom/ROADMAP/CHANGELOG 同步 + fat jar 内嵌 1.8.1；收口链（电池 / greencheck / tag / ci_watch / Release）待办**带前提命令**

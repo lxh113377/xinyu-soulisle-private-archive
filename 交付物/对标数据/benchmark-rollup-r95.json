@@ -14,7 +14,7 @@
       "src_code_files": 19,
       "first_screen_budget": {
         "files": 22,
-        "total_bytes": 888474
+        "total_bytes": 889157
       },
       "build_config_files": [
         "deploy/cloudbase/functions/chat/package.json"
@@ -61,7 +61,7 @@
       "src_code_files": 19,
       "first_screen_budget": {
         "files": 22,
-        "total_bytes": 888474
+        "total_bytes": 889157
       },
       "build_config_files": [
         "deploy/cloudbase/functions/chat/package.json"
