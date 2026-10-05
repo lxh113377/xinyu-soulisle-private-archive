@@ -124,6 +124,12 @@ def evaluate(members, fuse, today):
     dated = [m for m in members if m[1] is not None]
     by_name = max(dated, key=lambda m: m[1]) if dated else None
     by_mtime = max(members, key=lambda m: m[3])
+    # 交叉腿的**前提**是 mtime 真的携带信息。CI/全新 clone 下 `actions/checkout` 把每个文件都写成
+    # 同一时刻 ⇒ 全族 mtime 相同 ⇒ "mtime 最新"只是并列时的任意选择，与文件名最新不一致**不代表数据旧**。
+    # r96 一手：这条腿在 CI 上把整个判据判红（run 37281131793），而本地永远看不到。
+    # 处置=**逐条降档而非整判据降档**（R311）：龄期照判，只把这一腿降为"本维未验"，
+    # 并由 selftest 的反例腿证明"mtime 有区分度时它仍然咬"。
+    mtime_uniform = len({m[3] for m in members}) <= 1
     stem = stem_of(members[0][0])
     if by_name is None:
         return {"stem": stem, "files": len(members), "state": "UNDATEd", "age_days": None,
@@ -134,7 +140,12 @@ def evaluate(members, fuse, today):
            "state": "OVER-FUSE" if (today - by_name[1]).days > fuse else "WITHIN",
            "latest_by_mtime": by_mtime[0]}
     if by_mtime[0] != by_name[0]:
-        row["divergence"] = "mtime 最新=%s ≠ 文件名最新=%s" % (by_mtime[0], by_name[0])
+        if mtime_uniform:
+            row["divergence_unverified"] = (
+                "mtime 全族同值（%d 个成员同一 mtime）⇒ 本腿无区分度、记未验"
+                % len(members))
+        else:
+            row["divergence"] = "mtime 最新=%s ≠ 文件名最新=%s" % (by_mtime[0], by_name[0])
     return row
 
 
@@ -228,6 +239,15 @@ def selftest():
        "mtime 最新=peer-x-2026-09-26.json"[:9])
     eq("交叉腿的另一半：文件名最新仍优先当权威（不跟着 mtime 走）",
        div["newest"], "peer-x-2026-09-27.json")
+    # r96 CI 一手：全新 clone 下全族 mtime 同值 ⇒ 交叉腿无区分度，只能降为"未验"，
+    # 且**只降这一条**（龄期照判红）。下面两条腿一正一反，缺任一条这个降档就等于关门禁。
+    uni = evaluate([("peer-u-2026-09-27.json", date(2026, 9, 27), "文件名", 777.0),
+                    ("peer-u-2026-09-26.json", date(2026, 9, 26), "文件名", 777.0)], 7, T)
+    eq("mtime 全族同值 ⇒ 本腿降未验且不写 divergence（不凭 checkout 产物判红）",
+       "divergence" in uni, False)
+    eq("降档只降这一条：同值时超 fuse 照样判 OVER-FUSE", uni["state"], "OVER-FUSE")
+    eq("反例：mtime 有区分度时同输入必须仍判分歧（证明降档不是大赦）",
+       "divergence" in div, True)
 
     # 边界腿
     eq("边界 无日期可判 ⇒ UNDATEd 且 age 为 None（不得写成 0 天）",
@@ -290,20 +310,22 @@ def main():
     over = [r for r in rows if r["state"] == "OVER-FUSE"]
     und = [r for r in rows if r["state"] == "UNDATEd"]
     div = [r for r in rows if r.get("divergence")]
+    div_unv = [r for r in rows if r.get("divergence_unverified")]
     for r in rows:
-        print("%-26s 龄=%-6s 状态=%-10s 版本数=%-3s 最新=%s%s"
+        print("%-26s 龄=%-6s 状态=%-10s 版本数=%-3s 最新=%s%s%s"
               % (r["stem"],
                  ("%d天" % r["age_days"]) if r["age_days"] is not None else "-",
                  r["state"], r["files"], r["newest"] or "-",
-                 ("  ⚠" + r["divergence"]) if r.get("divergence") else ""))
+                 ("  ⚠" + r["divergence"]) if r.get("divergence") else "",
+                 ("  ℹ" + r["divergence_unverified"]) if r.get("divergence_unverified") else ""))
     identity_ok = len(within) + len(over) + len(und) == len(rows)
     n_par, par_names = count_partials(d)
     print("-" * 104)
     print("fuse=%d天(%s) 取数=%s 基准日=%s｜族 %d 个：线内 %d｜超 fuse %d｜无日期可判 %d｜"
-          "恒等式 %d+%d+%d==%d：%s｜mtime⇄文件名分歧 %d｜已排除 degraded 台账 %d 份"
+          "恒等式 %d+%d+%d==%d：%s｜mtime⇄文件名分歧 %d（另有 %d 族本腿未验）｜已排除 degraded 台账 %d 份"
           % (fuse, fuse_why, a.pattern, today, len(rows), len(within), len(over), len(und),
              len(within), len(over), len(und), len(rows),
-             "成立" if identity_ok else "不成立", len(div), n_par))
+             "成立" if identity_ok else "不成立", len(div), len(div_unv), n_par))
     if n_par:
         print("  ⚠ degraded（取数不全，按「坏一半不算重采」挪入 %s/，不得当基线用；重采前提=%s）: %s"
               % (PARTIAL_DIRNAME, "python _test/<probe>.py --json …（错峰单跑，勿 burst）",
@@ -319,7 +341,8 @@ def main():
              "dir": str(a.dir), "pattern": a.pattern, "identity_ok": identity_ok,
              "excluded_partial": {"count": n_par, "files": par_names, "dirname": PARTIAL_DIRNAME},
              "counts": {"within": len(within), "over_fuse": len(over), "undated": len(und),
-                        "divergence": len(div), "total": len(rows)},
+                        "divergence": len(div), "divergence_unverified": len(div_unv),
+                        "total": len(rows)},
              "rows": rows}, ensure_ascii=False, indent=1).encode("utf-8"))
         print("落盘 %s" % a.json)
     red = bool(over) or bool(und) or bool(div) or not identity_ok
