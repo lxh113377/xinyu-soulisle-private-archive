@@ -71,3 +71,8 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - **卷17** `07-next-steps.part111.md` — **r96**：三条改判（r95「不可测」被 12 仓实测证伪 / 假 NA 产地 /
   并发口径自相矛盾）+ 本轮 8 件新套件 + **r97 入口**（E2 棘轮降 32 / 重采须错峰 / 阶梯基线已立）
 
+- **卷18** `07-next-steps.part112.md` — **r96 收口**：发版链三处自伤逐条归因（tag 前未同步三源 / 先推 main 后推 tag /
+  tag 指向旧提交后 force 前移）+ 两条方法论（门禁要挑"可能有输入"的状态跑；`ci_status` 读远端 ⇒ 本地全绿成环）
+- **卷19** `07-next-steps.part113.md` — **r96 最终回执**：第八轮冻结树 `124/125 RED: voice`（**未取到 ALL-GREEN**）+
+  **voice 由「在册 flaky」改判为产品真缺陷**（`stopped:1` 而 `ev` 无 `end` ⇒ 按钮卡"正在听"；CI 走 A4 SKIP 从未覆盖）
+  ⇒ P1 待老大 + 本轮与计划的两处偏离（`ledger_age` 落 deferred 非 blocking / peers 未 burst 重采）

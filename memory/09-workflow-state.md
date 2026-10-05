@@ -56,7 +56,7 @@
 | WF-r95-提交率尺 | P2 | 「维护状态」维只有状态快照（★/pushed/release），无 30 天同口径窗口；★ 与维护度反向已实测 | done | - | - | 2026-10-05 03:05 | `_test/peer_maintenance_probe.py`（两腿交叉验证 + 印历史跨度 + `--self-only`/`--selftest` 14 条）；台账 `peer-maintenance-2026-10-05.json` 在盘；MoodChat 两腿差 1 ⇒ 判不可用不取平均 |
 | WF-r95-台账SNAP刷新 | P2 | 权威 `benchmark-metrics.json` 自 10-02 停滞，G17 报「台账记 112 / HEAD 现算 116」 | done | - | - | 2026-10-05 03:05 | 本轮重采 16/16；G17 差值 −4 → 0；README 电池数 118→120（G4 抓红后改，不是事后凑绿） |
 | WF-r95-落后格触发条件 | P2 | lint 门（peers 3/16）/ vector 记忆（7/16）/ i18n（3/16）/ mutation 门（0/16）—— 全部维持不执行，但把触发条件写死 | todo | - | - | 2026-10-05 03:05 | 触发条件见 r95 报告 §3 #7/#8：lint = 引入前端构建链或 size_budget 预算容得下 node_modules；vector = ①跨会话语义召回需求 ②接受双运行时（决策 #1 重评）；mutation = 覆盖率门连续两轮无新增缺口 |
-| WF-r96-对标轮 | P1 | r96 八维对标 + 四项改造（issue响应尺/并发口径封口/龄期尺+探针接线/引擎面归因+交付卫生） | doing | - | - | 2026-10-05 12:57 | - |
+| WF-r96-对标轮 | P1 | r96 八维对标 + 四项改造（issue响应尺/并发口径封口/龄期尺+探针接线/引擎面归因+交付卫生） | done | - | - | 2026-10-05 17:58 | 报告 r96.md；tag v1.8.0+Release；CI-WATCH-GREEN 3991069c；电池 124/125 唯一红=voice 真缺陷 |
 
 ## 推进记录
 
@@ -80,6 +80,7 @@
 - [2026-10-05 12:56] WF-r90-sync状态词滞留 todo → blocked（责任面在受管根 global_skills/A-project-handoff，本仓无执行位）
 - [2026-10-05 12:57] WF-r96-对标轮 新增（P1，todo）
 - [2026-10-05 12:57] WF-r96-对标轮 todo → doing
+- [2026-10-05 17:58] WF-r96-对标轮 doing → done
 
 ## 分卷目录
 
