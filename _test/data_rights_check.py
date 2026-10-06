@@ -67,13 +67,7 @@ def receipt_line(r):
     return " ｜ ".join(bits)
 
 
-def launch(pw):
-    for kw in ({}, {"channel": "msedge"}):
-        try:
-            return pw.chromium.launch(**kw)
-        except Exception:
-            continue
-    return None
+from browser_engine import launch as be_launch, short_face   # r98 E2 迁移：唯一实现见 browser_engine.py
 
 
 def stats(sid):
@@ -98,9 +92,11 @@ def main():
         return 2
 
     with sync_playwright() as pw:
-        b = launch(pw)
-        if b is None:
-            print("DATA-RIGHTS-ENV-UNVERIFIED 浏览器起不来")
+        try:
+            b, face = be_launch(pw, label="data_rights_check")
+        except Exception as e:                                # noqa: BLE001
+            print("DATA-RIGHTS-ENV-UNVERIFIED 浏览器起不来（三档全败）%s"
+                  % (str(e).splitlines()[0][:90] if str(e) else type(e).__name__))
             return 2
         pg = b.new_page(viewport={"width": 1280, "height": 900})
         errs = []
@@ -198,7 +194,8 @@ def main():
     if unv:
         print("DATA-RIGHTS-UNVERIFIED 判红= 未验=%s（不得据其声称已验）" % ",".join(unv))
         return 2
-    print("DATA-RIGHTS-PASS 披露随模式翻转+删除有回执并复核归零+导出含两份且与计数对齐 全绿")
+    print("DATA-RIGHTS-PASS 引擎=%s 披露随模式翻转+删除有回执并复核归零+导出含两份且与计数对齐 全绿"
+          % short_face(face))
     return 0
 
 

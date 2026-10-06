@@ -201,11 +201,7 @@ def wait_precache(pg, want, timeout_ms=15000):
     return have, [p for p in want if p not in have]
 
 
-def launch(pw):
-    try:
-        return pw.chromium.launch()
-    except Exception:
-        return pw.chromium.launch(channel="msedge")
+from browser_engine import launch as be_launch, short_face
 
 
 def run_static_only():
@@ -388,7 +384,7 @@ def run_runtime():
     errs = []
     miss = []            # SW 侧"壳里没这件"的现场留痕，R7 报红时直接指到文件名
     pw = sync_playwright().start()
-    browser = launch(pw)
+    browser, face = be_launch(pw, label="offline_shell_check")
     try:
         results = _run_checks(browser, errs, miss)
     finally:
@@ -400,7 +396,8 @@ def run_runtime():
     print(f"\n合计 {len(results)} 项，失败 {len(bad)} 项")
     for n, _, d in bad:
         print("  🔴", n, d[:120])
-    print("OFFLINE-SHELL-PASS" if not bad else "OFFLINE-SHELL-FAIL")
+    print(("OFFLINE-SHELL-PASS 引擎=%s" if not bad else "OFFLINE-SHELL-FAIL 引擎=%s")
+          % short_face(face))
     return 1 if bad else 0
 
 

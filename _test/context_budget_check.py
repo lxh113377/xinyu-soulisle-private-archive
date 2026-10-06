@@ -134,15 +134,11 @@ def js_state():
 def run(base, turns):
     from playwright.sync_api import sync_playwright
 
-    def launch(pw):
-        try:
-            return pw.chromium.launch()
-        except Exception:
-            return pw.chromium.launch(channel="msedge")
+    from browser_engine import launch as be_launch, short_face
 
     reads, errs, befores = [], [], []
     with sync_playwright() as p:
-        b = launch(p)
+        b, face = be_launch(p, label="context_budget_check")
         pg = b.new_page(viewport={"width": 1200, "height": 860})
         pg.on("pageerror", lambda e: errs.append(str(e)[:110]))
         pg.add_init_script("try{localStorage.setItem('%s',JSON.stringify("
@@ -188,7 +184,7 @@ def run(base, turns):
         b.close()
     if befores and len(befores) > len(reads):
         befores = befores[:len(reads)]
-    return reads, befores, acc, errs
+    return reads, befores, acc, errs, face
 
 
 def selftest():
@@ -282,6 +278,7 @@ def main():
     a = ap.parse_args()
     if a.selftest:
         sys.exit(selftest())
+    from browser_engine import short_face
     import urllib.request
     try:
         urllib.request.urlopen(a.base + "/api/health", timeout=6).read()
@@ -289,7 +286,7 @@ def main():
         print("CTXBUDGET-UNVERIFIED: 服务端不可达 %s（%s）⇒ 环境未验，不判绿" % (a.base, type(e).__name__))
         sys.exit(2)
     try:
-        reads, befores, acc, errs = run(a.base, a.turns)
+        reads, befores, acc, errs, face = run(a.base, a.turns)
     except Exception as e:
         print("CTXBUDGET-UNVERIFIED: 浏览器/夹具异常 %s: %s" % (type(e).__name__, str(e)[:120]))
         sys.exit(2)
@@ -300,11 +297,12 @@ def main():
     for x in bad:
         print("  " + x)
     if bad:
-        print("CTXBUDGET-FAIL: %d 条判红（轮次 %s）" % (len(bad), info.get("turns", len(reads))))
+        print("CTXBUDGET-FAIL 引擎=%s: %d 条判红（轮次 %s）"
+              % (short_face(face), len(bad), info.get("turns", len(reads))))
         sys.exit(1)
-    print("CTXBUDGET-PASS: 覆盖率 %s（窗口内送 %d 条／发前 %d 条，窗口=%d）｜"
+    print("CTXBUDGET-PASS 引擎=%s: 覆盖率 %s（窗口内送 %d 条／发前 %d 条，窗口=%d）｜"
           "截断 %d 条已由概要注意送达且条数对账｜system %d 字符 ≤ 上限 %d｜首轮零注入｜原话泄漏 0 条"
-          % (info["cov"], info["sent_hist"], info["before"], info["hm"], info["dropped"],
+          % (short_face(face), info["cov"], info["sent_hist"], info["before"], info["hm"], info["dropped"],
              info["sys_chars"], SYSTEM_CHAR_BUDGET))
     sys.exit(0)
 

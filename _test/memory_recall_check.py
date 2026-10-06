@@ -182,15 +182,11 @@ def send_and_capture(pg, text, wait_s=45):
 def run(base):
     from playwright.sync_api import sync_playwright
 
-    def launch(pw):
-        try:
-            return pw.chromium.launch()
-        except Exception:
-            return pw.chromium.launch(channel="msedge")
+    from browser_engine import launch as be_launch, short_face
 
     cases = []
     with sync_playwright() as p:
-        b = launch(p)
+        b, face = be_launch(p, label="memory_recall_check")
         pg = b.new_page(viewport={"width": 1200, "height": 860})
         errs = []
         pg.on("pageerror", lambda e: errs.append(str(e)[:110]))
@@ -241,7 +237,7 @@ def run(base):
         for c in cases:
             c["pageerrors"] = list(errs)
         b.close()
-    return cases
+    return cases, face
 
 
 def selftest():
@@ -342,6 +338,7 @@ def main():
     a = ap.parse_args()
     if a.selftest:
         sys.exit(selftest())
+    from browser_engine import short_face
     import urllib.request
     try:
         urllib.request.urlopen(a.base + "/api/health", timeout=6).read()
@@ -350,7 +347,7 @@ def main():
               % (a.base, type(e).__name__))
         sys.exit(2)
     try:
-        cases = run(a.base)
+        cases, face = run(a.base)
     except Exception as e:
         print("RECALL-UNVERIFIED: 浏览器/夹具异常 %s: %s" % (type(e).__name__, str(e)[:120]))
         sys.exit(2)
@@ -362,10 +359,11 @@ def main():
     if bad:
         for x in bad:
             print("  " + x)
-        print("RECALL-FAIL: %d 条判红（用例 %d）" % (len(bad), info.get("cases", 0)))
+        print("RECALL-FAIL 引擎=%s: %d 条判红（用例 %d）"
+              % (short_face(face), len(bad), info.get("cases", 0)))
         sys.exit(1)
-    print("RECALL-PASS: 记忆已回灌模型且清库即消失（用例 %d 类=%s，未捕获异常 0）"
-          % (info["cases"], ",".join(info["kinds"])))
+    print("RECALL-PASS 引擎=%s: 记忆已回灌模型且清库即消失（用例 %d 类=%s，未捕获异常 0）"
+          % (short_face(face), info["cases"], ",".join(info["kinds"])))
     sys.exit(0)
 
 

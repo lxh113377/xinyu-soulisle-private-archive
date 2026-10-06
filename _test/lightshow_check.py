@@ -17,6 +17,7 @@
 import sys, io, math, os
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
+from browser_engine import launch as be_launch, short_face
 from PIL import Image
 
 TOL_DEG = 18.0
@@ -77,10 +78,7 @@ def coverage(pts, w, h):
 
 errors = []
 with sync_playwright() as p:
-    try:
-        browser = p.chromium.launch()
-    except Exception:
-        browser = p.chromium.launch(channel="msedge")
+    browser, face = be_launch(p, label="lightshow_check")
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -238,4 +236,4 @@ assert lit_keep >= 6 * 170, f"点返回后星雾被清掉了（应保留）: {li
 assert lit_cleared == 0, f"「回到我的记忆」未清空演示点亮: {lit_cleared}"
 assert mem_after == mem_before, f"一键点亮污染了本机记忆: {mem_before} → {mem_after}"
 assert len(errors) == 0, f"console 报错: {errors}"
-print("LIGHTSHOW-CHECK-PASS")
+print("LIGHTSHOW-CHECK-PASS 引擎=%s" % short_face(face))

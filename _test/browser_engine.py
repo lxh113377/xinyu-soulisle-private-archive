@@ -75,6 +75,17 @@ def record(entry):
         return False
 
 
+def short_face(face):
+    """判定行用的紧凑身份：只去掉 ` 原因=…` 长串，引擎标签与完整版本号一个不删。
+
+    为什么要它（r98 实测）：完整 face 形如
+    `msedge(channel)(154.0.4258.53) 原因=managed->Error:BrowserType.launch: Executable doesn't
+    exist at D:\\pla…`，长度 ~90 字符；电池按 `run_all_suites.py:804` 的 `line[:110]` 截断
+    ⇒ 把它拼进任何已有内容的判定行，**尾巴上的实测数字会在受理面上消失**。
+    全量 face（含原因链）仍由 `record()` 落进面文件留档 ⇒ 行内省的是重复，不是证据。"""
+    return (face or "").split(" 原因=")[0]
+
+
 def _mk_face(tag, browser, why):
     try:
         ver = browser.version

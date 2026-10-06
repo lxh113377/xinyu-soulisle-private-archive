@@ -100,13 +100,7 @@ AXE_RUN = """async (opts) => {
 }"""
 
 
-def launch(pw):
-    for kw in ({}, {"channel": "msedge"}):
-        try:
-            return pw.chromium.launch(**kw)
-        except Exception:
-            continue
-    return None
+from browser_engine import launch as be_launch, short_face   # r98 E2 迁移：唯一实现见 browser_engine.py
 
 
 DECO_RE = re.compile(r"[^\w一-鿿]+", re.U)
@@ -247,10 +241,10 @@ def _run_audit(src, opts):
     live = []
 
     with sync_playwright() as pw:
-        b = launch(pw)
-        if b is None:
-            print("A11Y-ENV-UNVERIFIED 浏览器起不来（chromium 与 msedge 均失败）")
-            return 2
+        try:
+            b, face = be_launch(pw, label="a11y_check")
+        except Exception as e:                                 # noqa: BLE001
+            print("A11Y-ENV-UNVERIFIED 浏览器三档全败", str(e)[:90]); return 2
 
         def open_page(theme, motion="no-preference", w=1280, h=860):
             ctx = b.new_context(viewport={"width": w, "height": h}, reduced_motion=motion)
@@ -382,7 +376,7 @@ def _run_audit(src, opts):
                   "normal=%.5f reduce=%.5f 比值=%.3f" % (normal, reduced,
                                                      reduced / normal if normal else -1))
         b.close()
-    return viol_total, states_red, passes_min, inc, deltas
+    return viol_total, states_red, passes_min, inc, deltas, face
 
 
 def main():
@@ -414,7 +408,7 @@ def main():
     src = raw.decode("utf-8")
     opts = {"resultSelection": "farest", "runOnly": {"type": "tag", "values": TAGS}}
 
-    viol_total, states_red, passes_min, inc, deltas = _run_audit(src, opts)
+    viol_total, states_red, passes_min, inc, deltas, face = _run_audit(src, opts)
 
     bad = [n for n, ok, d in results if ok is False]
     unv = [n for n, ok, d in results if ok is None]
@@ -429,9 +423,9 @@ def main():
                  passes_min if passes_min < 10 ** 6 else -1, len(inc), ratio, len(unv),
                  ",".join(bad)))
         return 1
-    print("A11Y-PASS 审计面=%d项(状态%d x 主题%d) 违规节点=0 passes最小=%d 规则集=%s+%d "
+    print("A11Y-PASS 引擎=%s 审计面=%d项(状态%d x 主题%d) 违规节点=0 passes最小=%d 规则集=%s+%d "
           "对比度量不出=%d(<= %d) 动效降档=%s倍 反例自证=OK 未验=0"
-          % (len(STATES) * len(THEMES), len(STATES), len(THEMES), passes_min,
+          % (short_face(face), len(STATES) * len(THEMES), len(STATES), len(THEMES), passes_min,
              "wcag21aa", len(TAGS) - 5, len(inc), CONTRAST_INCOMPLETE_MAX, ratio))
     return 0
 

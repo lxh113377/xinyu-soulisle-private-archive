@@ -260,6 +260,11 @@ SUITES = [
     #   而**没有任何一处打印过它用了什么** ⇒ "本地浏览器套件全绿"不可归因（CI 面是另一台浏览器）。
     #   静态档零网络零浏览器进电池；`--machine` 档挂 CI 的 browser-regression job（那里拿到受管
     #   chromium，两侧读数变成两行可对账）。E2 是棘轮：未接入统一入口数只降不升。
+    #   ⚠️ 更正注 r98：上两句在写下时都还没有执行位——实测 `.github/workflows/` 全文对本脚本
+    #   **0 引用** ⇒ `--machine` 从未在受理面跑过（「列了没人跑」族）；r98 才在 browser-regression
+    #   job 里真加了一步。同时「未接入数只降不升」这条棘轮的**分子**按构造恒 ≈0（接完一件就离开
+    #   分母），r98 已把口径改成「回退余量 + 起点名册 − 现读 = 已接」，并迁了 8 件（32→24）。
+    #   取证与全文见 交付物/对标分析报告-2026-10-06-r98.md §2。
     ("browser_engine_declare", [sys.executable, "_test/browser_engine_declare_check.py"]),
     ("browser_engine_declare_selftest",
      [sys.executable, "_test/browser_engine_declare_check.py", "--selftest"]),

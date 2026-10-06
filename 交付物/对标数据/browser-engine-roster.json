@@ -1,0 +1,414 @@
+{
+ "written_by": "browser_engine_declare_check.py --write-roster",
+ "face": "AST(*.chromium.launch())",
+ "site_count": 32,
+ "call_points": 62,
+ "sites": {
+  "_reshoot_r86.py": {
+   "launch_points": 2,
+   "defs": [
+    "last_label",
+    "scroll_act",
+    "send_and_wait",
+    "shot"
+   ],
+   "imports_be": false
+  },
+  "a11y_check.py": {
+   "launch_points": 1,
+   "defs": [
+    "_probe_kb",
+    "_run_audit",
+    "axe_pin",
+    "check",
+    "goto_state",
+    "label_mismatch",
+    "launch",
+    "main",
+    "mean_abs",
+    "mean_abs_delta",
+    "motion_ok",
+    "open_page",
+    "png",
+    "run_selftest",
+    "strip_deco",
+    "unverified",
+    "want"
+   ],
+   "imports_be": false
+  },
+  "backup_online_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "ck",
+    "main"
+   ],
+   "imports_be": false
+  },
+  "browser_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "lit",
+    "panel_op"
+   ],
+   "imports_be": false
+  },
+  "clean_clone_check.py": {
+   "launch_points": 1,
+   "defs": [
+    "check",
+    "classify_errors",
+    "free_port",
+    "launch",
+    "log_message",
+    "main",
+    "run",
+    "selftest",
+    "unverified",
+    "want"
+   ],
+   "imports_be": false
+  },
+  "context_budget_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "assess",
+    "handler",
+    "history_max",
+    "js_state",
+    "launch",
+    "main",
+    "parse_body",
+    "run",
+    "selftest"
+   ],
+   "imports_be": false
+  },
+  "cors_probe.py": {
+   "launch_points": 2,
+   "defs": [],
+   "imports_be": false
+  },
+  "data_rights_check.py": {
+   "launch_points": 1,
+   "defs": [
+    "check",
+    "disclosure_ok",
+    "launch",
+    "main",
+    "receipt_line",
+    "selftest",
+    "stats",
+    "unverified",
+    "want"
+   ],
+   "imports_be": false
+  },
+  "demo_video_pipeline.py": {
+   "launch_points": 2,
+   "defs": [
+    "_ffmpeg_exe",
+    "_media_seconds",
+    "_mp4_seconds",
+    "assemble",
+    "at",
+    "build_ass",
+    "dock",
+    "f",
+    "hold",
+    "log",
+    "mark",
+    "one",
+    "run_recording",
+    "send",
+    "synth_tts",
+    "wait_ai_reply"
+   ],
+   "imports_be": false
+  },
+  "emotion_wiring_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "check",
+    "crisis_shortcircuit",
+    "e2e",
+    "emotion_api_ok",
+    "jar_up",
+    "main",
+    "read",
+    "selftest",
+    "send",
+    "sha",
+    "static_wiring",
+    "w1_w3"
+   ],
+   "imports_be": false
+  },
+  "entry_reach_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "_el",
+    "assess",
+    "capability_of",
+    "ck",
+    "enumerate_candidates",
+    "handler_segments",
+    "is_visible",
+    "live_measure",
+    "main",
+    "read_sources",
+    "selftest",
+    "verdict_line"
+   ],
+   "imports_be": false
+  },
+  "fault_injection_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "assess",
+    "black_hole",
+    "h",
+    "half_open_stream",
+    "js_state",
+    "launch",
+    "llm_timeout_s",
+    "loop",
+    "loop",
+    "main",
+    "make",
+    "probe_upstream_state",
+    "recover_disposition",
+    "run",
+    "selftest",
+    "serve",
+    "serve",
+    "upstream_state"
+   ],
+   "imports_be": false
+  },
+  "headers_csp_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "_finalize_probe",
+    "_observe_paths",
+    "_send",
+    "assess",
+    "csp_map",
+    "do_GET",
+    "head_via",
+    "log_message",
+    "main",
+    "merged",
+    "on_console",
+    "parse_headers",
+    "run_live",
+    "run_local",
+    "selftest",
+    "serve",
+    "stub"
+   ],
+   "imports_be": false
+  },
+  "j2_chat_contract.py": {
+   "launch_points": 2,
+   "defs": [
+    "main",
+    "run"
+   ],
+   "imports_be": false
+  },
+  "j4_memory_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "boot",
+    "http",
+    "lit",
+    "say",
+    "stats"
+   ],
+   "imports_be": false
+  },
+  "j4_remote_down_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "main"
+   ],
+   "imports_be": false
+  },
+  "lightshow_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "coverage",
+    "overlay",
+    "rgb2hue",
+    "sample",
+    "share_near",
+    "ui_state",
+    "wait_opening"
+   ],
+   "imports_be": false
+  },
+  "memory_recall_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "assess",
+    "handler",
+    "js_state",
+    "launch",
+    "main",
+    "one",
+    "run",
+    "seed_script",
+    "selftest",
+    "send_and_capture",
+    "sys_of"
+   ],
+   "imports_be": false
+  },
+  "mobile_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "_ck",
+    "_el",
+    "assess",
+    "launch",
+    "main",
+    "probe",
+    "selftest"
+   ],
+   "imports_be": false
+  },
+  "offline_shell_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "__init__",
+    "_run_checks",
+    "arr",
+    "check",
+    "header_rules",
+    "launch",
+    "log_message",
+    "main",
+    "probe_headers",
+    "run_runtime",
+    "run_selftest",
+    "run_static_only",
+    "sw_static_audit",
+    "vendor_stamp",
+    "wait_precache"
+   ],
+   "imports_be": false
+  },
+  "online_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "last_ai_state",
+    "wait_done"
+   ],
+   "imports_be": false
+  },
+  "pixel_dual_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "clusters2",
+    "freeze_phase",
+    "multicolor",
+    "overlay"
+   ],
+   "imports_be": false
+  },
+  "public_check.py": {
+   "launch_points": 2,
+   "defs": [],
+   "imports_be": false
+  },
+  "rescan_shots_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "ck",
+    "main"
+   ],
+   "imports_be": false
+  },
+  "screenshots.py": {
+   "launch_points": 2,
+   "defs": [],
+   "imports_be": false
+  },
+  "screenshots_online.py": {
+   "launch_points": 2,
+   "defs": [],
+   "imports_be": false
+  },
+  "screenshots_resubmit.py": {
+   "launch_points": 2,
+   "defs": [],
+   "imports_be": false
+  },
+  "settings_panel_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "arm_settle",
+    "badge",
+    "check",
+    "click_save",
+    "diag",
+    "dialog_state",
+    "main",
+    "new_page",
+    "open_dialog",
+    "read_cfg",
+    "run_main",
+    "run_selftest"
+   ],
+   "imports_be": false
+  },
+  "storage_resilience_check.py": {
+   "launch_points": 4,
+   "defs": [
+    "assess",
+    "diag",
+    "probe_case",
+    "row_line",
+    "run",
+    "selftest",
+    "server_up",
+    "settle"
+   ],
+   "imports_be": false
+  },
+  "stream_contract.py": {
+   "launch_points": 2,
+   "defs": [
+    "frames",
+    "main",
+    "post",
+    "run"
+   ],
+   "imports_be": false
+  },
+  "ux_guards_check.py": {
+   "launch_points": 2,
+   "defs": [
+    "check",
+    "main",
+    "u1",
+    "u2",
+    "u3"
+   ],
+   "imports_be": false
+  },
+  "voice_check.py": {
+   "launch_points": 1,
+   "defs": [
+    "class_is",
+    "main",
+    "no_input_device",
+    "open_stub_page",
+    "selftest",
+    "stub_legs"
+   ],
+   "imports_be": false
+  }
+ }
+}

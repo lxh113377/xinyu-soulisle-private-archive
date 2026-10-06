@@ -3,6 +3,7 @@
 import sys, io, os
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
+from browser_engine import launch as be_launch, short_face
 
 errors = []
 
@@ -16,10 +17,7 @@ def lit(pg):
 
 
 with sync_playwright() as p:
-    try:
-        browser = p.chromium.launch(args=LAUNCH_ARGS)
-    except Exception:
-        browser = p.chromium.launch(channel="msedge", args=LAUNCH_ARGS)
+    browser, face = be_launch(p, args=LAUNCH_ARGS, label="browser_check")
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -162,4 +160,4 @@ assert o_center > 0.9, f"面板居中不够实（{o_center}）——影响可读
 assert o_leaving < 0.5 and o_leaving < o_center, f"面板还大面积可见时没明显变淡（{o_leaving}）——随滚动淡出未生效"
 assert color_gap["applied"] >= 0.4 and color_gap["applied"] > color_gap["raw"], f"同色系次色未被拉开: {color_gap}"
 assert len(real_errors) == 0, f"console 报错: {real_errors}"
-print("ALL-ASSERT-PASS")
+print("ALL-ASSERT-PASS 引擎=%s" % short_face(face))

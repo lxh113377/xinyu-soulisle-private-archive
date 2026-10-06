@@ -94,13 +94,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-def launch(pw):
-    for kw in ({}, {"channel": "msedge"}):
-        try:
-            return pw.chromium.launch(**kw)
-        except Exception:
-            continue
-    return None
+from browser_engine import launch as be_launch, short_face   # r98 E2 迁移：唯一实现见 browser_engine.py
 
 
 def main():
@@ -151,9 +145,11 @@ def main():
                     os.chdir(old_cwd)
                     return 2
                 with sync_playwright() as pw:
-                    b = launch(pw)
-                    if b is None:
-                        print("CLEAN-CLONE-ENV-UNVERIFIED 浏览器起不来")
+                    try:
+                        b, face = be_launch(pw, label="clean_clone_check")
+                    except Exception as e:                    # noqa: BLE001
+                        print("CLEAN-CLONE-ENV-UNVERIFIED 浏览器起不来（三档全败）%s"
+                              % (str(e).splitlines()[0][:90] if str(e) else type(e).__name__))
                         return 2
                     pg = b.new_page(viewport={"width": 1280, "height": 860})
                     errs, failed = [], []
@@ -221,9 +217,9 @@ def main():
         print("CLEAN-CLONE-FAIL 克隆态=%s 判红=%s 未验=%s"
               % (head[:7] if 'head' in dir() else "?", ",".join(bad), ",".join(unv)))
         return 1
-    print("CLEAN-CLONE-PASS 从 HEAD(%s) 克隆可跑：页面真加载+离线链路通+未知报错0；"
+    print("CLEAN-CLONE-PASS 引擎=%s 从 HEAD(%s) 克隆可跑：页面真加载+离线链路通+未知报错0；"
           "已登记缺口 %d 条（命中 %s）"
-          % (head[:7], len(KNOWN_GAPS), ",".join("%s=%d" % (k, v) for k, v in hits.items())))
+          % (short_face(face), head[:7], len(KNOWN_GAPS), ",".join("%s=%d" % (k, v) for k, v in hits.items())))
     return 0
 
 
