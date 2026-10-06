@@ -109,8 +109,10 @@ async def class_is(page, want):
 async def stub_legs(browser, url):
     """A8/A9/A10：退出态三腿。每条腿都自带前置断言，防止「桩没生效却判通过」的白过。"""
     out = []
+    sl = {}
 
     # --- A8：stop() 被调用但浏览器**没派发 end**（真机 1/3）⇒ 按钮仍必须复位
+    n0 = len(out)
     ctx8, p8, errs8 = await open_stub_page(browser, url, {"silent": True})
     b8 = p8.locator("#btn-voice")
     await b8.click(timeout=5000)
@@ -144,8 +146,10 @@ async def stub_legs(browser, url):
     if errs8:
         out.append("A8 未捕获异常逃逸到页面 %d 条: %s" % (len(errs8), errs8[:2]))
     await ctx8.close()
+    sl["A8"] = "PASS" if len(out) == n0 else "FAIL"
 
     # --- A9 对照腿：正常派发 end 时同样必须复位，且 onresult 链路没被改坏
+    n0 = len(out)
     ctx9, p9, errs9 = await open_stub_page(browser, url, {"silent": False, "sendResult": True})
     b9 = p9.locator("#btn-voice")
     await b9.click(timeout=5000)
@@ -181,8 +185,10 @@ async def stub_legs(browser, url):
     if errs9:
         out.append("A9 未捕获异常逃逸到页面 %d 条: %s" % (len(errs9), errs9[:2]))
     await ctx9.close()
+    sl["A9"] = "PASS" if len(out) == n0 else "FAIL"
 
     # --- A10：rec.start() 抛异常 ⇒ 按钮不得留在监听态，异常不得逃逸（voice.js 头部约束 2）
+    n0 = len(out)
     ctx10, p10, errs10 = await open_stub_page(browser, url, {"startThrows": True})
     b10 = p10.locator("#btn-voice")
     await b10.click(timeout=5000)
@@ -200,7 +206,30 @@ async def stub_legs(browser, url):
         else:
             print("A10b PASS  start() 异常未逃逸（pageerror=0）")
     await ctx10.close()
-    return out
+    sl["A10"] = "PASS" if len(out) == n0 else "FAIL"
+    return out, sl
+
+
+def a5_status(saw_recording, recovered):
+    """A5 的结论只能由「先真进过监听态」派生。
+
+    r98 立此函数的原因是一手缺陷实测：原实现里 A5 的恢复轮询**不以 `saw_recording` 为前提**
+    ⇒ A4 走 SKIP（CI 无麦克风、class 里本来就没有 `recording`）时首帧即 `recovered=True`，
+    于是打印 `A5 PASS 退出监听态` —— 那是一条**空断言**，而门面行只有裸 `VOICE-PASS`，
+    受理面（电池按 `run_all_suites.py:18` 只留末条判定行）看不出它到底验没验。"""
+    if not saw_recording:
+        return "SKIP"
+    return "PASS" if recovered else "FAIL"
+
+
+def voice_verdict(fails, legs, slegs):
+    """门面行：档位必须落进这一行本身，否则被电池折掉 = 没有读数。"""
+    rp = sum(1 for v in legs.values() if v == "PASS")
+    sp = sum(1 for v in slegs.values() if v == "PASS")
+    return ("%s A4=%s A5=%s A6=%s A7=%s 真机腿=%d/%d 桩腿=%d/%d"
+            % ("VOICE-FAIL" if fails else "VOICE-PASS",
+               legs.get("A4", "?"), legs.get("A5", "?"),
+               legs.get("A6", "?"), legs.get("A7", "?"), rp, len(legs), sp, len(slegs)))
 
 
 def no_input_device(ev):
@@ -247,15 +276,50 @@ def selftest() -> int:
             os.environ.pop("CI", None)
         else:
             os.environ["CI"] = saved
+    # ── r98 新族：A5 空断言封口 + 门面行自带档位（正例/反例/变异三族）──
+    n_extra = 0
+    for saw, rec, want, why in [(True, True, "PASS", "进过监听态且复位 ⇒ 才谈得上 PASS"),
+                                (True, False, "FAIL", "进过监听态但 8s 未复位 ⇒ 判红"),
+                                (False, True, "SKIP", "从未进入监听态 ⇒ 不得记 PASS（r98 修掉的那一形）"),
+                                (False, False, "SKIP", "没进过也没复位 ⇒ 不适用，不是红")]:
+        got = a5_status(saw, rec)
+        n_extra += 1
+        if got != want:
+            bad.append("a5_status(%s,%s) 期望 %s 实得 %s ｜ %s" % (saw, rec, want, got, why))
+    keep_a5 = globals()["a5_status"]
+    globals()["a5_status"] = lambda saw, rec: "PASS" if rec else "FAIL"   # = r98 之前的形状
+    vac = globals()["a5_status"](False, True)
+    globals()["a5_status"] = keep_a5
+    n_extra += 2
+    if vac != "PASS":
+        bad.append("变异体没造出空断言（got=%s）⇒ 这条反例腿在打一个不存在的靶子" % vac)
+    if keep_a5(False, True) != "SKIP":
+        bad.append("还原后同一输入没回 SKIP ⇒ 动的是期望值不是尺")
+    v_ok = voice_verdict([], {"A4": "SKIP", "A5": "SKIP", "A6": "PASS", "A7": "SKIP"},
+                         {"A8": "PASS", "A9": "PASS", "A10": "PASS"})
+    v_bad = voice_verdict(["A8 卡在监听态"], {"A4": "PASS", "A5": "PASS", "A6": "PASS", "A7": "PASS"},
+                          {"A8": "FAIL", "A9": "PASS", "A10": "PASS"})
+    n_extra += 4
+    if "VOICE-PASS" not in v_ok or "A4=SKIP" not in v_ok or "A5=SKIP" not in v_ok             or "桩腿=3/3" not in v_ok:
+        bad.append("门面行缺档位读数：%s" % v_ok)
+    if len(v_ok) > 110 or len(v_bad) > 110:
+        bad.append("门面行超出电池截断线 110 ⇒ 尾部读数在受理面上不存在")
+    if "VOICE-FAIL" not in v_bad or "桩腿=2/3" not in v_bad or "A4=PASS" not in v_bad:
+        bad.append("FAIL 分支没带同样五个字段（红的那轮反而丢读数）：%s" % v_bad)
+    if "真机腿=0/0" not in voice_verdict([], {}, {}):
+        bad.append("空档位集被读成「全过」而不是 0/0")
+
     if bad:
         print("VOICE-SELFTEST-FAIL: " + " ; ".join(bad))
         return 1
-    print("VOICE-SELFTEST-PASS: %d 个边界用例全过（含本机不降级与权限类不降级两个反向方向）" % len(cases))
+    print("VOICE-SELFTEST-PASS: %d 个用例全过（no_input_device %d 条边界含两个反向方向 + "
+          "r98 新增 A5 空断言与门面档位 %d 条）" % (len(cases) + n_extra, len(cases), n_extra))
     return 0
 
 
 async def main() -> int:
     fails = []
+    legs, slegs = {}, {}
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             channel="msedge",
@@ -315,10 +379,13 @@ async def main() -> int:
                 break
             await page.wait_for_timeout(100)
         if saw_recording:
+            legs["A4"] = "PASS"
             print("A4 PASS  进入监听态（class=recording）")
         elif no_input_device((await page.evaluate("() => window.__voice")).get("ev", [])):
+            legs["A4"] = "SKIP"
             print("A4  SKIP  CI 无音频输入设备（audio-capture）⇒ 监听态不可能出现（本机跑同一条仍判红）")
         else:
+            legs["A4"] = "FAIL"
             fails.append("A4 未观察到监听态（class=recording 从未出现）")
 
         # A5 恢复：再点一次走 stop()（或识别自然结束）-> recording 移除、文案还原
@@ -328,15 +395,20 @@ async def main() -> int:
             except Exception:  # noqa: BLE001
                 pass
         recovered = False
+        cls = txt = ""
         for _ in range(80):  # 最多 8s
             cls = await btn.get_attribute("class") or ""
             txt = (await btn.inner_text() or "").strip()
             if "recording" not in cls:
                 recovered = True
-                print("A5 PASS  退出监听态，按钮还原 -> text=%r class=%r" % (txt, cls))
                 break
             await page.wait_for_timeout(100)
-        if not recovered:
+        legs["A5"] = a5_status(saw_recording, recovered)
+        if legs["A5"] == "PASS":
+            print("A5 PASS  退出监听态，按钮还原 -> text=%r class=%r" % (txt, cls))
+        elif legs["A5"] == "SKIP":
+            print("A5  SKIP  本轮没进过监听态 ⇒ 谈不上退出（不记 PASS，防 r98 那条空断言）")
+        else:
             fails.append("A5 卡在监听态，未恢复（8s 内 class=recording 未移除）")
 
         v = await page.evaluate("() => window.__voice")
@@ -346,18 +418,23 @@ async def main() -> int:
         ev = v.get("ev", [])
         print("A7 事件序列:", ev)
         if "start" not in ev:
+            legs["A7"] = "FAIL"
             fails.append("A7 识别未真正 start（事件序列=%s）" % ev)
         else:
+            legs["A7"] = "PASS"
             print("A7 PASS  识别已 start")
         blocking = [e for e in ev if e.startswith("error:") and
                     any(k in e for k in ("not-allowed", "service-not-allowed", "audio-capture"))]
         # CI 容器里没有音频输入设备，recognize() 只会回 audio-capture ⇒
         # 那是**环境不具备**、不是产品坏了（本机跑同一条会真断言；权限类错误不适用此降级，见 no_input_device）。
         if blocking and no_input_device(ev):
+            legs["A7"] = "SKIP"
             print("A7  SKIP  本环境无麦克风输入（CI），阻断项仅这类：", blocking)
         elif blocking:
+            legs["A7"] = "FAIL"
             fails.append("A7 阻断性错误（演示当天会直接不可用）: %s" % blocking)
         elif any(e.startswith("error:") for e in ev):
+            legs["A7"] = "NOTE"
             print("A7  NOTE  非阻断错误（假麦克风无声/联网服务）:",
                   [e for e in ev if e.startswith("error:")])
 
@@ -365,22 +442,26 @@ async def main() -> int:
         noise = ("ERR_CONNECTION_REFUSED", "Failed to load resource", "net::")
         real = [e for e in console_errors if not any(n in e for n in noise)]
         if real:
+            legs["A6"] = "FAIL"
             fails.append("A6 console 错误 %d 条: %s" % (len(real), real[:3]))
         else:
+            legs["A6"] = "PASS"
             print("A6 PASS  无 console 错误（已过滤网络探测噪声 %d 条）" % len(console_errors))
 
         # A8/A9/A10：桩化退出态三腿（同一浏览器另开 context，不干扰上面的真机腿）
-        fails.extend(await stub_legs(browser, URL))
+        sfails, slegs = await stub_legs(browser, URL)
+        fails.extend(sfails)
 
         await browser.close()
 
     print()
+    line = voice_verdict(fails, legs, slegs)
     if fails:
-        print("VOICE-FAIL")
+        print(line)
         for f in fails:
             print("  -", f)
         return 1
-    print("VOICE-PASS")
+    print(line)
     return 0
 
 
