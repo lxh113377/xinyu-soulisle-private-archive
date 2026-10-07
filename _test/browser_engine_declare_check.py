@@ -47,8 +47,10 @@ import argparse
 import ast
 import json
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -103,11 +105,47 @@ def imports_browser_engine(tree):
     return False
 
 
-def read_sources(dir_path):
-    """`{文件名: 原文}`，排除 SELF_NAMES。读不到的件登记为 None —— 不许静默消失。"""
+_UNSET = object()
+
+
+def git_tracked(dir_path):
+    """git 跟踪面的 `.py` 文件名集合（= 受理面：CI 与别人 clone 看得到的那一份）。
+
+    立此条的一手代价（r99b）：起点名册 32 件里的 `cors_probe.py` 被 `.gitignore:11` **故意**挡在库外
+    （那行注释原文「含同一 Key（实测 sk- 命中 1 处）」⇒ 它不可入库，密钥红线）。
+    而本件的取数原先读的是**本机目录** ⇒ 同一棵树三种读数：本地「未接 24 / 已接 8 / 名册核对=OK」、
+    CI「未接 23 / 已接 9 / 名册核对=红」、干净克隆 rc=2。机制是 E2b 把"CI 上从不存在的件"
+    读成「已离开分母 = 已接入」，于是这条红在受理面上**永远不可能绿**。
+    通则：**棘轮与名册的分母只能含由 git 决定的量**，含本机手工件的台账不可移植。
+    """
+    r = subprocess.run(["git", "-C", str(dir_path), "ls-files", "--cached"],
+                       capture_output=True, timeout=60)
+    if r.returncode != 0:
+        return None
+    return {l.split("/")[-1] for l in (r.stdout or b"").decode("utf-8", "replace").splitlines()
+            if l.strip() and l.strip().endswith(".py")}
+
+
+def local_only(dir_path, tracked):
+    """在盘但不在跟踪面的件（必须出声列出——本文件在册规矩「不许静默消失」的同族）。"""
+    return sorted(p.name for p in dir_path.glob("*.py")
+                  if p.name not in SELF_NAMES and (tracked is None or p.name not in tracked))
+
+
+def read_sources(dir_path, tracked=_UNSET):
+    """`{文件名: 原文}`，排除 SELF_NAMES。读不到的件登记为 None —— 不许静默消失。
+
+    r99b：默认只收 **git 跟踪面** 的件（`tracked` 未显式传 ⇒ 自己去取 git 面）。
+    `tracked=None`（无 .git / 非仓库）时回落磁盘面，但**主流程必须判 UNVERIFIED**，
+    回落只服务 selftest 的两把尺等价对照，不给生产结论当分母。
+    """
+    if tracked is _UNSET:
+        tracked = git_tracked(dir_path)
     out = {}
     for p in sorted(dir_path.glob("*.py")):
         if p.name in SELF_NAMES:
+            continue
+        if tracked is not None and p.name not in tracked:
             continue
         try:
             out[p.name] = p.read_text(encoding="utf-8")
@@ -139,8 +177,8 @@ def scan_sources(sources):
     return cur, broken
 
 
-def scan_dir(dir_path):
-    return scan_sources(read_sources(dir_path))
+def scan_dir(dir_path, tracked=_UNSET):
+    return scan_sources(read_sources(dir_path, tracked))
 
 
 def launch_sites(dir_path):
@@ -286,13 +324,23 @@ def run_static(baseline, roster_path=None):
     ctx = {sites, cur, wired, roster_ok, adopted, n_un, denom_ok}；`roster_ok=False` 时
     主流程必须 rc=2（名册缺失 ⇒ E2b 失明，不得读成「全部已接入」）。"""
     rows, red = [], []
-    sources = read_sources(TEST_DIR)
+    tracked = git_tracked(TEST_DIR)
+    if tracked is None:
+        rows.append(["口径面（git 跟踪）", "UNVERIFIED",
+                     "git 跟踪面取不到 ⇒ 分母口径未验；**禁止**回落本机磁盘面出结论"
+                     "（回落正是 r99b 修掉的那个缺陷：本机手工件会混进棘轮）"])
+        return rows, red, {"denom_ok": False, "git_face_ok": False}
+    sources = read_sources(TEST_DIR, tracked)
+    off_face = local_only(TEST_DIR, tracked)
     ct = CONTRIB.read_text(encoding="utf-8") if CONTRIB.is_file() else ""
     ok1, miss1 = e1_contrib_declares(ct)
     rows.append(["E1 回退被声明", "PASS" if ok1 else "RED",
                  "四要素齐" if ok1 else "缺=%s" % ",".join(miss1)])
     if not ok1:
         red.append("E1")
+    rows.append(["口径面（git 跟踪）", "PASS",
+                 "分母只含跟踪面 %d 件；本机未入库件已排除 %d 件：%s"
+                 % (len(tracked), len(off_face), "、".join(off_face[:6]) + ("…" if len(off_face) > 6 else "") or "无")])
 
     cur, broken = scan_sources(sources)
     if not cur:
@@ -339,7 +387,8 @@ def run_static(baseline, roster_path=None):
         red.append("E5")
     return rows, red, {"sites": sites, "cur": cur, "sources": sources, "wired": half,
                        "roster_ok": roster_ok, "adopted": adopted, "n_un": n_un,
-                       "denom_ok": True, "roster_n": len(rs["sites"]) if roster_ok else 0}
+                       "denom_ok": True, "git_face_ok": True, "face_excluded": off_face,
+                       "roster_n": len(rs["sites"]) if roster_ok else 0}
 
 
 def run_machine():
@@ -365,6 +414,36 @@ def run_machine():
     return face, "OK（面文件 %s 最近一条一致，label=%s）" % (path, last.get("label"))
 
 
+def _st_portable_face(eq, sites):
+    """r99b 腿：分母与名册只准含 **git 决定** 的量。
+
+    抽成独立函数不是审美：`selftest` 加上这 20 行后函数长 166 > `loc_guard --enforce` 的 150，
+    本仓的行数门当场把提交拦下（LOC-FAIL 点名 `selftest`）——同一族规矩第二次拦我，说明它有牙。
+    """
+    launch_txt = ("from playwright.sync_api import sync_playwright\n\n"
+                  "def m(pw):\n    return pw.chromium.launch()\n")
+    tmp = tempfile.mkdtemp(prefix="r99b-face-")
+    try:
+        tdir = Path(tmp)
+        for nm in ("tracked_a.py", "localonly_b.py"):
+            (tdir / nm).write_text(launch_txt, encoding="utf-8")
+        eq("跟踪面过滤：read_sources 只收跟踪面里的件",
+           sorted(read_sources(tdir, tracked={"tracked_a.py"})), ["tracked_a.py"])
+        eq("排除必须出声：在盘但未入库的件由 local_only 列出（不许静默消失）",
+           local_only(tdir, {"tracked_a.py"}), ["localonly_b.py"])
+        eq("对照腿（防装饰）：不给跟踪面时磁盘两件都在 ⇒ 换面确实改变了分母",
+           sorted(read_sources(tdir, tracked=None)), ["localonly_b.py", "tracked_a.py"])
+        eq("E2b 口径：名册有而跟踪面无 ⇒ 判「文件不在了/改名躲分母」，不得读成已接入",
+           bool(e2b({"localonly_b.py": {"launch_points": 1}}, {"tracked_a.py": {}},
+                    {"tracked_a.py": launch_txt})), True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    eq("真面：git 跟踪面取得到且非空（取不到时主流程判 rc=2，不回落磁盘面）",
+       bool(git_tracked(TEST_DIR)), True)
+    eq("真面回归钉：被 .gitignore 挡住的本机件不得留在分母里（cors_probe 那一族）",
+       "cors_probe.py" in sites, False)
+
+
 def selftest():
     cases = []
 
@@ -384,15 +463,19 @@ def selftest():
     eq("半接入残留只能是 sites 的子集",
        set(wired_names(src_real, sites)) <= set(sites), True)
     # ── r98 新腿①：换尺取证 = 与**被替换掉的旧子串规则**独立复算交叉，不是拿新尺自比新尺 ──
+    # r99b 修正：旧子串那侧也必须走**同一个面**，否则"AST 面（git 跟踪）vs 子串面（本机磁盘）"
+    # 比的不再是两把尺，而是两个分母 —— 那会把本轮刚修的缺陷伪装成"两把尺不等价"。
     ast_face = set(scan_sources(src_real)[0])
 
     def old_substring_face():
+        tr = git_tracked(TEST_DIR)
         return {p.name for p in sorted(TEST_DIR.glob("*.py"))
-                if p.name not in SELF_NAMES
+                if p.name not in SELF_NAMES and (tr is None or p.name in tr)
                 and "chromium.launch(" in p.read_text(encoding="utf-8", errors="replace")}
 
     eq("取数面切换等价：AST 集 ⇄ 旧子串集 对称差为空（两把尺各自独立复算）",
        ast_face ^ old_substring_face(), set())
+    _st_portable_face(eq, sites)
     COMMENT_ONLY = "def f():\n    # chromium.launch( 只是注释\n    pass\n"
     eq("变异体 旧子串规则确实会虚增分母（夹具：注释里写该串的子串面会认）",
        "chromium.launch(" in COMMENT_ONLY, True)
@@ -556,9 +639,11 @@ def write_roster(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--machine", action="store_true", help="真起一次浏览器取本机面（E3/E4）")
-    ap.add_argument("--baseline", type=int, default=24,
-                    help="E2 棘轮上界：仍含裸 chromium.launch 的站点数"
-                         "（r96 立 32 → r98 迁移 8 件后下调到实测余量 24，只降不升）")
+    ap.add_argument("--baseline", type=int, default=23,
+                    help="E2 棘轮上界：仍含裸 chromium.launch 的**跟踪面**站点数"
+                         "（r96 立 32 → r98 迁 8 件后 24 → r99b 分母改取 git 跟踪面，"
+                         "`cors_probe.py` 那类本机未入库件退出分母，实测 23。"
+                         "**这一格降 1 是换口径不是接入进步**，别当成又多迁了一件）")
     ap.add_argument("--json", default="")
     ap.add_argument("--roster", default="", help="覆盖起点名册路径（selftest/演习用）")
     ap.add_argument("--write-roster", action="store_true",
@@ -574,7 +659,10 @@ def main():
 
     rows, red, ctx = run_static(a.baseline, a.roster or None)
     if not ctx.get("denom_ok", True):
-        print("BROWSER-ENGINE-UNVERIFIED: E2 分母为 0（AST 现读没有 launch 站点 ≠ 全部已接入）")
+        print("BROWSER-ENGINE-UNVERIFIED: %s"
+              % ("git 跟踪面取不到 ⇒ 分母口径未验（不回落磁盘面出结论）"
+                 if not ctx.get("git_face_ok", True)
+                 else "E2 分母为 0（AST 现读没有 launch 站点 ≠ 全部已接入）"))
         return 2
     if a.census:
         rs, why = load_roster(a.roster or None)

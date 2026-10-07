@@ -1,8 +1,8 @@
 {
  "written_by": "browser_engine_declare_check.py --write-roster",
  "face": "AST(*.chromium.launch())",
- "site_count": 32,
- "call_points": 62,
+ "site_count": 31,
+ "call_points": 60,
  "sites": {
   "_reshoot_r86.py": {
    "launch_points": 2,
@@ -82,11 +82,6 @@
     "run",
     "selftest"
    ],
-   "imports_be": false
-  },
-  "cors_probe.py": {
-   "launch_points": 2,
-   "defs": [],
    "imports_be": false
   },
   "data_rights_check.py": {
@@ -410,5 +405,6 @@
    ],
    "imports_be": false
   }
- }
+ },
+ "face_note": "r99b：起点保持 r98 迁移动手前的集合，仅摘除 `cors_probe.py` —— 它被 .gitignore:11 故意挡在库外（注释原文「含同一 Key」⇒ 不可入库），留在名册里就等于让受理面（CI/clone）永远背着一件不存在文件的红。**这不是接入进步**：起点 32→31，已接数不变。"
 }

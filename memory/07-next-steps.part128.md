@@ -7,5 +7,10 @@
   `repo_config G12` + `release_governance` 的根是**远端缺 `v1.8.1` tag**（CI 读 `git tag` 读到 v1.8.0；
   干净克隆里有 v1.8.1 时两条同判据当场 PASS），清掉只需 `git push origin v1.8.1`（对外可见，待老大点头）；
   `live_sync` 是 §上面的在册旧红；`measure_entry` 是 live_sync 的下游影子（门面行尾巴「全量体检 rc=1」）；
-  `browser_engine_declare E2b` **未归因**（CI 已接 9 vs 本地 8，同树不同数 ⇒ 复算 annotations）。
+  `browser_engine_declare E2b` **已归因并修完（同日 r99b 续轮）**：上一行写"未归因"是保守误判——
+  `git clone --no-hardlinks` 本地即可逐字复现那句红（根因：起点名册含被 `.gitignore:11` 故意挡在库外的
+  `cors_probe.py`，本机目录面当分母 ⇒ CI 永远背一件不存在的文件，结构性不可能绿）。
+  修法 = 取数面走 `git ls-files` 跟踪面（取不到判 rc=2，禁止回落磁盘面）+ 名册从 `git show HEAD:` 只读重建、
+  只摘那一件（32→31）+ 基线 24→23（**换口径不是接入进步**，已接仍 8）。
+  ⇒ 教训一条：**写"归因不出"之前先跑一次干净克隆**，克隆是免费的。
   ⇒ 本轮口径：**代码面闭环，受理面未闭环**，缺口全部指向「tag 推不推」与「CF 凭据」两件老大专属动作。
