@@ -46,10 +46,11 @@ def jar_shape_leg():
     rc_stub, ok, total, _why = J.selftest_result()
     rc = 0 if (rc_real == 0 and rc_stub == 0) else 1
     facts = "bytes=%s libs=%s" % (r.get("bytes"), r.get("libs", "-"))
-    head = {"PASS": "jar=fat(%s,新于源码)" % facts,
+    head = {"PASS": "jar=fat(%s,fresh=%s)" % (facts, r.get("fresh", "-")),
             "SKIP": "jar=absent(%s⇒未验,不算通过)" % r["reason"],
             "FAIL": "jar=FAIL(%s｜%s)" % (r["reason"], facts)}[r["verdict"]]
-    return rc, "%s 夹具=%d/%d 最新源码=%s" % (head, ok, total, newest)
+    return rc, "%s 夹具=%d/%d 新鲜度=%s｜mtime 提示 %s（不判定）" % (
+        head, ok, total, r.get("fresh_detail", "-")[:52], newest or "-")
 
 
 def main() -> int:
