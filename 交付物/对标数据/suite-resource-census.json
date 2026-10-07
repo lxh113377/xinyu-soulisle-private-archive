@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 132,
+ "suites": 133,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
@@ -51,7 +51,7 @@
    ]
   },
   "free": {
-   "n": 91,
+   "n": 92,
    "seconds": 294.4,
    "members": [
     "disclaimer_forensics",
@@ -144,6 +144,7 @@
     "settle_wait_selftest",
     "timing_coupling",
     "timing_coupling_selftest",
+    "perf_ramp_delta",
     "perf_ramp_delta_selftest"
    ]
   },
@@ -1396,6 +1397,13 @@
    "facets": [
     "browser"
    ],
+   "exclusive": []
+  },
+  {
+   "suite": "perf_ramp_delta",
+   "target": "_test/perf_ramp_delta_check.py",
+   "mode": "real",
+   "facets": [],
    "exclusive": []
   },
   {
