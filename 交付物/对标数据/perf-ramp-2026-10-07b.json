@@ -1,0 +1,148 @@
+{
+ "base": "http://127.0.0.1:8123",
+ "reps": 25,
+ "samples": {
+  "static_index": {
+   "n": 25,
+   "min_ms": 1.4,
+   "p50_ms": 15.9,
+   "p95_ms": 16.2,
+   "max_ms": 16.3
+  },
+  "vendor_js": {
+   "n": 25,
+   "min_ms": 1.9,
+   "p50_ms": 15.0,
+   "p95_ms": 16.5,
+   "max_ms": 16.5
+  },
+  "health": {
+   "n": 25,
+   "min_ms": 1.2,
+   "p50_ms": 15.9,
+   "p95_ms": 16.5,
+   "max_ms": 16.7
+  },
+  "emotion_crisis": {
+   "n": 25,
+   "min_ms": 1.1,
+   "p50_ms": 15.2,
+   "p95_ms": 16.2,
+   "max_ms": 17.2,
+   "llm_used": false,
+   "resp_keys": [
+    "color",
+    "final",
+    "label",
+    "lex",
+    "llm",
+    "path",
+    "secondary"
+   ]
+  },
+  "throughput_health": {
+   "rps": 2935.1,
+   "p95_ms": 3.6,
+   "n": 48
+  }
+ },
+ "budgets": {
+  "static_index": 400.0,
+  "vendor_js": 400.0,
+  "health": 400.0,
+  "emotion_crisis": 400.0
+ },
+ "concurrency": {
+  "single_point_threads": 8,
+  "single_point_requests": 48
+ },
+ "ramp": {
+  "tiers": [
+   8,
+   16,
+   32,
+   64
+  ],
+  "work_per_thread": 4,
+  "budget_s": 60,
+  "result": {
+   "8": {
+    "state": "ok",
+    "health": {
+     "rps": 2598.2,
+     "p95_ms": 3.5,
+     "max_ms": 4.8,
+     "n": 32,
+     "threads": 8
+    },
+    "emotion": {
+     "rps": 2849.5,
+     "p95_ms": 3.2,
+     "max_ms": 3.6,
+     "n": 32,
+     "threads": 8,
+     "llm_used": false
+    },
+    "took_s": 0.01
+   },
+   "16": {
+    "state": "ok",
+    "health": {
+     "rps": 3424.7,
+     "p95_ms": 5.5,
+     "max_ms": 5.7,
+     "n": 64,
+     "threads": 16
+    },
+    "emotion": {
+     "rps": 3115.6,
+     "p95_ms": 4.8,
+     "max_ms": 5.5,
+     "n": 64,
+     "threads": 16,
+     "llm_used": false
+    },
+    "took_s": 0.02
+   },
+   "32": {
+    "state": "ok",
+    "health": {
+     "rps": 2154.4,
+     "p95_ms": 7.0,
+     "max_ms": 23.1,
+     "n": 128,
+     "threads": 32
+    },
+    "emotion": {
+     "rps": 3172.7,
+     "p95_ms": 7.6,
+     "max_ms": 9.5,
+     "n": 128,
+     "threads": 32,
+     "llm_used": false
+    },
+    "took_s": 0.04
+   },
+   "64": {
+    "state": "ok",
+    "health": {
+     "rps": 3039.0,
+     "p95_ms": 8.2,
+     "max_ms": 11.6,
+     "n": 256,
+     "threads": 64
+    },
+    "emotion": {
+     "rps": 2907.4,
+     "p95_ms": 9.7,
+     "max_ms": 16.0,
+     "n": 256,
+     "threads": 64,
+     "llm_used": false
+    },
+    "took_s": 0.09
+   }
+  }
+ },
+ "breach": []
+}

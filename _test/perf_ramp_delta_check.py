@@ -42,7 +42,9 @@ r96 的 8 档与本轮若用了别的档位集，逐档配对会拿 8 比 16。
 import argparse
 import json
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,17 +52,28 @@ DATA = ROOT / "交付物" / "对标数据"
 SELF_NAMES = {"perf_ramp_delta_check.py"}
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 FACES = ("health", "emotion")          # perf_baseline 的 ramp 面就这两条
-# 相对漂移上限。取 40% 的理由：r96 实测同机同档的档内波动本身就有 2368→2041.8 = −13.8%，
-# 而 8→64 之间 −13.8% 与 +28.6% 同时存在 ⇒ 阈值必须宽过**档间噪声**，
-# 否则这把尺天天红；又必须窄于「悄悄劣化一半」（−50%）才不是装饰。
-DEFAULT_TOL_PCT = 40.0
+# 相对漂移上限。**r99 由 40% 改 50%，并把理由换成当轮实测**：
+# 原理由（"r96 实测同机同档波动 2368→2041.8 = −13.8%"）量错了对象 —— 那两个数是**同一次**
+# 运行的 8 档与 16 档，本尺只比同一档位，永远不会拿 8 比 16，所以它不是"档内噪声"的读数。
+# r99 同机静置实测（work=4 连测 5 轮）档内带宽 13.5%~255.8% ⇒ 40% 阈值在仪器噪声带**里面**，
+# 天天会被自己踩穿（同日两份 30 分钟间隔实测最坏 −40.1%，当场判红一次）。
+# 同轮把采集口径提到 work=32 后带宽收到 ≤38.4% ⇒ 50% 有 11.6 个百分点余量。
+# 检测限请如实读：**本尺只能检出 ≥50% 的档内回退**，30% 量级的回退检不出；
+# 想让它看得更细，正解是继续提仪器精度（每档重复取中位数），不是把阈值调小假装看得见。
+DEFAULT_TOL_PCT = 50.0
 FOLD_LIMIT = 110
 
 
-def ledgers():
-    """全部 ramp 台账（按**文件名日期**排序）。刻意不按 mtime —— 见文件头。"""
+def ledgers(data_dir=None):
+    """全部 ramp 台账（按**文件名日期**排序）。刻意不按 mtime —— 见文件头。
+
+    `data_dir` 只给验牙用：变异注入必须打在临时副本上，不许动权威台账
+    （r98 一手代价 = 变异脚本改了 `perf-ramp-2026-10-05.json` 的 mtime，字节虽还原，
+    而那一刻「还原是否真发生」只能靠另取的基准字节证明）。
+    """
+    base = Path(data_dir) if data_dir else DATA
     out = []
-    for p in sorted(DATA.glob("perf-ramp-*.json")):
+    for p in sorted(base.glob("perf-ramp-*.json")):
         if p.name in SELF_NAMES:
             continue
         m = DATE_RE.search(p.stem)
@@ -105,6 +118,34 @@ def load_ramp(p):
         return parse_ramp(json.loads(p.read_text(encoding="utf-8")))
     except Exception:                                      # noqa: BLE001
         return None
+
+
+def meta_of(d):
+    """台账口径：每线程请求数 + 档集。r99 起这两项决定「有没有可比读数」。"""
+    ramp = d.get("ramp") or {}
+    return {"work": ramp.get("work_per_thread"), "tiers": ramp.get("tiers") or []}
+
+
+def load_meta(p):
+    try:
+        return meta_of(json.loads(p.read_text(encoding="utf-8")))
+    except Exception:                                      # noqa: BLE001
+        return {"work": None, "tiers": []}
+
+
+def caliber_gaps(pm, cm):
+    """口径差清单：空 = 可比。
+
+    为什么必须有这条（r99）：`RAMP_WORK` 从 4 提到 32 之后，目录里必然同时存在
+    两种口径的台账。档集相同但每线程请求数不同 ⇒ 两份 rps 不是同一个量，
+    拿它们算"漂移"会造出一个既有读数又判了红的**假证据**。
+    """
+    out = []
+    if pm.get("work") != cm.get("work"):
+        out.append("work_per_thread %s→%s" % (pm.get("work"), cm.get("work")))
+    if sorted(pm.get("tiers") or []) != sorted(cm.get("tiers") or []):
+        out.append("tiers %s→%s" % (pm.get("tiers"), cm.get("tiers")))
+    return out
 
 
 def compare(prev_tiers, cur_tiers, tol_pct):
@@ -230,6 +271,36 @@ def selftest():
     expect("门面行样例 %d 字符 ≤ 截断线 %d" % (len(line), FOLD_LIMIT), len(line) <= FOLD_LIMIT)
     expect("门面行必须自带阈值与棘轮数", ("阈值" in line) and ("比%d档面" % len(r0)) in line)
 
+    # 取数目录腿（r99 加 --dir 的接线回执）：验牙必须在临时副本上打，禁动权威台账。
+    # 同日期两条（`-10-07.json` 与 `-10-07b.json`）按名序排，b 落最后一位 = 本份，
+    # 这是同日噪底测量（两份间隔 ≥30min）能被本尺读成「相邻两份」的前提。
+    tmp = tempfile.mkdtemp(prefix="r99-ramp-")
+    try:
+        for nm in ("perf-ramp-2026-10-07.json", "perf-ramp-2026-10-07b.json"):
+            Path(tmp, nm).write_text(json.dumps(
+                {"ramp": {"result": {"8": {"health": {"rps": 100.0, "p95_ms": 1.0}}}}}),
+                encoding="utf-8")
+        books = ledgers(tmp)
+        expect("--dir 真改变取数面 ⇒ 临时目录两份都读到", len(books) == 2)
+        expect("--dir 下同日期按名序，b 那份是「本份」",
+               len(books) == 2 and books[-1][1].name.endswith("07b.json"))
+        expect("不传 --dir 时取数面仍是权威目录（临时件不得混进默认面）",
+               all("r99-ramp" not in str(p) for _d, p in ledgers()))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # 口径腿（r99）：work 或档集不同 ⇒ 不可比。禁止把两份不同口径的 rps 算成"漂移"，
+    # 那会产出一条**既有读数又判了红的假证据**（比 UNVERIFIED 更坏）。
+    m4 = {"work": 4, "tiers": [8, 16, 32, 64]}
+    m32 = {"work": 32, "tiers": [8, 16, 32, 64]}
+    expect("口径 同 work 同档 ⇒ 零差（可比）", caliber_gaps(m4, dict(m4)) == [])
+    expect("口径 work 4 vs 32 ⇒ 必须报差（旧件与新件不得互比）", bool(caliber_gaps(m4, m32)))
+    expect("口径 档集不同 ⇒ 必须报差", bool(caliber_gaps(m4, {"work": 4, "tiers": [8, 16]})))
+    expect("口径 work 取不到（None）vs 32 ⇒ 报差，不得把缺字段当相等",
+           bool(caliber_gaps({"work": None, "tiers": []}, m32)))
+    expect("口径 meta_of 认台账里的 work_per_thread 键（不是猜默认值）",
+           meta_of({"ramp": {"work_per_thread": 32, "tiers": [8]}})["work"] == 32)
+
     for x in bad:
         print("  不符: " + x)
     print("PERF-RAMP-DELTA-SELFTEST-%s（%d/%d 条）" % ("FAIL" if bad else "PASS", n - len(bad), n))
@@ -244,6 +315,8 @@ def load_ramp_of(d):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tol-pct", type=float, default=DEFAULT_TOL_PCT)
+    ap.add_argument("--dir", default="",
+                    help="台账目录（默认 交付物/对标数据）。验牙/噪底测量指临时副本，禁打权威台账")
     ap.add_argument("--json", default="", help="本轮读数落盘路径（由 perf_baseline_check --ramp 写）")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -252,7 +325,7 @@ def main():
 
     if a.json:
         Path(a.json).write_bytes(Path(a.json).read_bytes())   # 幂等落盘校验：路径必须可读
-    books = ledgers()
+    books = ledgers(a.dir or None)
     if len(books) < 2:
         print("PERF-RAMP-DELTA-UNVERIFIED: 可比台账 %d 份（需 ≥2：上一份 vs 本份）"
               "⇒ 没有「上一轮」就没有漂移可言，既不判绿也不判红" % len(books))
@@ -262,6 +335,12 @@ def main():
     if prev is None or cur is None:
         print("PERF-RAMP-DELTA-UNVERIFIED: %s 不可用（%s）"
               % ("上一份" if prev is None else "本份", prev_p.name if prev is None else cur_p.name))
+        return 2
+    gaps = caliber_gaps(load_meta(prev_p), load_meta(cur_p))
+    if gaps:
+        print("PERF-RAMP-DELTA-UNVERIFIED: 两份台账口径不同（%s）⇒ 不缩档不补插不折算，"
+              "整尺既不判绿也不判红（r99 把采集口径 work 从 4 提到 32，旧件与新件天然不可比）"
+              % "；".join(gaps))
         return 2
     rows, red, nas = compare(prev, cur, a.tol_pct)
     if not rows:

@@ -107,7 +107,11 @@ def main():
                            "localStorage.setItem('peiliao.session.v1','r44-probe');" % BASE)
         try:
             pg.goto(PAGE, wait_until="networkidle")
-            pg.wait_for_timeout(700)
+            # r99：披露语是前端按 cfg 渲染的，等它「渲染出来」（非空）而不是等 700ms。
+            # 等的是有没有，断言的是讲的是不是去向（disclosure_ok）——不是同一个数，
+            # 所以不构成「等自己要证的数」（settle_wait 那条约束）。
+            pg.wait_for_function("() => { const d = document.querySelector('#data-disclosure');"
+                                 " return !!d && d.textContent.trim().length > 0; }", timeout=8000)
             # D1 正向：remote=true
             txt = pg.locator("#data-disclosure").inner_text()
             check("D1a 开远端时披露语讲清去向", disclosure_ok(txt, True), txt[:78])
@@ -168,7 +172,8 @@ def main():
                                  "localStorage.setItem('peiliao.session.v1','r44-local');" % BASE)
             pg2 = ctx2.new_page()
             pg2.goto(PAGE, wait_until="networkidle")
-            pg2.wait_for_timeout(700)
+            pg2.wait_for_function("() => { const d = document.querySelector('#data-disclosure');"
+                                  " return !!d && d.textContent.trim().length > 0; }", timeout=8000)
             txt2 = pg2.locator("#data-disclosure").inner_text()
             ctx2.close()
             check("D1b 关远端时披露语翻回不留服务端", disclosure_ok(txt2, False), txt2[:78])

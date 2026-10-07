@@ -217,8 +217,80 @@ def classify(text, name=""):
                 bucket, note = "C_GUARDED", "读与决策之间隔着完成态等待(%s)" % how
             else:
                 bucket, note = "C1_HARD", "定长→取数→%s 立刻消费" % how
-        recs.append({"file": name, "line": stmt.lineno, "ms": ms, "bucket": bucket, "note": note})
+        recs.append({"file": name, "line": stmt.lineno, "ms": ms, "bucket": bucket, "note": note,
+                     "stmt": norm_stmt(ast.get_source_segment(text, stmt) or "")})
     return recs, total, None
+
+
+def norm_stmt(seg):
+    """语句指纹：取整行的首个物理行、压掉空白差异。评审账锚它，不锚行号。
+
+    为什么不锚行号（本仓在册教训）：行号锚法会让「没改这条的人」也变不了绿——上面任何一次
+    插行都会让存量评审项集体错位，而真实缺陷一个没动。锚语句本体后，改那一条才会翻面。
+    """
+    return " ".join((seg or "").split("\n")[0].split())
+
+
+# 逐件评审台账（r99）。键 = `文件名::语句指纹`，sites = 该形状在现读面里应出现的次数。
+# 口径三条：
+#   mis-wait     等错了 ⇒ 本轮已改成被等对象的完成态（改完该形状从 C1_HARD 消失，棘轮自己降）
+#   shaped-only  形状命中但**没有可等的异步态**（同步 DOM 变更 / 等待对象就是被断言对象）
+#   unobservable 产品没暴露完成态，硬造一个「等」等于替被测对象编造状态 ⇒ 保留定长并记此态
+# 本表只是**读数**：判据仍不猜意图（红只由棘轮产生），未覆盖件走续行出声、不判红。
+REVIEW = {
+    "clean_clone_check.py::pg.wait_for_timeout(2500)": {
+        "verdict": "shaped-only", "sites": 1,
+        "why": "等的是 vendor 三个全局到位，而 C2 断言的就是它 ⇒ 直接换 wait_for_function 会把 "
+               "FAIL 变成 Playwright TimeoutError（电池按 rc 分三态，崩溃不是判红）。"
+               "正解要先把超时折成 check(...,False) 再说，登记 r100"},
+    "memory_recall_check.py::pg.wait_for_timeout(1500)": {
+        "verdict": "shaped-only", "sites": 1,
+        "why": "reload 后清 localStorage 再读播种态，读的是本进程刚写入的确定值，无异步态可等"},
+    "offline_shell_check.py::pg.wait_for_timeout(600)": {
+        "verdict": "shaped-only", "sites": 1,
+        "why": "取数在 evaluate 的 async 体里自带 await fetch，这 600ms 什么都没等（装饰性定长）"},
+    "public_check.py::pg.wait_for_timeout(12000)": {
+        "verdict": "mis-wait", "sites": 1,
+        "why": "形状与 ux_guards U1d 同款（押回复落地）。但公网副本与 src **不同版**风险未证 ⇒ "
+               "改前先证 data-emotion 在公网面存在，否则新等会在公网面造出假红。登记 r100"},
+    "rescan_shots_check.py::pg.wait_for_timeout(2500)": {
+        "verdict": "shaped-only", "sites": 2,
+        "why": "两处分别等 SW 注册生效与离线重载后结构就位，而等的内容就是被断言的内容 ⇒ "
+               "同 clean_clone 那条：先把超时折成 FAIL 才谈改。该件不在电池面（batt=False）"},
+    "rescan_shots_check.py::pg.wait_for_timeout(700)": {
+        "verdict": "shaped-only", "sites": 1,
+        "why": "等 #dlg-settings 打开，而 dlg_open 正是被断言项（同上，改了会把 FAIL 变 CRASH）"},
+    "ux_guards_check.py::pg.wait_for_timeout(6000)": {
+        "verdict": "unobservable", "sites": 1,
+        "why": "45 条连发要等**全部回合**收干，产品没有 pending 回合计数器（实测 grep "
+               "responding|aria-busy|pending src/js 零命中）⇒ 等最后一条落地只证明最后一轮，"
+               "证明不了 45 轮。正解是产品暴露 window.__pendingTurns，属产品面改动，另轮做"},
+    "ux_guards_check.py::pg.wait_for_timeout(800)": {
+        "verdict": "shaped-only", "sites": 1,
+        "why": "展开是 chat-window.js 同步 insertBefore，800ms 押的是同步变更；而可等的完成态"
+               "（首条内容变了）就是被断言项"},
+}
+
+
+def review_gap(rows, review=None):
+    """C1_HARD ⇄ 评审账 双向对账。返回 (覆盖数, 未评审清单, 陈旧/数目不符清单)。纯函数。
+
+    第三项含两种形态：账里有而现读没有（锚点陈旧，多为该形状已被改掉），
+    以及指纹对得上但 sites 与现读条数不等（漏登记，或同形状重复出现没记数）。
+    """
+    review = REVIEW if review is None else review
+    need = {}
+    for r in rows:
+        if r["bucket"] != "C1_HARD":
+            continue
+        k = "%s::%s" % (r["file"], r.get("stmt") or "")
+        need[k] = need.get(k, 0) + 1
+    missing = sorted(k for k in need if k not in review)
+    mismatched = ["%s（现读 %d 条，账记 sites=%s）" % (k, need[k], review[k].get("sites"))
+                  for k in sorted(review) if k in need and review[k].get("sites") != need[k]]
+    stale = ["%s（账里有，现读无此形状 ⇒ 锚点陈旧或该件已被改掉）" % k
+             for k in sorted(review) if k not in need]
+    return sum(v for k, v in need.items() if k in review), missing, mismatched + stale
 
 
 def blocks_next(blk, idx):
@@ -374,6 +446,30 @@ def selftest():
     # 超线的部分在受理面上**根本不存在**，于是「基线/恒等式/C1 计数」全丢，
     # 本件在 CI 上只剩一个 PASS 词 —— 正是本仓在册教训 r40b，只是发生在自己身上。
     # 断言调的是 `face_line`（真生成器），不是字面量 ⇒ 改生成代码它会红。
+    # 评审账腿（r99）：台账与现读面必须双向对得上，否则「已评审」与「没人看过」不可区分。
+    fake = [{"file": "a.py", "bucket": "C1_HARD", "stmt": "pg.wait_for_timeout(500)"},
+            {"file": "b.py", "bucket": "POLL", "stmt": "pg.wait_for_timeout(9000)"}]
+    okk = "a.py::pg.wait_for_timeout(500)"
+    cov, mis, st = review_gap(fake, {okk: {"verdict": "shaped-only", "sites": 1}})
+    expect("评审账 覆盖齐 ⇒ 零未评审零对账差", cov == 1 and not mis and not st)
+    cov2, mis2, _s2 = review_gap(fake, {})
+    expect("反例 账清空 ⇒ 该件列为未评审（不得静默）", cov2 == 0 and mis2 == [okk])
+    _c3, _m3, st3 = review_gap(fake, {okk: {"verdict": "x", "sites": 7}})
+    expect("反例 sites 记 7 而现读 1 ⇒ 必须报对账差", bool(st3) and "sites=7" in st3[0])
+    _c4, _m4, st4 = review_gap([], {"ghost.py::pg.wait_for_timeout(9)": {"verdict": "x", "sites": 1}})
+    expect("反例 账里有而现读无 ⇒ 锚点陈旧必须点名（防台账变只增不减的坟场）", bool(st4))
+    cov5, _m5, _s5 = review_gap(fake, {okk: {"verdict": "x", "sites": 1},
+                                       "b.py::pg.wait_for_timeout(9000)": {"verdict": "y", "sites": 1}})
+    expect("口径腿 非 C1_HARD 的形状不进覆盖数（POLL 那条不得替评审账凑数）", cov5 == 1)
+    # 指纹稳定性：同一语句换行号必须仍是同一个键（锚行号的账会在别人插行时集体错位）
+    moved = [{"file": "a.py", "bucket": "C1_HARD", "stmt": "pg.wait_for_timeout(500)", "line": 99}]
+    expect("指纹腿 行号变了键不变（评审账不锚行号）", review_gap(moved, {okk: {"sites": 1}})[0] == 1)
+    # 真面自证：拿现读面跑一遍，账必须既无未评审也无陈旧（这条红了就是本轮台账没跟上树）
+    rrows, _rt, _rb, _ru, _ri = scan_dir(TEST_DIR)
+    rcov, rmis, rstale = review_gap(rrows)
+    expect("真面 现读 C1_HARD %d 件全部有评审结论（缺 %s）" % (rcov, rmis[:2]), not rmis)
+    expect("真面 评审账与现读逐键等值（对不上 %s）" % (rstale[:2],), not rstale)
+
     RANKED = [("ux_guards_check.py", 7), ("rescan_shots_check.py", 3), ("data_rights_check.py", 2),
               ("clean_clone_check.py", 1), ("memory_recall_check.py", 1),
               ("offline_shell_check.py", 1), ("public_check.py", 1)]
@@ -400,8 +496,10 @@ def selftest():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--baseline", type=int, default=28,
-                    help="C1_HARD 棘轮上界（r98 取实测值钉住，只降不升）")
+    ap.add_argument("--baseline", type=int, default=9,
+                    help="C1_HARD 棘轮上界（只降不升）。r98 建尺实测 16 却把上界写成 28 —— "
+                         "help 原文「取实测值钉住」与磁盘不符；r99 改掉 7 处误等后现读 9，"
+                         "基线随之 28→9（余量清零才是本意：留 19 的空档等于给新增误等发通行证）")
     ap.add_argument("--only", default="", help="逗号分隔的文件名子集（定位/演习用）")
     ap.add_argument("--json", default="")
     ap.add_argument("--selftest", action="store_true")
@@ -425,9 +523,22 @@ def main():
         return 2
     hard = c["C1_HARD"]
     hard_bat = sum(1 for r in rows if r["bucket"] == "C1_HARD" and r.get("in_battery"))
+    # 评审账合并进记录（写进 --json 台账），判据本身仍不猜意图：这里只是把**人工结论**挂在形状上。
+    for r in rows:
+        if r["bucket"] == "C1_HARD":
+            ent = REVIEW.get("%s::%s" % (r["file"], r.get("stmt") or ""))
+            r["verdict"] = ent["verdict"] if ent else None
+    covered, unreviewed, stale = review_gap(rows)
     red = []
     if hard > a.baseline:
         red.append("C1_HARD %d > 基线 %d" % (hard, a.baseline))
+    # 评审账完整性也是红（r99 新挂）：形状普查只报数，评审结论若没有责任方，
+    # 下一轮就无法区分「已评审并判定保留」与「没人看过」。两类红因分开点名。
+    if unreviewed:
+        red.append("C1_HARD 未登记评审结论 %d 处：%s"
+                   % (len(unreviewed), "、".join(unreviewed[:3]) + ("…" if len(unreviewed) > 3 else "")))
+    if stale:
+        red.append("评审账与现读对不上 %d 项（首条：%s）" % (len(stale), stale[0][:70]))
     if broken:
         red.append("SYNTAX %d 件" % len(broken))
     if unreadable:
@@ -454,13 +565,23 @@ def main():
         print("  - 红因=" + ",".join(red))
     if spill:
         print("  - C1_HARD 分布(门面行已满): " + "，".join(spill[:14]))
+    vd = {}
+    for r in rows:
+        if r["bucket"] == "C1_HARD" and r.get("verdict"):
+            vd[r["verdict"]] = vd.get(r["verdict"], 0) + 1
+    print("  - 逐件评审账(r99): 覆盖 %d/%d 件（%s）"
+          % (covered, hard, "，".join("%s=%d" % kv for kv in sorted(vd.items())) or "空"))
+    for s in stale[:6]:
+        print("  - 评审账对不上: " + s)
     if a.json:
         Path(a.json).write_bytes(json.dumps(
             {"baseline": a.baseline, "total_calls": total_calls, "files": files_with,
              "buckets": c, "c1_hard_battery": hard_bat, "red": red,
              "grep_face_note": "grep 面为 142 处/31 件（含注释与 docstring），本尺取 AST 面",
              "battery_face": "取到" if in_battery is not None else "未取到",
-             "worst": top, "records": rows}, ensure_ascii=False, indent=1).encode("utf-8"))
+             "worst": top, "review": {"covered": covered, "c1_hard": hard,
+                                      "missing": unreviewed, "stale": stale},
+             "records": rows}, ensure_ascii=False, indent=1).encode("utf-8"))
     return 1 if red else 0
 
 

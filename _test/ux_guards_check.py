@@ -22,6 +22,31 @@ sys.stdout.reconfigure(encoding="utf-8")
 BASE = "http://127.0.0.1:8123/index.html"
 results = []
 
+# r99（C1_HARD 逐件评审的产物）：一次往返的**完成态**用「身份」而不是「计数」或「中间态」判定。
+# 两次失败各证一种错法：
+#   ① `data-emotion 计数 > 基线` —— U2e 等满 15s：窗口化从 #chat-log **顶部**裁旧气泡，
+#      展开后再发一条时总数是下降的，「+1」是要等一个不会发生的形状。
+#   ② 等「最后一条是 user 气泡」（本轮已入列）—— 等满 8s：离线模板 ~3ms 就回完，
+#      中间态在第一次轮询之前已经过去，等的是转瞬即逝的态而不是终态。
+# 现写法：mark_turn() 在点提交前给**当时**最后一条气泡盖章（新气泡不可能带这个章），
+# wait_reply() 再等「最后一条带 data-emotion 且没有章」。app.js:224-227 在同一个不中断的
+# 同步块里 push 正式气泡并紧接着调 Voice.speak()，所以该终态对「speak 已发生」是充分的。
+TURN_MARK_JS = """() => { const m = document.querySelectorAll('#chat-log .msg');
+  const last = m[m.length - 1]; if (last) last.setAttribute('data-r99-prev', '1'); }"""
+TURN_DONE_JS = """() => { const m = document.querySelectorAll('#chat-log .msg');
+  const last = m[m.length - 1];
+  return !!last && last.hasAttribute('data-emotion') && !last.hasAttribute('data-r99-prev'); }"""
+
+
+def mark_turn(pg):
+    """点提交**之前**调用：给当时的最后一条气泡做身份记号。"""
+    pg.evaluate(TURN_MARK_JS)
+
+
+def wait_reply(pg, timeout=15000):
+    """点提交**之后**调用：等新 AI 气泡成为最后一条（真完成态，非猜的毫秒数）。"""
+    pg.wait_for_function(TURN_DONE_JS, timeout=timeout)
+
 
 def check(name, ok, detail=""):
     results.append((name, bool(ok), detail))
@@ -53,7 +78,9 @@ def u1(browser):
         localStorage.removeItem('peiliao.speak.v1');
         localStorage.removeItem('peiliao.history.v1'); localStorage.removeItem('peiliao.emotions.v1'); }""")
     pg.reload(wait_until="networkidle")
-    pg.wait_for_timeout(400)
+    # r99：原 `wait_for_timeout(400)` 押的是注入脚本落地时刻。`window.__tts` 由
+    # add_init_script 在文档起始就建，等的就是这个标记本身（不是被断言的计数）。
+    pg.wait_for_function("() => !!window.__tts", timeout=5000)
     supported = pg.evaluate("() => !!window.__tts && !window.__tts.unsupported")
     if not supported:
         check("U1a 浏览器不支持 TTS 时按钮应隐藏",
@@ -65,21 +92,26 @@ def u1(browser):
     check("U1a 朗读按钮存在", pg.evaluate(f"() => !!document.querySelector('{btn}')"))
     before = pg.get_attribute(btn, "aria-pressed")
     pg.click(btn)
-    pg.wait_for_timeout(150)
-    check("U1b 点击后 aria-pressed 翻转", pg.get_attribute(btn, "aria-pressed") != before,
-          f"{before} -> {pg.get_attribute(btn, 'aria-pressed')}")
+    # r99：三处 `wait_for_timeout` 换成被等对象的完成态（aria-pressed 翻面 / 本轮回复落地）。
+    pg.wait_for_function("(v) => document.getElementById('btn-speak')"
+                         ".getAttribute('aria-pressed') !== v", arg=before, timeout=5000)
+    now = pg.get_attribute(btn, "aria-pressed")
+    check("U1b 点击后 aria-pressed 翻转", now != before, f"{before} -> {now}")
     check("U1c 开关已持久化", pg.evaluate("() => localStorage.getItem('peiliao.speak.v1')") == "1")
     pg.fill("#chat-input", "今天有点低落")
+    mark_turn(pg)
     pg.click("#chat-form button[type=submit]")
-    pg.wait_for_timeout(3000)
+    wait_reply(pg)
     t = pg.evaluate("() => window.__tts")
     check("U1d 开启后新回复真的构造并提交了语音", t["constructed"] >= 1 and t["spoken"] >= 1, str(t))
     pg.click(btn)                                    # 关闭
-    pg.wait_for_timeout(150)
+    pg.wait_for_function("(v) => document.getElementById('btn-speak')"
+                         ".getAttribute('aria-pressed') !== v", arg=now, timeout=5000)
     c2 = pg.evaluate("() => window.__tts.constructed")
     pg.fill("#chat-input", "再说一句试试")
+    mark_turn(pg)
     pg.click("#chat-form button[type=submit]")
-    pg.wait_for_timeout(3000)
+    wait_reply(pg)
     c3 = pg.evaluate("() => window.__tts.constructed")
     check("U1e 关闭后不再朗读（关得掉）", c3 == c2, f"constructed {c2} -> {c3}")
     check("U1f 全程无 JS 异常", not errs, str(errs[:2]))
@@ -120,8 +152,11 @@ def u2(browser):
           f"{dom} -> {dom2}")
     # 展开是「临时查看」：再发一条消息必须把窗口收回默认档，否则 DOM 上界形同虚设
     pg.fill("#chat-input", "再来一句：还是有点低落")
+    mark_turn(pg)
     pg.click("#chat-form button[type=submit]")
-    pg.wait_for_timeout(3500)
+    # r99：等这条回复真正落地。被断言的 dom3（.msg 总数 ≤60）与等待量（最后一条是不是新的 AI 气泡）
+    # 不是同一个数，所以不构成「等自己要证的数」。
+    wait_reply(pg)
     dom3 = pg.evaluate("() => document.querySelectorAll('#chat-log .msg').length")
     check("U2e 新消息后窗口收回默认上界", dom3 <= 60, f"展开后 {dom2} -> 发新消息后 {dom3}")
     check("U2f 全程无 JS 异常", not errs, str(errs[:2]))

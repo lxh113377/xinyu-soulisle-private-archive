@@ -291,8 +291,13 @@ SUITES = [
     #   与 ledger_age 同族：记了读数却从不问它相对上一轮变了什么。
     #   只比**同一档位**的相邻两份台账；档集不同 ⇒ 逐档 NA，不缩档不补插不取平均。
     #   「上一份」按文件名日期取（不按 mtime —— 那正是 ledger_age 实测踩过的翻面点）。
-    #   ⚠️ 目前只有一份 ramp 台账 ⇒ 主流程恒回 rc=2 UNVERIFIED（**不判绿也不判红**）：
-    #   这是诚实态而非坏态，第二份台账由 perf_baseline_check --ramp 落盘时自动变成可比。
+    #   更正注 r99：本块原文两句在册表述被实测否证 ——
+    #     ① 「主流程要网络与起服务，不适合整跑」：`perf_ramp_delta_check.py` 的取数面是
+    #        `交付物/对标数据/perf-ramp-*.json` 两份落盘件，零网络零起服务（实测 2s 回 rc=2）；
+    #     ② 「第二份由 perf_baseline_check --ramp 落盘时自动变成可比」：--json 路径由人工给，
+    #        没有任何自动日期命名（唯一命名纪律出处是 docs/PERF-BASELINE.md）。
+    #   ⇒ 主流程已接进电池（本块下一条），132→133。台账不足两份时它诚实回 rc=2，不判绿不判红。
+    ("perf_ramp_delta", [sys.executable, "_test/perf_ramp_delta_check.py"]),
     ("perf_ramp_delta_selftest", [sys.executable, "_test/perf_ramp_delta_check.py", "--selftest"]),
 ]
 

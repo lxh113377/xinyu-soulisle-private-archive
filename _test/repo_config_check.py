@@ -174,6 +174,30 @@ def git_index_scripts():
             if p.strip()}
 
 
+def count_provenance_problems(doc_text):
+    """G16 第四段（r99）：文档里的 `--selftest N 条` 必须带**责任方标记**，否则红。
+
+    立此条的一手代价（r98 §3#5 登记、r99 落地）：`ledger_age` 那行文档写着 `--selftest 27 条`，
+    实测 32 条，漂了一整个轮次**没有任何门看得见** —— 因为条数的权威值在脚本自己印的那一行，
+    文档抄件没有机器责任方（G16 旧三面只核「脚本名在不在」，从不核条数）。
+
+    为什么不是「禁止文档出现条数」：本仓规矩是**被推翻的原文要留着加更正注**（R236 白名单排除法），
+    一刀切禁数字会逼作者把历史删掉或把话写得没人能核对。所以只要求二选一：
+      ① 指针形态「条数由脚本自己印 / 本行不抄数」（正解，先例见本文件 r90 那两行）；
+      ② 保留具体值但标明它是**哪一日的快照**（含「当日值」），读者才知道它不是现状。
+    口径限制（如实登记）：判据取**整行**为窗口，同行只要有标记就算过 —— 本文件的行都是几百字
+    一行的长行，按字符窗口切会把「同句无标记、别句有标记」误判成红，制造没人能修的假红。
+    """
+    bad = []
+    for i, line in enumerate((doc_text or "").splitlines(), 1):
+        if not re.search(r"(?:--selftest|selftest|判据桩)[^\n]{0,10}?(\d+)\s*条", line, re.I):
+            continue
+        if not re.search(r"(当日值|条数由脚本自己印|本行不抄数)", line):
+            bad.append("第 %d 行抄了 selftest 条数却没标责任方：%s"
+                       % (i, line.strip()[:52] + "…"))
+    return bad
+
+
 def gate_doc_audit(scripts, doc_text, on_disk, tracked=None):
     """G16 纯函数：电池脚本 ⇄ docs/quality-gates.md ⇄ git 三面双向对账。
 
@@ -205,6 +229,7 @@ def gate_doc_audit(scripts, doc_text, on_disk, tracked=None):
         if untracked:
             bad.append("电池登记了而 git 未跟踪（在盘上但没入库，CI 与发布面读不到）%d 条：%s"
                        % (len(untracked), "、".join(untracked[:6]) + ("…" if len(untracked) > 6 else "")))
+    bad += count_provenance_problems(doc_text)
     return bad
 
 
@@ -1154,8 +1179,23 @@ def _st_mut_b(bad):
     # 篡改⑭：版本断言三源对账（r35 一手实证 —— ROADMAP 停在 v1.3.0 而 tag/pom 已是 1.4.0）
 
 
+def _st_g16_count_legs(bad, real_doc):
+    """㉑h-j（r99 第四段）文档里的 `--selftest N 条` 必须挂责任方标记。"""
+    inj = real_doc + "\npython _test/x_marker_check.py  # `--selftest` 9 条\n"
+    if not count_provenance_problems(inj):
+        bad.append("篡改㉑h（注入一条无责任方的 `--selftest 9 条`）未被抓到 ⇒ 抄件仍可隐形")
+    now = count_provenance_problems(real_doc)
+    if now:
+        bad.append("篡改㉑i（当前真实文档）被判红 ⇒ 标记口径过严：%s" % now[0][:56])
+    stripped = re.sub(r"（[^（）]*当日值[^（）]*）", "", real_doc)
+    if stripped == real_doc:
+        bad.append("㉑j 文档里找不到任何责任方标记 ⇒ 第四段没有可对照的正样本，腿形同虚设")
+    elif not count_provenance_problems(stripped):
+        bad.append("㉑j 抹掉全部标记后仍零报 ⇒ 腿认的不是标记（真面漂了也不会红）")
+
+
 def _st_g16_git_face(bad, real_scripts, real_doc, real_disk):
-    """㉑e-g（r99）G16 第三面 git index 的三条腿。
+    """㉑e-j（r99）G16 新增两面：git index 第三面 + 文档条数责任方标记。
 
     抽成独立函数的原因不是美观：`_st_mut_c` 加这 10 行后函数长 160 > `loc_guard --enforce`
     的 150 上限，本仓的行数门当场把我拦下（LOC-FAIL 点名 `_st_mut_c`）。
@@ -1174,6 +1214,7 @@ def _st_g16_git_face(bad, real_scripts, real_doc, real_disk):
         if bool(want) != bool(got):
             bad.append("㉑g 第三腿读数与独立现算的未跟踪集不一致（现算 %d 条，判据报 %d 行）"
                        "⇒ 它解析的不是 index 面" % (len(want), len(got)))
+    _st_g16_count_legs(bad, real_doc)
 
 
 def _st_mut_c(bad, n_all, ex0):
