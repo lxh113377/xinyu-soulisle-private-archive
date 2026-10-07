@@ -16,7 +16,7 @@ jobs:
           python-version: "3.11"
       - name: 装判据第三方依赖（单一清单；漏装会让 job 以 rc=2 报"环境异常"，本地装了看不出来）
         run: pip install -r _test/requirements.txt
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
       # 语法层先过一遍：r28 的教训是聚合器自己写了条只有 Python 3.12 (PEP 701) 能解析的
@@ -84,7 +84,7 @@ jobs:
           python-version: "3.11"
       - name: 装判据第三方依赖（单一清单；漏装会让 job 以 rc=2 报"环境异常"，本地装了看不出来）
         run: pip install -r _test/requirements.txt
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
       - name: mvn verify（覆盖率门绑在 verify 相位；写成 package 就等于没装这道门，r75）
