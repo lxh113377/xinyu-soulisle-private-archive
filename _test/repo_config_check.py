@@ -164,14 +164,30 @@ def battery_scripts():
     return {p.split("/")[-1] for p in re.findall(r'"_test/([^"]+?\.(?:py|js))"', seg)}
 
 
-def gate_doc_audit(scripts, doc_text, on_disk):
-    """G16 纯函数：电池脚本 ⇄ docs/quality-gates.md 双向对账。
+def git_index_scripts():
+    """git index 面的 `_test/` 脚本名；取不到返回 None（该腿未验，不是通过）。"""
+    r = subprocess.run(["git", "-C", str(ROOT), "ls-files", "--cached", "--", "_test"],
+                       capture_output=True, timeout=60)
+    if r.returncode != 0:
+        return None
+    return {p.split("/")[-1] for p in (r.stdout or b"").decode("utf-8", "replace").splitlines()
+            if p.strip()}
+
+
+def gate_doc_audit(scripts, doc_text, on_disk, tracked=None):
+    """G16 纯函数：电池脚本 ⇄ docs/quality-gates.md ⇄ git 三面双向对账。
 
     立此条的实证（r57）：`docs/quality-gates.md` 头部写着「本文件不抄数」，所以**数字**没骗人，
     但它是 README 迁出去的"判据体系明细"，读者（含下一轮的我）会当成清单来读 —— 实测 44 条
     非 selftest 套件里 **16 条从未出现在其中**（perf_baseline / j2 / j4 / offline_shell / …），
     且这条盲区存活了 15 轮无人报警。同族根因仍是 M5⑥：**同一个清单有两处实现**。
     零分母不得判绿（R247）：取不到任何电池脚本 = 解析失效，不是"没有判据"。
+
+    第三面（r99 一手补）：磁盘与文档两面都在、**唯独从未 `git add`** 的判据，前两条腿谁都看不见。
+    实证 = r98 报告把 `timing_coupling_check.py` / `perf_ramp_delta_check.py` 标 ✅，而
+    `git ls-tree -r HEAD` 对这两个名字 0 命中 ⇒ 远端 CI 跑的那套判据里没有它们，本地三绿照旧。
+    取 index 面（`git ls-files --cached`）不取 HEAD 面：HEAD 面会让"把这些文件补进第一笔提交"
+    这个动作本身被自己拦住（钩子在提交前跑，那时 HEAD 还没有它们）。
     """
     bad = []
     if not scripts:
@@ -184,6 +200,11 @@ def gate_doc_audit(scripts, doc_text, on_disk):
     ghost = sorted(n for n in named if n not in on_disk)
     if ghost:
         bad.append("quality-gates 写了而 `_test/` 查无此件：%s" % "、".join(ghost))
+    if tracked is not None:
+        untracked = sorted(s for s in scripts if s not in tracked)
+        if untracked:
+            bad.append("电池登记了而 git 未跟踪（在盘上但没入库，CI 与发布面读不到）%d 条：%s"
+                       % (len(untracked), "、".join(untracked[:6]) + ("…" if len(untracked) > 6 else "")))
     return bad
 
 
@@ -1133,6 +1154,28 @@ def _st_mut_b(bad):
     # 篡改⑭：版本断言三源对账（r35 一手实证 —— ROADMAP 停在 v1.3.0 而 tag/pom 已是 1.4.0）
 
 
+def _st_g16_git_face(bad, real_scripts, real_doc, real_disk):
+    """㉑e-g（r99）G16 第三面 git index 的三条腿。
+
+    抽成独立函数的原因不是美观：`_st_mut_c` 加这 10 行后函数长 160 > `loc_guard --enforce`
+    的 150 上限，本仓的行数门当场把我拦下（LOC-FAIL 点名 `_st_mut_c`）。
+    """
+    if not gate_doc_audit(real_scripts, real_doc, real_disk, set()):
+        bad.append("篡改㉑e（真电池配空 git index）未被抓到 ⇒ 「在盘未入库」这一态仍隐形（r98 两把尺的原事故）")
+    if gate_doc_audit(real_scripts, real_doc, real_disk, real_scripts):
+        bad.append("篡改㉑f（git 面 ⊇ 电池全集）被判红 ⇒ 第三腿过严，第一次接真面就误伤")
+    real_tracked = git_index_scripts()
+    if not real_tracked:
+        bad.append("㉑g git index 面取不到或为空 ⇒ 第三腿本轮未验，不得把「没报红」当「验过」")
+    else:
+        want = [s for s in real_scripts if s not in real_tracked]
+        got = [l for l in gate_doc_audit(real_scripts, real_doc, real_disk, real_tracked)
+               if "git 未跟踪" in l]
+        if bool(want) != bool(got):
+            bad.append("㉑g 第三腿读数与独立现算的未跟踪集不一致（现算 %d 条，判据报 %d 行）"
+                       "⇒ 它解析的不是 index 面" % (len(want), len(got)))
+
+
 def _st_mut_c(bad, n_all, ex0):
     """r94：由 `selftest` 后段下移（含收尾打印与退出码）。
 
@@ -1207,6 +1250,7 @@ def _st_mut_c(bad, n_all, ex0):
         bad.append("篡改㉑c（文档引用不存在的判据脚本）未被抓到 ⇒ 反向腿失效")
     if not gate_doc_audit(set(), real_doc, real_disk):
         bad.append("篡改㉑d（分母取空）被判绿 ⇒ 违 R247 零命中不得判绿")
+    _st_g16_git_face(bad, real_scripts, real_doc, real_disk)
     # ㉔ G19 docs 索引双向对账：正向不误伤 + 抹链接必红 + 幽灵引文必红 + 空分母不得判绿
     dn_real = sorted(p.name for p in (ROOT / "docs").iterdir() if p.is_file()) \
         if (ROOT / "docs").exists() else []
@@ -1334,9 +1378,13 @@ def _cfg_head():
           f"run_all_suites.py 实测 {n} | README 声称 {s_claim}")
     scripts = battery_scripts()
     on_disk = {p.name for p in (ROOT / "_test").iterdir() if p.is_file()}
-    g16bad = gate_doc_audit(scripts, _read("docs/quality-gates.md"), on_disk)
-    check("G16 电池脚本 ⇄ quality-gates 明细双向对账（漏登/幽灵登都红）", not g16bad,
-          f"电池脚本 {len(scripts)} 条（分母从 SUITES 现读）| " + (" ; ".join(g16bad) or "全部在册"))
+    tracked = git_index_scripts()
+    g16bad = gate_doc_audit(scripts, _read("docs/quality-gates.md"), on_disk, tracked)
+    check("G16 电池脚本 ⇄ quality-gates 明细 ⇄ git index 三面双向对账（漏登/幽灵登/未入库皆红）",
+          not g16bad,
+          f"电池脚本 {len(scripts)} 条（分母从 SUITES 现读）| git index 面 "
+          f"{len(tracked) if tracked is not None else '取不到 ⇒ 第三腿未验'} 条 | "
+          + (" ; ".join(g16bad) or "全部在册"))
     pom, tag = pom_version(), latest_tag()
     docs_text = {name: (ROOT / name).read_text("utf-8", errors="replace")
                  for name in ("ROADMAP.md", "README.md") if (ROOT / name).exists()}

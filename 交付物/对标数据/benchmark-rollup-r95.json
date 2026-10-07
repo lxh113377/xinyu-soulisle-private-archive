@@ -3,7 +3,7 @@
   "dim_a_testing_repro": {
     "self": {
       "face": "git HEAD",
-      "regression_suites": 129,
+      "regression_suites": 132,
       "java_test_files": 11,
       "java_test_cases": 88,
       "jacoco_minimum": {
@@ -50,7 +50,7 @@
   "dim_b_zero_build_cost": {
     "self_cost": {
       "face": "git HEAD",
-      "regression_suites": 129,
+      "regression_suites": 132,
       "java_test_files": 11,
       "java_test_cases": 88,
       "jacoco_minimum": {

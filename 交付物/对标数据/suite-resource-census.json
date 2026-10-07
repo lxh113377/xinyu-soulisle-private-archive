@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 129,
+ "suites": 132,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
@@ -51,7 +51,7 @@
    ]
   },
   "free": {
-   "n": 88,
+   "n": 91,
    "seconds": 294.4,
    "members": [
     "disclaimer_forensics",
@@ -141,7 +141,10 @@
     "browser_engine_declare",
     "browser_engine_declare_selftest",
     "issue_probe_selftest",
-    "settle_wait_selftest"
+    "settle_wait_selftest",
+    "timing_coupling",
+    "timing_coupling_selftest",
+    "perf_ramp_delta_selftest"
    ]
   },
   "jar8123+port:18123": {
@@ -1373,6 +1376,31 @@
   {
    "suite": "settle_wait_selftest",
    "target": "_test/settle_wait.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "timing_coupling",
+   "target": "_test/timing_coupling_check.py",
+   "mode": "real",
+   "facets": [
+    "browser"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "timing_coupling_selftest",
+   "target": "_test/timing_coupling_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "perf_ramp_delta_selftest",
+   "target": "_test/perf_ramp_delta_check.py",
    "mode": "stub",
    "facets": [],
    "exclusive": []

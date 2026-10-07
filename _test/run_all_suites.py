@@ -274,6 +274,26 @@ SUITES = [
     #   且本轮已实测同轮 burst 重采会撞 GitHub secondary rate limit），只入零网络的判定桩。
     ("issue_probe_selftest", [sys.executable, "_test/peer_issue_response_probe.py", "--selftest"]),
     ("settle_wait_selftest", [sys.executable, "_test/settle_wait.py", "--selftest"]),
+    # r98：「判据把成败押在机器时刻上」这一族的普查尺。立因是 r96 连吃两条同根 CI 红
+    #   （j4_memory 定长 8s 押落库时刻 / data_rights 快照⇄导出跨时刻），当时把两处升到
+    #   settle_wait 公共件——但**同一个类还剩多少处没人普查**，而「修类不修例」要求普查。
+    #   本件只断言可 AST 判定的**形状**（定长等待→紧接取数→该数被决策消费），不断言意图；
+    #   红只由棘轮产生（C1_HARD > 基线），即它自称的是「这个形状还剩多少处」不是「这些是 bug」。
+    #   分母取 AST 面而非 grep 面：grep 多出的 2 处在注释/docstring 里，按 grep 钉基线
+    #   等于给尺埋「改注释就翻面」的假红（门面行同时印两个读数）。
+    #   ⚠️ 门面行必须 ≤110 字符（run_all_suites 的 line[:110]）：超线的部分在受理面上不存在，
+    #   第一版 187 字符 ⇒ 基线/恒等式/C1 计数全丢，这条已由 selftest 的 face_line 腿钉住。
+    ("timing_coupling", [sys.executable, "_test/timing_coupling_check.py"]),
+    ("timing_coupling_selftest", [sys.executable, "_test/timing_coupling_check.py", "--selftest"]),
+    # r98：阶梯并发的**漂移**尺。r96 跑出了 8/16/32/64 四档曲线并写下「无塌方点」，
+    #   但那条曲线当时只有一个点 ⇒「漂移」在 r96 之后无人量过，且地板（rps≥50、p95≤400ms）
+    #   只防塌方**不防悄悄劣化**（rps 2368→900 仍全在地板之上，判据一声不响）。
+    #   与 ledger_age 同族：记了读数却从不问它相对上一轮变了什么。
+    #   只比**同一档位**的相邻两份台账；档集不同 ⇒ 逐档 NA，不缩档不补插不取平均。
+    #   「上一份」按文件名日期取（不按 mtime —— 那正是 ledger_age 实测踩过的翻面点）。
+    #   ⚠️ 目前只有一份 ramp 台账 ⇒ 主流程恒回 rc=2 UNVERIFIED（**不判绿也不判红**）：
+    #   这是诚实态而非坏态，第二份台账由 perf_baseline_check --ramp 落盘时自动变成可比。
+    ("perf_ramp_delta_selftest", [sys.executable, "_test/perf_ramp_delta_check.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），

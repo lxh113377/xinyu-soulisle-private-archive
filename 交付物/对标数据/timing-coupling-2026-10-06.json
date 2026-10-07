@@ -1,0 +1,1077 @@
+{
+ "baseline": 28,
+ "total_calls": 131,
+ "files": 29,
+ "buckets": {
+  "C1_HARD": 16,
+  "C_GUARDED": 0,
+  "READ_NO_DECIDE": 29,
+  "NEXT_NO_READ": 49,
+  "POLL": 25,
+  "LAST": 9,
+  "VARLEN": 3
+ },
+ "c1_hard_battery": 13,
+ "red": [],
+ "grep_face_note": "grep 面为 142 处/31 件（含注释与 docstring），本尺取 AST 面",
+ "battery_face": "取到",
+ "worst": {
+  "clean_clone_check.py": 1,
+  "data_rights_check.py": 2,
+  "memory_recall_check.py": 1,
+  "offline_shell_check.py": 1,
+  "public_check.py": 1,
+  "rescan_shots_check.py": 3,
+  "ux_guards_check.py": 7
+ },
+ "records": [
+  {
+   "file": "_reshoot_r86.py",
+   "line": 35,
+   "ms": 700,
+   "bucket": "LAST",
+   "note": "本块最后一条，后面没有取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 42,
+   "ms": null,
+   "bucket": "VARLEN",
+   "note": "定长实参不是字面整数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 82,
+   "ms": 2000,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 93,
+   "ms": 2500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 98,
+   "ms": 2000,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 117,
+   "ms": 2000,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 119,
+   "ms": 800,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 129,
+   "ms": 3000,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 132,
+   "ms": 3500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 65,
+   "ms": 11000,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 71,
+   "ms": 900,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 73,
+   "ms": 1200,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 141,
+   "ms": 11000,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "_reshoot_r86.py",
+   "line": 143,
+   "ms": 900,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "a11y_check.py",
+   "line": 196,
+   "ms": 500,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "a11y_check.py",
+   "line": 199,
+   "ms": 700,
+   "bucket": "LAST",
+   "note": "本块最后一条，后面没有取数",
+   "in_battery": true
+  },
+  {
+   "file": "a11y_check.py",
+   "line": 332,
+   "ms": 600,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "a11y_check.py",
+   "line": 208,
+   "ms": 1500,
+   "bucket": "LAST",
+   "note": "本块最后一条，后面没有取数",
+   "in_battery": true
+  },
+  {
+   "file": "a11y_check.py",
+   "line": 211,
+   "ms": 500,
+   "bucket": "LAST",
+   "note": "本块最后一条，后面没有取数",
+   "in_battery": true
+  },
+  {
+   "file": "a11y_check.py",
+   "line": 368,
+   "ms": 1200,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "a11y_check.py",
+   "line": 214,
+   "ms": 500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "a11y_check.py",
+   "line": 216,
+   "ms": 900,
+   "bucket": "LAST",
+   "note": "本块最后一条，后面没有取数",
+   "in_battery": true
+  },
+  {
+   "file": "backup_online_check.py",
+   "line": 54,
+   "ms": 3500,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "backup_online_check.py",
+   "line": 62,
+   "ms": 4000,
+   "bucket": "LAST",
+   "note": "本块最后一条，后面没有取数",
+   "in_battery": true
+  },
+  {
+   "file": "backup_online_check.py",
+   "line": 89,
+   "ms": 2000,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "backup_online_check.py",
+   "line": 78,
+   "ms": 1200,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 34,
+   "ms": 800,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 47,
+   "ms": 3000,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 57,
+   "ms": 3000,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 64,
+   "ms": 1500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 70,
+   "ms": 2500,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 75,
+   "ms": 500,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 78,
+   "ms": 600,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 98,
+   "ms": 1800,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 100,
+   "ms": 2000,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 93,
+   "ms": 250,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "browser_check.py",
+   "line": 114,
+   "ms": 800,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "clean_clone_check.py",
+   "line": 165,
+   "ms": 2500,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→check 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "context_budget_check.py",
+   "line": 153,
+   "ms": 2200,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "context_budget_check.py",
+   "line": 158,
+   "ms": 1800,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "context_budget_check.py",
+   "line": 174,
+   "ms": 200,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "data_rights_check.py",
+   "line": 110,
+   "ms": 700,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→check 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "data_rights_check.py",
+   "line": 152,
+   "ms": 600,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "data_rights_check.py",
+   "line": 171,
+   "ms": 700,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→check 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "demo_video_pipeline.py",
+   "line": 202,
+   "ms": 800,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "demo_video_pipeline.py",
+   "line": 106,
+   "ms": null,
+   "bucket": "VARLEN",
+   "note": "定长实参不是字面整数",
+   "in_battery": false
+  },
+  {
+   "file": "demo_video_pipeline.py",
+   "line": 139,
+   "ms": 400,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": false
+  },
+  {
+   "file": "demo_video_pipeline.py",
+   "line": 146,
+   "ms": 560,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": false
+  },
+  {
+   "file": "demo_video_pipeline.py",
+   "line": 161,
+   "ms": 400,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": false
+  },
+  {
+   "file": "demo_video_pipeline.py",
+   "line": 172,
+   "ms": 3500,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": false
+  },
+  {
+   "file": "demo_video_pipeline.py",
+   "line": 112,
+   "ms": 400,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": false
+  },
+  {
+   "file": "demo_video_pipeline.py",
+   "line": 126,
+   "ms": 600,
+   "bucket": "LAST",
+   "note": "本块最后一条，后面没有取数",
+   "in_battery": false
+  },
+  {
+   "file": "emotion_wiring_check.py",
+   "line": 162,
+   "ms": 300,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "emotion_wiring_check.py",
+   "line": 176,
+   "ms": 600,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "entry_reach_check.py",
+   "line": 185,
+   "ms": 450,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": false
+  },
+  {
+   "file": "fault_injection_check.py",
+   "line": 354,
+   "ms": 2200,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "headers_csp_check.py",
+   "line": 271,
+   "ms": 500,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "headers_csp_check.py",
+   "line": 281,
+   "ms": 3000,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "headers_csp_check.py",
+   "line": 305,
+   "ms": 250,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "headers_csp_check.py",
+   "line": 323,
+   "ms": 200,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "headers_csp_check.py",
+   "line": 359,
+   "ms": 250,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "j2_chat_contract.py",
+   "line": 46,
+   "ms": 600,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "j2_chat_contract.py",
+   "line": 50,
+   "ms": 10000,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "j4_memory_check.py",
+   "line": 50,
+   "ms": 800,
+   "bucket": "LAST",
+   "note": "本块最后一条，后面没有取数",
+   "in_battery": true
+  },
+  {
+   "file": "j4_memory_check.py",
+   "line": 93,
+   "ms": 3500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "j4_memory_check.py",
+   "line": 101,
+   "ms": 10000,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "j4_remote_down_check.py",
+   "line": 63,
+   "ms": 800,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "j4_remote_down_check.py",
+   "line": 69,
+   "ms": 2500,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "lightshow_check.py",
+   "line": 89,
+   "ms": 900,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "lightshow_check.py",
+   "line": 145,
+   "ms": 800,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "lightshow_check.py",
+   "line": 156,
+   "ms": 500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "lightshow_check.py",
+   "line": 161,
+   "ms": 320,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "lightshow_check.py",
+   "line": 165,
+   "ms": 6400,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "lightshow_check.py",
+   "line": 169,
+   "ms": 900,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "lightshow_check.py",
+   "line": 173,
+   "ms": 400,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "lightshow_check.py",
+   "line": 187,
+   "ms": 700,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "lightshow_check.py",
+   "line": 193,
+   "ms": 700,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "memory_recall_check.py",
+   "line": 176,
+   "ms": 250,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "memory_recall_check.py",
+   "line": 201,
+   "ms": 2200,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "memory_recall_check.py",
+   "line": 204,
+   "ms": 900,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "memory_recall_check.py",
+   "line": 207,
+   "ms": 1800,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "memory_recall_check.py",
+   "line": 215,
+   "ms": 1500,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→append 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "memory_recall_check.py",
+   "line": 222,
+   "ms": 1500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "memory_recall_check.py",
+   "line": 229,
+   "ms": 1500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "mobile_check.py",
+   "line": 235,
+   "ms": 250,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "offline_shell_check.py",
+   "line": 269,
+   "ms": 600,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→check 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "offline_shell_check.py",
+   "line": 200,
+   "ms": 400,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "online_check.py",
+   "line": 42,
+   "ms": 400,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "pixel_dual_check.py",
+   "line": 49,
+   "ms": 300,
+   "bucket": "LAST",
+   "note": "本块最后一条，后面没有取数",
+   "in_battery": true
+  },
+  {
+   "file": "pixel_dual_check.py",
+   "line": 110,
+   "ms": 800,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "pixel_dual_check.py",
+   "line": 134,
+   "ms": 700,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "pixel_dual_check.py",
+   "line": 141,
+   "ms": 1800,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "pixel_dual_check.py",
+   "line": 139,
+   "ms": 2200,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  },
+  {
+   "file": "public_check.py",
+   "line": 46,
+   "ms": 12000,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "public_check.py",
+   "line": 52,
+   "ms": 12000,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→if 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "public_check.py",
+   "line": 59,
+   "ms": 8000,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "public_check.py",
+   "line": 31,
+   "ms": 2600,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "public_check.py",
+   "line": 33,
+   "ms": 2500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "rescan_shots_check.py",
+   "line": 48,
+   "ms": 2500,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→ck 立刻消费",
+   "in_battery": false
+  },
+  {
+   "file": "rescan_shots_check.py",
+   "line": 69,
+   "ms": 2500,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→ck 立刻消费",
+   "in_battery": false
+  },
+  {
+   "file": "rescan_shots_check.py",
+   "line": 82,
+   "ms": 1500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "rescan_shots_check.py",
+   "line": 84,
+   "ms": 700,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→ck 立刻消费",
+   "in_battery": false
+  },
+  {
+   "file": "rescan_shots_check.py",
+   "line": 64,
+   "ms": 400,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots.py",
+   "line": 17,
+   "ms": 2000,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots.py",
+   "line": 19,
+   "ms": 600,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots.py",
+   "line": 23,
+   "ms": 1200,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots.py",
+   "line": 25,
+   "ms": 500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots.py",
+   "line": 28,
+   "ms": 800,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots_online.py",
+   "line": 18,
+   "ms": 6000,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots_online.py",
+   "line": 20,
+   "ms": 400,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots_online.py",
+   "line": 24,
+   "ms": 12000,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots_online.py",
+   "line": 26,
+   "ms": 400,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots_resubmit.py",
+   "line": 21,
+   "ms": 1500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots_resubmit.py",
+   "line": 26,
+   "ms": 8000,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots_resubmit.py",
+   "line": 29,
+   "ms": 12000,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "screenshots_resubmit.py",
+   "line": 31,
+   "ms": 400,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": false
+  },
+  {
+   "file": "storage_resilience_check.py",
+   "line": 151,
+   "ms": null,
+   "bucket": "VARLEN",
+   "note": "定长实参不是字面整数",
+   "in_battery": true
+  },
+  {
+   "file": "storage_resilience_check.py",
+   "line": 176,
+   "ms": 600,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "storage_resilience_check.py",
+   "line": 210,
+   "ms": 700,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "stream_contract.py",
+   "line": 121,
+   "ms": 500,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "stream_contract.py",
+   "line": 124,
+   "ms": 14000,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "ux_guards_check.py",
+   "line": 56,
+   "ms": 400,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→if 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "ux_guards_check.py",
+   "line": 68,
+   "ms": 150,
+   "bucket": "READ_NO_DECIDE",
+   "note": "取到数但本块内没被决策消费",
+   "in_battery": true
+  },
+  {
+   "file": "ux_guards_check.py",
+   "line": 74,
+   "ms": 3000,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→check 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "ux_guards_check.py",
+   "line": 78,
+   "ms": 150,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→check 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "ux_guards_check.py",
+   "line": 82,
+   "ms": 3000,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→check 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "ux_guards_check.py",
+   "line": 99,
+   "ms": 400,
+   "bucket": "NEXT_NO_READ",
+   "note": "下一条不取数",
+   "in_battery": true
+  },
+  {
+   "file": "ux_guards_check.py",
+   "line": 103,
+   "ms": 6000,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→check 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "ux_guards_check.py",
+   "line": 116,
+   "ms": 800,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→check 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "ux_guards_check.py",
+   "line": 124,
+   "ms": 3500,
+   "bucket": "C1_HARD",
+   "note": "定长→取数→check 立刻消费",
+   "in_battery": true
+  },
+  {
+   "file": "ux_guards_check.py",
+   "line": 137,
+   "ms": 600,
+   "bucket": "POLL",
+   "note": "在循环体里（轮询形状）",
+   "in_battery": true
+  }
+ ]
+}
