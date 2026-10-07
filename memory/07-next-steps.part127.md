@@ -31,6 +31,9 @@ r98 报告已含八维表四板块。报告 = `交付物/对标分析报告-2026
    （否则 FAIL 变 CRASH，违三态纪律；现读面 `python _test/timing_coupling_check.py --json …` 的 records 可指认）
 ④ 产品暴露 `window.__pendingTurns`，替掉 `ux_guards` 的 6000ms（评审账里唯一 `unobservable`）
 ⑤ 确认 r99 两笔推送后 CI 的 133 套件真执行位都在（`gh run view --json jobs`，不信管道 rc）
+⑥ **r99b 新发现**：`preflight` 在 CI 判红靠的是 `jar mtime < 源码 mtime`——runner 上两者由检出/构建写入
+   顺序决定，与代码新旧无关（本机绿只是我恰好后打 jar）。正解＝新鲜度改由 git 决定的量
+   （jar 内嵌 `git rev`/build stamp ⇄ `git describe`），复算：`gh run view 37655652607 --log-failed | grep preflight`
 
 ## P0（永不为空）
 
