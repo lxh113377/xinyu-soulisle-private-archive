@@ -53,6 +53,12 @@ xinyu:
     # 建连超时保持与聊天链路同一个值（10s）——本轮只收紧「分类腿的请求级超时」，
     # 不动任何既有建连预算，避免把 chat 的行为一起改掉。
     connect-timeout-s: ${XINYU_EMOTION_CONNECT_TIMEOUT_S:10}
+    # 三级路由（2026-10-08）：lexicon=旧双路原样；auto=危机短路→词典/模型共识→分歧升LLM→词典兜底。
+    # model-url 留空 = 本地模型腿整体关闭，auto 行为与旧双路完全一致（零配置零变化）。
+    # 共识语义结构性永不倒退：一致时 fin=词典读数；分歧离线落词典；分歧在线与旧「分歧采信 LLM」逐字同。
+    route: ${XINYU_EMOTION_ROUTE:auto}
+    model-url: ${XINYU_EMOTION_MODEL_URL:}
+    model-timeout-ms: ${XINYU_EMOTION_MODEL_TIMEOUT_MS:1500}
   eval:
     # 评测集权威源在项目 _test/ 下（不复制进 jar，避免造第二份副本）
     dataset: ${XINYU_EVAL_DATASET:./_test/emotion-eval-dataset.json}

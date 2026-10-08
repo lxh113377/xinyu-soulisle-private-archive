@@ -197,4 +197,132 @@ class EmotionClassifierTest {
                 .thenReturn(new LlmProxy.Result(200, upstreamContent("{\"emotion\":\"calm\"}")));
         assertEquals(0.5, clf.classify("今天天气不错").fin().intensity(), 1e-9, "intensity 缺失同样取 0.5");
     }
+
+    // ------------------------------------------------------------------
+    // 三级路由（2026-10-08）：危机短路永不概率化；本地模型高置信采信、低置信升级。
+    // 旧双路语义由上面既有用例钉住（兼容构造器 route=lexicon），这里只测新增分支。
+    // ------------------------------------------------------------------
+
+    /** 本地模型桩：默认可用、高置信；用 Mockito 便于断言「哪些腿被调用/零调用」 */
+    private static ModelProxy modelMock(String emotion, double confidence) {
+        ModelProxy m = org.mockito.Mockito.mock(ModelProxy.class);
+        org.mockito.Mockito.when(m.enabled()).thenReturn(true);
+        org.mockito.Mockito.when(m.classify(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(new ModelProxy.Verdict(emotion, 0.7, confidence));
+        return m;
+    }
+
+    private static LlmProxy llmMock(boolean hasKey, String emotion, boolean fail) {
+        LlmProxy llm = org.mockito.Mockito.mock(LlmProxy.class);
+        org.mockito.Mockito.when(llm.hasKey()).thenReturn(hasKey);
+        if (fail) {
+            org.mockito.Mockito.when(llm.call(org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any()))
+                    .thenThrow(new IllegalStateException("upstream down"));
+        } else {
+            org.mockito.Mockito.when(llm.call(org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any()))
+                    .thenReturn(new LlmProxy.Result(200, upstreamContent(
+                            "{\"emotion\":\"" + emotion + "\",\"intensity\":0.9}")));
+        }
+        return llm;
+    }
+
+    @Test
+    @DisplayName("auto+危机短路：本地模型与 LLM 都零调用（安全边界永不概率化）")
+    void autoCrisisSkipsBothModels() {
+        ModelProxy model = modelMock("sadness", 0.99);
+        LlmProxy llm = llmMock(true, "sadness", false);
+        EmotionClassifier clf = new EmotionClassifier(llm, model, 8000, "auto");
+        EmotionClassifier.Outcome o = clf.classify("感觉活着好累，不想活了");
+        assertEquals("词典·危机拦截", o.path());
+        assertNull(o.model());
+        assertNull(o.llm());
+        org.mockito.Mockito.verifyNoInteractions(model, llm);
+    }
+
+    @Test
+    @DisplayName("auto+词典模型共识：双证据采信，fin 取词典读数，LLM 零调用")
+    void autoConsensusUsesLexiconVerdict() {
+        // 「明天要答辩，紧张得睡不着」词典读数 = fear ⇒ 模型也回 fear 即共识
+        ModelProxy model = modelMock("fear", 0.92);
+        LlmProxy llm = llmMock(true, "fear", false);
+        EmotionClassifier clf = new EmotionClassifier(llm, model, 8000, "auto");
+        EmotionClassifier.Outcome o = clf.classify("明天要答辩，紧张得睡不着");
+        assertEquals("词典+模型共识（conf=0.92）", o.path());
+        assertEquals("fear", o.fin().emotion());
+        assertEquals(o.lex().intensity(), o.fin().intensity(), 1e-9, "共识时强度口径取词典读数");
+        assertEquals(0.92, o.model().confidence(), 1e-9, "模型置信度留证据链");
+        org.mockito.Mockito.verify(llm, org.mockito.Mockito.never())
+                .call(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("auto+分歧：词典裁决不改判，LLM 零调用（在线实测分歧升 LLM 会倒退，已否决）")
+    void autoDisagreementAdjudicatedByLexicon() {
+        // 词典对这句读数 = sadness ⇒ 模型回 fear 构成分歧
+        ModelProxy model = modelMock("fear", 0.55);
+        LlmProxy llm = llmMock(true, "sadness", false);
+        EmotionClassifier clf = new EmotionClassifier(llm, model, 8000, "auto");
+        EmotionClassifier.Outcome o = clf.classify("保研名单里没有我");
+        assertEquals("词典与模型分歧 → 词典裁决", o.path());
+        assertEquals(o.lex().emotion(), o.fin().emotion(), "分歧时 fin 必须取词典读数");
+        assertEquals("fear", o.model().emotion(), "模型腿分歧信号留在证据链里");
+        assertNull(o.llm());
+        org.mockito.Mockito.verify(llm, org.mockito.Mockito.never())
+                .call(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("auto+分歧+离线：同为词典裁决（在线离线行为恒等）")
+    void autoDisagreementOfflineSameAsOnline() {
+        ModelProxy model = modelMock("love", 0.60);
+        LlmProxy llm = llmMock(false, "love", true);
+        EmotionClassifier clf = new EmotionClassifier(llm, model, 8000, "auto");
+        EmotionClassifier.Outcome o = clf.classify("论文被拒了三次，心里特别难过");
+        assertEquals("词典与模型分歧 → 词典裁决", o.path());
+        assertEquals("sadness", o.fin().emotion());
+        assertNull(o.llm());
+    }
+
+    @Test
+    @DisplayName("auto+本地模型失败（null）：落回原双路，标签与旧语义逐字一致")
+    void autoModelDownFallsBackToLegacy() {
+        ModelProxy model = org.mockito.Mockito.mock(ModelProxy.class);
+        org.mockito.Mockito.when(model.enabled()).thenReturn(true);
+        org.mockito.Mockito.when(model.classify(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(null);
+        // 词典对这句的读数是 sadness ⇒ LLM 回 joy 才触发「分歧」分支
+        LlmProxy llm = llmMock(true, "joy", false);
+        EmotionClassifier clf = new EmotionClassifier(llm, model, 8000, "auto");
+        EmotionClassifier.Outcome o = clf.classify("论文被拒了三次，心里特别难过");
+        assertEquals("词典+LLM 分歧 → 采信 LLM", o.path());
+        assertNull(o.model(), "本地腿没出结果，model 字段必须为 null");
+        assertEquals("joy", o.fin().emotion());
+    }
+
+    @Test
+    @DisplayName("route=lexicon：本地模型可用也整体关停（演示切换与回归对照）")
+    void lexiconRouteDisablesModel() {
+        ModelProxy model = modelMock("fear", 0.99);
+        LlmProxy llm = llmMock(false, "fear", true);
+        EmotionClassifier clf = new EmotionClassifier(llm, model, 8000, "lexicon");
+        EmotionClassifier.Outcome o = clf.classify("明天要答辩，紧张得睡不着");
+        assertEquals("仅词典（离线）", o.path());
+        org.mockito.Mockito.verifyNoInteractions(model);
+    }
+
+    @Test
+    @DisplayName("兼容构造器（双参）：内部隐含 route=lexicon + 空 ModelProxy ⇒ 行为与引入前逐字节一致")
+    void legacyConstructorStaysLexicon() {
+        EmotionClassifier clf = new EmotionClassifier(llmMock(false, "fear", true), 8000);
+        EmotionClassifier.Outcome o = clf.classify("论文被拒了三次，心里特别难过");
+        assertEquals("仅词典（离线）", o.path());
+        assertNull(o.model());
+        assertNull(o.llm());
+    }
 }

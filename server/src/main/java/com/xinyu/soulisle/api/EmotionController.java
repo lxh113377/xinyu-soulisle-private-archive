@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xinyu.soulisle.engine.EmotionClassifier;
 import com.xinyu.soulisle.engine.EmotionEngine;
 import com.xinyu.soulisle.engine.EmotionLexicon;
+import com.xinyu.soulisle.engine.ModelProxy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -63,6 +64,7 @@ public class EmotionController {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("lex", lexJson(lex));
+        body.put("model", o.model() == null ? null : modelVerdictJson(o.model()));
         body.put("llm", o.llm() == null ? null : verdictJson(o.llm()));
         body.put("final", verdictJson(o.fin()));
         body.put("path", o.path());
@@ -197,6 +199,15 @@ public class EmotionController {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("emotion", v.emotion());
         m.put("intensity", v.intensity());
+        return m;
+    }
+
+    /** 本地模型腿比 LLM 腿多带一个 confidence（softmax top-1），证据标签要展示它 */
+    private Map<String, Object> modelVerdictJson(ModelProxy.Verdict v) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("emotion", v.emotion());
+        m.put("intensity", v.intensity());
+        m.put("confidence", v.confidence());
         return m;
     }
 
