@@ -1,0 +1,348 @@
+{
+ "repos": {
+  "lobehub/lobehub": {
+   "tier": "A",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "apps/auth/package.json",
+     "apps/cli/package.json",
+     "apps/desktop/package.json",
+     "apps/desktop/src/main/package.json"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 4,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "SillyTavern/SillyTavern": {
+   "tier": "A",
+   "tree": {
+    "a11y_named": 1,
+    "named_samples": [
+     "public/scripts/a11y.js"
+    ],
+    "manifests": [
+     "package.json",
+     "plugins/package.json",
+     "src/electron/package.json",
+     "tests/package.json"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 4,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "tier": "B",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "pyproject.toml",
+     "requirements-bilibili.txt",
+     "requirements.txt"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 3,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "morettt/my-neuro": {
+   "tier": "B",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "docs/package.json",
+     "electron-installer/package.json",
+     "live-2d/mcp/package.json",
+     "live-2d/package.json"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 4,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "letta-ai/letta-code": {
+   "tier": "D",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "package.json",
+     "python/pyproject.toml"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 2,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "hello-diana/MASCOT": {
+   "tier": "C",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "pyproject.toml"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 1,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "ddxfish/sapphire": {
+   "tier": "C",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "core/setup.py",
+     "install/requirements-minimal.txt",
+     "install/requirements-stt.txt",
+     "install/requirements-tts.txt"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 4,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "v2rockets/Loyal-Elephie": {
+   "tier": "C",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "backend/requirements.txt",
+     "frontend/package.json"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 2,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "tier": "C",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "requirements.txt"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 1,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "Lum1104/MER-Factory": {
+   "tier": "D",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "docs/guide/Gemfile",
+     "docs/package.json",
+     "requirements.txt"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 3,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "CheaperjamRen/leemo": {
+   "tier": "C",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "bundled-skills/default-enabled/baoyu-format-markdown/scripts/package.json",
+     "bundled-skills/default-enabled/baoyu-markdown-to-html/scripts/package.json",
+     "bundled-skills/default-enabled/baoyu-url-to-markdown/scripts/package.json",
+     "bundled-skills/optional/baoyu-post-to-wechat/scripts/package.json"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 4,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "NJX-njx/opensoul": {
+   "tier": "C",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "extensions/bluebubbles/package.json",
+     "extensions/copilot-proxy/package.json",
+     "extensions/diagnostics-otel/package.json",
+     "extensions/discord/package.json"
+    ],
+    "jvm_manifests": [
+     "apps/android/app/build.gradle.kts",
+     "apps/android/build.gradle.kts"
+    ]
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 4,
+   "jvm_manifests": [
+    "apps/android/app/build.gradle.kts",
+    "apps/android/build.gradle.kts"
+   ],
+   "dep_status": "ok"
+  },
+  "s-nagaev/chibi": {
+   "tier": "C",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "pyproject.toml",
+     "requirements-dev.txt",
+     "requirements.txt"
+    ],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 3,
+   "jvm_manifests": [],
+   "dep_status": "ok"
+  },
+  "29-Cu/succhia": {
+   "tier": "C",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [],
+    "jvm_manifests": []
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 0,
+   "jvm_manifests": [],
+   "dep_status": "not_applicable(无通用清单)"
+  },
+  "zeroa234/ryza-ai-revive": {
+   "tier": "C",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [
+     "desktop/package.json"
+    ],
+    "jvm_manifests": [
+     "android/app/build.gradle",
+     "android/build.gradle"
+    ]
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 1,
+   "jvm_manifests": [
+    "android/app/build.gradle",
+    "android/build.gradle"
+   ],
+   "dep_status": "ok"
+  },
+  "Bwcx-songyu/MoodChat": {
+   "tier": "C",
+   "tree": {
+    "a11y_named": 0,
+    "named_samples": [],
+    "manifests": [],
+    "jvm_manifests": [
+     "pom.xml"
+    ]
+   },
+   "readme": {},
+   "deps": [],
+   "dep_err": [],
+   "manifest_count": 0,
+   "jvm_manifests": [
+    "pom.xml"
+   ],
+   "dep_status": "not_applicable(仅 JVM 清单)"
+  },
+  "__self__": {
+   "tree": {
+    "a11y_named": 10,
+    "named_samples": [
+     "_test/__pycache__/a11y_check.cpython-312.pyc",
+     "_test/__pycache__/peer_a11y_probe.cpython-312.pyc",
+     "_test/a11y_check.py",
+     "_test/peer_a11y_probe.py"
+    ],
+    "manifests": [
+     "_test/requirements.txt",
+     "deploy/cloudbase/functions/chat/package.json"
+    ],
+    "jvm_manifests": [
+     "server/pom.xml"
+    ]
+   },
+   "readme": {
+    "a11y_claim": "5 处｜样本 '无障碍'"
+   },
+   "deps": [],
+   "dep_err": [],
+   "dep_status": "ok",
+   "manifest_count": 2,
+   "jvm_manifests": [
+    "server/pom.xml"
+   ]
+  }
+ },
+ "blind": [],
+ "denominator": 16,
+ "usable": 16,
+ "ts": "2026-10-07T20:10:28Z"
+}

@@ -1,0 +1,255 @@
+{
+ "base": "http://127.0.0.1:8123",
+ "reps": 25,
+ "samples": {
+  "static_index": {
+   "n": 25,
+   "min_ms": 1.0,
+   "p50_ms": 15.4,
+   "p95_ms": 16.3,
+   "max_ms": 24.9
+  },
+  "vendor_js": {
+   "n": 25,
+   "min_ms": 1.7,
+   "p50_ms": 14.8,
+   "p95_ms": 27.4,
+   "max_ms": 28.0
+  },
+  "health": {
+   "n": 25,
+   "min_ms": 0.5,
+   "p50_ms": 15.3,
+   "p95_ms": 16.1,
+   "max_ms": 16.1
+  },
+  "emotion_crisis": {
+   "n": 25,
+   "min_ms": 0.5,
+   "p50_ms": 15.0,
+   "p95_ms": 16.0,
+   "max_ms": 16.1,
+   "llm_used": false,
+   "resp_keys": [
+    "color",
+    "final",
+    "label",
+    "lex",
+    "llm",
+    "path",
+    "secondary"
+   ]
+  },
+  "throughput_health": {
+   "rps": 3518.9,
+   "p95_ms": 2.8,
+   "n": 48
+  }
+ },
+ "budgets": {
+  "static_index": 400.0,
+  "vendor_js": 400.0,
+  "health": 400.0,
+  "emotion_crisis": 400.0
+ },
+ "concurrency": {
+  "single_point_threads": 8,
+  "single_point_requests": 48
+ },
+ "ramp": {
+  "tiers": [
+   8,
+   16,
+   32,
+   64
+  ],
+  "work_per_thread": 32,
+  "reps_per_tier": 5,
+  "warmup_per_tier": 1,
+  "budget_s": 240,
+  "worst_band_pct": 80.7,
+  "result": {
+   "8": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 4622.4,
+     "p95_ms": 2.3,
+     "max_ms": 3.3,
+     "threads": 8,
+     "n": 256,
+     "band_rps": 1.1,
+     "reps_rps": [
+      4610.2,
+      4644.6,
+      4622.4,
+      4593.7,
+      4633.8
+     ]
+    },
+    "emotion": {
+     "rps": 4341.4,
+     "p95_ms": 2.5,
+     "max_ms": 7.2,
+     "threads": 8,
+     "n": 256,
+     "band_rps": 35.9,
+     "reps_rps": [
+      3284.5,
+      4455.2,
+      4337.7,
+      4464.6,
+      4341.4
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 0.71
+   },
+   "16": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 4296.9,
+     "p95_ms": 5.5,
+     "max_ms": 8.8,
+     "threads": 16,
+     "n": 512,
+     "band_rps": 64.2,
+     "reps_rps": [
+      4623.7,
+      4466.5,
+      4296.9,
+      3104.4,
+      2815.7
+     ]
+    },
+    "emotion": {
+     "rps": 4006.2,
+     "p95_ms": 5.8,
+     "max_ms": 14.0,
+     "threads": 16,
+     "n": 512,
+     "band_rps": 80.7,
+     "reps_rps": [
+      4513.9,
+      4358.2,
+      4006.2,
+      2497.6,
+      2731.6
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 1.68
+   },
+   "32": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 2823.5,
+     "p95_ms": 17.0,
+     "max_ms": 28.9,
+     "threads": 32,
+     "n": 1024,
+     "band_rps": 10.4,
+     "reps_rps": [
+      2784.8,
+      2823.5,
+      2694.5,
+      2948.6,
+      2974.6
+     ]
+    },
+    "emotion": {
+     "rps": 2799.1,
+     "p95_ms": 17.1,
+     "max_ms": 24.8,
+     "threads": 32,
+     "n": 1024,
+     "band_rps": 8.3,
+     "reps_rps": [
+      2795.6,
+      2747.2,
+      2974.7,
+      2799.1,
+      2836.9
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 4.37
+   },
+   "64": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 2866.2,
+     "p95_ms": 33.8,
+     "max_ms": 55.7,
+     "threads": 64,
+     "n": 2048,
+     "band_rps": 13.5,
+     "reps_rps": [
+      2628.7,
+      2686.5,
+      2866.2,
+      2984.0,
+      2920.7
+     ]
+    },
+    "emotion": {
+     "rps": 2722.3,
+     "p95_ms": 34.4,
+     "max_ms": 56.2,
+     "threads": 64,
+     "n": 2048,
+     "band_rps": 10.9,
+     "reps_rps": [
+      2578.4,
+      2590.9,
+      2859.6,
+      2820.1,
+      2722.3
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 8.94
+   }
+  }
+ },
+ "breach": []
+}

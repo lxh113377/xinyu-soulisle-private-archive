@@ -1,0 +1,255 @@
+{
+ "base": "http://127.0.0.1:8123",
+ "reps": 25,
+ "samples": {
+  "static_index": {
+   "n": 25,
+   "min_ms": 1.3,
+   "p50_ms": 1.7,
+   "p95_ms": 21.2,
+   "max_ms": 21.5
+  },
+  "vendor_js": {
+   "n": 25,
+   "min_ms": 1.9,
+   "p50_ms": 15.4,
+   "p95_ms": 27.5,
+   "max_ms": 28.0
+  },
+  "health": {
+   "n": 25,
+   "min_ms": 1.2,
+   "p50_ms": 15.4,
+   "p95_ms": 16.2,
+   "max_ms": 16.4
+  },
+  "emotion_crisis": {
+   "n": 25,
+   "min_ms": 0.9,
+   "p50_ms": 12.8,
+   "p95_ms": 16.3,
+   "max_ms": 19.9,
+   "llm_used": false,
+   "resp_keys": [
+    "color",
+    "final",
+    "label",
+    "lex",
+    "llm",
+    "path",
+    "secondary"
+   ]
+  },
+  "throughput_health": {
+   "rps": 2586.6,
+   "p95_ms": 3.2,
+   "n": 48
+  }
+ },
+ "budgets": {
+  "static_index": 400.0,
+  "vendor_js": 400.0,
+  "health": 400.0,
+  "emotion_crisis": 400.0
+ },
+ "concurrency": {
+  "single_point_threads": 8,
+  "single_point_requests": 48
+ },
+ "ramp": {
+  "tiers": [
+   8,
+   16,
+   32,
+   64
+  ],
+  "work_per_thread": 32,
+  "reps_per_tier": 5,
+  "warmup_per_tier": 1,
+  "budget_s": 240,
+  "worst_band_pct": 38.3,
+  "result": {
+   "8": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 3360.1,
+     "p95_ms": 3.3,
+     "max_ms": 8.2,
+     "threads": 8,
+     "n": 256,
+     "band_rps": 11.7,
+     "reps_rps": [
+      3547.0,
+      3360.1,
+      3412.2,
+      3263.7,
+      3175.5
+     ]
+    },
+    "emotion": {
+     "rps": 2998.2,
+     "p95_ms": 3.2,
+     "max_ms": 10.7,
+     "threads": 8,
+     "n": 256,
+     "band_rps": 27.1,
+     "reps_rps": [
+      2998.2,
+      3545.5,
+      3749.9,
+      2992.2,
+      2949.8
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 0.93
+   },
+   "16": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 2651.4,
+     "p95_ms": 8.9,
+     "max_ms": 12.1,
+     "threads": 16,
+     "n": 512,
+     "band_rps": 38.3,
+     "reps_rps": [
+      3546.0,
+      3564.7,
+      2589.3,
+      2576.8,
+      2651.4
+     ]
+    },
+    "emotion": {
+     "rps": 2445.6,
+     "p95_ms": 9.2,
+     "max_ms": 11.9,
+     "threads": 16,
+     "n": 512,
+     "band_rps": 36.0,
+     "reps_rps": [
+      3268.3,
+      2977.2,
+      2445.6,
+      2403.0,
+      2433.3
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 2.16
+   },
+   "32": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 2895.0,
+     "p95_ms": 17.1,
+     "max_ms": 26.4,
+     "threads": 32,
+     "n": 1024,
+     "band_rps": 12.3,
+     "reps_rps": [
+      2660.3,
+      2770.7,
+      2895.0,
+      2939.0,
+      2987.4
+     ]
+    },
+    "emotion": {
+     "rps": 2787.8,
+     "p95_ms": 17.1,
+     "max_ms": 26.2,
+     "threads": 32,
+     "n": 1024,
+     "band_rps": 16.2,
+     "reps_rps": [
+      2585.9,
+      2776.5,
+      2787.8,
+      2898.7,
+      3004.4
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 4.43
+   },
+   "64": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 2777.6,
+     "p95_ms": 34.6,
+     "max_ms": 56.7,
+     "threads": 64,
+     "n": 2048,
+     "band_rps": 10.4,
+     "reps_rps": [
+      2936.8,
+      2842.7,
+      2777.6,
+      2660.7,
+      2661.9
+     ]
+    },
+    "emotion": {
+     "rps": 2732.4,
+     "p95_ms": 35.4,
+     "max_ms": 54.8,
+     "threads": 64,
+     "n": 2048,
+     "band_rps": 11.4,
+     "reps_rps": [
+      2764.5,
+      2732.4,
+      2530.3,
+      2499.4,
+      2784.9
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 9.0
+   }
+  }
+ },
+ "breach": []
+}

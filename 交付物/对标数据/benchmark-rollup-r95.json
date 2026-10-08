@@ -29,8 +29,8 @@
     },
     "peers_quality_tooling": {
       "available": true,
-      "file": "peer-quality-tooling-2026-10-03.json",
-      "ts": "2026-10-03",
+      "file": "peer-quality-tooling-2026-10-08.json",
+      "ts": "2026-10-08",
       "generated_by": "peer_quality_tooling_probe.py",
       "denominator": 16,
       "have_test_struct": 7,
@@ -40,8 +40,8 @@
     },
     "peers_repro": {
       "available": true,
-      "file": "peer-repro-2026-10-03.json",
-      "ts": "2026-10-02T17:32:45Z",
+      "file": "peer-repro-2026-10-08.json",
+      "ts": "2026-10-07T20:40:20Z",
       "denominator": 16,
       "with_lockfile": 11,
       "stale": null
