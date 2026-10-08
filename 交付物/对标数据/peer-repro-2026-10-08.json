@@ -1,0 +1,443 @@
+{
+ "repos": {
+  "lobehub/lobehub": {
+   "tier": "A",
+   "tree": {
+    "locks": [
+     "apps/desktop/pnpm-lock.yaml"
+    ],
+    "envx": [
+     ".env.example",
+     "docker-compose/deploy/.env.example",
+     "docker-compose/dev/.env.example",
+     "docker-compose/eval/.env.example",
+     "docker-compose/production/grafana/.env.example"
+    ],
+    "runtime": [
+     ".agents/skills/run-eval-harbor/scripts/smoke/environment/Dockerfile",
+     ".devcontainer/devcontainer.json",
+     "Dockerfile",
+     "docker-compose/deploy/docker-compose.yml",
+     "docker-compose/deploy/elasticsearch/Dockerfile",
+     "docker-compose/dev/docker-compose.yml",
+     "docker-compose/eval/docker-compose.yml",
+     "docker-compose/production/grafana/docker-compose.yml"
+    ],
+    "guides": []
+   },
+   "readme": {
+    "codeblock": 8,
+    "install_cmd": 1,
+    "env_doc": 7
+   },
+   "pin": {
+    "pinned": 0,
+    "total": 3,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "SillyTavern/SillyTavern": {
+   "tier": "A",
+   "tree": {
+    "locks": [
+     "package-lock.json",
+     "src/electron/package-lock.json",
+     "tests/package-lock.json"
+    ],
+    "envx": [],
+    "runtime": [
+     "Dockerfile",
+     "docker/docker-compose.yml"
+    ],
+    "guides": []
+   },
+   "readme": {
+    "quickstart": 1
+   },
+   "pin": {
+    "pinned": 1,
+    "total": 72,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "tier": "B",
+   "tree": {
+    "locks": [
+     "uv.lock"
+    ],
+    "envx": [],
+    "runtime": [
+     "dockerfile"
+    ],
+    "guides": []
+   },
+   "readme": {},
+   "pin": {
+    "pinned": 0,
+    "total": 61,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "morettt/my-neuro": {
+   "tier": "B",
+   "tree": {
+    "locks": [
+     "docs/package-lock.json",
+     "electron-installer/package-lock.json",
+     "live-2d/mcp/package-lock.json",
+     "live-2d/package-lock.json",
+     "live-2d/plugins/community/dawn-dusk-line/package-lock.json",
+     "live-2d/scripts/electron-ui-package/package-lock.json"
+    ],
+    "envx": [],
+    "runtime": [],
+    "guides": [
+     "docs/deploy/install.md",
+     "docs/guide/quick-start.md",
+     "docs/qt/guide/quick-start.md"
+    ]
+   },
+   "readme": {},
+   "pin": {
+    "pinned": 0,
+    "total": 1,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "letta-ai/letta-code": {
+   "tier": "D",
+   "tree": {
+    "locks": [
+     "bun.lock"
+    ],
+    "envx": [],
+    "runtime": [
+     "docker/Dockerfile"
+    ],
+    "guides": []
+   },
+   "readme": {
+    "quickstart": 1,
+    "codeblock": 18,
+    "install_cmd": 1,
+    "env_doc": 1
+   },
+   "pin": {
+    "pinned": 4,
+    "total": 23,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "hello-diana/MASCOT": {
+   "tier": "C",
+   "tree": {
+    "locks": [],
+    "envx": [],
+    "runtime": [],
+    "guides": []
+   },
+   "readme": {
+    "codeblock": 28,
+    "install_cmd": 7,
+    "env_doc": 1
+   },
+   "pin": {
+    "pinned": 0,
+    "total": 48,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "ddxfish/sapphire": {
+   "tier": "C",
+   "tree": {
+    "locks": [],
+    "envx": [],
+    "runtime": [
+     "Dockerfile",
+     "docker-compose.yml"
+    ],
+    "guides": [
+     "docs/INSTALLATION.md",
+     "docs/QUICK-START.md"
+    ]
+   },
+   "readme": {
+    "quickstart": 1,
+    "codeblock": 14,
+    "install_cmd": 2
+   },
+   "pin": {
+    "pinned": 0,
+    "total": 27,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "v2rockets/Loyal-Elephie": {
+   "tier": "C",
+   "tree": {
+    "locks": [
+     "frontend/package-lock.json"
+    ],
+    "envx": [],
+    "runtime": [],
+    "guides": []
+   },
+   "readme": {
+    "codeblock": 16,
+    "install_cmd": 2
+   },
+   "pin": {
+    "pinned": 8,
+    "total": 16,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "tier": "C",
+   "tree": {
+    "locks": [],
+    "envx": [],
+    "runtime": [],
+    "guides": []
+   },
+   "readme": {
+    "codeblock": 4,
+    "install_cmd": 1
+   },
+   "pin": {
+    "pinned": 1,
+    "total": 2,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "Lum1104/MER-Factory": {
+   "tier": "D",
+   "tree": {
+    "locks": [
+     "docs/package-lock.json"
+    ],
+    "envx": [
+     ".env.example"
+    ],
+    "runtime": [],
+    "guides": [
+     "docs/guide/getting-started.md",
+     "docs/guide/zh/getting-started.md"
+    ]
+   },
+   "readme": {
+    "quickstart": 2,
+    "codeblock": 58,
+    "install_cmd": 2
+   },
+   "pin": {
+    "pinned": 0,
+    "total": 12,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "CheaperjamRen/leemo": {
+   "tier": "C",
+   "tree": {
+    "locks": [
+     "bundled-skills/default-enabled/baoyu-format-markdown/scripts/bun.lock",
+     "bundled-skills/default-enabled/baoyu-format-markdown/scripts/package-lock.json",
+     "bundled-skills/default-enabled/baoyu-markdown-to-html/scripts/bun.lock",
+     "bundled-skills/default-enabled/baoyu-url-to-markdown/scripts/bun.lock",
+     "bundled-skills/optional/baoyu-post-to-wechat/scripts/bun.lock",
+     "bundled-skills/optional/baoyu-post-to-x/scripts/bun.lock",
+     "package-lock.json"
+    ],
+    "envx": [
+     ".env.example"
+    ],
+    "runtime": [],
+    "guides": []
+   },
+   "readme": {},
+   "pin": {
+    "pinned": 0,
+    "total": 8,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "NJX-njx/opensoul": {
+   "tier": "C",
+   "tree": {
+    "locks": [
+     "pnpm-lock.yaml",
+     "scripts/docs-i18n/go.sum"
+    ],
+    "envx": [
+     ".env.example",
+     "apps/ios/fastlane/.env.example"
+    ],
+    "runtime": [
+     "Dockerfile",
+     "docker-compose.yml",
+     "scripts/docker/cleanup-smoke/Dockerfile",
+     "scripts/docker/install-sh-e2e/Dockerfile",
+     "scripts/docker/install-sh-nonroot/Dockerfile",
+     "scripts/docker/install-sh-smoke/Dockerfile",
+     "scripts/e2e/Dockerfile"
+    ],
+    "guides": [
+     "apps/ios/fastlane/SETUP.md",
+     "docs/cli/setup.md",
+     "docs/install/installer.md",
+     "docs/start/getting-started.md",
+     "docs/start/quickstart.md",
+     "docs/start/setup.md",
+     "docs/zh-CN/cli/setup.md",
+     "docs/zh-CN/install/installer.md",
+     "docs/zh-CN/start/getting-started.md",
+     "docs/zh-CN/start/quickstart.md",
+     "docs/zh-CN/start/setup.md"
+    ]
+   },
+   "readme": {
+    "quickstart": 3,
+    "codeblock": 18,
+    "install_cmd": 3
+   },
+   "pin": {
+    "pinned": 0,
+    "total": 1,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "s-nagaev/chibi": {
+   "tier": "C",
+   "tree": {
+    "locks": [
+     "poetry.lock",
+     "uv.lock"
+    ],
+    "envx": [
+     ".env.example"
+    ],
+    "runtime": [
+     "Dockerfile",
+     "examples/docker-compose.minimal.redis.yml",
+     "examples/docker-compose.minimal.yml",
+     "examples/docker-compose.personal-use.yml",
+     "examples/docker-compose.public-use.yml"
+    ],
+    "guides": []
+   },
+   "readme": {
+    "quickstart": 1,
+    "codeblock": 16,
+    "install_cmd": 2
+   },
+   "pin": {
+    "pinned": 0,
+    "total": 135,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "29-Cu/succhia": {
+   "tier": "C",
+   "tree": {
+    "locks": [],
+    "envx": [],
+    "runtime": [],
+    "guides": []
+   },
+   "readme": {
+    "quickstart": 1,
+    "codeblock": 4,
+    "install_cmd": 1
+   },
+   "pin": {
+    "pinned": null,
+    "total": 0,
+    "err": []
+   },
+   "c_status": "not_applicable"
+  },
+  "zeroa234/ryza-ai-revive": {
+   "tier": "C",
+   "tree": {
+    "locks": [
+     "desktop/package-lock.json"
+    ],
+    "envx": [],
+    "runtime": [],
+    "guides": [
+     "docs/SETUP.md"
+    ]
+   },
+   "readme": {
+    "codeblock": 6,
+    "install_cmd": 1
+   },
+   "pin": {
+    "pinned": 2,
+    "total": 2,
+    "err": []
+   },
+   "c_status": "ok"
+  },
+  "Bwcx-songyu/MoodChat": {
+   "tier": "C",
+   "tree": {
+    "locks": [],
+    "envx": [],
+    "runtime": [],
+    "guides": []
+   },
+   "readme": {
+    "codeblock": 1,
+    "install_cmd": 1
+   },
+   "pin": {
+    "pinned": null,
+    "total": 0,
+    "err": []
+   },
+   "c_status": "not_applicable"
+  },
+  "__self__": {
+   "tree": {
+    "locks": [],
+    "envx": [
+     ".env.example"
+    ],
+    "runtime": [
+     "server/Dockerfile"
+    ],
+    "guides": []
+   },
+   "pin": {
+    "pinned": null,
+    "total": 0,
+    "err": []
+   },
+   "c_status": "not_applicable",
+   "readme": {
+    "codeblock": 14,
+    "install_cmd": 1,
+    "env_doc": 8
+   }
+  }
+ },
+ "blind": [],
+ "denominator": 16,
+ "usable": 16,
+ "ts": "2026-10-07T20:40:20Z"
+}
