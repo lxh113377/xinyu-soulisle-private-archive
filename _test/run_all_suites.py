@@ -235,6 +235,19 @@ SUITES = [
     # 等超限清零再切 --enforce 并挂 CI 步。若现在就阻断，等于用一把更松的尺去卡已经在位的纪律。
     ("loc_guard", [sys.executable, "_test/loc_guard_check.py", "--enforce"]),
     ("loc_guard_selftest", [sys.executable, "_test/loc_guard_check.py", "--selftest"]),
+    # r101：G16 第五腿抓到 4 条「已入库、却既不在电池也不在 CI」的孤儿判据 ⇒ 本轮接线。
+    # 与 r96「离线桩入链、网络面不入电池」的分工不同处：这四条的真面实测**都能跑通**
+    # （jar@8123 由 ensure_server 自管；docker_image_sim 是磁盘等价实现、本机无 Docker 也能判），
+    # 所以接的是真面 + 桩两条而不只接桩。entry_reach 尤其不能只接桩 —— 在册结论写着
+    # 「再 display:none 会被 entry_reach 判红」，那只对真面成立，接桩等于把那句话继续挂着当空头主张。
+    # rescan_shots 全文无 --selftest 口（传该旗标会照跑真面），因此它只有一条真面腿。
+    ("jar_shape", [sys.executable, "_test/jar_shape_check.py"]),
+    ("jar_shape_selftest", [sys.executable, "_test/jar_shape_check.py", "--selftest"]),
+    ("entry_reach", [sys.executable, "_test/entry_reach_check.py"]),
+    ("entry_reach_selftest", [sys.executable, "_test/entry_reach_check.py", "--selftest"]),
+    ("docker_image_sim", [sys.executable, "_test/docker_image_sim_check.py"]),
+    ("docker_image_sim_selftest", [sys.executable, "_test/docker_image_sim_check.py", "--selftest"]),
+    ("rescan_shots", [sys.executable, "_test/rescan_shots_check.py"]),
     # r94 类扫发现、r95 接线：「印 FAIL 门面行却无非零退出路径」这一族已发生两次（r93 j2、r94 j4）。
     # 修例不修类 ⇒ 常驻判据。静态零网络零浏览器，可进任意档；电池按 rc 记账，本件正是给 rc 记账本身兜底。
     ("verdict_exit_parity", [sys.executable, "_test/verdict_exit_parity_check.py"]),
