@@ -1,0 +1,68 @@
+{
+ "date": "2026-10-09",
+ "model": "hfl/chinese-roberta-wwm-ext",
+ "device": "cuda",
+ "dev_metrics": {
+  "eval_loss": 0.4628,
+  "eval_macro_f1": 0.8898,
+  "eval_runtime": 0.5138,
+  "eval_samples_per_second": 1887.901,
+  "eval_steps_per_second": 31.141,
+  "epoch": 6.0
+ },
+ "eval73_model_only": {
+  "total_non_crisis": 67,
+  "correct": 58,
+  "accuracy": 86.6,
+  "note": "危机 6 条由词典短路层负责（路由层 6/6 保证），不进模型单腿成绩"
+ },
+ "eval73_misses": [
+  {
+   "text": "论文又被导师打回来了，好崩溃",
+   "expect": "fear",
+   "pred": "sadness"
+  },
+  {
+   "text": "奖学金评上了，请室友吃了顿好的",
+   "expect": "joy",
+   "pred": "calm"
+  },
+  {
+   "text": "挂科了，不知道该怎么跟家里交代",
+   "expect": "fear",
+   "pred": "sadness"
+  },
+  {
+   "text": "和暧昧对象聊天，他半天不回我",
+   "expect": "love",
+   "pred": "anger"
+  },
+  {
+   "text": "又焦虑又生气，导师和爸妈一起施压",
+   "expect": "fear",
+   "pred": "anger"
+  },
+  {
+   "text": "舍友半夜打电话，破防了",
+   "expect": "anger",
+   "pred": "fear"
+  },
+  {
+   "text": "deadline 就在明天，赶不上了",
+   "expect": "fear",
+   "pred": "sadness"
+  },
+  {
+   "text": "毕业前和他表白了，不后悔",
+   "expect": "love",
+   "pred": "calm"
+  },
+  {
+   "text": "别难过了，我陪着你",
+   "expect": "calm",
+   "pred": "joy"
+  }
+ ],
+ "baseline_lexicon_73": 98.6,
+ "gate": "accuracy(67 non-crisis) 与词典引擎同口径对账；正式基线见 _test/emotion_eval.js 输出"
+}
