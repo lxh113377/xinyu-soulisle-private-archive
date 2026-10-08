@@ -1,0 +1,120 @@
+{
+ "schema": "xinyu-ramp-noise-v1",
+ "taken_at": "2026-10-08",
+ "caliber": {
+  "work_per_thread": 32,
+  "reps_per_tier": 5,
+  "warmup_per_tier": 1,
+  "tiers": [
+   8,
+   16,
+   32,
+   64
+  ]
+ },
+ "round_files": [
+  "perf-ramp-2026-10-08-a.json",
+  "perf-ramp-2026-10-08-b.json",
+  "perf-ramp-2026-10-08-c.json",
+  "perf-ramp-2026-10-08-d.json",
+  "perf-ramp-2026-10-08-e.json",
+  "perf-ramp-2026-10-08-f.json",
+  "perf-ramp-2026-10-08-g.json",
+  "perf-ramp-2026-10-08-h.json",
+  "perf-ramp-2026-10-08-i.json",
+  "perf-ramp-2026-10-08-j.json"
+ ],
+ "tol_pct_current": 50.0,
+ "finding": "同轮重复取中位数**没有**降低跨轮噪声：t8/t16 跨轮带宽 55.9%~76.7%（>阈值 50% ⇒ 不可判），t32/t64 只有 9.2%~16.6%（阈值余量 3~5 倍）。主导误差是轮与轮之间的机器状态（相关性噪声），5 次 reps 共享同一状态因此压不掉；检测限仍写 ±50%，未下压。",
+ "next_step_for_r101": "按档噪声底定阈（t32/t64 可由本表直接推导，判据=本件 adjacent_worst_pct×~2，t8/t16 走 NA(noise-floor)），无需再采样",
+ "rows": [
+  {
+   "tier": 8,
+   "face": "health",
+   "rounds": 10,
+   "rps_min": 2785.7,
+   "rps_max": 4622.4,
+   "cross_round_band_pct": 65.9,
+   "adjacent_worst_pct": 55.9,
+   "within_round_band_median_pct": 25.3,
+   "resolvable_at_tol_50": false
+  },
+  {
+   "tier": 8,
+   "face": "emotion",
+   "rounds": 10,
+   "rps_min": 2882.7,
+   "rps_max": 4494.9,
+   "cross_round_band_pct": 55.9,
+   "adjacent_worst_pct": 49.9,
+   "within_round_band_median_pct": 30.4,
+   "resolvable_at_tol_50": false
+  },
+  {
+   "tier": 16,
+   "face": "health",
+   "rounds": 10,
+   "rps_min": 2651.4,
+   "rps_max": 4542.5,
+   "cross_round_band_pct": 71.3,
+   "adjacent_worst_pct": 71.3,
+   "within_round_band_median_pct": 47.1,
+   "resolvable_at_tol_50": false
+  },
+  {
+   "tier": 16,
+   "face": "emotion",
+   "rounds": 10,
+   "rps_min": 2445.6,
+   "rps_max": 4321.8,
+   "cross_round_band_pct": 76.7,
+   "adjacent_worst_pct": 76.7,
+   "within_round_band_median_pct": 51.4,
+   "resolvable_at_tol_50": false
+  },
+  {
+   "tier": 32,
+   "face": "health",
+   "rounds": 10,
+   "rps_min": 2675.7,
+   "rps_max": 3120.8,
+   "cross_round_band_pct": 16.6,
+   "adjacent_worst_pct": 14.2,
+   "within_round_band_median_pct": 7.4,
+   "resolvable_at_tol_50": true
+  },
+  {
+   "tier": 32,
+   "face": "emotion",
+   "rounds": 10,
+   "rps_min": 2570.9,
+   "rps_max": 2901.0,
+   "cross_round_band_pct": 12.8,
+   "adjacent_worst_pct": 12.7,
+   "within_round_band_median_pct": 10.1,
+   "resolvable_at_tol_50": true
+  },
+  {
+   "tier": 64,
+   "face": "health",
+   "rounds": 10,
+   "rps_min": 2607.8,
+   "rps_max": 2924.9,
+   "cross_round_band_pct": 12.2,
+   "adjacent_worst_pct": 7.9,
+   "within_round_band_median_pct": 10.4,
+   "resolvable_at_tol_50": true
+  },
+  {
+   "tier": 64,
+   "face": "emotion",
+   "rounds": 10,
+   "rps_min": 2502.6,
+   "rps_max": 2732.4,
+   "cross_round_band_pct": 9.2,
+   "adjacent_worst_pct": 8.8,
+   "within_round_band_median_pct": 10.9,
+   "resolvable_at_tol_50": true
+  }
+ ]
+}

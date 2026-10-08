@@ -1,0 +1,382 @@
+{
+ "repos": {
+  "lobehub/lobehub": {
+   "tier": "A",
+   "tree": {
+    "in_build": 4108,
+    "in_build_samples": [
+     ".agents/scripts/check/check.test.ts",
+     ".agents/scripts/check/delegate.test.ts",
+     ".agents/skills/deep-review/scripts/validate-output.test.ts"
+    ],
+    "langs": {
+     "suffix": 2825,
+     "dir": 1283
+    },
+    "coverage_cfg": [
+     ".agents/skills/deep-review/scripts/vitest.config.ts",
+     "apps/desktop/scripts/core-ota-test/vitest.config.mjs",
+     "codecov.yml",
+     "packages/heterogeneous-agents/vitest.config.ts",
+     "packages/memory-user-memory/vitest.config.ts"
+    ],
+    "ci_testish_wf": [
+     ".github/workflows/claude-auto-e2e-testing.yml",
+     ".github/workflows/claude-auto-testing.yml",
+     ".github/workflows/test.yml"
+    ],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {
+    "cov_badge": "7 处｜样本 'codecov'"
+   },
+   "truncated": false,
+   "err": []
+  },
+  "SillyTavern/SillyTavern": {
+   "tier": "A",
+   "tree": {
+    "in_build": 38,
+    "in_build_samples": [
+     "tests/byaf-import.test.js",
+     "tests/chat-backups.test.js",
+     "tests/chat-info.test.js"
+    ],
+    "langs": {
+     "dir": 38
+    },
+    "coverage_cfg": [
+     "tests/jest.config.json"
+    ],
+    "ci_testish_wf": [
+     ".github/workflows/pr-check-merge-conflicts.yaml",
+     ".github/workflows/pr-checks.yml"
+    ],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "tier": "B",
+   "tree": {
+    "in_build": 0,
+    "in_build_samples": [],
+    "langs": {},
+    "coverage_cfg": [],
+    "ci_testish_wf": [],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "morettt/my-neuro": {
+   "tier": "B",
+   "tree": {
+    "in_build": 7,
+    "in_build_samples": [
+     "live-2d/js/ai/reasoning-request.test.js",
+     "live-2d/js/live/bilibili-live.test.js",
+     "live-2d/plugins/built-in/memos/tests/backend-embedding-sync.test.js"
+    ],
+    "langs": {
+     "suffix": 2,
+     "dir": 1,
+     "py": 4
+    },
+    "coverage_cfg": [],
+    "ci_testish_wf": [],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "letta-ai/letta-code": {
+   "tier": "D",
+   "tree": {
+    "in_build": 958,
+    "in_build_samples": [
+     ".github/scripts/contribution-guard.test.cjs",
+     "scripts/agent-watch/verify-pr-identity.test.ts",
+     "scripts/builtin-skills-watch/agent-watch.test.ts"
+    ],
+    "langs": {
+     "suffix": 958
+    },
+    "coverage_cfg": [],
+    "ci_testish_wf": [
+     ".github/workflows/ci.yml"
+    ],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "hello-diana/MASCOT": {
+   "tier": "C",
+   "tree": {
+    "in_build": 0,
+    "in_build_samples": [],
+    "langs": {},
+    "coverage_cfg": [],
+    "ci_testish_wf": [],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "ddxfish/sapphire": {
+   "tier": "C",
+   "tree": {
+    "in_build": 377,
+    "in_build_samples": [
+     "plugins/coding-harness/tests/test_harness.py",
+     "plugins/discord/tests/_fakes.py",
+     "plugins/discord/tests/test_auto_join_service.py"
+    ],
+    "langs": {
+     "dir": 376,
+     "py": 1
+    },
+    "coverage_cfg": [
+     "pytest.ini"
+    ],
+    "ci_testish_wf": [],
+    "out_of_band": 7,
+    "out_of_band_samples": [
+     "plugins/discord/tests/conftest.py",
+     "plugins/game-room/tests/conftest.py",
+     "plugins/mindpalace/tests/conftest.py"
+    ]
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "v2rockets/Loyal-Elephie": {
+   "tier": "C",
+   "tree": {
+    "in_build": 0,
+    "in_build_samples": [],
+    "langs": {},
+    "coverage_cfg": [],
+    "ci_testish_wf": [],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "tier": "C",
+   "tree": {
+    "in_build": 0,
+    "in_build_samples": [],
+    "langs": {},
+    "coverage_cfg": [],
+    "ci_testish_wf": [],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "Lum1104/MER-Factory": {
+   "tier": "D",
+   "tree": {
+    "in_build": 2,
+    "in_build_samples": [
+     "test/test_ffmpeg.py",
+     "test/test_openface.py"
+    ],
+    "langs": {
+     "dir": 2
+    },
+    "coverage_cfg": [],
+    "ci_testish_wf": [],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "CheaperjamRen/leemo": {
+   "tier": "C",
+   "tree": {
+    "in_build": 326,
+    "in_build_samples": [
+     "bundled-skills/default-enabled/baoyu-markdown-to-html/scripts/main.test.ts",
+     "bundled-skills/optional/baoyu-image-gen/scripts/build-batch.test.ts",
+     "bundled-skills/optional/baoyu-image-gen/scripts/main.test.ts"
+    ],
+    "langs": {
+     "suffix": 169,
+     "dir": 157
+    },
+    "coverage_cfg": [
+     "vitest.config.ts"
+    ],
+    "ci_testish_wf": [
+     ".github/workflows/ci.yml"
+    ],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "NJX-njx/opensoul": {
+   "tier": "C",
+   "tree": {
+    "in_build": 1092,
+    "in_build_samples": [
+     "apps/android/app/src/test/java/ai/opensoul/android/NodeForegroundServiceTest.kt",
+     "apps/android/app/src/test/java/ai/opensoul/android/WakeWordsTest.kt",
+     "apps/android/app/src/test/java/ai/opensoul/android/gateway/BonjourEscapesTest.kt"
+    ],
+    "langs": {
+     "java": 11,
+     "suffix": 1061,
+     "dir": 20
+    },
+    "coverage_cfg": [
+     "ui/vitest.config.ts",
+     "vitest.config.ts"
+    ],
+    "ci_testish_wf": [
+     ".github/workflows/ci.yml",
+     "Swabble/.github/workflows/ci.yml"
+    ],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {
+    "test_cmd": "3 处｜样本 \"('pnpm test', '', '', '')\"",
+    "test_doc": "1 处｜样本 \"('## Testing', 'Testing')\""
+   },
+   "truncated": false,
+   "err": []
+  },
+  "s-nagaev/chibi": {
+   "tier": "C",
+   "tree": {
+    "in_build": 93,
+    "in_build_samples": [
+     "tests/providers/test_openai_responses_e2e.py",
+     "tests/runners/test_editor_context_integration.py",
+     "tests/runners/test_ide_background_messages.py"
+    ],
+    "langs": {
+     "dir": 93
+    },
+    "coverage_cfg": [
+     "pytest.ini"
+    ],
+    "ci_testish_wf": [],
+    "out_of_band": 8,
+    "out_of_band_samples": [
+     "tests/__init__.py",
+     "tests/conftest.py",
+     "tests/providers/__init__.py"
+    ]
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "29-Cu/succhia": {
+   "tier": "C",
+   "tree": {
+    "in_build": 0,
+    "in_build_samples": [],
+    "langs": {},
+    "coverage_cfg": [],
+    "ci_testish_wf": [],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "zeroa234/ryza-ai-revive": {
+   "tier": "C",
+   "tree": {
+    "in_build": 0,
+    "in_build_samples": [],
+    "langs": {},
+    "coverage_cfg": [],
+    "ci_testish_wf": [],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {
+    "test_doc": "1 处｜样本 \"('## Tests', 'Tests')\""
+   },
+   "truncated": false,
+   "err": []
+  },
+  "Bwcx-songyu/MoodChat": {
+   "tier": "C",
+   "tree": {
+    "in_build": 1,
+    "in_build_samples": [
+     "src/test/java/org/example/aispingbt/AiSpingBtApplicationTests.java"
+    ],
+    "langs": {
+     "java": 1
+    },
+    "coverage_cfg": [],
+    "ci_testish_wf": [],
+    "out_of_band": 0,
+    "out_of_band_samples": []
+   },
+   "readme": {},
+   "truncated": false,
+   "err": []
+  },
+  "__self__": {
+   "tree": {
+    "in_build": 12,
+    "in_build_samples": [
+     "_test/js/emotion-engine.unit.test.mjs",
+     "server/src/test/java/com/xinyu/soulisle/api/ChatControllerTest.java",
+     "server/src/test/java/com/xinyu/soulisle/api/EmotionControllerTest.java"
+    ],
+    "langs": {
+     "suffix": 1,
+     "java": 11
+    },
+    "coverage_cfg": [],
+    "ci_testish_wf": [
+     ".github/workflows/ci.yml"
+    ],
+    "out_of_band": 104,
+    "out_of_band_samples": [
+     "_test/_democonfig_switch.py",
+     "_test/_reshoot_r86.py",
+     "_test/a11y_check.py"
+    ]
+   },
+   "readme": {}
+  }
+ },
+ "na": [],
+ "denominator": 16,
+ "ts": "2026-10-07T20:42:44Z"
+}
