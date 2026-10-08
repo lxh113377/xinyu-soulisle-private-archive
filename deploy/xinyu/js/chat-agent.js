@@ -229,7 +229,15 @@ window.ChatAgent = (function () {
   // 次情绪判定统一走 EmotionEngine.secondaryOf（单一真相源），用于双色星雾
 
   /** respond(text, onDelta?)：onDelta 存在且在线时逐字回调已生成文本（流式），否则一次性返回 */
-  async function respond(text, onDelta) {
+  // r100：轮次完成态由产品自己报数，替掉测试里的定长等待。只计数，异常也过 finally。
+  let pendingTurns = 0;
+  window.__pendingTurns = 0;
+  async function turn(fn) {
+    window.__pendingTurns = ++pendingTurns;
+    try { return await fn(); } finally { window.__pendingTurns = --pendingTurns; }
+  }
+
+  async function respondCore(text, onDelta) {
     const t0 = performance.now(); // 计时起点含情绪分类：latency 如实反映整轮等待
     // 后端 /api/emotion 可用时以后端为准（消除 JS/Java 两份真相），不可用即回落本地；
     // 危机词在 EmotionRemote 内部先本地短路，不会因为网络而延迟拦截。
@@ -268,6 +276,9 @@ window.ChatAgent = (function () {
              emoSrc, memory: mode === "model" ? memBefore : 0,
              dropped: mode === "model" ? dropBefore : 0 };
   }
+
+  /* 对外仍叫 respond：包一层 turn()，每轮起止就成了可等的读数（r100） */
+  async function respond(text, onDelta) { return turn(() => respondCore(text, onDelta)); }
 
   /** 记住一轮问答：本地 history 为主，远端（J4，默认关闭）尽力而为 */
   function remember(userText, aiText) {
