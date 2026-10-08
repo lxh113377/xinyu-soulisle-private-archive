@@ -71,6 +71,7 @@
   |---|---|---|---|---|
   | `_test/emotion-eval-dataset.json` | **73 条** | `node _test/emotion_eval.js`（JS 侧）、`GET /api/emotion/eval`（Java 侧直读，决策 #5 不复制进 jar）、`engine_consistency_check.py` 双端逐条对账 | 团队自建：按 7 类情绪（joy/sadness/anger/fear/calm/love/crisis）人工撰写，**不来自任何模型输出或线上对话日志**；2026-09-23 由 36 条扩至 73 条（扩充部分同样人工写，含 6 条危机样本） | 结构冻结：新增只允许"人工写 + 双端复跑全绿"，禁止用 LLM 批量生成 |
   | `_test/vendor-manifest.json` | 3 条 | `vendor_freshness_check.py` 的完整性/版本对账声明源 | 本项目自维护（r21 建），非评测数据，列此仅为明确它**不属于**裁决用评测集 | 随 vendor 变更同步（`--refresh` 后人工核对 diff） |
+  | `_test/emotion-blindset.json` | 237 条（2026-10-08 建，六情绪 231 + 危机 6） | `ml/reports/eval_report.json`（模型对账）、`_test/emotion_blindset_eval.py`（词典/模型/LLM/三级路由四路对比，S5 答辩材料引用） | **模型盲测集**：DeepSeek 生成（校园倾诉语域，few-shot 取自 73 条评测集风格）+ self-consistency 过滤（零温二遍标注不一致即弃，1580→1396→去重 231）+ 6 条危机改写样例（测短路层，不进模型训练标签）。**非自证循环**：标注器（DeepSeek）≠ 被测对象（RoBERTa/词典）；与 train/dev 零交集由 `ml/data/build_dataset.py check` 断言。已知局限：生成域（校园倾诉）为主，微博域泛化未覆盖 | 2026-10-08 冻结：只允许整集替换并重跑断言，禁止增量混入；红线同上——禁止回填线上对话文本 |
 - 红线：训练/生产数据禁止写入测试专用文件；新增评测数据先登记来源（provenance）
   - **为什么本项目特别要盯这条**：情绪评测集的准确率会被写进《应用方案》PDF 与答辩材料（当前 98.6% / 危机 6-6），
     一旦把"模型自己生成的样本"或"用户真实对话"混进测试集，这个数字就从"可复现的能力度量"退化成"自证循环"，

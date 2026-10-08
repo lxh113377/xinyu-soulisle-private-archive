@@ -1,0 +1,14 @@
+# 心屿 · 情绪模型环境（uv venv + Python 3.12）
+# 重建：uv venv .venv --python 3.12
+#       uv pip install --python .venv torch --index-url https://download.pytorch.org/whl/cu128
+#       uv pip install --python .venv -r requirements.txt
+# 说明：torch 单独装（Blackwell sm_120 须 cu128 轮子，torch>=2.7）；transformers 版本随 latest
+#       实测过（TrainingArguments 用 use_cpu 而非 no_cuda——4.4x 起已移除旧参数）。
+accelerate>=1.1.0
+transformers>=4.44
+pandas
+pyarrow
+fastapi
+uvicorn[standard]
+scikit-learn
+huggingface_hub
