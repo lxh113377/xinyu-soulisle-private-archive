@@ -198,8 +198,21 @@ def count_provenance_problems(doc_text):
     return bad
 
 
-def gate_doc_audit(scripts, doc_text, on_disk, tracked=None):
-    """G16 纯函数：电池脚本 ⇄ docs/quality-gates.md ⇄ git 三面双向对账。
+def ci_wired_scripts():
+    """CI 接线面的脚本名。**权威源借用不自复刻**：`ci_contract_check.wiring_surface()`。
+
+    取不到返回 None ⇒ 调用方把 G16 第五腿标成「未验」，**不得**读成「CI 没接任何判据」。
+    """
+    try:
+        import ci_contract_check as C
+        ci, _bat, _raw = C.wiring_surface()
+    except Exception:
+        return None
+    return {str(x).split("/")[-1] for x in ci}
+
+
+def gate_doc_audit(scripts, doc_text, on_disk, tracked=None, ci_scripts=None):
+    """G16 纯函数：电池脚本 ⇄ docs/quality-gates.md ⇄ git 三面双向对账（+ r101 第五腿孤儿判据）。
 
     立此条的实证（r57）：`docs/quality-gates.md` 头部写着「本文件不抄数」，所以**数字**没骗人，
     但它是 README 迁出去的"判据体系明细"，读者（含下一轮的我）会当成清单来读 —— 实测 44 条
@@ -212,6 +225,13 @@ def gate_doc_audit(scripts, doc_text, on_disk, tracked=None):
     `git ls-tree -r HEAD` 对这两个名字 0 命中 ⇒ 远端 CI 跑的那套判据里没有它们，本地三绿照旧。
     取 index 面（`git ls-files --cached`）不取 HEAD 面：HEAD 面会让"把这些文件补进第一笔提交"
     这个动作本身被自己拦住（钩子在提交前跑，那时 HEAD 还没有它们）。
+
+    第五腿（r101）：方向反过来问 —— 前四条腿只核「已登记的有没有漏」，**从没问过「在盘上入库了的
+    判据有没有人执行」**。本轮实测 4 条 `_test/*_check.py` 既不在电池也不在 CI：
+    `jar_shape_check` / `entry_reach_check` / `docker_image_sim_check` / `rescan_shots_check`，
+    其中 `rescan_shots_check` **还写在 quality-gates 明细里** ⇒ 「文档写了 = 有人在跑」正是
+    r96 给 peers 判过的那类假门（workflow 可以是空的，永不开火的门比没有门更坏）。
+    分母口径同 r99b：**取 git 跟踪面**不取 `iterdir()`，否则他人未跟踪的半成品会被判成我的孤儿。
     """
     bad = []
     if not scripts:
@@ -229,6 +249,16 @@ def gate_doc_audit(scripts, doc_text, on_disk, tracked=None):
         if untracked:
             bad.append("电池登记了而 git 未跟踪（在盘上但没入库，CI 与发布面读不到）%d 条：%s"
                        % (len(untracked), "、".join(untracked[:6]) + ("…" if len(untracked) > 6 else "")))
+    if tracked is not None and ci_scripts is not None:
+        face = {n for n in tracked if n.endswith("_check.py")}
+        if not face:
+            bad.append("G16 第五腿取到零判据面（git 跟踪面里没有 `*_check.py`）⇒ 该腿未验，"
+                       "不得把「没报红」读成「没有孤儿」")
+        else:
+            orph = sorted(n for n in face if n not in scripts and n not in ci_scripts)
+            if orph:
+                bad.append("已入库却电池与 CI 两头都不执行的孤儿判据 %d 条（写进文档也不算接线）：%s"
+                           % (len(orph), "、".join(orph[:8]) + ("…" if len(orph) > 8 else "")))
     bad += count_provenance_problems(doc_text)
     return bad
 
@@ -1194,6 +1224,48 @@ def _st_g16_count_legs(bad, real_doc):
         bad.append("㉑j 抹掉全部标记后仍零报 ⇒ 腿认的不是标记（真面漂了也不会红）")
 
 
+def _st_g16_orphan_face(bad, real_scripts, real_doc, real_disk, real_tracked):
+    """㉑k（r101）G16 第五腿：已入库却两头都不执行的孤儿判据。
+
+    抽成独立函数是承 ㉑e-j 的同一条理由（本仓 150 行/函数门），不是审美。
+    双向都验：既验「造一个孤儿必红」，也验「已接线的不得被读成孤儿」——
+    只测拒绝侧的授权判据会让新能力对唯一受众永久 403 而全绿，同族。
+    """
+    ci_now = ci_wired_scripts()
+    if ci_now is None:
+        bad.append("㉑k0 CI 接线面取不到（ci_contract_check 不可调用）⇒ 第五腿本轮未验，"
+                   "不得把「没报红」当「没有孤儿」")
+        return
+    face = {n for n in real_tracked if n.endswith("_check.py")} if real_tracked else set()
+    if not face:
+        bad.append("㉑k0 git 跟踪面里取不到 `*_check.py` ⇒ 第五腿的分母是空的，本轮未验")
+        return
+    wired = sorted(n for n in face if n in real_scripts)
+    if not wired:
+        bad.append("㉑k0 跟踪面有判据却无一在电池里 ⇒ 无法造对照，第五腿未验")
+        return
+    probe = wired[0]
+    if not [l for l in gate_doc_audit(real_scripts - {probe}, real_doc, real_disk,
+                                      real_tracked, ci_now - {probe})
+            if "孤儿判据" in l and probe in l]:
+        bad.append("㉑k1 把已入库判据 %s 从电池与 CI 两面同时摘掉仍未报红 ⇒ 第五腿恒真" % probe)
+    if not [l for l in gate_doc_audit(real_scripts - {probe}, real_doc + "\n_test/%s\n" % probe,
+                                      real_disk | {probe}, real_tracked, ci_now - {probe})
+            if "孤儿判据" in l]:
+        bad.append("㉑k2 该件写进 quality-gates 明细后第五腿就放过它 ⇒ 「文档写了」被当成接线，"
+                   "永不开火的门会比没有门更坏")
+    if [l for l in gate_doc_audit(real_scripts, real_doc, real_disk, real_tracked, ci_now)
+        if "孤儿判据" in l]:
+        bad.append("㉑k3 真面（现电池 + 现 CI 接线）被第五腿判出孤儿 ⇒ 本轮确有判据两头都不执行，"
+                   "要么接线要么如实挂账，不得改腿求绿")
+    if [l for l in gate_doc_audit(real_scripts, real_doc, real_disk, real_tracked, None)
+        if "孤儿判据" in l]:
+        bad.append("㉑k4 取不到 CI 接线面（None）时第五腿仍报孤儿 ⇒ 它把「没量到」当成了「没接线」")
+    if not [l for l in gate_doc_audit(real_scripts, real_doc, real_disk, {"x.py"}, ci_now)
+            if "零判据面" in l]:
+        bad.append("㉑k5 跟踪面不含任何 `*_check.py` 时第五腿静默 ⇒ 零分母被读成通过（R247）")
+
+
 def _st_g16_git_face(bad, real_scripts, real_doc, real_disk):
     """㉑e-j（r99）G16 新增两面：git index 第三面 + 文档条数责任方标记。
 
@@ -1214,6 +1286,7 @@ def _st_g16_git_face(bad, real_scripts, real_doc, real_disk):
         if bool(want) != bool(got):
             bad.append("㉑g 第三腿读数与独立现算的未跟踪集不一致（现算 %d 条，判据报 %d 行）"
                        "⇒ 它解析的不是 index 面" % (len(want), len(got)))
+    _st_g16_orphan_face(bad, real_scripts, real_doc, real_disk, real_tracked)
     _st_g16_count_legs(bad, real_doc)
 
 
@@ -1420,11 +1493,13 @@ def _cfg_head():
     scripts = battery_scripts()
     on_disk = {p.name for p in (ROOT / "_test").iterdir() if p.is_file()}
     tracked = git_index_scripts()
-    g16bad = gate_doc_audit(scripts, _read("docs/quality-gates.md"), on_disk, tracked)
-    check("G16 电池脚本 ⇄ quality-gates 明细 ⇄ git index 三面双向对账（漏登/幽灵登/未入库皆红）",
+    ci_now = ci_wired_scripts()
+    g16bad = gate_doc_audit(scripts, _read("docs/quality-gates.md"), on_disk, tracked, ci_now)
+    check("G16 电池 ⇄ quality-gates ⇄ git index ⇄ CI 接线 四面双向对账（漏登/幽灵登/未入库/孤儿判据皆红）",
           not g16bad,
           f"电池脚本 {len(scripts)} 条（分母从 SUITES 现读）| git index 面 "
           f"{len(tracked) if tracked is not None else '取不到 ⇒ 第三腿未验'} 条 | "
+          f"CI 接线面 {len(ci_now) if ci_now is not None else '取不到 ⇒ 第五腿未验'} 条 | "
           + (" ; ".join(g16bad) or "全部在册"))
     pom, tag = pom_version(), latest_tag()
     docs_text = {name: (ROOT / name).read_text("utf-8", errors="replace")
