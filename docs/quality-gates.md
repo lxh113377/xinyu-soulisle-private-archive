@@ -130,6 +130,11 @@ python _test/ci_perf_wiring_check.py --selftest  # r91 判据桩：11 条（当�
  python _test/verdict_exit_parity_check.py --selftest  # r95 判据桩：10 条（当日值，现值由脚本自印；三形态正例／无门面行／软面钉死：assert 不在 FAIL 分支 ⇒ 归 OK-exception 不判红，只作趋势读数／反例印 FAIL 无退出必判 DEFECT／同形态修好必转绿／两个变异体各翻一侧／坏语法单独成档不判绿）
  python _test/ci_contract_check.py                  # r95 立：「CI 全绿契约」本身的**结构性**门。9 条腿：契约已入库（未入库 ⇒ greencheck run 恒 UNKNOWN ⇒ pre-push 钩子恒放行，实测已坐实）／checks 非空／blocking name 唯一／每条 blocking 有 cmd+timeout_s+cost_ms+cost_source／声明的总预算 == 各条之和（可复算）／blocking 合计 <= 20s pre-push 预算／**接线自证**（每条 blocking 的脚本或 `-m` 模块在 CI workflow 与电池里都有执行位，否则"列了但没人跑"）／deferred 必带 reason 且 reason 必须点名承接面。**不调用 greencheck run**（会递归），静态零网络零浏览器；同时进电池与契约 blocking 自身
  python _test/ci_contract_check.py --selftest      # r95 判据桩：15 条（当日值，现值由脚本自印；3 正例含 `python -m 模块` 形态／8 反例逐条注入一手形态／结构腿空契约／变异体补上执行位后必须转绿／变异体两者皆无必须点名）—— 正例腿是必须的：第一版把 `any(s in x for x in (集合,集合))` 写成对容器做成员判定，恒 False，14 条合法 blocking 全被误报"没人跑"，只有正例腿抓得到
+ python _test/jar_shape_check.py                   # r101 接线（**此前已入库却电池与 CI 两头都不执行**，由 G16 第五腿抓到）。部署产物形态与新鲜度守卫：fat jar 必须含 `BOOT-INF/lib`、pom⇄jar 版本同源、**jar 内资源字节的 SHA256 == 源码**（r99c 定的口径：mtime 只证明"文件被动过"，不证明"内容对得上"）。ci.yml 的 java-build 作业虽有 unzip 一行，但那不是本件（本件还管新鲜度）
+ python _test/jar_shape_check.py --selftest        # 12 类夹具（当日值，现值由脚本自印；形态 4 + 新鲜度 7，含回归钉「mtime 早于源码必须仍绿」——否则下一轮就会有人把尺改回按 mtime 判）
+ python _test/entry_reach_check.py                 # r101 接线（同上抓到）。窄屏能力入口可达性判据（r48 立）：盯「桌面点得到、手机整块没了」这类静默消失。接线的真正理由是**账实相符**——`memory/` 在册结论写着「再 display:none 会被 entry_reach 判红」，而它此前既不在电池也不在 CI，那句话在受理面上无人执行；`--selftest` 印 cases=11 fails=0 ALL-OK，真面本轮实测 `ENTRY-REACH-PASS visible=7/8 gap=0 undetermined=0 state_gated_excluded=1[btn-exit-show]`（需 jar@8123 + 浏览器，与电池内既有 33 条 playwright 套件同前置 ⇒「要浏览器」不构成豁免理由）
+ python _test/docker_image_sim_check.py            # r101 接线（同上抓到）。Dockerfile 的 COPY/ENV/WORKDIR/ENTRYPOINT 在磁盘上做等价实现后逐项断言 ⇒ **本机无 Docker 也能判**（`server/Dockerfile` 自 J5 起挂着「未实测」标签，这条就是那块没被量到的面；真面实测 `DOCKER-SIM-PASS`）
+ python _test/rescan_shots_check.py                # r101 接线（同上抓到，且它此前**已写在本文档明细里却两头不执行**——正是 r96 给 peers 判过的那类「永不开火的门」）。交付物回扫：为「离线壳」与「评委自助设置面板」出两张实证截图，腿名册 LEGS 是唯一分母，任一条没被记录 = 记未验并在结论行点名（r100 三态纪律）。⚠️ 本件**没有 `--selftest` 口**（传该旗标会被 argparse 之外的路径吞掉而照跑真面，本轮实测踩到）⇒ 只有真面一条腿，需 jar@8123
 ```
 
 > 前置：多数判据需 fat jar 起在 8123（`java -jar server/target/soulisle-server.jar --server.port=8123`，
