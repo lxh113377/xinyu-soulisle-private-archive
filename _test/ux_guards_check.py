@@ -132,7 +132,21 @@ def u2(browser):
     for i in range(45):
         pg.fill("#chat-input", f"第 {i+1} 句：今天有点低落")
         pg.click("#chat-form button[type=submit]")
-    pg.wait_for_timeout(6000)
+    # r100：这一批是"连发不等"，等的从来不是 6 秒，而是**这一批全部落地**。
+    # 产品侧现在自报 `window.__pendingTurns`（chat-agent.js 的 turn() 包裹 respond，
+    # 异常/提前 return 都过 finally ⇒ 不会只加不减）。轮询按 raf：respond 的 finally 减到 0
+    # 之后，app.js 的渲染在同一微任务续体里紧跟着跑，rAF 观察到 0 时那一轮的渲染必然已完成。
+    # 取不到这个钩子（旧副本/公网未重部署）⇒ 超时后如实点名 typeof，不折成"窗口化坏了"。
+    settled = True
+    why = ""
+    try:
+        pg.wait_for_function("() => window.__pendingTurns === 0", timeout=20000, polling="raf")
+    except Exception as e:
+        settled = False
+        why = str(e).splitlines()[0][:80]
+    check("U2g 连发批次等得到本轮终态（__pendingTurns 归零，非定长 6000ms）", settled,
+          "typeof=%s%s" % (pg.evaluate("() => typeof window.__pendingTurns"),
+                           "" if settled else " ｜" + why))
     dom = pg.evaluate("() => document.querySelectorAll('#chat-log .msg').length")
     hist = pg.evaluate("() => window.ChatAgent.getHistory().length")
     check("U2a DOM 节点不随消息单调增长（≤60）", 0 < dom <= 60, f".msg={dom}, 历史={hist}")

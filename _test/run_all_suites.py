@@ -5,7 +5,11 @@
   · `fold_detail()`：判据 rc≠0 时除"含判据词的行"外，还带出其后的 `-` 续行与 stderr 末两行
     （实证动因：`voice` 判红时收口面只剩一行 `VOICE-FAIL`，原因行没有 token 就被折叠掉）；
   · 整跑并发锁（`acquire_lock`/`lock_state`，TTL 1800s）：电池不可重入，并跑的第二条一律
-    `rc=2 未验`——不给绿，也不产出一条无法归因的红。两者均由 `--selftest` 双向自证（11 类桩）。
+    `rc=2 未验`——不给绿，也不产出一条无法归因的红。
+  · `blind_reds()`（r100）：rc=1 却**一行判据结论都没有** ⇒ 单列「盲红」档。判据自己崩了与
+    产品判红在收口面同形，正是 r99 三处 Playwright 超时的现场；这条把它变成可点名的读数。
+  以上各桩均由 `--selftest` 双向自证（**桩数由脚本自己印，本行不抄数**——抄了就会漂，
+  口径见 docs/quality-gates.md 的「文档条数须挂责任方」）。
 """
 import os
 import subprocess, sys, io, re, time, json, shutil, atexit
@@ -415,6 +419,38 @@ def split_quota(hard_names, blurbs):
     return [n for n in hard_names if n not in quota], quota
 
 
+def blind_reds(bad):
+    """纯函数（r100）：rc=1 **且收口行不含判据词** ⇒ 仪器自己崩了，不是产品红。
+
+    此前电池只按 rc==1 归类，于是「套件半路抛异常、一行结论都没印出来」与「真判红」在收口面
+    同形（r99 的三处 Playwright 超时正是这一类现场：判据崩了，下一轮却去修一段没坏的产品代码）。
+    判定只看**行形状**，不看套件名 ⇒ 没有豁免名单，也绕不过去（改名无效）。
+    """
+    return [n for n, rc, line in bad if rc == 1 and not VERDICT_RE.search(line or "")]
+
+
+def blind_selftest():
+    """双向自证：有结论的行不许被抢判成盲红，真崩的必须点名，且不越界抢 rc=2/rc=3 的档。"""
+    cases = [
+        (blind_reds([("a", 1, "FOO-PASS 判红=0")]) == [],
+         "正例：rc=1 且有判据行 ⇒ 不判盲红"),
+        (blind_reds([("a", 1, "X-UNVERIFIED 未取到台账")]) == [],
+         "正例：行含 UNVERIFIED ⇒ 那是结论，不是崩"),
+        (blind_reds([("a", 1, "BAR-FAIL 判红=2 条 x,y")]) == [],
+         "反例防线：FAIL 行本身即结论，不得因为'红了'就被再记一次盲红"),
+        (blind_reds([("b", 1, "Traceback (most recent call last):")]) == ["b"],
+         "漏报侧①：崩栈行必须点名"),
+        (blind_reds([("c", 1, "")]) == ["c"], "漏报侧②：stdout 空必须点名"),
+        (blind_reds([("d", 2, "")]) == [], "边界：rc=2 环境未验 ⇒ 不抢这一档"),
+        (blind_reds([("e", 0xC0000409, "")]) == [], "边界：rc 非 1/2 ⇒ 归 CRASH 档，不重复计"),
+    ]
+    bad = [note for ok, note in cases if not ok]
+    for note in bad:
+        print("  · BLIND-SELFTEST-FAIL " + note)
+    print("BLIND-SELFTEST: %d/%d" % (len(cases) - len(bad), len(cases)))
+    return 1 if bad else 0
+
+
 def fold_detail(out_lines, err_text, rc):
     """rc≠0 时该把哪些证据带进收口行。纯函数，可自证。
 
@@ -733,6 +769,24 @@ def acquire_lock():
     return path, None
 
 
+def selftest_all():
+    """`--selftest` 分派（r100 从 main 提出，纯搬家）。各档桩数由每条桩自己印，这里不抄数。"""
+    rc1 = lock_selftest()
+    rc2 = fold_selftest()
+    rc3 = quota_selftest()
+    rc4 = timing_selftest()
+    rc5, serve_fails = serve_selftest()
+    rc6 = blind_selftest()
+    print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s ＋ 计费分档 %s ＋ 台账写入 %s ＋ 自管决策 %s ＋ 盲红分档 %s）"
+          % ("PASS" if not (rc1 | rc2 | rc3 | rc4 | rc5 | rc6) else "FAIL",
+             "ok" if not rc1 else "红", "ok" if not rc2 else "红",
+             "ok" if not rc3 else "红", "ok" if not rc4 else "红",
+             "ok" if not rc5 else "红", "ok" if not rc6 else "红"))
+    for f in serve_fails:
+        print("  · SELF-HOST-FAIL " + f)
+    return 1 if (rc1 | rc2 | rc3 | rc4 | rc5 | rc6) else 0
+
+
 def main():
     global SUITES
     argv = sys.argv[1:]
@@ -748,19 +802,7 @@ def main():
               % " ".join(unknown))
         return 2
     if "--selftest" in argv:
-        rc1 = lock_selftest()
-        rc2 = fold_selftest()
-        rc3 = quota_selftest()
-        rc4 = timing_selftest()
-        rc5, serve_fails = serve_selftest()
-        print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s ＋ 计费分档 %s ＋ 台账写入 %s ＋ 自管决策 %s）"
-              % ("PASS" if not (rc1 | rc2 | rc3 | rc4 | rc5) else "FAIL",
-                 "ok" if not rc1 else "红", "ok" if not rc2 else "红",
-                 "ok" if not rc3 else "红", "ok" if not rc4 else "红",
-                 "ok" if not rc5 else "红"))
-        for f in serve_fails:
-            print("  · SELF-HOST-FAIL " + f)
-        return 1 if (rc1 | rc2 | rc3 | rc4 | rc5) else 0
+        return selftest_all()
     if "--list" in argv:
         print("SUITES:", len(SUITES))
         return 0
@@ -846,9 +888,16 @@ def main():
     hard, quota = split_quota(hard, blurbs)
     soft = [b[0] for b in bad if b[1] == 2]
     crash = [(b[0], b[1]) for b in bad if b[1] not in (1, 2)]
+    # r100 类扫（修类不修例）：rc=1 **却没有一行判据结论** = 仪器自己崩了，不是产品红。
+    # 此前这类与真红同形（收口行只按 rc==1 归类），下一轮就会去「修」一段没坏的产品代码——
+    # r99 三处 Playwright 超时崩在进程出口，正是这一类的现场。单列点名，rc 判定一字不改。
+    blind = blind_reds(bad)
     parts = []
     if hard:
         parts.append("RED(判红，必须修): " + ",".join(hard))
+    if blind:
+        parts.append("BLIND-RED(判红却无任何判据结论行 ⇒ 仪器崩了，不是产品红，必须查): "
+                     + ",".join(blind))
     if soft:
         parts.append("ENV-UNVERIFIED(不是判红，但不得声称已验): " + ",".join(soft))
     if crash:

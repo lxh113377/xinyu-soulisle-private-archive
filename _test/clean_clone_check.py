@@ -18,8 +18,11 @@
 已知缺口（唯一一条，带理由与计数，不扩表）：
   js/demo-config.js 404 —— 该文件含本机演示用明文 Key，按密钥红线永不入库；改法要么"引用改为
   存在性探测"、要么"该路径提交零密钥版 + Key 另存不入库文件"，两者都动密钥面 ⇒ 需老大在场。
-用法：python _test/clean_clone_check.py [--keep]
-退出码：0=全绿 1=判红 2=环境未验（git/浏览器不可用、克隆失败、端口占用）
+用法：python _test/clean_clone_check.py [--keep] [--nav-timeout N]
+退出码：0=全绿 1=判红（含判据自身崩溃，由兜底腿 C6 点名）2=环境未验（git/浏览器不可用、克隆失败、端口占用）
+r100 三态纪律：导航/求值层异常不再逃出进程——它折成 C2 判红并带异常原因，C3/C4/C5 各记未验
+并在结论行点名（分母不缩水）；任何未预期异常由 guarded_main 兜底，保证电池永远拿得到一行判据结论。
+演习口：`--nav-timeout 1` 出一次真实 Playwright 超时；`--nav-timeout abc` 让仪器自己崩（必出 C6）。
 """
 import http.server
 import os
@@ -97,6 +100,83 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 from browser_engine import launch as be_launch, short_face   # r98 E2 迁移：唯一实现见 browser_engine.py
 
 
+def drive_page(b, port, nav_timeout_ms):
+    """页面驱动段（r100 从 main 提出：纯搬家、行为零变化；LOC 门 ≤150 行/函数）。
+
+    结论一律经 check()/unverified() 落进模块级 results；导航/求值层异常不得吃掉结论行。
+    返回已登记缺口的命中表（C5 的销账点名与 PASS 行都要它）。
+    """
+    pg = b.new_page(viewport={"width": 1280, "height": 860})
+    errs, failed = [], []
+    failed_why = []   # r65：原实现只留 URL 末段，把 `failure` 原因丢了 ⇒
+    # 良性中止与真缺件在证据上不可分（同族：测量须带状态码）。C4 判红时必须能自证是哪一类。
+    pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
+    pg.on("pageerror", lambda e: errs.append("PAGEERROR: " + str(e)))
+    pg.on("requestfailed", lambda x: (failed.append(x.url.split("/")[-1]),
+                                      failed_why.append("%s<-%s" % (
+                                          x.url.split("/")[-1], x.failure))))
+    nav_err = None
+    try:
+        resp = pg.goto("http://127.0.0.1:%d/index.html" % port,
+                       wait_until="networkidle", timeout=nav_timeout_ms)
+        pg.wait_for_timeout(2500)
+        st = pg.evaluate("""() => ({
+            three: typeof THREE, gsap: typeof gsap, st: typeof ScrollTrigger,
+            acts: document.querySelectorAll('section.act').length,
+            gl: !!document.querySelector('#gl'),
+            input: !!document.querySelector('#chat-input')})""")
+    except Exception as e:
+        # r100：导航/求值层异常**必须留在证据面上**。原实现让它逃出进程 ⇒
+        # 电池读到 rc=1 却拿不到任何 CLEAN-CLONE-* 判据行（「无原因判红」），
+        # 真缺陷与仪器崩溃在受理面上不可分。**不折成 UNVERIFIED**：走到这里
+        # 说明浏览器起得来、克隆也建成了，那份页面真打不开就是要被本判据抓住的缺陷；
+        # 环境档已由 git/克隆/launch 三处前置出口各自 return 2。
+        resp, st = None, None
+        nav_err = "%s: %s" % (type(e).__name__, str(e).splitlines()[0][:90])
+        check("C2 干净克隆里页面真加载", False,
+              "浏览器层导航/求值异常 %s" % nav_err)
+    if st is not None:
+        ok2 = (resp and resp.status == 200 and st["three"] == "object"
+               and st["gsap"] == "object" and st["st"] == "function"
+               and st["acts"] == 5 and st["gl"] and st["input"])
+        check("C2 干净克隆里页面真加载", ok2,
+              "http=%s %s" % (resp.status if resp else None, st))
+    if nav_err is not None:
+        # 分母不缩水：C2 崩了就不许把 C3/C4/C5 悄悄省掉（同族：判据只测拒绝侧
+        # 会让新能力永久 403 而全绿）。三条各记未验并在结论行点名。
+        for _n in ("C3 离线降级链路真走通",
+                   "C4 报错必须 ⊆ 已知缺口（新面孔即红）",
+                   "C5 已知缺口不得变成永久豁免"):
+            unverified(_n, "C2 导航/求值异常 ⇒ 页面无从判定")
+        return {}
+    ok3 = False
+    try:
+        pg.fill("#chat-input", "今天有点难过")
+        pg.click("button[type=submit]")
+        pg.wait_for_function(
+            "() => document.querySelectorAll('#chat-log .msg').length >= 2",
+            timeout=20000)
+        ok3 = True
+    except Exception as e:
+        detail3 = str(e)[:90]
+    check("C3 离线降级链路真走通", ok3, "" if ok3 else detail3)
+    hits, unknown, unknown_req = classify_errors(errs, failed)
+    check("C4 报错必须 ⊆ 已知缺口（新面孔即红）", not unknown and not unknown_req,
+          "未解释 console %d 条 %s；未登记失败请求 %s；失败原因 %s"
+          % (len(unknown), unknown[:1], unknown_req[:2], failed_why[:4]))
+    closed = [g for g, c in hits.items() if c == 0]
+    check("C5 已知缺口不得变成永久豁免", not closed,
+          "登记 %d 条，实测命中 %s%s"
+          % (len(KNOWN_GAPS),
+             ",".join("%s=%d" % (k.split("/")[-1], v) for k, v in hits.items() if v) or "无",
+             "；0 命中须销账：" + ",".join(x.split("/")[-1] for x in closed)
+             if closed else ""))
+    if closed:
+        print("     ⚠️ 缺口已不存在，请从 KNOWN_GAPS 删掉：%s"
+              % [x.split("/")[-1] for x in closed])
+    return hits
+
+
 def main():
     if "--selftest" in sys.argv[1:]:
         return selftest()
@@ -107,6 +187,14 @@ def main():
     tmp = Path(tempfile.mkdtemp(prefix="xinyu_clone_"))
     clone = tmp / "repo"
     keep = "--keep" in sys.argv[1:]
+    # r100 导航超时**演习口**（三向反例里两向由它产出，且零假分支）：
+    #   `--nav-timeout 1`  ⇒ 逼出一次真实的 Playwright 超时（不是代码里 raise 的仿品）
+    #   `--nav-timeout abc` ⇒ int() 在 main 内抛 ValueError ⇒ 由 guarded_main 兜底腿接住
+    # 缺省 30000 = Playwright 原默认，未启用演习时口径一字未动。
+    _nt = "30000"
+    if "--nav-timeout" in sys.argv:
+        _nt = sys.argv[sys.argv.index("--nav-timeout") + 1]
+    nav_timeout_ms = int(_nt)
     try:
         # 从 HEAD 克隆：`file://` 关掉本地硬链接优化，逼它真走对象传输，
         # 否则 local clone 会直接读工作树，"未提交的改动"会混进来冒充已交付状态。
@@ -151,56 +239,11 @@ def main():
                         print("CLEAN-CLONE-ENV-UNVERIFIED 浏览器起不来（三档全败）%s"
                               % (str(e).splitlines()[0][:90] if str(e) else type(e).__name__))
                         return 2
-                    pg = b.new_page(viewport={"width": 1280, "height": 860})
-                    errs, failed = [], []
-                    failed_why = []   # r65：原实现只留 URL 末段，把 `failure` 原因丢了 ⇒
-                    # 良性中止与真缺件在证据上不可分（同族：测量须带状态码）。C4 判红时必须能自证是哪一类。
-                    pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
-                    pg.on("pageerror", lambda e: errs.append("PAGEERROR: " + str(e)))
-                    pg.on("requestfailed", lambda x: (failed.append(x.url.split("/")[-1]),
-                                                      failed_why.append("%s<-%s" % (
-                                                          x.url.split("/")[-1], x.failure))))
-                    resp = pg.goto("http://127.0.0.1:%d/index.html" % port,
-                                   wait_until="networkidle")
-                    pg.wait_for_timeout(2500)
-                    st = pg.evaluate("""() => ({
-                        three: typeof THREE, gsap: typeof gsap, st: typeof ScrollTrigger,
-                        acts: document.querySelectorAll('section.act').length,
-                        gl: !!document.querySelector('#gl'),
-                        input: !!document.querySelector('#chat-input')})""")
-                    ok2 = (resp and resp.status == 200 and st["three"] == "object"
-                           and st["gsap"] == "object" and st["st"] == "function"
-                           and st["acts"] == 5 and st["gl"] and st["input"])
-                    check("C2 干净克隆里页面真加载", ok2,
-                          "http=%s %s" % (resp.status if resp else None, st))
-                    ok3 = False
+                    hits = drive_page(b, port, nav_timeout_ms)
                     try:
-                        pg.fill("#chat-input", "今天有点难过")
-                        pg.click("button[type=submit]")
-                        pg.wait_for_function(
-                            "() => document.querySelectorAll('#chat-log .msg').length >= 2",
-                            timeout=20000)
-                        ok3 = True
-                    except Exception as e:
-                        detail3 = str(e)[:90]
-                    check("C3 离线降级链路真走通", ok3, "" if ok3 else detail3)
-
-                    hits, unknown, unknown_req = classify_errors(errs, failed)
-                    check("C4 报错必须 ⊆ 已知缺口（新面孔即红）", not unknown and not unknown_req,
-                          "未解释 console %d 条 %s；未登记失败请求 %s；失败原因 %s"
-                          % (len(unknown), unknown[:1], unknown_req[:2], failed_why[:4]))
-                    closed = [g for g, c in hits.items() if c == 0]
-                    check("C5 已知缺口不得变成永久豁免", not closed,
-                          "登记 %d 条，实测命中 %s%s"
-                          % (len(KNOWN_GAPS),
-                             ",".join("%s=%d" % (k.split("/")[-1], v)
-                                      for k, v in hits.items() if v) or "无",
-                             "；0 命中须销账：" + ",".join(x.split("/")[-1] for x in closed)
-                             if closed else ""))
-                    if closed:
-                        print("     ⚠️ 缺口已不存在，请从 KNOWN_GAPS 删掉：%s"
-                              % [x.split("/")[-1] for x in closed])
-                    b.close()
+                        b.close()
+                    except Exception as e:                       # noqa: BLE001
+                        print("     （浏览器关闭失败 %s，不影响判据）" % type(e).__name__)
                 httpd.shutdown()
         finally:
             os.chdir(old_cwd)
@@ -259,5 +302,29 @@ def selftest():
     return 0 if ok == n else 1
 
 
+def guarded_main():
+    """r100：判据的失败路径自己不能崩，也不能崩掉结论行。
+
+    未预期异常从 main 逃出时，电池只看到 rc=1 而看不到 `CLEAN-CLONE-*` 行 ⇒「无原因判红」，
+    与真实红在受理面上同形（在册同族：崩溃不冒充环境、判据不许 exit 掉后面的）。
+    兜底腿把异常本身判红并**照常印结论行**，rc 恒 1（不是 2——仪器坏了不是环境未验）。
+    """
+    try:
+        return main()
+    except SystemExit:
+        raise
+    except BaseException as e:                                   # noqa: BLE001
+        check("C6 判据自身未崩溃", False,
+              "未预期异常 %s: %s（上方逐条为崩溃前已判定项）"
+              % (type(e).__name__, str(e).splitlines()[0][:110]))
+        bad = [n for n, ok, d in results if ok is False]
+        unv = [n for n, ok, d in results if ok is None]
+        print("=" * 72)
+        print("CLEAN-CLONE-FAIL 兜底腿=C6 判红=%d 条 %s 未验=%d 条 %s"
+              % (len(bad), ",".join(x.split(" ")[0] for x in bad),
+                 len(unv), ",".join(x.split(" ")[0] for x in unv)))
+        return 1
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(guarded_main())
