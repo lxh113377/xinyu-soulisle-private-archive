@@ -2,6 +2,65 @@
 
 *(自 `v1.7.0` 起的在制增量 r94–r96 已随 **v1.8.0** 发布；`v1.8.0` 之后的 r96 受理面修复与 r97 语音退出态修复已随 **v1.8.1** 发布。)*
 
+### Fixed（r100① · 判据三态纪律：Playwright 超时不再吃掉结论行，电池新增「盲红」档）
+
+- 一手缺陷（本轮 Read 全文实测，非引用台账）：`clean_clone_check.py` 的 `pg.goto/evaluate`、
+  `rescan_shots_check.py` 的断网 `pg.reload(timeout=25000)`、`public_check.py` 的导航与**全部裸 `assert`**
+  都在判据的**失败路径**上。未预期异常逃出进程 ⇒ 电池按 rc 分三态（1 判红 / 2 未验 / 其余 CRASH），
+  而 rc=1 又没有任何 `XXX-FAIL` 行——**「仪器崩了」与「产品坏了」在受理面同形**，下一轮就会去改没坏代码。
+- 修法（三件同一口径）：① 超时/求值异常**折成判红并带异常原因**（不折 UNVERIFIED：能走到导航这步，
+  说明浏览器与克隆都已在位，那份页面打不开正是本判据存在的理由；环境档仍由各前置出口 `return 2`）；
+  ② 未走到的腿**逐条记未验**——`rescan_shots`/`public_check` 各建腿名册 `LEGS` 作唯一分母
+  （12 条 / 10 条），`report()` 单出口在任何出口都印结论行；③ `guarded_main()` 兜底腿（`C6`/`SX`/`PX`）
+  接住未预期异常并照常印门面行，浏览器关闭也各自包好。
+- 演习口 `--nav-timeout`（真实超时，不是代码里 raise 的仿品）：`1` 逼 Playwright 超时、`abc` 让仪器自崩。
+  真机三向回执（本轮实测）：`clean_clone` 正常 `CLEAN-CLONE-PASS` rc=0 ／ `--nav-timeout 1` rc=1 点名
+  `TimeoutError: Page.goto: Timeout 1ms exceeded` ＋ C3/C4/C5 未验 ／ `abc` rc=1 出 `C6`；
+  `rescan_shots` `PASS` rc=0 ／ 超时腿 `S0-0` 判红 + 11 条未验 rc=1 ／ `abc` 出 `SX` rc=1；
+  `public_check` `PUBLIC-ONLINE-ALL-PASS 判红=0 未验=0 腿名册=10` rc=0（公网真跑 10 条全绿）／ 两条反例同上。
+- **修类不修例**：`run_all_suites.py` 新增 `blind_reds()`（rc=1 且收口行不含判据词 ⇒ 单列 `BLIND-RED` 档）
+  ＋ `blind_selftest()` 双向 7 向（含「FAIL 行本身即结论，不得因红了再记一次盲红」「rc=2/rc=3 不抢这一档」）。
+  红照判、rc 判定一字未动，只是把「谁崩了」变成点名读数。
+- 途中自造一次并当场被自家门拦住：改名 `nav_timeout`→`nav_timeout_ms` 前的 `NameError` 从 `drive_page()`
+  抛出——**新加的守卫把它折成了带原因的 C2 判红**，正是本轮要修的形态在修完后第一次咬到自己。
+  `loc_guard --enforce` 也拦了两次（`main` 加守卫后 159/164 > 150）⇒ 抽 `drive_page()` / `drive_chat()`，
+  阈值不动；代价如实登记在 r100④ 与 `docs/quality-gates.md` 的 timing_coupling 行（两处定长被改判
+  `READ_NO_DECIDE`，是尺变软不是活变好，故 C1_HARD 基线 9 一字未动）。
+
+### Changed（r100② · 性能仪器：每档 5 次取中位数 + 自报噪声底；检测限**未**下压的实测结论）
+
+- `perf_baseline_check.py`：`--ramp-reps 5` / `--ramp-warmup 1`（新默认），`reduce_reps()` 纯函数把同档多次
+  折成中位数读数（rps/p95/max 取中、`llm_used` **每一次**都 False 才算 False），每档面入库 `band_rps`/
+  `reps`/`reps_warmup_dropped`、整轮 `worst_band_pct`；selftest 加 6 向（取中不取均、冷启不掺、空样本不得
+  折成 ok、`judge_ramp` 吃得动中位数产物……）⇒ `SELFTEST-PASS`。
+- `perf_ramp_delta_check.py`：口径腿 `caliber_gaps()` 加 `reps_per_tier`/`warmup_per_tier` 两维（旧台账读
+  None ⇒ 判口径差 rc=2，不冒充「没差」）；新增 `noise_floor()`，本轮该档面带宽 ≥ 阈值 ⇒ 门面行 `噪声档=N`
+  + 明细行点名「不具因果判定力（须复跑）」，**红照判、rc 不放宽**；selftest 32→40 条。
+- **负面结论，写在权威面上**（docs/PERF-BASELINE.md §1b，10 份同口径台账）：每档跑 5 次取中位数
+  **没有**把跨轮噪声压下来——t8/t16 跨轮带宽 55.9%~76.7%（比 r99 单次口径的 38.4% 还大），t32/t64 只有
+  9.2%~16.6%。机理：同一轮里的 5 次 reps 共享同一台机器的同一时刻，噪声是**相关**的，重复不产生独立性。
+  ⇒ **检测限仍写 ≥50%，阈值一字未动**；真正到手的是「仪器自报噪声底」＋「按档定阈」的可推导数据（r101 入口）。
+- 命名纪律一手代价：`ledgers()` 按 `(日期, 文件名字典序)` 取相邻两份，而 `.`(0x2E) > `-`(0x2D)，
+  当天第一份写成无后缀 ⇒ 比的成了「第一份 vs 最后一份」，实测产出 2 条 `t16 p95 +67.9%` **假红**；
+  已把该份改名 `-a`（现 a..j 严格时间序），纪律落在 docs/PERF-BASELINE.md §1b。
+
+### Changed（r100③ · 产品暴露 `window.__pendingTurns`，U2g 替掉 ux_guards 的 6000ms 定长）
+
+- `src/js/chat-agent.js`：`respond()` 改名 `respondCore()`，对外仍叫 `respond`，外面包一层 `turn()`——
+  进轮 `+1`、`finally` `−1`（异常与提前 return 都过 finally，不会只加不减）。零网络零 UI，仅完成态可观测。
+  字节 14,699→15,225（预算 15,302，余 77B）；`deploy/xinyu` 同步后 SHA256 逐字节等，
+  `DEPLOY-SYNC-PASS` / `BUDGET-PASS` / `JS-SYNTAX-PASS` 三面实测。
+- `_test/ux_guards_check.py`：U2 的 45 条连发不再 `wait_for_timeout(6000)`，改等 `__pendingTurns === 0`
+  （轮询 `raf`：`respond` 的 finally 减到 0 之后 `app.js` 的渲染在同一微任务续体里紧接着跑），新增腿 **U2g**。
+  真机回执 `UX-GUARDS-PASS 合计 22 项 失败 0`；双向反例（一次性脚本，不入库）实测：抹掉钩子 ⇒ 超时判红、
+  真往返 ⇒ 归零通过 ⇒ `DRILL-PASS`。
+- 由此 `timing_coupling` 在册唯一那条 `unobservable` 定长**真销账**；同轮的 LOC 提取让另两条定长
+  移出 C1_HARD（未消除，见上），评审账按「键与现读同起同落」重对 ⇒ `TIMING-COUPLING-PASS 覆盖 6/6`。
+- ⚠️ 公网面落后一件：`live_sync` 现点名 `js/chat-agent.js(live=14699B local=15225B)` 与原有的
+  `js/voice.js`，前提仍是 Cloudflare 凭据（P0 在册，未解）。
+
+
+
 ### Fixed（r99b · 受理面那条 `E2b` 红的归因与修法：判据分母从本机目录面改取 git 跟踪面）
 
 - 上一轮我在 r99 报告里把这条写成"本轮未归因"——**那是保守误判**：`git clone --no-hardlinks` 到临时目录

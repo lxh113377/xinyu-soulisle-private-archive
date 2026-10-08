@@ -52,6 +52,11 @@ RAMP_WORK = 32            # 每线程请求数 ⇒ 各档总请求 = 档位 × 3
 # 才有 11.6 个百分点的余量。旧台账（work=4）与新台账（work=32）**不可比**，由漂移尺的口径腿
 # 逐档记 NA、整体回 rc=2 UNVERIFIED（不判红也不判绿），不是回落成"没漂移"。
 RAMP_BUDGET_S = 60         # 整段阶梯的硬上限；到点即停并把未跑档记 NA(budget-exhausted)
+# r100：每档**重复取中位数**（入口第②条，"先提仪器精度再谈调小阈值"）。一手依据：work=32 时
+# 同机静置 5 轮的档内带宽仍有 9.2%~38.4%，r99 只能把检测限如实写成 50%。单档 took_s≈0.07~0.61s
+# （实测见 perf-ramp-2026-10-07d.json），整段阶梯 1.2s ⇒ 5 次重复的代价是秒级，不是分钟级。
+RAMP_REPS = 5              # 参与中位数的次数
+RAMP_WARMUP = 1            # 每档先丢掉的冷启次数（r99 首轮 986.6 rps 的冷启离群点就是这么来的）
 
 
 def timed(fn):
@@ -142,45 +147,106 @@ def judge(m):
     return bad
 
 
-def measure_ramp(base, tiers, work, budget_s):
+def reduce_reps(reps_out, warm=None):
+    """把同一档多次跑的结果折成**一个中位数读数**（纯函数，selftest 双向打过）。
+
+    为什么是中位数而不是平均值：r99 实测 work=32 单跑时每档带宽仍达 9.2%~38.4%，这类样本
+    是**单侧长尾**（某一次被别的进程抢占就飙高），均值会被长尾拖走，中位数不会。
+    口径四条，都是"宁可少声称也不虚报"：
+      · rps 取各次的中位数（越大越好），p95/max 取各次的中位数（越小越好）；
+      · `llm_used` 必须**每一次**都是 False 才算 False——任何一次 True/None 都往严的方向走
+        （一次都没证到的东西不许写进结论）；
+      · `warm`（冷启丢弃次）只入库计数，不参与任何统计量；
+      · 样本不足时 `band_rps` 照实印、不猜：漂移尺的口径腿会因 reps/warmup 不同拒绝互比。
+    """
+    warm = warm or []
+    ok = [r for r in reps_out if r.get("state") == "ok"]
+    if not ok:
+        return {"state": "NA(no-rep-succeeded)", "reps": len(reps_out),
+                "reps_asked": len(reps_out), "reps_warmup_dropped": len(warm)}
+    rps = [r["health"]["rps"] for r in ok if (r.get("health") or {}).get("rps") is not None]
+    out = {"state": "ok", "reps": len(ok), "reps_asked": len(reps_out),
+           "reps_warmup_dropped": len(warm)}
+    for face in ("health", "emotion"):
+        vals = [r[face] for r in ok if isinstance(r.get(face), dict) and "rps" in r[face]]
+        if not vals:
+            out[face] = {"state": "NA(no-sample)"}
+            continue
+        pr = [v["rps"] for v in vals]
+        pp = [v["p95_ms"] for v in vals]
+        out[face] = {"rps": round(pct(pr, 50), 1), "p95_ms": round(pct(pp, 50), 1),
+                     "max_ms": round(pct([v["max_ms"] for v in vals], 50), 1),
+                     "threads": vals[0]["threads"], "n": vals[0]["n"],
+                     "band_rps": round((max(pr) - min(pr)) / min(pr) * 100.0, 1) if min(pr) else None,
+                     "reps_rps": [round(x, 1) for x in pr]}
+        if face == "emotion":
+            llms = [v.get("llm_used") for v in vals]
+            # 单一真相：llm_used 只放在 emotion 面内（judge_ramp 读的就是这一处），
+            # 档级不再另存一份副本，免得两处漂移。
+            out[face]["llm_used"] = False if all(x is False for x in llms) else (
+                None if any(x is None for x in llms) else True)
+            out["reps_llm"] = llms
+    return out
+
+
+def measure_ramp(base, tiers, work, budget_s, reps=1, warmup=0):
     """阶梯并发：每档开 `n` 个线程、每线程 `work` 次闭环请求，打两条面
     （health=纯服务端并发；emotion=危机短路句，仍要求不调 LLM）。
     到 `budget_s` 即**停止加档**，未跑的档记 NA(budget-exhausted)——不缩档数、不降并发、
-    不加有界重试（放宽等于为绿而松尺，与本仓 voice 8s 预算 / coverage 门同宗纪律）。"""
+    不加有界重试（放宽等于为绿而松尺，与本仓 voice 8s 预算 / coverage 门同宗纪律）。
+
+    r100：每档跑 `reps` 次并取**中位数**（`reduce_reps`）。立因是 r99 把检测限如实写成 50%
+    ——单跑一次时同机静置的档内带宽就有 9.2%~38.4%，30% 量级的真实回退根本检不出。
+    先提仪器精度再谈调小阈值，不拿"看不见"当"没坏"。某档跑到一半超预算 ⇒ 该档用已跑完的次数
+    出中位数并如实记 `reps`<`reps_asked`（不冒充满次数，也不整档作废）。
+    `warmup` 次冷启跑**不进中位数**：r99 那个 986.6 rps 的首轮离群点就是冷启，丢它是修仪器
+    而不是挑数据 —— 已跑次数与丢弃次数一起入库（`reps_warmup_dropped`），漂移尺按同一口径拒比。"""
     out = {}
     deadline = time.perf_counter() + budget_s
     crisis_body = json.dumps({"text": CRISIS_TEXT}, ensure_ascii=False).encode("utf-8")
     for n in tiers:
         if time.perf_counter() > deadline:
-            out[n] = {"state": "NA(budget-exhausted)"}
+            out[n] = {"state": "NA(budget-exhausted)", "reps": 0}
             continue
-        rec = {"state": "ok"}
-        for face, url, body in (("health", base + "/api/health", None),
-                                ("emotion", base + "/api/emotion", crisis_body)):
-            def hit(u=url, b=body):
-                return timed(lambda: get(u, b))
-            t0 = time.perf_counter()
-            try:
-                with ThreadPoolExecutor(max_workers=n) as ex:
-                    res = list(ex.map(lambda _: hit(), range(n * work)))
-            except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
-                rec[face] = {"state": "NA(fetch-failed:%s)" % getattr(e, "reason", e)[:50]}
-                continue
-            wall = time.perf_counter() - t0
-            lats = [x[0] for x in res]
-            last = res[-1][1][1] if isinstance(res[-1][1], tuple) else res[-1][1]
-            d = {"rps": round(len(lats) / wall, 1) if wall > 0 else None,
-                 "p95_ms": round(pct(lats, 95), 1), "max_ms": round(max(lats), 1),
-                 "n": len(lats), "threads": n}
-            if face == "emotion":
+        t_tier = time.perf_counter()
+        reps_out = []
+        warm = []          # 冷启次数的原始读数：入库留证，但不参与中位数
+        got = 0
+        for _ in range(max(1, reps) + max(0, warmup)):
+            if time.perf_counter() > deadline:
+                break
+            rec = {"state": "ok"}
+            for face, url, body in (("health", base + "/api/health", None),
+                                    ("emotion", base + "/api/emotion", crisis_body)):
+                def hit(u=url, b=body):
+                    return timed(lambda: get(u, b))
+                t0 = time.perf_counter()
                 try:
-                    d["llm_used"] = bool(json.loads((last or b"").decode("utf-8", "replace")).get("llm"))
-                except Exception as e:                          # noqa: BLE001
-                    d["llm_used"] = None
-                    d["guard"] = "UNVERIFIED:%s" % type(e).__name__
-            rec[face] = d
-        rec["took_s"] = round(time.perf_counter() - t0, 2)
-        out[n] = rec
+                    with ThreadPoolExecutor(max_workers=n) as ex:
+                        res = list(ex.map(lambda _: hit(), range(n * work)))
+                except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
+                    rec[face] = {"state": "NA(fetch-failed:%s)" % getattr(e, "reason", e)[:50]}
+                    rec["state"] = "NA(fetch-failed)"
+                    continue
+                wall = time.perf_counter() - t0
+                lats = [x[0] for x in res]
+                last = res[-1][1][1] if isinstance(res[-1][1], tuple) else res[-1][1]
+                d = {"rps": round(len(lats) / wall, 1) if wall > 0 else None,
+                     "p95_ms": round(pct(lats, 95), 1), "max_ms": round(max(lats), 1),
+                     "n": len(lats), "threads": n}
+                if face == "emotion":
+                    try:
+                        d["llm_used"] = bool(json.loads((last or b"").decode("utf-8", "replace")).get("llm"))
+                    except Exception as e:                          # noqa: BLE001
+                        d["llm_used"] = None
+                        d["guard"] = "UNVERIFIED:%s" % type(e).__name__
+                rec[face] = d
+            if rec.get("state") == "ok":
+                (warm if got < warmup else reps_out).append(rec)
+            got += 1
+        merged = reduce_reps(reps_out, warm)
+        merged["took_s"] = round(time.perf_counter() - t_tier, 2)
+        out[n] = merged
     return out
 
 
@@ -260,7 +326,44 @@ def selftest():
         bad.append("⑩预算耗尽不该算判红（它该走 UNVERIFIED 分支）：%s" % b4)
     if len(na4) != 3:
         bad.append("⑪未跑的档必须逐档点名（期望 3 条 NA，实得 %d）⇒ 缺档会被读成『没有缺档』" % len(na4))
-    print("SELFTEST-%s" % ("PASS: 百分位/空样本/恒慢/缺面/口径漂移 + 阶梯 正例/双地板/LLM偷换/NA不冒充绿 九向正确"
+    # ── r100 中位数折叠腿：reduce_reps 是新写的纯函数，没自证就是没接线（R238 的层 a）──
+    def rep(rps, p95, llm=False):
+        return {"state": "ok",
+                "health": {"rps": rps, "p95_ms": p95, "n": 32, "threads": 8, "max_ms": p95 * 2},
+                "emotion": {"rps": rps, "p95_ms": p95, "n": 32, "threads": 8, "max_ms": p95 * 2,
+                            "llm_used": llm}}
+    three = [rep(100.0, 60.0), rep(200.0, 70.0), rep(1000.0, 90.0)]
+    mid = reduce_reps(three)
+    if abs(mid["health"]["rps"] - 200.0) > 1e-6:
+        bad.append("⑫中位数取错：[100,200,1000] 的 rps 应取 200（均值会是 433＝被长尾拖走），实得 %s"
+                   % mid["health"]["rps"])
+    if abs(mid["health"]["band_rps"] - 900.0) > 1e-6:
+        bad.append("⑬档内带宽算法失效：(max-min)/min 应得 900.0%%，实得 %s" % mid["health"]["band_rps"])
+    if reduce_reps([rep(900.0, 60.0), rep(900.0, 60.0, llm=True), rep(900.0, 60.0)])["emotion"]["llm_used"] is not True:
+        bad.append("⑭口径偷换漏报：三次里有一次走了 LLM，中位数读数却写成 False")
+    mixed = reduce_reps([rep(900.0, 60.0), rep(900.0, 60.0, llm=None), rep(900.0, 60.0)])
+    if mixed["emotion"]["llm_used"] is not None:
+        bad.append("⑮未证到的那次没被如实带出：llm_used=None 应折成 None（不得被两次 False 洗绿）")
+    w = reduce_reps([rep(900.0, 60.0), rep(900.0, 60.0)], [rep(50.0, 900.0)])
+    if w["reps"] != 2 or w["reps_warmup_dropped"] != 1 or w["health"]["rps"] < 800.0:
+        bad.append("⑯冷启次掺进了中位数：reps=%s dropped=%s rps=%s（丢弃次那次 50rps 必须不参与）"
+                   % (w["reps"], w["reps_warmup_dropped"], w["health"]["rps"]))
+    if reduce_reps([])["state"] != "NA(no-rep-succeeded)" or \
+            reduce_reps([{"state": "NA(fetch-failed)", "health": {"state": "NA"}}])["state"] != "NA(no-rep-succeeded)":
+        bad.append("⑰空/全失败样本被折成了 ok ⇒ 没取到数会冒充『跑过且绿』")
+    # 层 b（接线）：中位数读数必须能被 judge_ramp 直接吃，且严口径仍咬得住。
+    healthy_mid = {n: reduce_reps(three) for n in (8, 16, 32, 64)}
+    bb, nna = judge_ramp(healthy_mid, tiers)
+    if bb or nna:
+        bad.append("⑱接线失效：reduce_reps 的产物 judge_ramp 读不动（%s %s）⇒ 中位数进不了判据链"
+                   % (bb, nna))
+    llm_mid = {n: reduce_reps(three) for n in (8, 16, 32, 64)}
+    llm_mid[16] = reduce_reps([rep(900.0, 60.0), rep(900.0, 60.0, llm=None)])
+    bb2, _ = judge_ramp(llm_mid, (8, 16, 32, 64))
+    if not any("llm_used" in x and "16" in x for x in bb2):
+        bad.append("⑲变异体失效：16 档中位数读数里 llm_used=None 没被 judge_ramp 点名 ⇒ 中位数把偷换抹平了")
+    print("SELFTEST-%s" % ("PASS: 百分位/空样本/恒慢/缺面/口径漂移 + 阶梯 正例/双地板/LLM偷换/NA不冒充绿"
+                           " + 中位数 取中/带宽/LLM从严/冷启不掺/空样本/接线双证"
                            if not bad else "FAIL: " + "; ".join(bad)))
     return 1 if bad else 0
 
@@ -273,6 +376,10 @@ def main():
                     help="阶梯并发档位，逗号分隔（如 8,16,32,64）；**默认关**——电池不因此变长，"
                          "由 CI 的 perf-baseline 作业与人工轮次显式开启")
     ap.add_argument("--ramp-work", type=int, default=RAMP_WORK)
+    ap.add_argument("--ramp-reps", type=int, default=RAMP_REPS,
+                    help="每档参与中位数的次数（r100；1=退回单次读数）")
+    ap.add_argument("--ramp-warmup", type=int, default=RAMP_WARMUP,
+                    help="每档先丢掉几次冷启（r100；不计入中位数，只入库计数）")
     ap.add_argument("--ramp-budget", type=int, default=RAMP_BUDGET_S)
     ap.add_argument("--json", default="")
     ap.add_argument("--selftest", action="store_true")
@@ -299,22 +406,34 @@ def main():
     tiers = tuple(int(x) for x in a.ramp.split(",") if x.strip())
     ramp, ramp_bad, ramp_na = None, [], []
     if tiers:
-        ramp = measure_ramp(a.base, tiers, a.ramp_work, a.ramp_budget)
+        ramp = measure_ramp(a.base, tiers, a.ramp_work, a.ramp_budget,
+                            reps=a.ramp_reps, warmup=a.ramp_warmup)
         ramp_bad, ramp_na = judge_ramp(ramp, tiers)
         for n in tiers:
             d = ramp[n]
             h = d.get("health") or {}
             e = d.get("emotion") or {}
-            print("  ramp@%-4s %-18s health: rps=%-8s p95=%-7s ｜ emotion: rps=%-8s p95=%-7s llm_used=%s"
-                  % (n, d.get("state"), h.get("rps", "-"), h.get("p95_ms", "-"),
-                     e.get("rps", "-"), e.get("p95_ms", "-"), e.get("llm_used", "-")))
+            print("  ramp@%-4s %-18s reps=%s(warm丢%s) health: rps=%-8s p95=%-7s band=%-6s"
+                  " ｜ emotion: rps=%-8s p95=%-7s band=%-6s llm_used=%s"
+                  % (n, d.get("state"), d.get("reps", "-"), d.get("reps_warmup_dropped", "-"),
+                     h.get("rps", "-"), h.get("p95_ms", "-"), h.get("band_rps", "-"),
+                     e.get("rps", "-"), e.get("p95_ms", "-"), e.get("band_rps", "-"),
+                     e.get("llm_used", "-")))
+    # 档内带宽（max-min)/min 的中位数口径 —— 检测限由它推导，不靠"感觉够用"。
+    bands = [v.get(f, {}).get("band_rps") for v in (ramp or {}).values()
+             for f in ("health", "emotion")
+             if isinstance(v.get(f), dict) and v[f].get("band_rps") is not None]
+    worst_band = round(max(bands), 1) if bands else None
     if a.json:
         Path(a.json).write_bytes(json.dumps({"base": a.base, "reps": a.reps, "samples": m,
                                              "budgets": {k: v["p95_ms"] for k, v in BUDGETS.items()},
                                              "concurrency": {"single_point_threads": CONC["threads"],
                                                              "single_point_requests": CONC["threads"] * CONC["per_thread"]},
                                              "ramp": ({"tiers": list(tiers), "work_per_thread": a.ramp_work,
+                                                       "reps_per_tier": a.ramp_reps,
+                                                       "warmup_per_tier": a.ramp_warmup,
                                                        "budget_s": a.ramp_budget,
+                                                       "worst_band_pct": worst_band,
                                                        "result": {str(k): v for k, v in (ramp or {}).items()}}
                                                       if ramp else None),
                                              "breach": bad + ramp_bad},
@@ -341,7 +460,10 @@ def main():
                         for n in tiers)
         p95s = [(ramp[n].get("health") or {}).get("p95_ms") for n in tiers
                 if (ramp[n].get("health") or {}).get("p95_ms") is not None]
-        tier_note = "｜阶梯 %s｜p95@N 峰值 %sms" % (line, round(max(p95s), 1) if p95s else "-")
+        tier_note = ("｜阶梯 %s｜p95@N 峰值 %sms｜每档中位数取 %d 次（另丢冷启 %d 次）"
+                     "｜档内带宽最坏 %s%%" % (line, round(max(p95s), 1) if p95s else "-",
+                                             a.ramp_reps, a.ramp_warmup,
+                                             worst_band if worst_band is not None else "-"))
     print("PERF-BASELINE-PASS（%d 个目标在预算内｜实测峰值 p95=%.1fms，最紧余量 %.0fms｜"
           "吞吐 并发%d线程×%d请求=%s rps%s｜口径=本地无外网 + 危机路径不调 LLM；"
           "这是自身棘轮不是跨项目对比）"

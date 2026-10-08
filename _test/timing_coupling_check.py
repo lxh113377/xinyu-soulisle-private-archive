@@ -237,22 +237,22 @@ def norm_stmt(seg):
 #   shaped-only  形状命中但**没有可等的异步态**（同步 DOM 变更 / 等待对象就是被断言对象）
 #   unobservable 产品没暴露完成态，硬造一个「等」等于替被测对象编造状态 ⇒ 保留定长并记此态
 # 本表只是**读数**：判据仍不猜意图（红只由棘轮产生），未覆盖件走续行出声、不判红。
+#
+# r100 对账（键必须与现读同起同落，所以这里只记「现在仍在 C1_HARD 里」的形状；
+# 三条已被移出去的形状连同结论一起写在 交付物/对标分析报告-2026-10-08-r100.md §3-①）：
+#   · ux_guards_check.py::pg.wait_for_timeout(6000) —— **真消除**：产品暴露 window.__pendingTurns，
+#     U2g 改等它归零（timing_coupling 在册唯一那条 unobservable 由此销账）。
+#   · clean_clone_check.py::pg.wait_for_timeout(2500) 与 public_check.py::pg.wait_for_timeout(12000)
+#     —— **没有消除**：LOC 门（≤150 行/函数）把 wait+read 提进了 drive_page()/drive_chat()，
+#     决策留在调用方 ⇒ 本尺把它们改判 READ_NO_DECIDE。这是**尺变软**，不是活变好，
+#     所以 C1_HARD 基线一字未动（仍 9，现读 6）；r101 的正解是把被审面扩到「跨函数返回值的消费者」。
 REVIEW = {
-    "clean_clone_check.py::pg.wait_for_timeout(2500)": {
-        "verdict": "shaped-only", "sites": 1,
-        "why": "等的是 vendor 三个全局到位，而 C2 断言的就是它 ⇒ 直接换 wait_for_function 会把 "
-               "FAIL 变成 Playwright TimeoutError（电池按 rc 分三态，崩溃不是判红）。"
-               "正解要先把超时折成 check(...,False) 再说，登记 r100"},
     "memory_recall_check.py::pg.wait_for_timeout(1500)": {
         "verdict": "shaped-only", "sites": 1,
         "why": "reload 后清 localStorage 再读播种态，读的是本进程刚写入的确定值，无异步态可等"},
     "offline_shell_check.py::pg.wait_for_timeout(600)": {
         "verdict": "shaped-only", "sites": 1,
         "why": "取数在 evaluate 的 async 体里自带 await fetch，这 600ms 什么都没等（装饰性定长）"},
-    "public_check.py::pg.wait_for_timeout(12000)": {
-        "verdict": "mis-wait", "sites": 1,
-        "why": "形状与 ux_guards U1d 同款（押回复落地）。但公网副本与 src **不同版**风险未证 ⇒ "
-               "改前先证 data-emotion 在公网面存在，否则新等会在公网面造出假红。登记 r100"},
     "rescan_shots_check.py::pg.wait_for_timeout(2500)": {
         "verdict": "shaped-only", "sites": 2,
         "why": "两处分别等 SW 注册生效与离线重载后结构就位，而等的内容就是被断言的内容 ⇒ "
@@ -260,11 +260,6 @@ REVIEW = {
     "rescan_shots_check.py::pg.wait_for_timeout(700)": {
         "verdict": "shaped-only", "sites": 1,
         "why": "等 #dlg-settings 打开，而 dlg_open 正是被断言项（同上，改了会把 FAIL 变 CRASH）"},
-    "ux_guards_check.py::pg.wait_for_timeout(6000)": {
-        "verdict": "unobservable", "sites": 1,
-        "why": "45 条连发要等**全部回合**收干，产品没有 pending 回合计数器（实测 grep "
-               "responding|aria-busy|pending src/js 零命中）⇒ 等最后一条落地只证明最后一轮，"
-               "证明不了 45 轮。正解是产品暴露 window.__pendingTurns，属产品面改动，另轮做"},
     "ux_guards_check.py::pg.wait_for_timeout(800)": {
         "verdict": "shaped-only", "sites": 1,
         "why": "展开是 chat-window.js 同步 insertBefore，800ms 押的是同步变更；而可等的完成态"
