@@ -3,9 +3,9 @@
   "dim_a_testing_repro": {
     "self": {
       "face": "git HEAD",
-      "regression_suites": 133,
-      "java_test_files": 11,
-      "java_test_cases": 88,
+      "regression_suites": 140,
+      "java_test_files": 12,
+      "java_test_cases": 101,
       "jacoco_minimum": {
         "LINE": 0.9,
         "BRANCH": 0.9
@@ -50,9 +50,9 @@
   "dim_b_zero_build_cost": {
     "self_cost": {
       "face": "git HEAD",
-      "regression_suites": 133,
-      "java_test_files": 11,
-      "java_test_cases": 88,
+      "regression_suites": 140,
+      "java_test_files": 12,
+      "java_test_cases": 101,
       "jacoco_minimum": {
         "LINE": 0.9,
         "BRANCH": 0.9
