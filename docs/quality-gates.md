@@ -76,7 +76,7 @@ python _test/pdf_leak_scan.py            # PDF 文本层泄露复扫（R242：�
 python _test/tracked_secret_scan.py      # 跟踪文件密钥形态扫描（r35）—— 与 CI 密钥门禁同一把尺，且本地也跑
 python _test/remote_tree_audit.py        # 远端树洁净度审计（r37）：评委看得见的是远端 main 的文件树，不是本机工作树
 python _test/mobile_check.py             # 移动端与触屏可达性判据（r47）—— 量真实几何，不量"有没有写 @media"
-python _test/release_governance_check.py # 发布治理判据（r45，双通道同尺）—— 盯「版本在动、内容没切版」这一族
+python _test/release_governance_check.py # 发布治理判据（r45，双通道同尺）—— 盯「版本在动、内容没切版」这一族；R2c 的「归属轮次」口径 r101 收窄为**只认 `type(rNNN …)` 括号内轮号**，标题正文引用别轮（`fix(r101 收口): … + r102 入口建卷` 曾判红点名一个还没有提交的轮次）降为 `R2c(口径)` 告警；无 scope 的 feat/fix 仍按整条标题判，收窄不留后门（条数由 `--selftest` 自印）
 python _test/j2_chat_contract.py         # J2 契约验收：POST /api/chat 与 v1 1:1，前端零代码改动即可切到 Spring Boot
 python _test/j4_memory_check.py          # J4 持久化验验收：记忆从 localStorage 迁到服务端数据库（并保留本地降级）
 python _test/j4_remote_down_check.py     # J4 熔断对照：服务端没有 /api/memory 时，远端记忆必须"试一次就闭嘴"

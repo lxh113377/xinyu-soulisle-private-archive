@@ -40,11 +40,21 @@
 
 ### Known reds（本轮整跑如实登记，未修不冒充）
 
-- `eol_parity` 21 项全部属**他会话**：`ml/data/{train,dev}.jsonl`、`_test/emotion-blindset.json`、
-  `ml/reports/eval_report.json`（ml 会话已入库件）+ `交付物/AIC/*` 14 件（未入库）⇒ 本轮 grep 复算
-  命中本轮改动 **0 项**。按在册纪律：不改他人文件、不放宽判据，只报归属。
-- `ci_status`／`release_governance`／`live_sync`／`live_sync_alt`：均为在册已知，前提在老大侧
-  （Cloudflare API Token 与远端 CI 面），r99/r100 同名单。
+- `eol_parity` **13 项**（第 4 次整跑现读，取代本块旧版的 21 项——ml 会话那 4 个已入库件本轮已行尾归一）：
+  全部属**他会话未入库件** `交付物/AIC/*`；grep 复算命中本轮改动 **0 项**。
+  按在册纪律：不改他人未跟踪文件、不放宽判据，只报归属。
+- `live_sync`／`live_sync_alt`（同一根因的两个面）：公网 `js/chat-agent.js(live=14699B local=15225B)`、
+  `js/voice.js(live=4148B local=4798B)`。本机独立复算 `curl -s -w "%{http_code} %{size_download}"
+  https://xinyu-soulisle.pages.dev/js/voice.js` ⇒ `200 4148`。voice.js 末次改动是 r97 `e103db0`
+  （那一轮切了 v1.8.1 却没重部公网）⇒ 处置动作 = **重新部署公网**，属发布动作，本轮计划明令不做。
+- `release_governance` `R1`：v1.8.1 之后累计 **6 个 feat**（上限 5）⇒ 门在咬人，不是判据坏
+  （r98/r99 各 1 条 + 本轮 r101 的 4 条 feat）。处置 = 切版发布，同样在本轮范围外。
+  本轮同时修掉这一族的**一条真·假红**：`R2c` 原把整条标题扫出的轮号都当「归属轮次」，
+  于是 `fix(r101 收口): … + r102 入口建卷` 判红点名了一个**还没有任何提交的 r102**。
+  现归属只认 `type(rNNN …)` 括号内的轮号，括号外提到别轮降为 `R2c(口径)` 告警（可见不判红）；
+  收窄只作用于写了规范 scope 的提交，无 scope 仍按整条标题判（不留后门）。
+- `ci_status`：远端 `main`(`8b54af6`) 最近一次 run `37667798532` 两条 job 红，红因单一条 = 上面那条公网漂移
+  （`gh run view 37667798532 --log-failed` 实测只有 `LIVE-SYNC-FAIL … voice.js`）⇒ 与 `live_sync` 同根，不重复计账。
 
 ### Fixed（r100① · 判据三态纪律：Playwright 超时不再吃掉结论行，电池新增「盲红」档）
 
