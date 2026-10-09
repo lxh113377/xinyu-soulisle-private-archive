@@ -1,12 +1,12 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 133,
+ "suites": 140,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
   "jar8123": {
-   "n": 39,
+   "n": 44,
    "seconds": 623.8,
    "members": [
     "preflight",
@@ -47,11 +47,16 @@
     "storage_resilience",
     "storage_resilience_selftest",
     "ci_perf_wiring",
-    "ci_perf_wiring_selftest"
+    "ci_perf_wiring_selftest",
+    "jar_shape",
+    "jar_shape_selftest",
+    "entry_reach",
+    "entry_reach_selftest",
+    "rescan_shots"
    ]
   },
   "free": {
-   "n": 92,
+   "n": 94,
    "seconds": 294.4,
    "members": [
     "disclaimer_forensics",
@@ -127,6 +132,8 @@
     "run_logged_selftest",
     "loc_guard",
     "loc_guard_selftest",
+    "docker_image_sim",
+    "docker_image_sim_selftest",
     "verdict_exit_parity",
     "verdict_exit_parity_selftest",
     "ci_contract",
@@ -1261,6 +1268,80 @@
    "mode": "stub",
    "facets": [],
    "exclusive": []
+  },
+  {
+   "suite": "jar_shape",
+   "target": "_test/jar_shape_check.py",
+   "mode": "real",
+   "facets": [
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "jar_shape_selftest",
+   "target": "_test/jar_shape_check.py",
+   "mode": "stub",
+   "facets": [
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "entry_reach",
+   "target": "_test/entry_reach_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "entry_reach_selftest",
+   "target": "_test/entry_reach_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "docker_image_sim",
+   "target": "_test/docker_image_sim_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "docker_image_sim_selftest",
+   "target": "_test/docker_image_sim_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "rescan_shots",
+   "target": "_test/rescan_shots_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
   },
   {
    "suite": "verdict_exit_parity",
