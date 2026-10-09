@@ -15,6 +15,8 @@
 """
 import argparse
 import json
+import os
+import platform
 import statistics
 import sys
 import time
@@ -368,6 +370,33 @@ def selftest():
     return 1 if bad else 0
 
 
+def machine_state():
+    """台账的**机器状态凭据**（r101）—— 让下一轮真能把阈值收紧的那块机制。
+
+    为什么本轮要加它：r100 实测「每档取中位数压不掉跨轮噪声」，根因是同一轮 5 次共享这台机器
+    此刻的状态；而 r101 现算 11 个相邻对的最坏差时，跨轮/离群对（10-05→10-07 的 t64/emotion
+    63.1%）与同日静置对混在一个桶里取 max ⇒ 结论只能是「±50% 已是这份数据能支持的最严值」。
+    要把跨轮对与同日对分开算，前提是台账里**有**可比性凭据；没有就只能整桶取 max。
+    取不到的项一律记 None（不造默认值 —— 那会把"不知道"读成"相同"），`tag_env_set` 明写标识
+    到底有没有给：缺它时漂移尺会照实报「N 份台账无机器标识 ⇒ 跨轮不可归因」。
+    只用 stdlib：Windows 上 `getloadavg`/`sched_getaffinity` 不存在 ⇒ 相应项为 None。
+    """
+    tag = (os.environ.get("XINYU_MACHINE") or "").strip() or None
+    try:
+        load = list(os.getloadavg())
+    except (OSError, AttributeError):
+        load = None
+    try:
+        aff = len(os.sched_getaffinity(os.getpid()))
+    except (OSError, AttributeError):
+        aff = None
+    return {"tag": tag, "tag_env_set": tag is not None,
+            "cpu_count": os.cpu_count(), "cpu_affinity": aff,
+            "os": "%s %s" % (platform.system(), platform.release()),
+            "python": platform.python_version(), "loadavg_1m": (load[0] if load else None),
+            "taken_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("base", nargs="?", default="http://127.0.0.1:8123")
@@ -426,12 +455,14 @@ def main():
     worst_band = round(max(bands), 1) if bands else None
     if a.json:
         Path(a.json).write_bytes(json.dumps({"base": a.base, "reps": a.reps, "samples": m,
+                                             "machine": machine_state(),
                                              "budgets": {k: v["p95_ms"] for k, v in BUDGETS.items()},
                                              "concurrency": {"single_point_threads": CONC["threads"],
                                                              "single_point_requests": CONC["threads"] * CONC["per_thread"]},
                                              "ramp": ({"tiers": list(tiers), "work_per_thread": a.ramp_work,
                                                        "reps_per_tier": a.ramp_reps,
                                                        "warmup_per_tier": a.ramp_warmup,
+                                                       "machine_tag": machine_state()["tag"],
                                                        "budget_s": a.ramp_budget,
                                                        "worst_band_pct": worst_band,
                                                        "result": {str(k): v for k, v in (ramp or {}).items()}}
