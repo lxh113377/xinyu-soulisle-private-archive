@@ -124,12 +124,16 @@ def evaluate(members, fuse, today):
     dated = [m for m in members if m[1] is not None]
     by_name = max(dated, key=lambda m: m[1]) if dated else None
     by_mtime = max(members, key=lambda m: m[3])
-    # 交叉腿的**前提**是 mtime 真的携带信息。CI/全新 clone 下 `actions/checkout` 把每个文件都写成
-    # 同一时刻 ⇒ 全族 mtime 相同 ⇒ "mtime 最新"只是并列时的任意选择，与文件名最新不一致**不代表数据旧**。
-    # r96 一手：这条腿在 CI 上把整个判据判红（run 37281131793），而本地永远看不到。
-    # 处置=**逐条降档而非整判据降档**（R311）：龄期照判，只把这一腿降为"本维未验"，
-    # 并由 selftest 的反例腿证明"mtime 有区分度时它仍然咬"。
-    mtime_uniform = len({m[3] for m in members}) <= 1
+    # 交叉腿的**前提**是 mtime 真的携带信息。r96 一手是「CI 上全族同值」，本轮（r101）撞上它的
+    # **未覆盖变体**：runner 的 checkout 按 git 顺序落盘，同族 mtime 互不相等但只差亚秒——
+    # 「全等才降档」这条守卫不触发，于是"mtime 最新"退化成任意选择，CI 判红而本机永远看不到
+    # （run 37886693021：`分歧 1｜另有 0 族本腿未验`）。
+    # 判据不能靠"恰好全等"活着：**mtime 有没有区分度，由被保护对象的节奏定**——
+    # 整族跨度 < fuse（默认 7 天=重采节奏）时，mtime 分辨不出「哪一轮更新的」⇒ 本腿记未验。
+    # 跨度 ≥ fuse 时（本机常态：不同轮次真采于不同日）这条腿照常咬，降档不是大赦。
+    spread_s = max(m[3] for m in members) - min(m[3] for m in members)
+    informative = spread_s >= fuse * 86400
+    mtime_uniform = not informative
     stem = stem_of(members[0][0])
     if by_name is None:
         return {"stem": stem, "files": len(members), "state": "UNDATEd", "age_days": None,
@@ -142,8 +146,8 @@ def evaluate(members, fuse, today):
     if by_mtime[0] != by_name[0]:
         if mtime_uniform:
             row["divergence_unverified"] = (
-                "mtime 全族同值（%d 个成员同一 mtime）⇒ 本腿无区分度、记未验"
-                % len(members))
+                "本族 mtime 跨度 %.1f 小时 < fuse %d 天（重采节奏）⇒ mtime 分辨不出哪一轮更新，"
+                "本腿记未验（%d 个成员）" % (spread_s / 3600.0, fuse, len(members)))
         else:
             row["divergence"] = "mtime 最新=%s ≠ 文件名最新=%s" % (by_mtime[0], by_name[0])
     return row
@@ -324,13 +328,24 @@ def selftest():
     eq("变异体 非法日期 2026-13-45 ⇒ None（不得回落到 1 月 1 日）",
        parse_named_date("peer-x-2026-13-45.json"), None)
     eq("变异体 非日期串 ⇒ None（不得读成 0 龄）", parse_iso_ts("not-a-date"), None)
-    # 把 mtime 换成与文件名不同的那份 ⇒ 分歧列必须出现（否则交叉腿是恒假的）
-    div = evaluate([("peer-x-2026-09-27.json", date(2026, 9, 27), "文件名", 1.0),
-                    ("peer-x-2026-09-26.json", date(2026, 9, 26), "文件名", 999.0)], 7, T)
-    eq("交叉腿真在作用：mtime 指向旧版 ⇒ 必须记分歧", div.get("divergence", "")[:9],
+    # 把 mtime 换成与文件名不同的那份 ⇒ 分歧列必须出现（否则交叉腿是恒假的）。
+    # r101 更正：夹具的 mtime 必须**跨过重采节奏**才叫信息——旧夹具写 1.0/999.0（差 998 秒），
+    # 那正好是本轮 CI 假红的形态（checkout 只差亚秒），拿它当"有区分度"等于把缺陷编码进测试。
+    _t0 = 1_760_000_000.0
+    div = evaluate([("peer-x-2026-09-27.json", date(2026, 9, 27), "文件名", _t0),
+                    ("peer-x-2026-09-26.json", date(2026, 9, 26), "文件名", _t0 + 8 * 86400)], 7, T)
+    eq("交叉腿真在作用：mtime 跨度 ≥ fuse 且指向旧版 ⇒ 必须记分歧", div.get("divergence", "")[:9],
        "mtime 最新=peer-x-2026-09-26.json"[:9])
     eq("交叉腿的另一半：文件名最新仍优先当权威（不跟着 mtime 走）",
        div["newest"], "peer-x-2026-09-27.json")
+    # r101 CI 一手（run 37886693021）：同族 mtime 互不相等但只差一小时 ⇒ "全等才降档"不触发，
+    # CI 判红而本机看不见。这条腿把该形态钉成**未验**，与上面那条一起构成两侧。
+    near = evaluate([("peer-n-2026-09-27.json", date(2026, 9, 27), "文件名", _t0),
+                     ("peer-n-2026-09-26.json", date(2026, 9, 26), "文件名", _t0 + 3600)], 7, T)
+    eq("mtime 只差 1 小时（< fuse）⇒ 记未验不记分歧（CI checkout 噪声不得判红）",
+       "divergence" in near, False)
+    eq("同一输入必须确实给出未验文案（不是静默跳过）",
+       "未验" in near.get("divergence_unverified", ""), True)
     # r96 CI 一手：全新 clone 下全族 mtime 同值 ⇒ 交叉腿无区分度，只能降为"未验"，
     # 且**只降这一条**（龄期照判红）。下面两条腿一正一反，缺任一条这个降档就等于关门禁。
     uni = evaluate([("peer-u-2026-09-27.json", date(2026, 9, 27), "文件名", 777.0),
@@ -510,12 +525,23 @@ def main():
         print("落盘 %s" % a.json)
     red = bool(over) or bool(und) or bool(div) or not identity_ok or bool(na_div) or bool(na_reds)
     if red:
-        for x in na_reds:
-            print("  红因=" + x)
+        # 门面行**先**印：电池的 fold_detail 取的是「命中行之后 5 行内的 `-` 开头者」，
+        # 红因印在它前面，受理面上就只剩这半句（r101 CI 一手：`分歧 1` 点名不到族）。
         print("LEDGER-AGE-FAIL（peer 台账 %d 族：≤fuse %d｜超 fuse %d｜无日期可判 %d｜分歧 %d｜"
               "NA分叉=%d(waived %d)｜恒等式 %s）"
-              % (len(rows), len(within), len(over), len(und), len(div), len(na_div) + len(na_waived),
+              % (len(rows), len(within), len(over), len(und), len(div), len(na_div),
                  len(na_waived), "成立" if identity_ok else "不成立"))
+        for x in na_reds:
+            print("- 红-NA: " + x)
+        for r in div:
+            print("- 红-分歧: %s %s" % (r["stem"], r["divergence"]))
+        for x in over:
+            print("- 红-超龄: %s(%d 天)" % (x["stem"], x["age_days"]))
+        for x in und:
+            print("- 红-无日期: %s(%s)" % (x["stem"], x.get("why", "")))
+        if not identity_ok:
+            print("- 红-恒等式: 线内%d+超龄%d+无日期%d != 族%d ⇒ 有一族落进了没定义的桶"
+                  % (len(within), len(over), len(und), len(rows)))
         return 1
     if na_unknown:
         print("LEDGER-AGE-UNVERIFIED（龄期面全绿，但件内 NA 有 %d 族认不出形状/读不动 ⇒ "
