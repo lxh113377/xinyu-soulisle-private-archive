@@ -161,6 +161,31 @@ def rounds_in(text):
 # 不是产品缺陷；收窄到 feat/fix/perf/refactor 后 r38 自然消失，r41-r44 四条 feat 仍然咬住。
 NOTE_WORTHY = re.compile(r"^(feat|fix|perf|refactor)(\(|:)", re.I)
 
+# 归属轮次的口径（r101 一手代价）：提交 `fix(r101 收口): … + r102 入口建卷` 里那个 r102 是
+# **对下一轮的引用**，不是这条提交的归属轮 —— 旧口径把整条标题扫出的 rNNN 都当归属，于是
+# R2c 判红点名一个还没有任何提交的轮次。与 r90 那条「散文提及不算登记」同族，只是这次
+# 提及长在标题里。括号（scope）才是本仓写归属轮的位置。
+SCOPE_RE = re.compile(r"^(?:feat|fix|perf|refactor)\(([^)]*)\)", re.I)
+
+
+def commit_rounds(subjects):
+    """返回 (归属轮次集合, 仅提及轮次集合)。
+
+    只在「标题带 scope 且 scope 里确实有轮号」时才把 scope 外的轮号降为提及；
+    无 scope（`fix: …`）或有 scope 但 scope 里没有轮号（`fix(收口): … r102 …`）一律沿用旧口径
+    按整条标题判 —— 收窄只作用于写规范的提交，不给偷懒写法开后门（不放宽）。
+    """
+    owned, mentioned = set(), set()
+    for s in subjects:
+        m = SCOPE_RE.match(s)
+        own = rounds_in(m.group(1)) if m else set()
+        if own:
+            owned |= own
+            mentioned |= rounds_in(s) - own
+        else:
+            owned |= rounds_in(s)
+    return owned, mentioned
+
 
 def unreleased_bullets(md_text):
     """只数 [Unreleased] 到下一个 `## ` 之间的 `- ` 行；跨段计数会把历史版本算进来（分母虚高）。"""
@@ -238,16 +263,22 @@ def judge(tag, commits, bullets, md_text, ceiling=CEILING, prev_bases=None):
         if bullets > 0 and n == 0:
             bad.append("R2b [Unreleased] 有 %d 条 bullet 而 %s..HEAD 零 commit ⇒ 写了没提交（文案先行）"
                        % (bullets, tag))
-        subj = " ".join(s for s, _d in commits if NOTE_WORTHY.match(s))
-        req_rounds = rounds_in(subj)
+        subj = [s for s, _d in commits if NOTE_WORTHY.match(s)]
+        req_rounds, stray_rounds = commit_rounds(subj)
         sec_rounds = rounds_in(unreleased_section(md_text))
         head_rounds = heading_rounds(md_text)
         miss = sorted(req_rounds - head_rounds, key=int)
         only_prose = sorted((head_rounds ^ sec_rounds) & req_rounds, key=int)
+        stray = sorted(stray_rounds - head_rounds - req_rounds, key=int)
         if only_prose:
             warn.append("R2c(口径) 这些轮次只在散文/bullet 正文里被提到、没有自己的 `### ` 小节：%s"
                         " ⇒ 散文提及不算登记（r90 一手：我在披露里写了一句 r91 就把它喂绿了）"
                         % ",".join("r" + x for x in only_prose))
+        if stray:
+            warn.append("R2c(口径) 标题里提到、但不是本条提交归属轮次的轮号：%s"
+                        " ⇒ 归属只认 `type(rNNN …)` 括号内的轮号；括号外提到别轮（如「r102 入口建卷」）"
+                        "是引用不是记账，判红会让一个还没有提交的轮次背红因（r101 一手）"
+                        % ",".join("r" + x for x in stray))
         if miss:
             bad.append("R2c 这些轮次有 feat/fix 级提交却没进 [Unreleased]（按 `### ` 小节标题认登记）：%s"
                       " ⇒ 计数非零会被旧轮次 bullet 掩盖，只有逐轮点名才看得见漏记的那几轮"
@@ -336,6 +367,38 @@ _CASES = [
          [("feat(r38): 护栏", "x"), ("chore(r38 台账): 刷新", "x"), ("docs(r38 收口): 报告", "x")],
          3, "## [Unreleased]\n### Added（r38 · 护栏）\n- r38 的说明\n\n## [1.4.3] - r38 续\n- 历史\n", False),
 ]
+
+
+def _st_scope_rounds(fail):
+    """边界 S/T：R2c 的「归属轮次」口径（r101 一手代价，见 `commit_rounds` 的注释）。
+
+    抽成模块级不是为好看：`selftest` 加上这两条就 166 行越过 loc_guard 的 150 行函数长门
+    （本文件 r94 那次已经为同样的原因把用例表提出来过一次）。
+    表驱动用例只能断言「有没有红」，这里要断言**红里点的是谁**：收窄若把真漏记也放掉、
+    或把别轮混进红堆，只有点名才看得见（红集合 == 点名集合，成员判定不算）。
+    """
+    com = [("feat(r101 ①): 耦合尺被审面扩到跨函数返回值", "2026-10-09T01:00:00+08:00"),
+           ("fix(r101 收口): 报告补同句取证 + r102 入口建卷", "2026-10-09T02:00:00+08:00")]
+    reg = ("## [Unreleased]\n### Fixed（r101 · 收口）\n- 一条\n\n## [1.5.0] - 历史\n").splitlines(True)
+    md_reg = "".join(reg)
+    md_miss = md_reg.replace("### Fixed（r101 · 收口）", "### Fixed")
+    n = 0
+    bad, warn, _ = judge("v1.5.0", com, 1, md_reg)
+    r2c = [x for x in bad if x.startswith("R2c")]
+    st = [x for x in warn if x.startswith("R2c(口径)") and "r102" in x]
+    n += 1
+    got1 = 1 if (not r2c and len(st) == 1) else 0
+    if not got1:
+        fail.append("边界S 标题引用下一轮（r102）仍被判红，或该引用没被点名"
+                    "（应零 R2c 红 + 恰一条 R2c(口径) 点名 r102）：bad=%s warn=%s" % (bad, warn))
+    bad2, warn2, _ = judge("v1.5.0", com, 1, md_miss)
+    r2c2 = [x for x in bad2 if x.startswith("R2c")]
+    n += 1
+    got2 = 1 if (len(r2c2) == 1 and "r101" in r2c2[0] and "r102" not in r2c2[0]) else 0
+    if not got2:
+        fail.append("边界T 真漏记的那一轮没咬住，或红里混进了被引用的下一轮（收窄变成了放宽）：%s/%s"
+                    % (bad2, warn2))
+    return got1 + got2, n
 
 
 def selftest():
@@ -473,6 +536,9 @@ def selftest():
         ok += 1
     else:
         fail.append("边界R 未涉及新轮次的正例被 R2c 新口径误伤：%s/%s" % (_br, _wr))
+    _so, _sn = _st_scope_rounds(fail)
+    ok += _so
+    r2_sites += _sn
     total = len(_CASES) + 12 + r7_sites + r2_sites
     for x in fail:
         print("  SELFTEST-FAIL " + x)

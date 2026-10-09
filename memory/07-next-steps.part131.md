@@ -32,5 +32,15 @@
 
 ## 已知红（不修不隐瞒，均非本轮引入）
 
-`live_sync` / `live_sync_alt`（前提 = Cloudflare API Token）、`ci_status`（需先有远端 run）、
-`release_governance`（tag/pom 治理）、`eol_parity` 13 项（AIC 会话未入库件）。
+第 4 次整跑现读 `132/137 rc=1`，判红 5 条／红因 3 条：
+`live_sync` + `live_sync_alt`（公网 `chat-agent.js 14699⇄15225B`、`voice.js 4148⇄4798B`，
+前提 = Cloudflare API Token）、`ci_status`（远端 run `37667798532` 红因即同一条漂移）、
+`release_governance R1`（v1.8.1 后 6 feat／上限 5 ⇒ **到切版点**）、
+`eol_parity` 13 项（AIC 会话未入库件，本轮改动命中 0 项）。
+
+## 待老大裁决（r102 第 ⑦ 项，两条都是二选一，判据不得自选）
+
+1. **切版还是继续攒**：切 `v1.8.2` 需 bump pom + 建 tag + 推 tag（发布动作）；
+   在册顺序 = 先 tag 再整跑（否则 G12/R2a/R2c 在中间态必红）。
+2. **`live_sync` 算阻塞还是 advisory**：`ci.yml:249` 的 job 标题写「不阻塞」且确有
+   `continue-on-error: true`，但整跑按 rc=1 判红 ⇒ 标题与受理面互斥。改标题或改电池都行，**要人定方向**。
