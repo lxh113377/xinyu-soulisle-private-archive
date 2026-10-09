@@ -80,4 +80,5 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - **卷35** `07-next-steps.part129.md` — **r100 收口（上）**：本轮四项改造各自的复算命令与回执（①三态纪律 ②中位数口径＋**检测限未下压的负面结论** ③`__pendingTurns`+U2g ④peers 错峰重采 16/16 落盘、5 族 rc=1 逐条归因）
 - **卷36** `07-next-steps.part130.md` — **r100 收口（下）**：两条会再犯的教训（同日台账后缀字典序＝时间序；LOC 提取让 `timing_coupling` 改判、基线未动）＋ **r101 入口四条**（按档定阈／被审面扩到跨函数消费者／假理由普查／403 补采）＋ ⏸ v1.8.1 仍 blocked（live_sync 现两件）
 - **卷37** `07-next-steps.part131.md` — **r101 收口与 r102 入口**：把 12 条 `debt-open` 改成完成态等待（C1 从 22 往下走的唯一正解）／`ledger_age` 摘牌／采一轮带 `machine_tag` 的阶梯台账后分桶重算阈值／peers 两件（SNAP 重采 + 403 补采，前置=先建断点续采）／CHANGELOG 吞行常驻判据／`build_dataset.py` 写侧锁 newline／AIC 13 项行尾红归其会话
+- **卷38** `07-next-steps.part132.md` — **r101 部署段（公网两条线重部实测）**：Pages 直传的 Functions 取数面是 **cwd** 不是上传目录（第一发把 `/api/chat` 打成 405 的一手证据与修法）＋ Pages git 连接自 `c567ad3` 停摆（合并前先核 build output 目录）＋ `tcb hosting deploy` 被 MSYS 改写云端路径（`MSYS_NO_PATHCONV=1` 正解，误造的 1 个野对象已删并复量）＋ 桶内 24 个 09-30 野键待裁决 ＋ LFS 属性⇄裸 blob 不一致致新 clone 恒脏、rebase 被拦（绕行=临时 clone + cherry-pick）＋ linked worktree 的 `--autostash` 写的是**全仓共用** `refs/stash`
 
