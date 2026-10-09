@@ -183,6 +183,98 @@ def count_partials(dir_path):
     return len(names), names
 
 
+# ── r101 第二面：件内 NA（按位置数），补「按文件位置判 degraded」的口径缺口 ──────────────
+# 立因（r100 §2.5 登记、r101 落地）：上面那条 degraded 只在文件被**挪进 `_partial/`** 时计数，
+# 所以「龄 0 天但取数不全」的件在它眼里是新鲜基线 ⇒ **按日期新鲜 ≠ 按取数完整**。
+# 一手实测（本轮）：`peer-memory-2026-10-08.json` 顶层声明 `usable=17 blind=0 denominator=17
+# na=[]`，而件内 `repos[*].edge[*]` 有 5 处 `"NA(` ⇒ 声明与内容分叉，而对标报告 peers 列就从这里取数。
+DECL_KEYS = ("blind", "na", "unverified")     # 顶层**声明位**；数内容时排除它们，否则把声明本身再数一遍
+NA_PREFIXES = ("NA", "NA(")                  # 只认这两个哨兵；`"n/a"`（不适用）不算"没取到"
+
+
+def _leaf_na(node, top_level):
+    """递归数出非声明位里带 NA 哨兵的叶子串个数。键大小写敏感，值按 strip 后前缀匹配。"""
+    n = 0
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if top_level and k in DECL_KEYS:
+                continue
+            n += _leaf_na(v, False)
+    elif isinstance(node, list):
+        for v in node:
+            n += _leaf_na(v, False)
+    elif isinstance(node, str):
+        s = node.strip()
+        if s == "NA" or s.startswith("NA("):
+            n += 1
+    return n
+
+
+def declared_na(d):
+    """顶层声明的 NA 数 → (int or None, 形状名)。
+
+    形状**按键形自动识别**，不写「族→形状」硬表：本仓实测五类 schema 且不统一
+    （A usable/blind/denominator、A′ blind 是 list、B unverified 且无 ts、C rows+na、
+    D counted/peers_expected 无 denominator）。硬表第一次新增族就漏，漏了就静默当"完整"。
+    认不出 ⇒ 返回 None，由调用方判 `NA-UNKNOWN`（未知不等于零）。"""
+    if "blind" in d and "usable" in d and "denominator" in d:
+        b = d.get("blind")
+        return (b if isinstance(b, int) and not isinstance(b, bool) else len(b or [])), "A"
+    if "unverified" in d:
+        return len(d.get("unverified") or []), "B"
+    if "na" in d:
+        return len(d.get("na") or []), "C"
+    if "counted" in d and "peers_expected" in d:
+        return max(0, int(d.get("peers_expected") or 0) - int(d.get("counted") or 0)), "D"
+    return None, "unknown"
+
+
+def na_census(d):
+    """单份台账 → (状态, 声明数, 件内数, 形状)。四态 CLEAR/DECLARED/DIVERGE/UNKNOWN。"""
+    if not isinstance(d, dict):
+        return "NA-UNKNOWN", None, None, "not-a-dict"
+    dec, kind = declared_na(d)
+    if dec is None:
+        return "NA-UNKNOWN", None, None, kind
+    found = _leaf_na(d, True)
+    if found > dec:
+        return "NA-DIVERGE", dec, found, kind
+    if found == 0 and dec == 0:
+        return "NA-CLEAR", dec, found, kind
+    return "NA-DECLARED", dec, found, kind
+
+
+NA_DIVERGE_WAIVED = {
+    # 豁免必须**机器可读 + 带到期条件**（在册反例：注释式豁免等于没人认领的余量）。
+    "peer-memory": {
+        "reason": "探针把字段级 NA 只写进 repos[*].edge，不进 blind/na 声明 ⇒ 声明 blind=0 "
+                  "与件内 5 处 NA 分叉（r101 一手实测）",
+        "expiry": "peer_memory_probe.py 把字段级 NA 计入声明位 + 下一次错峰真采两件同时成立",
+        "entered": "2026-10-09"},
+}
+
+
+def na_rollup(census, waived=None):
+    """汇总 (分叉族, 未知族, 红因列表)。豁免只压**已登记且确在分叉里**的族：
+      · 豁免名单里有而现读没分叉 ⇒ 死豁免判红（在册规矩：声明式名册要双向差集）；
+      · 现读分叉而名单没有 ⇒ 判红并点名。
+    返回 (diverge_unwaived, unknown, reds, waived_hits)。"""
+    waived = NA_DIVERGE_WAIVED if waived is None else waived
+    diverge = sorted(f for f, (st, _d, _f, _k) in census.items() if st == "NA-DIVERGE")
+    unknown = sorted(f for f, (st, _d, _f, _k) in census.items() if st == "NA-UNKNOWN")
+    hits = sorted(f for f in diverge if f in waived)
+    reds = ["件内 NA 与声明分叉且未豁免 %d 族：%s"
+            % (len([f for f in diverge if f not in waived]),
+               "、".join("%s(声明%s/件内%s)" % (f, census[f][1], census[f][2])
+                         for f in diverge if f not in waived)) or "无"] \
+        if [f for f in diverge if f not in waived] else []
+    stale = sorted(f for f in waived if f not in diverge)
+    if stale:
+        reds.append("豁免名单里的死项 %d 条（现读没分叉却还挂着 ⇒ 下次真分叉会被它吞掉）：%s"
+                    % (len(stale), "、".join(stale)))
+    return [f for f in diverge if f not in waived], unknown, reds, hits
+
+
 def selftest():
     cases = []
 
@@ -266,6 +358,44 @@ def selftest():
     eq("排除面不得与「没有这个目录」同形：目录不在 ⇒ 0 且不报错",
        count_partials(ROOT / "_no_such_dir_")[0], 0)
 
+    # ── r101 件内 NA 面（四态 + 豁免语义 + 形状自动识别，正反双向） ──
+    eq("NA 四态 干净件（声明 0 且件内无 NA）⇒ CLEAR",
+       na_census({"usable": 2, "blind": 0, "denominator": 2})[0], "NA-CLEAR")
+    eq("NA 四态 声明 5 条且都在声明位里 ⇒ DECLARED（声明位不得再数第二遍）",
+       na_census({"usable": 11, "blind": 5, "denominator": 16,
+                  "na": ["A(http=403 NA)", "B NA(x)", "C NA", "D NA", "E NA"]}),
+       ("NA-DECLARED", 5, 0, "A"))
+    eq("NA 四态 blind 是 list 的 A′ 形状也认（len 作声明数）",
+       na_census({"usable": 1, "blind": ["X NA("], "denominator": 2})[1], 1)
+    eq("NA 四态 声明 0 而件内 5 处 ⇒ DIVERGE（peer-memory 的一手形状）",
+       na_census({"usable": 17, "blind": 0, "denominator": 17,
+                  "repos": {str(i): {"edge": ["NA(nothing)"]} for i in range(5)}}),
+       ("NA-DIVERGE", 0, 5, "A"))
+    eq("NA 四态 键形认不出 ⇒ UNKNOWN（未知绝不读成「取数完整」）",
+       na_census({"something_else": 1})[0], "NA-UNKNOWN")
+    eq("NA 四态 件不是 dict ⇒ UNKNOWN 而不是 0 处",
+       na_census(["not", "a", "dict"])[0], "NA-UNKNOWN")
+    eq("哨兵口径 \"n/a\"（不适用）不得算「没取到」⇒ 仍 CLEAR",
+       na_census({"usable": 1, "blind": 0, "denominator": 1,
+                  "self": {"note": "n/a", "path": "a/n/a/b"}})[0], "NA-CLEAR")
+    _c_1 = {"peer-mem": ("NA-DIVERGE", 0, 5, "A")}
+    eq("豁免语义① 名单清空 ⇒ 分叉必须回到红名单（证明豁免不是装饰）",
+       na_rollup(_c_1, waived={})[0], ["peer-mem"])
+    eq("豁免语义② 登记且确在分叉 ⇒ 压住判红但 hits 照点（不折成「没分叉」）",
+       na_rollup(_c_1, waived={"peer-mem": {"expiry": "x"}})[3], ["peer-mem"])
+    _r3 = na_rollup(_c_1, waived={"other-family": {"expiry": "x"}})
+    eq("豁免语义③ 名单挂在不分叉的族上 ⇒ 该族的分叉照判红（豁免不跨族生效）", _r3[0], ["peer-mem"])
+    eq("豁免语义④ 死项必须出声（现读没分叉却挂着 ⇒ 下次真分叉会被它吞）",
+       any("死项" in x for x in _r3[2]), True)
+    _real = {}
+    for _p in sorted((ROOT / DEFAULT_DIR).glob("peer-*-*.json")):
+        try:
+            _real[_p.name.split("-2026")[0]] = na_census(json.loads(_p.read_text(encoding="utf-8")))
+        except Exception:                                      # noqa: BLE001
+            continue
+    eq("真面自证 在册豁免的每一项当前确实分叉（probe 修好后这条转红 ⇒ 提醒摘牌）",
+       sorted(k for k in NA_DIVERGE_WAIVED if _real.get(k, ("",))[0] != "NA-DIVERGE"), [])
+
     bad = [(n, g, w) for n, g, w in cases if g != w]
     for n, g, w in bad:
         print("  用例不符: %s ｜ got=%r want=%r" % (n, g, w))
@@ -319,6 +449,24 @@ def main():
                  ("  ⚠" + r["divergence"]) if r.get("divergence") else "",
                  ("  ℹ" + r["divergence_unverified"]) if r.get("divergence_unverified") else ""))
     identity_ok = len(within) + len(over) + len(und) == len(rows)
+    # r101 第二面：逐族读**最新那一份**的内容，数件内 NA 位置并与顶层声明对账。
+    census, census_unread = {}, []
+    for r in rows:
+        if not r.get("newest"):
+            census[r["stem"]] = ("NA-UNKNOWN", None, None, "无最新件可判")
+            continue
+        p = Path(d) / r["newest"]
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception as e:                                  # noqa: BLE001
+            census_unread.append("%s(%s)" % (r["stem"], type(e).__name__))
+            census[r["stem"]] = ("NA-UNKNOWN", None, None, "件不可解析")
+            continue
+        census[r["stem"]] = na_census(data)
+    na_div, na_unknown, na_reds, na_waived = na_rollup(census)
+    na_counts = {}
+    for _f, (st, _de, _fo, _k) in census.items():
+        na_counts[st] = na_counts.get(st, 0) + 1
     n_par, par_names = count_partials(d)
     print("-" * 104)
     print("fuse=%d天(%s) 取数=%s 基准日=%s｜族 %d 个：线内 %d｜超 fuse %d｜无日期可判 %d｜"
@@ -335,6 +483,17 @@ def main():
               + "; ".join("%s(%d天)" % (r["stem"], r["age_days"]) for r in over))
     if und:
         print("  无日期可判（不得读成「没有超龄」）: " + "; ".join(r["stem"] for r in und))
+    print("  件内 NA 四态：%s（读件 %d 份，不可解析 %d）"
+          % ("｜".join("%s=%d" % kv for kv in sorted(na_counts.items())) or "无",
+             len(census), len(census_unread)))
+    if na_waived:
+        print("  ⚠ 分叉已豁免（名单机器可读、带 expiry，现读仍**照点数**不折零）：%s"
+              % "; ".join("%s[声明%s/件内%s] expiry=%s"
+                          % (f, census[f][1], census[f][2], NA_DIVERGE_WAIVED[f]["expiry"])
+                          for f in na_waived))
+    if na_unknown:
+        print("  NA-UNKNOWN（形状认不出或件读不动 ⇒ 整尺判未验，绝不读成「取数完整」）: "
+              + "; ".join("%s[%s]" % (f, census[f][3]) for f in na_unknown))
     if a.json:
         Path(a.json).write_bytes(json.dumps(
             {"today": str(today), "fuse_days": fuse, "fuse_source": fuse_why,
@@ -342,14 +501,31 @@ def main():
              "excluded_partial": {"count": n_par, "files": par_names, "dirname": PARTIAL_DIRNAME},
              "counts": {"within": len(within), "over_fuse": len(over), "undated": len(und),
                         "divergence": len(div), "divergence_unverified": len(div_unv),
+                        "na_by_state": na_counts, "na_diverge": na_div,
+                        "na_diverge_waived": na_waived, "na_unknown": na_unknown,
+                        "na_unreadable": census_unread,
                         "total": len(rows)},
+             "na_census": {f: list(v) for f, v in sorted(census.items())},
              "rows": rows}, ensure_ascii=False, indent=1).encode("utf-8"))
         print("落盘 %s" % a.json)
-    red = bool(over) or bool(und) or bool(div) or not identity_ok
-    print("LEDGER-AGE-%s（peer 台账 %d 族：≤fuse %d｜超 fuse %d｜无日期可判 %d｜分歧 %d｜"
-          "恒等式 %s）" % ("FAIL" if red else "PASS", len(rows), len(within), len(over),
-                          len(und), len(div), "成立" if identity_ok else "不成立"))
-    return 1 if red else 0
+    red = bool(over) or bool(und) or bool(div) or not identity_ok or bool(na_div) or bool(na_reds)
+    if red:
+        for x in na_reds:
+            print("  红因=" + x)
+        print("LEDGER-AGE-FAIL（peer 台账 %d 族：≤fuse %d｜超 fuse %d｜无日期可判 %d｜分歧 %d｜"
+              "NA分叉=%d(waived %d)｜恒等式 %s）"
+              % (len(rows), len(within), len(over), len(und), len(div), len(na_div) + len(na_waived),
+                 len(na_waived), "成立" if identity_ok else "不成立"))
+        return 1
+    if na_unknown:
+        print("LEDGER-AGE-UNVERIFIED（龄期面全绿，但件内 NA 有 %d 族认不出形状/读不动 ⇒ "
+              "整尺不得记 PASS，也不得记成 0 分叉）" % len(na_unknown))
+        return 2
+    print("LEDGER-AGE-PASS（peer 台账 %d 族：≤fuse %d｜超 fuse %d｜无日期可判 %d｜分歧 %d｜"
+          "NA分叉=%d(waived %d)｜恒等式 %s）"
+          % (len(rows), len(within), len(over), len(und), len(div), len(na_div), len(na_waived),
+             "成立" if identity_ok else "不成立"))
+    return 0
 
 
 if __name__ == "__main__":
