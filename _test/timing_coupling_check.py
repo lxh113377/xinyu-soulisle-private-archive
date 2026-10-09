@@ -95,16 +95,39 @@ def _uses(node, names):
     return any(isinstance(x, ast.Name) and x.id in names for x in ast.walk(node))
 
 
+def _store_names(target):
+    """赋值左侧被绑定的名字，含**容器写入**的根名。
+
+    `res["ui_count"] = pg.evaluate(...)` 里 `res` 是 Load 上下文，旧口径取不到它 ⇒
+    取到的数明明进了 `res`、`res` 又被 return 出去，本尺却看不见这条手递手（r101 实测
+    `storage_resilience_check.py:176` 就是这么差点漏掉的）。元组解包逐元素递归。"""
+    names = set()
+    if isinstance(target, ast.Name):
+        names.add(target.id)
+    elif isinstance(target, ast.Starred):
+        names |= _store_names(target.value)
+    elif isinstance(target, (ast.Tuple, ast.List)):
+        for el in target.elts:
+            names |= _store_names(el)
+    elif isinstance(target, (ast.Subscript, ast.Attribute)):
+        base = target
+        while isinstance(base, (ast.Subscript, ast.Attribute)):
+            base = base.value
+        if isinstance(base, ast.Name):
+            names.add(base.id)
+    return names
+
+
 def _read_names(stmt):
-    """该语句里由「取数调用」直接绑定的名字（含 tuple unpack）。"""
+    """该语句里由「取数调用」绑定的名字（含 tuple unpack 与容器写入）。"""
     names = set()
     for x in ast.walk(stmt):
         if isinstance(x, ast.Assign) and _is_read(x.value):
-            names |= {n.id for n in ast.walk(x) if isinstance(n, ast.Name)
-                      and isinstance(n.ctx, ast.Store)}
+            for t in x.targets:
+                names |= _store_names(t)
         elif isinstance(x, (ast.AnnAssign, ast.AugAssign)) and getattr(x, "value", None) is not None \
-                and _is_read(x.value) and isinstance(x.target, ast.Name):
-            names.add(x.target.id)
+                and _is_read(x.value):
+            names |= _store_names(x.target)
     return names
 
 
@@ -150,7 +173,11 @@ def _tainted_decision(stmts, idx, read_names):
 
     污点是**传递**的：`msgs = pg.evaluate(...)` 之后断言读的是 `last = msgs[-1]`。
     一跳式污点在 `browser_check.py:49→147` 这个真实形状上漏报，而漏报会被下一轮读成
-    「其余都干净」。"""
+    「其余都干净」。
+
+    `return` 只算**交接**不算决策（r101）：形态名回 "return" 由调用方去查返回值在**调用点**
+    有没有被消费。把它直接当决策等于发第二条降噪通道 —— 任何函数只要在末尾 `return` 一下
+    就能把定长等待洗成"已消费"，与 r100 抓到的「提取函数即降噪」是同一条病换个口。"""
     tainted = set(read_names)
     between_wait = False
     for j in range(idx + 1, len(stmts)):
@@ -161,6 +188,8 @@ def _tainted_decision(stmts, idx, read_names):
             return j, between_wait, "assert"
         if isinstance(s, ast.If) and _uses(s.test, tainted):
             return j, between_wait, "if"
+        if isinstance(s, ast.Return) and _uses(s.value, tainted):
+            return j, between_wait, "return"
         for x in ast.walk(s):
             if isinstance(x, ast.Call):
                 fn = _attr_name(x)
@@ -179,6 +208,196 @@ def _tainted_decision(stmts, idx, read_names):
     return None, between_wait, ""
 
 
+def owner_map(tree):
+    """每个节点的 id → 所属主体（函数名；模块体为 None）。嵌套函数按**最内层**归属。
+
+    `def` 语句本身算外层主体的语句（否则递归找调用点时它不在任何 flat 清单里）。"""
+    own = {}
+
+    def visit(node, cur):
+        for ch in ast.iter_child_nodes(node):
+            if isinstance(ch, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                own[id(ch)] = cur
+                visit(ch, ch.name)
+            else:
+                own[id(ch)] = cur
+                visit(ch, cur)
+    visit(tree, None)
+    return own
+
+
+def _not_a_flow_body(node):
+    return isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda))
+
+
+def linear_stmts(node):
+    """该语句自身 + 其中**随它一起执行**的语句（if 的两个分支都算「可能执行」）。
+
+    遇函数/类定义即止：`def` 体在定义点不执行，把它的内容算进后续流就是把另一个主体的
+    消费当成了这里的消费。"""
+    out = []
+
+    def walk(n):
+        out.append(n)
+        for field in ("body", "orelse", "finalbody"):
+            seq = getattr(n, field, None)
+            if isinstance(seq, list):
+                for s in seq:
+                    if isinstance(s, ast.stmt) and not _not_a_flow_body(s):
+                        walk(s)
+        for h in getattr(n, "handlers", None) or []:
+            for s in getattr(h, "body", []) or []:
+                if isinstance(s, ast.stmt) and not _not_a_flow_body(s):
+                    walk(s)
+        if getattr(n, "body", None) is not None and isinstance(n.body, ast.stmt) \
+                and not _not_a_flow_body(n.body):
+            walk(n.body)
+    walk(node)
+    return out
+
+
+def flow_ctx(tree, blocks):
+    """(语句→(所属块清单, 序号) 索引) 与 (块清单 id → 拥有它的节点)。"""
+    idx_map, list_owner = {}, {}
+    for node in ast.walk(tree):
+        for field in ("body", "orelse", "finalbody"):
+            seq = getattr(node, field, None)
+            if isinstance(seq, list) and seq and all(isinstance(x, ast.stmt) for x in seq):
+                list_owner[id(seq)] = node
+                for i, s in enumerate(seq):
+                    idx_map[id(s)] = (seq, i)
+        for h in getattr(node, "handlers", None) or []:
+            if h.body:
+                list_owner[id(h.body)] = node
+                for i, s in enumerate(h.body):
+                    idx_map[id(s)] = (h.body, i)
+    return idx_map, list_owner
+
+
+def forward_flow(stmt, idx_map, list_owner):
+    """stmt 之后**仍可能顺序执行**的语句清单（沿块树上溯取后续兄弟，排除互斥分支与嵌套函数体）。
+
+    为什么不能用 lineno 摊平（r101 一手）：第一版按「同主体、lineno 更大」续扫，实测把平行分支
+    （同一 `if/else` 的另一侧等）的消费也算成 C1_HARD ⇒ 分子从 6 虚涨到 27，其中相当一部分在真实
+    执行流上根本碰不到那个决策。判据的分子只能由行为决定。
+    上溯取的是 `host` **自身作为语句**所在的块（不是它的父节点）：`clean_clone_check.py:121`
+    的等待在 `try:` 体内、决策在 try 之后的 `if st is not None:` —— 取父节点会直接跳到函数定义
+    之后的语句，那条决策永远够不着（本轮实测踩到，修前该点仍判 READ_NO_DECIDE）。"""
+    out, cur = [], stmt
+    for _round in range(64):                       # 上溯层数封顶，防御异常树
+        loc = idx_map.get(id(cur))
+        if loc is None:
+            break
+        seq, i = loc
+        for s in seq[i + 1:]:
+            if _not_a_flow_body(s):
+                continue                       # 后续出现的 def/class：定义点不执行其体
+            out.extend(linear_stmts(s))
+        host = list_owner.get(id(seq))
+        if host is None or isinstance(host, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                             ast.ClassDef, ast.Lambda)):
+            break                                  # 跨函数交给 return_consumed，不在这里续
+        cur = host
+    return out
+
+
+def _enclosing_stmt(tree, node):
+    """包含该节点的最内层语句（用对象同一性判定，不靠行号区间猜）。"""
+    best = None
+    for s in ast.walk(tree):
+        if not isinstance(s, ast.stmt):
+            continue
+        for x in ast.walk(s):
+            if x is node:
+                if best is None or _span(s) < _span(best):
+                    best = s
+                break
+    return best
+
+
+def _span(s):
+    ls = [n.lineno for n in ast.walk(s) if hasattr(n, "lineno")]
+    return max(ls) - min(ls) if ls else 0
+
+
+def return_consumed(tree, own, flow, fname):
+    """`fname` 的返回值在**调用点**有没有被决策消费。r101 扩面的跨函数那一半。
+
+    三种调用点形状各给一条结论，其余一律算没消费：
+      ① `X = fname(...)` / `X, Y = fname(...)` ⇒ 拿绑定名去调用点之后的执行流续扫；
+      ② 调用直接长在 `assert/if/check(...)` 里 ⇒ 调用点本身就是消费点；
+      ③ 裸调用作 Expr、结果没人接 ⇒ **不判**（反例腿的靶子：把它也算消费，
+         「提取函数 + 无人接收」立刻成为第二条降噪通道）。
+    """
+    if not fname:
+        return None
+    idx_map, list_owner = flow
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and _attr_name(node) == fname):
+            continue
+        if own.get(id(node)) == fname:
+            continue                           # 自身体内的调用不算调用点（自调不作消费证据）
+        host = _enclosing_stmt(tree, node)
+        if host is None or own.get(id(host)) == fname:
+            continue
+        if isinstance(host, (ast.Assert, ast.If)):
+            return "cross-fn@%d(%s)" % (host.lineno, "assert" if isinstance(host, ast.Assert) else "if")
+        if isinstance(host, ast.Expr):
+            for x in ast.walk(host):
+                if isinstance(x, ast.Call) and _attr_name(x) in CHECK_NAMES \
+                        and any(g is node for a in x.args for g in ast.walk(a)):
+                    return "cross-fn@%d(%s)" % (host.lineno, _attr_name(x))
+        names = set()
+        if isinstance(host, ast.Assign):
+            names = {n.id for t in host.targets for n in ast.walk(t) if isinstance(n, ast.Name)}
+        elif isinstance(host, (ast.AnnAssign, ast.AugAssign)) and isinstance(host.target, ast.Name):
+            names = {host.target.id}
+        if not names:
+            continue
+        seq = forward_flow(host, idx_map, list_owner)
+        j, _g, how = _tainted_decision(seq, -1, names) if seq else (None, False, "")
+        if j is not None and how != "return":
+            return "cross-fn@%d(%s)" % (seq[j].lineno, how)
+    return None
+
+
+def decide_bucket(tree, own, flow, stmt, blk, idx, nxt):
+    """定长等待的归类。搜索面三面依次：**同块 → 沿执行流上溯的后续块 → 跨函数的返回值消费点**。
+
+    r100 的一手缺陷是只走第一面：LOC 门（≤150 行/函数）逼着把 `wait+read` 提进 helper、
+    决策留在调用方，本尺随即把两处改判 READ_NO_DECIDE —— **提取函数成了一条降噪通道**。
+    正解是扩被审面而不是内联驱动件：内联会把 `public_check.main` 从 130 行顶向 150 门
+    （在册反例「余量是没锁住的余量，不是成绩」），且 `loc_guard` 取数面是 `git ls-tree HEAD`，
+    工作树未入库件根本不被它看见 ⇒ 两侧读数不可比。
+    """
+    rn = _read_names(nxt)
+    j, guarded, how = _tainted_decision(blk, idx, rn)
+    if j is not None and how != "return":
+        if guarded:
+            return "C_GUARDED", "读与决策之间隔着完成态等待(%s)" % how
+        return "C1_HARD", "定长→取数→%s 立刻消费" % how
+    seq = forward_flow(stmt, *flow)
+    j2, g2, how2 = (_tainted_decision(seq, -1, rn) if len(seq) > 1 else (None, False, ""))
+    if j2 is not None and how2 != "return":
+        if g2:
+            return "C_GUARDED", "跨块：读与决策之间隔着完成态等待(%s)" % how2
+        return "C1_HARD", "定长→取数→%s 消费(跨块@%d)" % (how2, seq[j2].lineno)
+    got = None
+    hand = (j is not None and how == "return") or (j2 is not None and how2 == "return")
+    if not hand and not rn:
+        # 取数直接长在 return 表达式里（`return page.evaluate(...)`）⇒ 没有绑定名可追，
+        # 但返回值就是那次取数本身，仍算交接（r101 实测 emotion_wiring_check.py:162）。
+        hand = any(isinstance(s, ast.Return) and s.value is not None and _is_read(s.value)
+                   for s in seq)
+    if hand:
+        got = return_consumed(tree, own, flow, own.get(id(stmt)))
+    if got:
+        return "C1_HARD", "定长→取数→return→调用点消费(%s)" % got
+    if guarded or g2:
+        return "C_GUARDED", "读与决策之间隔着完成态等待"
+    return "READ_NO_DECIDE", "取到数但同块/执行流后续/跨函数三面都没被决策消费"
+
+
 def classify(text, name=""):
     """单件源码 → (逐条记录, 自报调用总数, 解析错误串 or None)。纯函数，夹具不造文件。"""
     recs = []
@@ -188,6 +407,8 @@ def classify(text, name=""):
         return recs, 0, "SyntaxError line %s: %s" % (e.lineno, e.msg)
     blocks = _blocks(tree)
     loops = _loop_stmt_ids(tree)
+    own = owner_map(tree)
+    flow = flow_ctx(tree, blocks)
     total = 0
     for stmt in ast.walk(tree):
         if not isinstance(stmt, ast.Expr):
@@ -210,13 +431,7 @@ def classify(text, name=""):
         elif not _is_read(nxt):
             bucket, note = "NEXT_NO_READ", "下一条不取数"
         else:
-            j, guarded, how = _tainted_decision(blk, idx, _read_names(nxt))
-            if j is None:
-                bucket, note = "READ_NO_DECIDE", "取到数但本块内没被决策消费"
-            elif guarded:
-                bucket, note = "C_GUARDED", "读与决策之间隔着完成态等待(%s)" % how
-            else:
-                bucket, note = "C1_HARD", "定长→取数→%s 立刻消费" % how
+            bucket, note = decide_bucket(tree, own, flow, stmt, blk, idx, nxt)
         recs.append({"file": name, "line": stmt.lineno, "ms": ms, "bucket": bucket, "note": note,
                      "stmt": norm_stmt(ast.get_source_segment(text, stmt) or "")})
     return recs, total, None
@@ -236,6 +451,17 @@ def norm_stmt(seg):
 #   mis-wait     等错了 ⇒ 本轮已改成被等对象的完成态（改完该形状从 C1_HARD 消失，棘轮自己降）
 #   shaped-only  形状命中但**没有可等的异步态**（同步 DOM 变更 / 等待对象就是被断言对象）
 #   unobservable 产品没暴露完成态，硬造一个「等」等于替被测对象编造状态 ⇒ 保留定长并记此态
+#   debt-open    （r101 新增档，不是把旧三档放宽）形状命中、异步态**真实存在**、产品也已暴露
+#                完成态 ⇒ 该改成完成态等待；但本轮只扩尺不动驱动件（动驱动＝三副本同步＋回归＋
+#                公网面差距），所以记债并登记 r102。**为什么不塞进 shaped-only**：那个词会被
+#                下一轮读成「无需处理」，而这里每一条都是可以直接改成 `wait_for_function` 的真债。
+# 更正注 r101（本文件 §「r100 对账」下面那三行的结论仍成立，只是数变了）：把被审面扩到
+#   「同块 → 沿执行流上溯的后续块 → 跨函数的返回值消费点」之后，`clean_clone_check.py:122`
+#   与 `public_check.py:51/55/59` 按预言回到 C1_HARD；同时另捞出 12 处此前同样被盲区漏掉的
+#   真债（browser_check / j2 / j4 / lightshow / emotion_wiring / storage_resilience /
+#   stream_contract）。现读由 6 涨到 22 ⇒ **这是口径变更不是活变差**，旧 9 与新 22 不可比，
+#   基线随之 9→22 并在 `--baseline` help 里写明「换口径」；下一轮的正解是把 debt-open 那 12 条
+#   改成完成态等待（每条改完自己离开 C1_HARD ⇒ 棘轮自己降），而不是把基线再往上抬。
 # 本表只是**读数**：判据仍不猜意图（红只由棘轮产生），未覆盖件走续行出声、不判红。
 #
 # r100 对账（键必须与现读同起同落，所以这里只记「现在仍在 C1_HARD 里」的形状；
@@ -264,6 +490,64 @@ REVIEW = {
         "verdict": "shaped-only", "sites": 1,
         "why": "展开是 chat-window.js 同步 insertBefore，800ms 押的是同步变更；而可等的完成态"
                "（首条内容变了）就是被断言项"},
+    # ── 以下 15 条键 = r101 扩面（跨块 / 跨函数返回值消费）捞出的存量真债，逐条已核决策行 ──
+    "clean_clone_check.py::pg.wait_for_timeout(2500)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "r100 那条改判点回到分子：wait→evaluate(st) 在 try 体内、决策在 try 之后的 "
+               "`if st is not None:`(跨块@138)。等的是页面加载完成 ⇒ 正解 wait_for_selector('#chat-input')"},
+    "public_check.py::pg.wait_for_timeout(12000)": {
+        "verdict": "debt-open", "sites": 2,
+        "why": "r100 那条改判点：wait→inner_text/eval 后 `return probe,…`，调用方 ck(\"P5 双路情绪读数…\") "
+               "消费(@194)。产品 r100 已暴露 window.__pendingTurns ⇒ 可等它归零，12s 定长属重复"},
+    "public_check.py::pg.wait_for_timeout(8000)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "同上第三处（危机词那条腿），消费点同为 @194"},
+    "browser_check.py::page.wait_for_timeout(2500)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "wait→crisis_readout=inner_text(#probe-result)，决策 `assert \"危机\" in crisis_readout`"
+               "(跨块@152) ⇒ 等的是回复落定，__pendingTurns 可替"},
+    "browser_check.py::page.wait_for_timeout(500)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "wait→dock_collapsed=get_attribute/eval，决策 `assert dock_collapsed`(跨块@153) "
+               "⇒ dock 开合是 class 变更，可 wait_for_function 断言 classList"},
+    "browser_check.py::page.wait_for_timeout(2000)": {
+        "verdict": "unobservable", "sites": 1,
+        "why": "滚到底再回滚后读 opacity(back3)，决策 @157 ⇒ 等的是滚动过渡落定，"
+               "产品没暴露「过渡结束」这个态；硬造等待等于替被测对象编状态，保留定长并记此态"},
+    "browser_check.py::page.wait_for_timeout(800)": {
+        "verdict": "unobservable", "sites": 1,
+        "why": "面板进屏 opacity(o_enter)，返回值在 @158 的 assert 消费 ⇒ 同上，过渡动画无完成态可等"},
+    "lightshow_check.py::page.wait_for_timeout(900)": {
+        "verdict": "unobservable", "sites": 1,
+        "why": "演示态滚动是否被中断，读 scroll_y/ui_after_scroll 后在 @229 断言 ⇒ 等的是动画帧序，"
+               "无完成态暴露"},
+    "lightshow_check.py::page.wait_for_timeout(700)": {
+        "verdict": "unobservable", "sites": 1,
+        "why": "「回到我的记忆」清演示点亮，读 lit_cleared 后 @236 断言 ⇒ 同上（点亮是逐粒子动画）"},
+    "j2_chat_contract.py::page.wait_for_timeout(600)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "A 组在线腿：wait→取气泡文本 return，调用方 `if \"在线大模型生成\" not in a_last`(@72) 消费 "
+               "⇒ 600ms 是回复后的渲染拍，可等 __pendingTurns/气泡 class"},
+    "j2_chat_contract.py::page.wait_for_timeout(10000)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "同件等回复的 10s 定长，消费点 @72 ⇒ 可等完成态归零"},
+    "stream_contract.py::page.wait_for_timeout(14000)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "流式契约件：wait→eval_on_selector_all(msgs) 后 `return msgs[-1], had_stream`，"
+               "调用方 @136 的 if 消费 ⇒ 本件本就是测逐字流式的，等「流结束」有现成可见证据（.streaming 消失）"},
+    "j4_memory_check.py::page.wait_for_timeout(10000)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "远端记忆落库回读，决策 `if mem_off < 2`(跨块@127) ⇒ 等的是服务端写入，"
+               "可改轮询 /api/memory/stats 计数到位"},
+    "emotion_wiring_check.py::page.wait_for_timeout(300)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "前置已有 wait_for_function 判流式结束，这 300ms 再等文本节点落定后直接 "
+               "`return page.evaluate(...)`，调用方 check(\"W4…\")(@180) 消费 ⇒ 重复定长，"
+               "可折进那条 wait_for_function 的谓词里"},
+    "storage_resilience_check.py::page.wait_for_timeout(600)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "计数槽由 rAF/事件回写（源码注释自陈「给一拍」），写进 res 容器后 @223 的 if 消费 ⇒ "
+               "容器写入的污点这条 r101 才追得到；可等「计数文本变了」"},
 }
 
 
@@ -356,6 +640,84 @@ def face_line(total_calls, files_with, hard, hard_bat, baseline, bucketed,
     return line, spill
 
 
+def _st_cross_face(expect, bucket_of):
+    """r101 扩面腿：跨块执行流与跨函数返回值消费，正反双向 + 两条回归钉 + 一条变异腿。
+
+    单独成函数是承本文件 ㉑ 那几条的同一条理由（`selftest` 余量不足以再塞 10 行）。
+    """
+    XFER = ("def drive(pg):\n"
+            "    pg.wait_for_timeout(1200)\n"
+            "    probe = pg.inner_text('#x')\n"
+            "    return probe\n"
+            "def main(pg):\n"
+            "    v = drive(pg)\n"
+            "    assert v\n")
+    XFER_BARE = ("def drive(pg):\n"
+                 "    pg.wait_for_timeout(1200)\n"
+                 "    probe = pg.inner_text('#x')\n"
+                 "    return probe\n"
+                 "def main(pg):\n"
+                 "    drive(pg)\n")
+    XFER_PRINT = ("def drive(pg):\n"
+                  "    pg.wait_for_timeout(1200)\n"
+                  "    probe = pg.inner_text('#x')\n"
+                  "    return probe\n"
+                  "def main(pg):\n"
+                  "    v = drive(pg)\n"
+                  "    print(v)\n")
+    XFER_INLINE = ("def drive(pg):\n"
+                   "    pg.wait_for_timeout(300)\n"
+                   "    return pg.inner_text('#x')\n"
+                   "def main(pg):\n"
+                   "    assert drive(pg)\n")
+    EXCL = ("def f(pg):\n"
+            "    if pg.inner_text('#a'):\n"
+            "        pg.wait_for_timeout(900)\n"
+            "        v = pg.inner_text('#b')\n"
+            "    else:\n"
+            "        assert v == 'x'\n")
+    NEST = ("def f(pg):\n"
+            "    pg.wait_for_timeout(900)\n"
+            "    v = pg.inner_text('#b')\n"
+            "def g():\n"
+            "    assert v\n")
+    expect("正例 提取成 helper 且返回值被调用方断言 ⇒ 仍判 C1_HARD"
+           "（这封住的正是 r100 那条「LOC 门逼搬家 ⇒ 尺自动降噪」通道）",
+           bucket_of(XFER) == "C1_HARD")
+    expect("反例 helper 返回值裸调用无人接收 ⇒ 不得升格", bucket_of(XFER_BARE) == "READ_NO_DECIDE")
+    expect("反例 调用方只 print 返回值 ⇒ 仍不判"
+           "（把 return 当决策就会开出第二条通道：print 不是决策）",
+           bucket_of(XFER_PRINT) == "READ_NO_DECIDE")
+    expect("正例 取数直接长在 return 表达式里（无绑定名）⇒ 交接仍成立",
+           bucket_of(XFER_INLINE) == "C1_HARD")
+    expect("回归钉 if/else 互斥分支里的消费不算"
+           "（第一版按 lineno 摊平，实测把分子从 6 虚涨到 27 ⇒ 退回那条写法本腿必红）",
+           bucket_of(EXCL) == "READ_NO_DECIDE")
+    expect("回归钉 后续 def 的定义体不在调用点执行 ⇒ 不算消费", bucket_of(NEST) == "READ_NO_DECIDE")
+
+    def hard_of(fname):
+        p = TEST_DIR / fname
+        if not p.is_file():
+            return None
+        recs, _t, _e = classify(p.read_text(encoding="utf-8", errors="replace"), fname)
+        return sum(1 for r in recs if r["bucket"] == "C1_HARD")
+
+    before = {n: hard_of(n) for n in ("clean_clone_check.py", "public_check.py")}
+    keep = (globals()["forward_flow"], globals()["return_consumed"])
+    try:
+        globals()["forward_flow"] = lambda *a, **k: []
+        globals()["return_consumed"] = lambda *a, **k: None
+        after = {n: hard_of(n) for n in ("clean_clone_check.py", "public_check.py")}
+        expect("变异腿 把两条新面打桩成恒空 ⇒ clean_clone/public_check 必须掉出分子"
+               "（证明这些读数是新面产出的，不是原本就在）",
+               all(before[n] is not None and before[n] > 0 for n in before)
+               and all(after[n] == 0 for n in after))
+    finally:
+        globals()["forward_flow"], globals()["return_consumed"] = keep
+    expect("  还原后同一批文件回到原读数（动的是尺不是期望值）",
+           {n: hard_of(n) for n in before} == before)
+
+
 def selftest():
     """正例 / 四种「不得升格」反例 / 传递污点 / 恒等式 / 变异 / 盲区 / 截断，逐条有名字。"""
     bad, n = [], 0
@@ -416,6 +778,7 @@ def selftest():
     expect("传递污点 断言读的是派生名 ⇒ 必须抓到 C1_HARD（一跳式会漏报）",
            bucket_of(TRANSIT) == "C1_HARD")
     expect("VARLEN 实参是变量 ⇒ 单独一桶，不判红只计数", bucket_of(VARLEN) == "VARLEN")
+    _st_cross_face(expect, bucket_of)
 
     fixtures = [("C1", C1), ("PRINT", PRINT_ONLY), ("LOOP", LOOP), ("GUARD", GUARD),
                 ("TRANSIT", TRANSIT), ("VARLEN", VARLEN), ("NOREAD", NOREAD), ("TAIL", TAIL)]
@@ -491,10 +854,15 @@ def selftest():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--baseline", type=int, default=9,
+    ap.add_argument("--baseline", type=int, default=22,
                     help="C1_HARD 棘轮上界（只降不升）。r98 建尺实测 16 却把上界写成 28 —— "
                          "help 原文「取实测值钉住」与磁盘不符；r99 改掉 7 处误等后现读 9，"
-                         "基线随之 28→9（余量清零才是本意：留 19 的空档等于给新增误等发通行证）")
+                         "基线随之 28→9（余量清零才是本意：留 19 的空档等于给新增误等发通行证）。"
+                         "⚠️ **22 是 r101 的口径变更值，与旧 9 不可比**：被审面从「同块」扩到"
+                         "「同块 → 执行流后续块 → 跨函数返回值消费」后，r100 被 LOC 搬家掩掉的 "
+                         "4 处与另外 12 处存量真债一起回到分子。旧 9 不是「当时只有 9 处」而是"
+                         "「当时只看得见 9 处」。下一轮的正解是把 12 条 debt-open 改成完成态等待"
+                         "（改完自动离开分子 ⇒ 棘轮自己降），不是抬基线。")
     ap.add_argument("--only", default="", help="逗号分隔的文件名子集（定位/演习用）")
     ap.add_argument("--json", default="")
     ap.add_argument("--selftest", action="store_true")
