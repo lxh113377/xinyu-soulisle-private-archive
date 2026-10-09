@@ -5,6 +5,7 @@
 - [ ] ⏸ **已冻结（范围冲突待老大一句话解冻）**：起草《应用方案》PDF（大纲：交付物/提交包/应用方案大纲.md；AI核心作用章节可直接引用：双路情绪引擎实测分歧案例 + 词典层评测 94.4%/危机召回3/3 + **Serverless密钥隔离架构**，见 _test/emotion_eval.js / src/functions/api/chat.js）
 
 ## P1 — 应该做
+- [x] WF-r101-对标轮 r101 八维对标 + 四项改造（耦合尺跨函数扩面／ledger_age 件内NA／按档定阈机制+负面结论／G20 声称对账与孤儿判据接线）（由 flow 登记；状态: done）
 - [x] WF-r100-对标轮 r100 八维对标 + 四项改造（判据三态纪律/性能中位数口径/__pendingTurns 完成态/peers 错峰重采）（由 flow 登记；状态: done）
 - [x] WF-r97-voice退出态 voice 退出态真缺陷修复 + v1.8.1 切版（r94/r95/r96 三轮挂账项）（由 flow 登记；状态: done）
 - [ ] VOL-CC6BC 体量治理[L5 自动化链] _trash/ 回收区超龄 — 人工核后清空该面 `_trash`（`handoff.py recycle --list <锚点>` 逐项看）；治理链不自作清历史 —— 里面混着人工裁决过的件（由 flow 登记；状态: todo）
