@@ -29,3 +29,9 @@
 6. **共享仓库里 `refs/stash` 是全仓共用**：在 linked worktree 内 `git rebase --autostash` 写的
    stash 落进同一个 `refs/stash`（本轮实测：主树 `git stash list` 立刻看得见那条 `autostash`）。
    ⇒ 在册「共享工作树禁裸 stash」再添一手；本轮事后按内容核验（只有那 1 个 mp4）才 drop。
+
+7. **r102 机器判据缺口（自觉型登记）**：`- ` 红因续行必须排在门面行**之后**这条规矩，本轮第三次踩中
+   （`ledger_age` 的红因印在前面，被 `run_all_suites` 的 fold_detail 整片吞掉 ⇒ CI 上只剩半句）。
+   本轮只改了 `ledger_age` 一件，**全类普查没有判据**：`_test/*_check.py` 里凡是印 FAIL 门面行又印明细的件，
+   明细位置/前缀形态无人量。候选落点=静态扫「FAIL 行行号 < 明细行行号 ∧ 明细以 `- ` 开头」，
+   或改 fold 窗口同时取命中行之前 N 行（后者动聚合器，影响面更大，须人定方向）。
