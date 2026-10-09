@@ -79,4 +79,5 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - **卷34** `07-next-steps.part128.md` — r99 的 **P0 段全文**（含 CI 五条红的逐条归因：远端缺 `v1.8.1` tag / live_sync 在册旧红 / measure_entry 是其下游影子 / `browser_engine_declare E2b` 未归因）。迁移动因 = part127 追加后顶到 4,180B 撞 4KB 单卷硬限，原卷只留指针＋ 本会话踩坑逐条 ＋ 电池 129→132 ＋ **r99 入口**（①采第二份 ramp 台账让漂移尺脱离诚实未验）
 - **卷35** `07-next-steps.part129.md` — **r100 收口（上）**：本轮四项改造各自的复算命令与回执（①三态纪律 ②中位数口径＋**检测限未下压的负面结论** ③`__pendingTurns`+U2g ④peers 错峰重采 16/16 落盘、5 族 rc=1 逐条归因）
 - **卷36** `07-next-steps.part130.md` — **r100 收口（下）**：两条会再犯的教训（同日台账后缀字典序＝时间序；LOC 提取让 `timing_coupling` 改判、基线未动）＋ **r101 入口四条**（按档定阈／被审面扩到跨函数消费者／假理由普查／403 补采）＋ ⏸ v1.8.1 仍 blocked（live_sync 现两件）
+- **卷37** `07-next-steps.part131.md` — **r101 收口与 r102 入口**：把 12 条 `debt-open` 改成完成态等待（C1 从 22 往下走的唯一正解）／`ledger_age` 摘牌／采一轮带 `machine_tag` 的阶梯台账后分桶重算阈值／peers 两件（SNAP 重采 + 403 补采，前置=先建断点续采）／CHANGELOG 吞行常驻判据／`build_dataset.py` 写侧锁 newline／AIC 13 项行尾红归其会话
 
