@@ -41,8 +41,10 @@ r96 的 8 档与本轮若用了别的档位集，逐档配对会拿 8 比 16。
 """
 import argparse
 import json
+import math
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -62,6 +64,67 @@ FACES = ("health", "emotion")          # perf_baseline 的 ramp 面就这两条
 # 想让它看得更细，正解是继续提仪器精度（每档重复取中位数），不是把阈值调小假装看得见。
 DEFAULT_TOL_PCT = 50.0
 FOLD_LIMIT = 110
+# ⇒ 更正注 r101：上面「每档重复取中位数」这条 r100 已落地（每档 5 次取中位 + 丢 1 次冷启），
+#   而实测**没有**把跨轮噪声压下来（同轮 5 次共享同一台机器此刻的状态，噪声是相关的；压得掉的
+#   只有采样次数那一半）。⇒ 单一 ±50% 对 t32/t64 太松（真实回退 30%~45% 检不出）、对 t8/t16
+#   又太紧（相邻轮最坏差本身就 49.9%~76.7%，判红而什么都没坏）。
+#   本轮的正解不是"把全局阈值调小"，而是**按档定阈 + 量不出来的档如实判不可判**：
+#   阈值由**权威台账现算**（相邻轮最坏差 × 2，向上取整到 5% 一格），
+#   推出来比旧全局阈还松的档面 ⇒ 记 `NA(noise-floor)`，**不放宽、也不硬判**。
+TOL_FACTOR = 2.0                      # 阈值 = 相邻轮最坏差 × 2（留一倍余量，防把测量噪声判成回归）
+TOL_STEP = 5.0                        # 向上取整到 5% 一格：逐日微漂不该让阈值本身天天变
+NOISE_UNUSABLE_PCT = DEFAULT_TOL_PCT  # 派生阈 > 旧全局阈 ⇒ 该档面不可判（宁可 NA，不许放宽）
+MIN_BOOKS_FOR_TIER = 3                # 至少三份才能产出 ≥2 个相邻差，否则没有"最坏差"可谈
+
+
+def adjacent_worst(books):
+    """从**同口径台账全集**现算每个 (档,面) 的相邻轮最坏差 → (dict, 参与份数)。
+
+    为什么不读 r100 的 `ramp-noise-*.json` 汇总件：那份是当轮一次性算出的抄件，
+    阈值若从抄件取，"被比的量"与"判定用的阈"就分家了 —— 同一事实两处实现是本仓在册根因
+    （M5⑥），且汇总件不会随新台账自己更新。汇总件继续留着当**证据**，只退出**分母**。
+    口径不同的相邻两份（`caliber_gaps` 非空）整对跳过，不折算不缩档。"""
+    worst = {}
+    for (_d1, p1), (_d2, p2) in zip(books, books[1:]):
+        if caliber_gaps(load_meta(p1), load_meta(p2)):
+            continue
+        a, b = load_ramp(p1), load_ramp(p2)
+        if not a or not b:
+            continue
+        for tier in sorted(set(a) & set(b)):
+            for face in FACES:
+                if face not in a[tier] or face not in b[tier]:
+                    continue
+                base = a[tier][face]["rps"] or 1e-9
+                d = abs((b[tier][face]["rps"] - a[tier][face]["rps"]) / base * 100.0)
+                k = (int(tier), face)
+                if d > worst.get(k, -1.0):
+                    worst[k] = d
+    return worst, len(books)
+
+
+def tier_tols(books):
+    """→ (每档面阈值 dict, 无法收紧的档面集合, 原始最坏差, 参与份数)。
+
+    **只许比全局更严，绝不放宽**：`tol = min(DEFAULT_TOL_PCT, ceil(adjacent_worst×2 上取整5))`。
+    这条 min 是机器保证，不是措辞 —— 反例腿里遍历合成数据断言它成立。
+    推出来 ≥ 全局阈的档面进 `capped`：**保持 ±50 并点名「噪声受限、无法收紧」**，
+    而不是把它折成 NA(noise-floor) —— 那等于把今天还能判的档面取消掉，**按档定阈反而变软**。
+    一手实测（r101，15 份台账 11 个可比对）：t32/health 相邻最坏差 40.1%、t64/emotion 63.1%
+    ⇒ ×2 后全部档面超出 ±50 ⇒ 现行全局阈已是这份数据能支持的最严值；
+    r100 入口①写的「数据已给全、按档定到 30%/20%」取的是**同日静置子集**（a..j）的读数，
+    那不含 10-05→10-07 与 10-07→10-07b 这类跨轮/离群对 ⇒ 前提不成立，见报告 §2。
+    """
+    worst, used = adjacent_worst(books)
+    tol, capped = {}, set()
+    for k, w in sorted(worst.items()):
+        t = math.ceil(w * TOL_FACTOR / TOL_STEP) * TOL_STEP
+        if t >= NOISE_UNUSABLE_PCT:
+            capped.add(k)
+            tol[k] = NOISE_UNUSABLE_PCT          # 保持全局值：不放宽，也谈不上收紧
+        else:
+            tol[k] = min(NOISE_UNUSABLE_PCT, t)  # min 是硬下界保证：阈只会更严或持平
+    return tol, capped, worst, used
 
 
 def is_ramp_ledger(p):
@@ -152,20 +215,24 @@ def load_ramp(p):
 
 
 def meta_of(d):
-    """台账口径：每线程请求数 + 档集 + 每档重复次数/丢弃的冷启次数。
+    """台账口径：每线程请求数 + 档集 + 每档重复次数/丢弃的冷启次数 + 机器标识（r101）。
     r99 起前两项决定「有没有可比读数」；r100 起后两项同理——单次读数与中位数读数不是同一个量
     （后者已经把档内长尾折掉了），拿 1 次去比 5 次会造出既有读数又判红的**假证据**。
-    旧台账没有这两个键 ⇒ 读出 None ⇒ 判口径差，不冒充"没差"。"""
+    旧台账没有这两个键 ⇒ 读出 None ⇒ 判口径差，不冒充"没差"。
+    `mtag` 是 r101 新增的**可比性凭据**：两侧都给了标识且不同 ⇒ 判口径差（两台机器的 rps
+    相减不是漂移）；**任一侧缺标识 ⇒ 不判差**（存量台账一律没有它，判差等于把整把尺打死，
+    那比"不可归因"更坏），缺多少份由 main 单独出声。"""
     ramp = d.get("ramp") or {}
     return {"work": ramp.get("work_per_thread"), "tiers": ramp.get("tiers") or [],
-            "reps": ramp.get("reps_per_tier"), "warmup": ramp.get("warmup_per_tier")}
+            "reps": ramp.get("reps_per_tier"), "warmup": ramp.get("warmup_per_tier"),
+            "mtag": ramp.get("machine_tag")}
 
 
 def load_meta(p):
     try:
         return meta_of(json.loads(p.read_text(encoding="utf-8")))
     except Exception:                                      # noqa: BLE001
-        return {"work": None, "tiers": [], "reps": None, "warmup": None}
+        return {"work": None, "tiers": [], "reps": None, "warmup": None, "mtag": None}
 
 
 def caliber_gaps(pm, cm):
@@ -185,11 +252,17 @@ def caliber_gaps(pm, cm):
         out.append("reps_per_tier %s→%s" % (pm.get("reps"), cm.get("reps")))
     if pm.get("warmup") != cm.get("warmup"):
         out.append("warmup_per_tier %s→%s" % (pm.get("warmup"), cm.get("warmup")))
+    if pm.get("mtag") and cm.get("mtag") and pm["mtag"] != cm["mtag"]:
+        out.append("machine_tag %s→%s" % (pm.get("mtag"), cm.get("mtag")))
     return out
 
 
-def compare(prev_tiers, cur_tiers, tol_pct):
-    """逐档逐面算相对漂移。返回 (读数行, 红因列表, NA 列表)。纯函数，selftest 直接调。"""
+def compare(prev_tiers, cur_tiers, tol_pct, tier_tol=None):
+    """逐档逐面算相对漂移。返回 (读数行, 红因列表, NA 列表)。纯函数，selftest 直接调。
+
+    `tier_tol` 存在时**每档面用它自己的阈**（r101 按档定阈），缺该键则回落 `tol_pct`。
+    阈只会更严或持平（`tier_tols()` 里的 min 保证），所以本函数**不存在放宽路径**；
+    红因文案格式一字未改（在册腿按该串匹配），阈源与所用阈放进 rows 供明细行用。"""
     rows, red, nas = [], [], []
     for tier in sorted(set(prev_tiers) | set(cur_tiers)):
         if tier not in prev_tiers or tier not in cur_tiers:
@@ -199,6 +272,8 @@ def compare(prev_tiers, cur_tiers, tol_pct):
             if face not in prev_tiers[tier] or face not in cur_tiers[tier]:
                 nas.append("t%d/%s" % (tier, face))
                 continue
+            k = (int(tier), face)
+            tol = (tier_tol or {}).get(k, tol_pct)
             a, b = prev_tiers[tier][face], cur_tiers[tier][face]
             base = a["rps"] or 1e-9
             dpct = (b["rps"] - a["rps"]) / base * 100.0
@@ -207,18 +282,22 @@ def compare(prev_tiers, cur_tiers, tol_pct):
                          "prev_p95": a["p95_ms"], "cur_p95": b["p95_ms"],
                          "rps_dpct": round(dpct, 1), "p95_dpct": round(ppct, 1),
                          "prev_llm": a.get("llm_used"), "cur_llm": b.get("llm_used"),
+                         "tol_used": tol,
+                         "tol_src": "按档" if (tier_tol or {}).get(k) is not None else "全局",
                          "band": b.get("band_rps")})
             # rps 掉超过阈值 = 劣化；p95 涨超过阈值 = 劣化。**只劣化判红**，改善不判红
             # （否则一台更快的机器会让这把尺天天红 —— 与「指标变好」无关的判红是噪声源）。
-            if dpct < -tol_pct:
-                red.append("t%d/%s rps %+.1f%% < -%.0f%%" % (tier, face, dpct, tol_pct))
-            if ppct > tol_pct:
-                red.append("t%d/%s p95 %+.1f%% > +%.0f%%" % (tier, face, ppct, tol_pct))
+            if dpct < -tol:
+                red.append("t%d/%s rps %+.1f%% < -%.0f%%" % (tier, face, dpct, tol))
+            if ppct > tol:
+                red.append("t%d/%s p95 %+.1f%% > +%.0f%%" % (tier, face, ppct, tol))
     return rows, red, nas
 
 
-def noise_floor(rows, tol_pct):
-    """仪器自报的「这一档今天分辨不出来」清单：本轮档内带宽 ≥ 阈值的档面。
+def noise_floor(rows, tol_pct, tier_tol=None):
+    """仪器自报的「这一档今天分辨不出来」清单：本轮档内带宽 ≥ **该档所用阈值** 的档面。
+
+    r101 起阈值按档，所以这里的对照对象也跟着按档取；缺 `tier_tol` 时与 r100 同义（全局阈）。
 
     立据（r100 静置 5 轮、每轮 30s 间隔实测）：t8/t16 跨轮带宽 50.6%~68.1%，t32/t64 只有
     8.0%~16.6%；而**每档跑 5 次取中位数并没有把跨轮噪声压下来**——同一轮里的 5 次共享同一台
@@ -227,11 +306,15 @@ def noise_floor(rows, tol_pct):
     但把这些档面**点名成噪声底**，好让下一轮不会拿一档的单次红去当"回归已证"。
     `band` 缺失（旧台账 / 未记带宽）⇒ 不计入，也不得折成 0 冒充安静。
     """
-    return [("t%d/%s" % (r["tier"], r["face"]), r["band"]) for r in rows
-            if isinstance(r.get("band"), (int, float)) and r["band"] >= tol_pct]
+    out = []
+    for r in rows:
+        t = (tier_tol or {}).get((int(r["tier"]), r["face"]), tol_pct)
+        if isinstance(r.get("band"), (int, float)) and r["band"] >= t:
+            out.append(("t%d/%s" % (r["tier"], r["face"]), r["band"]))
+    return out
 
 
-def face_line(prev_name, cur_name, rows, red, nas, tol):
+def face_line(prev_name, cur_name, rows, red, nas, tol, tol_label=None):
     """门面行（≤110 字符）。棘轮数 = 参与比较的档×面数，必须印出来：
     否则「0 红」与「一档都没比成」在受理面上无法区分 —— 空比较恒绿是本仓在册最贵的一族。
 
@@ -241,9 +324,10 @@ def face_line(prev_name, cur_name, rows, red, nas, tol):
     def brief(n):
         m = DATE_RE.search(n or "")
         return m.group(1)[5:] if m else "?"
-    line = ("PERF-RAMP-DELTA-%s: %s→%s 比%d档面 阈值±%.0f%% 红%d"
+    tl = tol_label or ("±%.0f%%" % tol)
+    line = ("PERF-RAMP-DELTA-%s: %s→%s 比%d档面 阈值%s 红%d"
             % ("FAIL" if red else "PASS", brief(prev_name), brief(cur_name),
-               len(rows), tol, len(red)))
+               len(rows), tl, len(red)))
     if nas:
         line += " NA%d" % len(nas)
     nf = noise_floor(rows, tol)
@@ -309,6 +393,74 @@ def _st_denominator(expect):
                                        "perf-ramp-noise-2026-10-08.json"])
         expect("分母自卫：不同前缀的件根本不进视野（glob 没匹配 ≠ 我判过它不是台账）",
                "unrelated-2026-10-08.json" not in foreign_files(tmpd))
+    finally:
+        shutil.rmtree(str(tmpd), ignore_errors=True)
+
+
+def _ramp_book(rps32, rps64):
+    """合成一份最小可比台账（两档两面，同口径）。只给 `--dir` 临时副本用，绝不出权威面。"""
+    res = {"32": {f: {"rps": rps32, "p95_ms": 20.0, "band_rps": 3.0} for f in FACES},
+           "64": {f: {"rps": rps64, "p95_ms": 20.0, "band_rps": 3.0} for f in FACES}}
+    return {"reps": 5, "budgets": {}, "breach": [],
+            "ramp": {"tiers": [32, 64], "work_per_thread": 32, "reps_per_tier": 5,
+                     "warmup_per_tier": 1, "budget_s": 240, "result": res}}
+
+
+def _st_tier_tol(expect):
+    """r101 按档定阈桩。四条硬规矩各一条腿，其中**「只更严不放宽」是机器断言不是措辞**。
+
+    一手代价（本轮）：第一版我把「量不出更严值」的档折成 `NA(noise-floor)`（既不计红也不计绿），
+    真面跑出来 8 个档面**全部 NA**、比 0 档面 —— 那等于把今天还能判的档面整批取消，
+    **按档定阈反而让尺变软**。现口径改成「保持全局 ±50 并点名受限」，本函数第 ④ 条腿
+    就是钉住这个反例：噪声大的档必须**照判**，且 −45% 不红（因为全局阈就是 50）。
+    """
+    tmpd = Path(tempfile.mkdtemp(prefix="xinyu_ramp_tol_"))
+    try:
+        seq = [(1000.0, 1000.0), (1005.0, 1300.0), (995.0, 990.0), (1000.0, 1300.0)]
+        for i, (a32, a64) in enumerate(seq):
+            (tmpd / ("perf-ramp-2026-10-0%d.json" % (i + 1))).write_text(
+                json.dumps(_ramp_book(a32, a64)), encoding="utf-8")
+        books = ledgers(tmpd)
+        tol, capped, worst, used = tier_tols(books)
+        quiet, loud = (32, "health"), (64, "health")
+        expect("① 派生：安静档（相邻最坏差 1.0%%）阈收到 %.0f%%（=ceil(2×1/5)×5）"
+               % tol.get(quiet, -1), tol.get(quiet) == 5.0)
+        expect("② 派生：吵闹档（最坏差 30%%）×2=60%% 超全局 ⇒ 保持 ±50 并进 capped 点名",
+               tol.get(loud) == DEFAULT_TOL_PCT and loud in capped)
+        expect("③ 只更严不放宽：全部派生阈 ≤ 全局阈（机器断言，遍历合成面）",
+               all(v <= DEFAULT_TOL_PCT for v in tol.values()) and used == len(books))
+        prev, cur = parse_ramp(_ramp_book(1000.0, 1000.0)), parse_ramp(_ramp_book(920.0, 550.0))
+        _r, red_new, _n = compare(prev, cur, DEFAULT_TOL_PCT, tol)
+        _r2, red_old, _n2 = compare(prev, cur, DEFAULT_TOL_PCT, None)
+        expect("④ 检测能力变强：t32 −8%% 在旧全局 ±50%% 下不红、在按档阈 5%% 下**必红**",
+               not any("t32" in x for x in red_old) and any("t32/health rps" in x for x in red_new))
+        expect("⑤ 没有放宽：t64 −45%% 在新旧口径下都不红（阈仍是 50%%），且该档被 capped 点名",
+               not any("t64" in x for x in red_new) and not any("t64" in x for x in red_old)
+               and loud in capped)
+        expect("⑥ 变异腿：把 tier_tol 打成空 ⇒ ④ 那条 −8%% 就不红了（证明收紧是新表在起作用，不是装饰）",
+               not any("t32/health rps" in x for x in red_old))
+        for n, m in (("缺标识侧", {"mtag": None}), ("有标识侧", {"mtag": "boxA"})):
+            base = {"work": 32, "tiers": [32], "reps": 5, "warmup": 1}
+            g = caliber_gaps(dict(base, mtag=None), dict(base, mtag="boxA"))
+            if n == "缺标识侧":
+                expect("⑦ 机器维向后兼容：任一侧没有 machine_tag ⇒ 不判口径差"
+                       "（否则存量台账会让整把尺打死，比『不可归因』更坏）", g == [])
+        g2 = caliber_gaps({"work": 32, "tiers": [32], "reps": 5, "warmup": 1, "mtag": "boxA"},
+                          {"work": 32, "tiers": [32], "reps": 5, "warmup": 1, "mtag": "boxB"})
+        expect("⑧ 机器维生效：两侧都有标识且不同 ⇒ 判口径差（两台机器的 rps 相减不是漂移）",
+               any("machine_tag" in x for x in g2))
+        only2 = Path(tempfile.mkdtemp(prefix="xinyu_ramp_tol2_"))
+        try:
+            for i in (0, 1):
+                (only2 / ("perf-ramp-2026-10-0%d.json" % (i + 1))).write_text(
+                    json.dumps(_ramp_book(1000.0, 1000.0)), encoding="utf-8")
+            p = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--dir", str(only2)],
+                               capture_output=True, text=True, timeout=90)
+            expect("⑨ 台账不足（2 份 <%d）⇒ 回落全局并**出声**「噪声表未取到」（回落≠没有阈）"
+                   % MIN_BOOKS_FOR_TIER,
+                   p.returncode in (0, 2) and "噪声表未取到" in (p.stdout or ""))
+        finally:
+            shutil.rmtree(str(only2), ignore_errors=True)
     finally:
         shutil.rmtree(str(tmpd), ignore_errors=True)
 
@@ -429,10 +581,12 @@ def selftest():
            meta_of({"ramp": {"work_per_thread": 32, "tiers": [8],
                              "reps_per_tier": 5, "warmup_per_tier": 1}})["reps"] == 5
            and meta_of({"ramp": {"reps_per_tier": 5, "warmup_per_tier": 1}})["warmup"] == 1)
-    expect("口径 load_meta 读坏件 ⇒ 四键全空而非静默可比",
-           load_meta(Path(__file__)) == {"work": None, "tiers": [], "reps": None, "warmup": None})
+    expect("口径 load_meta 读坏件 ⇒ 五键全空而非静默可比（含 r101 的 mtag，未知不许读成『相同』）",
+           load_meta(Path(__file__)) == {"work": None, "tiers": [], "reps": None,
+                                         "warmup": None, "mtag": None})
     _st_noise_floor(expect)
     _st_denominator(expect)
+    _st_tier_tol(expect)
 
     for x in bad:
         print("  不符: " + x)
@@ -478,26 +632,57 @@ def main():
               "整尺既不判绿也不判红（r99 把采集口径 work 从 4 提到 32，旧件与新件天然不可比）"
               % "；".join(gaps))
         return 2
-    rows, red, nas = compare(prev, cur, a.tol_pct)
+    # r101 按档定阈：阈由权威台账现算（相邻轮最坏差 × 2）。两个回落条件都**出声**：
+    #   ① 用户显式给了 `--tol-pct`（演习口）⇒ 尊重全局值，不按档（演习必须能注入任意阈）；
+    #   ② 可比台账 < MIN_BOOKS_FOR_TIER ⇒ 产不出相邻差 ⇒ 回落 DEFAULT 并点名"噪声表未取到"。
+    # 回落不等于"没有阈值"，更不等于"不判"。
+    tier_tol, capped, worst_map, used_books = {}, set(), {}, 0
+    tol_label = "±%.0f%%" % a.tol_pct
+    if abs(a.tol_pct - DEFAULT_TOL_PCT) < 1e-9:
+        if len(books) >= MIN_BOOKS_FOR_TIER:
+            tier_tol, capped, worst_map, used_books = tier_tols(books)
+            tightened = {k: v for k, v in tier_tol.items() if v < NOISE_UNUSABLE_PCT}
+            tol_label = ("按档(%d份台账)" % used_books) if tightened else \
+                        "±%.0f%%(按档算不出更严值)" % NOISE_UNUSABLE_PCT
+        else:
+            tol_label = "±%.0f%%(台账%d份<%d，噪声表未取到)" % (a.tol_pct, len(books), MIN_BOOKS_FOR_TIER)
+    rows, red, nas = compare(prev, cur, a.tol_pct, tier_tol)
     if not rows:
         print("PERF-RAMP-DELTA-UNVERIFIED: 两份台账无可比档面（NA=%s）"
               "⇒ 档集不相交是「没比成」不是「没漂移」" % ",".join(nas))
         return 2
-    line = face_line(prev_p.name, cur_p.name, rows, red, nas, a.tol_pct)
+    line = face_line(prev_p.name, cur_p.name, rows, red, nas, a.tol_pct, tol_label)
     if len(line) > FOLD_LIMIT:
         print("PERF-RAMP-DELTA-NOTE: 门面行 %d 字符 > 截断线 %d ⇒ 尾部读数在受理面上不存在"
               % (len(line), FOLD_LIMIT))
     print(line)
     for r in rows:
-        print("  - t%d/%s rps %.1f→%.1f（%+.1f%%）p95 %.1f→%.1f（%+.1f%%）"
+        print("  - t%d/%s rps %.1f→%.1f（%+.1f%%）p95 %.1f→%.1f（%+.1f%%）阈%.0f%%(%s)"
               % (r["tier"], r["face"], r["prev_rps"], r["cur_rps"], r["rps_dpct"],
-                 r["prev_p95"], r["cur_p95"], r["p95_dpct"]))
+                 r["prev_p95"], r["cur_p95"], r["p95_dpct"], r["tol_used"], r["tol_src"]))
+    if tier_tol:
+        print("  - 阈表(相邻最坏差×2 上取整5，只更严不放宽；台账 %d 份)：%s"
+              % (used_books, " ".join("t%d/%s=%.0f(差%.1f%s)"
+                                      % (k[0], k[1][:2], tier_tol[k], worst_map[k],
+                                         "≤全局" if k in capped else "")
+                                      for k in sorted(tier_tol))))
+        if capped:
+            print("  - 受限档面(相邻最坏差×2 已 ≥ 全局 ±%.0f%% ⇒ 保持全局值，不放宽也不硬收)：%s "
+                  "要收紧的正解是给台账补机器状态字段、把跨轮对与同日静置对分开算，"
+                  "不是调小阈值假装看得见"
+                  % (NOISE_UNUSABLE_PCT, ",".join("t%d/%s" % (k[0], k[1]) for k in sorted(capped))))
     # r100 噪声底：仪器自报「本轮这一档的档内带宽 ≥ 阈值」⇒ 该档的单次红不足以证明回归。
     # 红照判、rc 一字不改（不 loosening）；只是把"哪几档今天量不出来"变成机器可见的读数，
     # 免得下一轮拿 t8 的一次 −60% 当成"吞吐塌了"去改没坏的产品代码。
-    for name, band in noise_floor(rows, a.tol_pct):
-        print("  - 噪声底 %s 本轮档内带宽 %.1f%% ≥ 阈值 %.0f%% ⇒ 该档漂移不具因果判定力（须复跑）"
-              % (name, band, a.tol_pct))
+    tol_by_name = {"t%d/%s" % (r["tier"], r["face"]): r["tol_used"] for r in rows}
+    tagged = sum(1 for _d, p in books if load_meta(p).get("mtag"))
+    if tagged < len(books):
+        print("  - 机器状态凭据缺口 %d/%d 份有 machine_tag ⇒ 缺的只能整桶取 max，"
+              "跨轮对与同日静置对分不开 ⇒ 这就是阈值收紧不了的根子（改机制项，不是调参）"
+              % (tagged, len(books)))
+    for name, band in noise_floor(rows, a.tol_pct, tier_tol):
+        print("  - 噪声底 %s 本轮档内带宽 %.1f%% ≥ 该档阈 %.0f%% ⇒ 该档漂移不具因果判定力（须复跑）"
+              % (name, band, tol_by_name.get(name, a.tol_pct)))
     # llm_used 是这套读数的诚实性前提：r96 的每档都断言了它为 False。
     # 哪一档它变成 True，下一轮的 rps 就掺了上游延迟，这份漂移读数对该档不可用。
     tainted = ["t%d/%s" % (r["tier"], r["face"]) for r in rows if r.get("cur_llm") is True]
