@@ -43,6 +43,13 @@
   G16 电池脚本 ⇄ `docs/quality-gates.md` 明细双向对账：电池里跑的 `_test/*.py|js` 必须在该文档出现，
      文档写了而 `_test/` 查无此件也算红（r57 实证：该文档被当作"判据清单"读，而 44 条套件里 16 条从未在其中，
      同族根因 M5⑥ 一处清单两处实现；分母从 SUITES 现读，零分母不判绿）
+  G20 面上声称 ⇄ 它依赖的权威面（r101 立）：名册制 `CLAIMS`，每条 = (文件, 声称锚, 权威面, 理由)。
+     权威面一律 **import 既有函数现读**（battery_scripts / 磁盘台账目录 / 载体在位性），不开第二份 grep；
+     四态各说各话 —— 声称被面否证＝红、同行带「更正注」＝降为点名（保留被推翻原文是本仓规矩）、
+     锚在面上取不到＝只点名不判红（尺的语义不得宽于自称）、面取不到＝未验（不得读成"没命中所以通过"）。
+     立因三条一手实测：`js_syntax_check.py` 称「97 道电池里没有任何静态语法判据」而本件早已在电池、
+     `docs/PERF-BASELINE.md` 引用的汇总件名磁盘不存在（R240）、r100 报告称「U2g 双向反例 DRILL-PASS」
+     而 `ux_guards_check.py` 里 `--selftest|--drill` 零命中（空头主张）
   G19 `docs/` 真实文件 ⇄ `docs/README.md` 索引双向对账（r89）：磁盘上的每份文档都必须被索引链接（幽灵引文也算红）。
      动因：r87 交付 API/EXTENSIONS/PERF-BASELINE 三本手册后索引仍只列 openapi.yaml ⇒ 写了但没人找得到；
      原 G3 只问"openapi 被引用了吗"，对其余文档零覆盖（拿存在性结论冒充目录完整性）
@@ -261,6 +268,109 @@ def gate_doc_audit(scripts, doc_text, on_disk, tracked=None, ci_scripts=None):
                            % (len(orph), "、".join(orph[:8]) + ("…" if len(orph) > 8 else "")))
     bad += count_provenance_problems(doc_text)
     return bad
+
+
+def claim_faces():
+    """三张权威面现读（**全部 import 既有权威函数，不写第二份 grep**）。
+    任一张取不到 ⇒ 返回 None 项，由 `claim_face_audit()` 判该条未验（不得读成「没命中所以通过」）。"""
+    faces = {}
+    bs = battery_scripts()
+    faces["battery_scripts"] = bs or None
+    ux = ROOT / "_test" / "ux_guards_check.py"
+    if ux.is_file():
+        t = ux.read_text(encoding="utf-8", errors="replace")
+        faces["ux_drill"] = ("--selftest" in t) or ("--drill" in t)
+    else:
+        faces["ux_drill"] = None
+    doc = ROOT / "docs" / "PERF-BASELINE.md"
+    ldir = ROOT / "交付物" / "对标数据"
+    disk = {p.name for p in ldir.glob("*.json")} if ldir.is_dir() else set()
+    qp = {}
+    if doc.is_file() and disk:
+        dt = doc.read_text(encoding="utf-8", errors="replace")
+        for n in set(re.findall(r"`((?:perf-ramp|ramp-noise)-[A-Za-z0-9.\-*<>a-z]+\.json)`", dt)):
+            cut = min([n.index(c) for c in "*<>" if c in n] or [len(n)])
+            pref = n[:cut]
+            qp[n] = bool(pref) and (n in disk or any(x.startswith(pref) for x in disk))
+    faces["quoted_paths"] = qp or None
+    faces["quoted_path_disk"] = len(disk)
+    return faces
+
+
+CLAIMS = (
+    {"file": "_test/js_syntax_check.py",
+     "anchor": "道电池里没有任何静态语法判据",
+     "face": "battery_js_syntax",
+     "why": "排除性声称（「没有任何 X」）而现读面里就有 X ⇒ 该句是陈旧读数，"
+            "必须改掉或同行标「更正注」（承 browser_engine_declare 的同行豁免先例）"},
+    {"file": "docs/PERF-BASELINE.md",
+     "anchor_re": r"`((?:perf-ramp|ramp-noise)-[A-Za-z0-9.\-*]+\.json)`",
+     "face": "quoted_path_exists",
+     "why": "被文档引用的台账件必须磁盘存在（R240：文档写了 ≠ 磁盘有；r100 改名后没回写引用，"
+            "r101 实测 `perf-ramp-noise-2026-10-08.json` 在磁盘上不存在）"},
+    {"file": "交付物/对标分析报告-2026-10-08-r100.md",
+     "anchor": "DRILL-PASS` 双向",
+     "face": "ux_drill",
+     "why": "报告声称某反例已就位（`U2g 双向反例；DRILL-PASS 双向`），而代码里没有该载体 ⇒ "
+            "空头主张。正解是**撤销声称并加更正注**，不是顺手补一个跑不起来的旗标"},
+)
+
+
+def claim_face_audit(claim_defs, texts, faces, marked_ok=True):
+    """名册制纯函数：每条声称 ⇄ 它依赖的权威面。返回 (红因, 点名, 未验)。
+
+    三种出口各说各话（在册纪律：红/不可判/零分母/盲区 不得共用一句文案）：
+      · 锚命中**且**权威面否证 ⇒ 红（且同行没有「更正注」标记）；
+      · 锚命中、权威面也支持 ⇒ 静默通过；
+      · 锚命中但被同行「更正注」标注 ⇒ 只点名不判红（历史留痕是本仓规矩，R236 白名单排除法）；
+      · 锚在文本里取不到 ⇒ 点名「该声称已不在面上」，**不判红**（尺的语义不得宽于自称）；
+      · 权威面取不到 ⇒ 判「未验」，不得读成通过。
+    """
+    red, notes, unverified = [], [], []
+    for c in claim_defs:
+        txt = texts.get(c["file"])
+        if txt is None:
+            unverified.append("%s 读不到 ⇒ 该条未验" % c["file"])
+            continue
+        if c.get("anchor_re"):
+            hits = [(m.group(1), "") for m in re.finditer(c["anchor_re"], txt)]
+        else:
+            hits = [(ln.strip(), ln) for ln in txt.splitlines() if c["anchor"] in ln]
+        if not hits:
+            notes.append("%s 的声称锚已不在面上（%s）⇒ 只点名不判红" % (c["file"], c["anchor"] or c["anchor_re"]))
+            continue
+        for frag, line in hits:
+            if c["face"] == "battery_js_syntax":
+                bs = faces.get("battery_scripts")
+                if bs is None:
+                    unverified.append("电池面取不到 ⇒ %s 该条未验" % c["file"])
+                    continue
+                bad, detail = ("js_syntax_check.py" in bs), "现读电池里就有 js_syntax_check.py"
+            elif c["face"] == "battery_scripts_present":
+                bs = faces.get("battery_scripts")
+                if bs is None:
+                    unverified.append("电池面取不到 ⇒ %s 该条未验" % c["file"])
+                    continue
+                bad, detail = (c["check_name"] not in bs), "该件不在电池面（现读 %d 条）" % len(bs)
+            elif c["face"] == "ux_drill":
+                if faces.get("ux_drill") is None:
+                    unverified.append("ux_guards 读不到 ⇒ 该条未验")
+                    continue
+                bad, detail = (not faces["ux_drill"]), "_test/ux_guards_check.py 内无 --selftest/--drill 载体"
+            elif c["face"] == "quoted_path_exists":
+                if not faces.get("quoted_paths"):
+                    unverified.append("引用面/台账目录取不到 ⇒ 该条未验")
+                    continue
+                bad = faces["quoted_paths"].get(frag) is False
+                detail = "磁盘查无 `交付物/对标数据/%s`" % frag
+            else:
+                unverified.append("未知 face=%s ⇒ 该条未验" % c["face"])
+                continue
+            if bad and not (marked_ok and "更正注" in line):
+                red.append("%s: %s（%s）" % (c["file"], detail, c["why"][:26]))
+            elif bad:
+                notes.append("%s 带「更正注」的历史声称仍在面上：%s" % (c["file"], frag[:40]))
+    return red, notes, unverified
 
 
 def docs_index_audit(index_text, disk_names):
@@ -1365,6 +1475,7 @@ def _st_mut_c(bad, n_all, ex0):
     if not gate_doc_audit(set(), real_doc, real_disk):
         bad.append("篡改㉑d（分母取空）被判绿 ⇒ 违 R247 零命中不得判绿")
     _st_g16_git_face(bad, real_scripts, real_doc, real_disk)
+    _st_claim_face(bad, real_scripts)
     # ㉔ G19 docs 索引双向对账：正向不误伤 + 抹链接必红 + 幽灵引文必红 + 空分母不得判绿
     dn_real = sorted(p.name for p in (ROOT / "docs").iterdir() if p.is_file()) \
         if (ROOT / "docs").exists() else []
@@ -1436,6 +1547,47 @@ def _st_mut_c(bad, n_all, ex0):
     return 1 if bad else 0
 
 
+def _st_claim_face(bad, real_scripts):
+    """G20 桩：红路径／更正注降档／锚不在／面取不到／死引用／未知 face／真面正例。
+    四态出口各说各话（在册纪律：红、不可判、零分母、盲区 不得共用一句文案）。"""
+    js = next(c for c in CLAIMS if c["face"] == "battery_js_syntax")
+    qs = next(c for c in CLAIMS if c["face"] == "quoted_path_exists")
+    txt = "为什么这一面此前没人量：97 道电池里没有任何静态语法判据（`grep -l x`）\n"
+    bs_has = {"battery_scripts": set(real_scripts) | {"js_syntax_check.py"}}
+    r1, _n1, u1 = claim_face_audit([js], {js["file"]: txt}, bs_has)
+    if not r1:
+        bad.append("G20a 现读电池里就有 js_syntax_check.py 而文仍称「没有任何」⇒ 必须判红；实测不红 ⇒ 尺恒假")
+    if u1:
+        bad.append("G20a′ 面明明取到了却同时报未验 ⇒ 两个态混了")
+    r2, n2, _u2 = claim_face_audit(
+        [js], {js["file"]: txt.replace("为什么", "更正注 r101：为什么")}, bs_has)
+    if r2 or not n2:
+        bad.append("G20b 同行带「更正注」应降为**点名**（保留被推翻原文是本仓规矩），"
+                   "实测 red=%s notes=%s" % (r2, n2))
+    r3, n3, _u3 = claim_face_audit([js], {js["file"]: "这一行不含那句声称\n"}, bs_has)
+    if r3 or not any("已不在面上" in x for x in n3):
+        bad.append("G20c 锚取不到必须只点名不判红（尺的语义不得宽于自称）")
+    r4, _n4, u4 = claim_face_audit([js], {js["file"]: txt}, {"battery_scripts": None})
+    if r4 or not u4:
+        bad.append("G20d 权威面取不到 ⇒ 必须判未验，不得静默读成「没命中所以通过」")
+    r5, _n5, _u5 = claim_face_audit(
+        [qs], {qs["file"]: "汇总件 `ramp-noise-2099-01-01.json`\n"},
+        {"quoted_paths": {"ramp-noise-2099-01-01.json": False}, "quoted_path_disk": 3})
+    if not r5:
+        bad.append("G20e 文档引用的台账件磁盘不存在 ⇒ 必须判红（R240：文档写了 ≠ 磁盘有）")
+    r6, _n6, u6 = claim_face_audit([{"file": "f", "anchor": "x", "face": "no_such_face"}],
+                                   {"f": "x\n"}, {})
+    if not u6 or r6:
+        bad.append("G20f 未知 face ⇒ 必须判未验而不是判红或静默通过")
+    real_texts = {}
+    for c in CLAIMS:
+        p = ROOT / c["file"]
+        real_texts[c["file"]] = p.read_text(encoding="utf-8", errors="replace") if p.is_file() else None
+    r7, _n7, u7 = claim_face_audit(CLAIMS, real_texts, claim_faces())
+    if r7 or u7:
+        bad.append("G20g 真面（销账后）不应仍有红或未验，实测 red=%s unverified=%s" % (r7, u7))
+
+
 def selftest():
     """r94：只留调度——三段断言体已下移到 `_st_mut_a/b/c`。
 
@@ -1487,6 +1639,15 @@ def _cfg_head():
     g19bad = docs_index_audit(_read("docs/README.md"), docs_names)
     check("G19 docs/ 文件 ⇄ docs/README.md 索引双向对账（漏引/幽灵引都红）", not g19bad,
           f"docs/ 实有 {len(docs_names)} 件（分母从目录现读）| " + (" ; ".join(g19bad) or "全部在册"))
+    ctexts = {c["file"]: ((ROOT / c["file"]).read_text(encoding="utf-8", errors="replace")
+                          if (ROOT / c["file"]).is_file() else None) for c in CLAIMS}
+    cfaces = claim_faces()
+    cred, cnote, cunv = claim_face_audit(CLAIMS, ctexts, cfaces)
+    check("G20 面上声称 ⇄ 它依赖的权威面（陈旧读数/空头主张/死引用判红；带「更正注」降为点名；面取不到判未验）",
+          not cred and not cunv,
+          f"名册 {len(CLAIMS)} 条｜台账目录 {cfaces.get('quoted_path_disk', -1)} 份｜"
+          f"红 {len(cred)}｜点名 {len(cnote)}｜未验 {len(cunv)} | "
+          + (" ; ".join(cred + cunv) or ("仅点名: " + " ; ".join(cnote[:2]) if cnote else "全部对齐")))
     n = battery_count()
     check("G4 电池条目数 == README 声称的套件数", s_claim is not None and s_claim == n,
           f"run_all_suites.py 实测 {n} | README 声称 {s_claim}")
