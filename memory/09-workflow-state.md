@@ -63,6 +63,7 @@
 | WF-r97-v1.8.1发布链 | P0 | 推 main+tag v1.8.1+CI 回执+Release（Pages 面未发布，CI 电池不豁免 live 面） | blocked | - | 本机无 CF 凭据（env 全 unset / ~/.wrangler 不存在 / gh secret 空 / 全局 wrangler 崩），pages.dev 无法更新 ⇒ live_sync 判红未解，推送链 held。前提=npx wrangler pages deploy xinyu --project-name=xinyu-soulisle --commit-dirty=true | 2026-10-06 04:50 | - |
 | VOL-AGG-da9b83 | P2 | 体量治理[L3 产物] 体量余量聚合（14 项） — 另有 14 项待判断，合计 87861530 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-06 04:57 | - |
 | WF-r100-对标轮 | P1 | r100 八维对标 + 四项改造（判据三态纪律/性能中位数口径/__pendingTurns 完成态/peers 错峰重采） | done | - | - | 2026-10-08 06:11 | 报告 r100.md；四项回执见 07.part129/part130（②为负面结论） |
+| WF-r101-对标轮 | P1 | r101 八维对标 + 四项改造（耦合尺跨函数扩面／ledger_age 件内NA／按档定阈机制+负面结论／G20 声称对账与孤儿判据接线） | done | - | - | 2026-10-09 08:58 | - |
 
 ## 推进记录
 
@@ -95,6 +96,9 @@
 - [2026-10-06 04:57] 体量体检登记 1 项（待判断项转任务，id 前缀 VOL-）
 - [2026-10-08 06:10] WF-r100-对标轮 新增（P1，todo）
 - [2026-10-08 06:11] WF-r100-对标轮 todo → done
+- [2026-10-09 08:58] WF-r101-对标轮 新增（P1，todo）
+- [2026-10-09 08:58] WF-r101-对标轮 todo → doing
+- [2026-10-09 08:58] WF-r101-对标轮 doing → done
 
 ## 分卷目录
 
