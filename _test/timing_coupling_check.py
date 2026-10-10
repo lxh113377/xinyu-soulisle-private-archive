@@ -462,6 +462,20 @@ def norm_stmt(seg):
 #   stream_contract）。现读由 6 涨到 22 ⇒ **这是口径变更不是活变差**，旧 9 与新 22 不可比，
 #   基线随之 9→22 并在 `--baseline` help 里写明「换口径」；下一轮的正解是把 debt-open 那 12 条
 #   改成完成态等待（每条改完自己离开 C1_HARD ⇒ 棘轮自己降），而不是把基线再往上抬。
+# ── r102 更正注（本轮一手实测：现读 29、基线 22、棘轮红，红因有二）──
+#   ① r101 登记的 12 条 debt-open，**本轮结掉 11 条**（改完成态等待后各自离开 C1_HARD）：
+#      clean_clone×1 / public×3 / browser×2 / emotion_wiring×1 / storage_resilience×1 /
+#      j2×2 / stream×1。完成态实现上收 `settle_wait.wait_reply`（私有标记 + data-emotion /
+#      「友好错误态」双终态）——ux_guards 原有的那份一并上收，五处判据共一处实现。
+#   ② **j4:101 的 debt-open 登记是错的，本轮改判 unobservable**：B 腿（default 关闭）那句
+#      10000ms 不是"等服务端写入"，而是**阴性对照的观察窗**——remote 关着时服务端-count
+#      恒等于基线，轮询"计数到位"永不满足、轮询"静止"则立即满足（窗口消失）。确认一件事
+#      **没有发生**没有完成态可等；产品也没有"已完成写入"的钩子（memory-store 未暴露）。
+#      修正记在此，债务本身（给产品补写入回执钩子）登记 r103。
+#   ③ r87 的 face_check 新进 7 处 C1_HARD（改前 22 → 现读 29），全部登记 debt-open：
+#      摄像头开关/关闭/总闸/F8/F9/公网关闭腿，等的大多是 `live===0`（流真停）这类现成状态，
+#      属"可改而未改"——**没有为了方便把它们塞进 shaped-only**。r87 件本身未入库（staged），
+#      本轮只登记不改写，结转 r103 随该件一起入库时处理。
 # 本表只是**读数**：判据仍不猜意图（红只由棘轮产生），未覆盖件走续行出声、不判红。
 #
 # r100 对账（键必须与现读同起同落，所以这里只记「现在仍在 C1_HARD 里」的形状；
@@ -490,26 +504,6 @@ REVIEW = {
         "verdict": "shaped-only", "sites": 1,
         "why": "展开是 chat-window.js 同步 insertBefore，800ms 押的是同步变更；而可等的完成态"
                "（首条内容变了）就是被断言项"},
-    # ── 以下 15 条键 = r101 扩面（跨块 / 跨函数返回值消费）捞出的存量真债，逐条已核决策行 ──
-    "clean_clone_check.py::pg.wait_for_timeout(2500)": {
-        "verdict": "debt-open", "sites": 1,
-        "why": "r100 那条改判点回到分子：wait→evaluate(st) 在 try 体内、决策在 try 之后的 "
-               "`if st is not None:`(跨块@138)。等的是页面加载完成 ⇒ 正解 wait_for_selector('#chat-input')"},
-    "public_check.py::pg.wait_for_timeout(12000)": {
-        "verdict": "debt-open", "sites": 2,
-        "why": "r100 那条改判点：wait→inner_text/eval 后 `return probe,…`，调用方 ck(\"P5 双路情绪读数…\") "
-               "消费(@194)。产品 r100 已暴露 window.__pendingTurns ⇒ 可等它归零，12s 定长属重复"},
-    "public_check.py::pg.wait_for_timeout(8000)": {
-        "verdict": "debt-open", "sites": 1,
-        "why": "同上第三处（危机词那条腿），消费点同为 @194"},
-    "browser_check.py::page.wait_for_timeout(2500)": {
-        "verdict": "debt-open", "sites": 1,
-        "why": "wait→crisis_readout=inner_text(#probe-result)，决策 `assert \"危机\" in crisis_readout`"
-               "(跨块@152) ⇒ 等的是回复落定，__pendingTurns 可替"},
-    "browser_check.py::page.wait_for_timeout(500)": {
-        "verdict": "debt-open", "sites": 1,
-        "why": "wait→dock_collapsed=get_attribute/eval，决策 `assert dock_collapsed`(跨块@153) "
-               "⇒ dock 开合是 class 变更，可 wait_for_function 断言 classList"},
     "browser_check.py::page.wait_for_timeout(2000)": {
         "verdict": "unobservable", "sites": 1,
         "why": "滚到底再回滚后读 opacity(back3)，决策 @157 ⇒ 等的是滚动过渡落定，"
@@ -524,30 +518,34 @@ REVIEW = {
     "lightshow_check.py::page.wait_for_timeout(700)": {
         "verdict": "unobservable", "sites": 1,
         "why": "「回到我的记忆」清演示点亮，读 lit_cleared 后 @236 断言 ⇒ 同上（点亮是逐粒子动画）"},
-    "j2_chat_contract.py::page.wait_for_timeout(600)": {
-        "verdict": "debt-open", "sites": 1,
-        "why": "A 组在线腿：wait→取气泡文本 return，调用方 `if \"在线大模型生成\" not in a_last`(@72) 消费 "
-               "⇒ 600ms 是回复后的渲染拍，可等 __pendingTurns/气泡 class"},
-    "j2_chat_contract.py::page.wait_for_timeout(10000)": {
-        "verdict": "debt-open", "sites": 1,
-        "why": "同件等回复的 10s 定长，消费点 @72 ⇒ 可等完成态归零"},
-    "stream_contract.py::page.wait_for_timeout(14000)": {
-        "verdict": "debt-open", "sites": 1,
-        "why": "流式契约件：wait→eval_on_selector_all(msgs) 后 `return msgs[-1], had_stream`，"
-               "调用方 @136 的 if 消费 ⇒ 本件本就是测逐字流式的，等「流结束」有现成可见证据（.streaming 消失）"},
+    # ── r102 改判：j4:101 从 debt-open 转为 unobservable（详见本文件 r102 更正注②）──
     "j4_memory_check.py::page.wait_for_timeout(10000)": {
+        "verdict": "unobservable", "sites": 1,
+        "why": "B 腿（cfg.remote 缺省=关）这句 10000ms 是**阴性对照观察窗**，不是等服务端写入："
+               "remote 关着时服务端 count 恒等于基线 ⇒ 轮询「计数到位」永不满足、轮询「静止」"
+               "立即满足（窗口消失）。确认一件事**没有发生**没有完成态；产品也没暴露写入回执钩子"
+               "（memory-store 无计数器）⇒ 保留定长记此态。给产品补钩子的债务登记 r103。"},
+    # ── r102 新登记：r87 的 face_check 7 处（改前 22→现读 29 的来源）。全部 debt-open：
+    #      等的大多是现成状态（live 流归零 / 入口显隐 / ui.state / 状态行翻面），
+    #      "可改而未改"不塞 shaped-only。r87 件 staged 未入库 ⇒ 本轮只登记，结转 r103。──
+    "face_check.py::pg.wait_for_timeout(600)": {
         "verdict": "debt-open", "sites": 1,
-        "why": "远端记忆落库回读，决策 `if mem_off < 2`(跨块@127) ⇒ 等的是服务端写入，"
-               "可改轮询 /api/memory/stats 计数到位"},
-    "emotion_wiring_check.py::page.wait_for_timeout(300)": {
+        "why": "F10 关 #face-switch 后读 running/live/aria-checked ⇒ live===0（流真停）是现成完成态"},
+    "face_check.py::page.wait_for_timeout(600)": {
         "verdict": "debt-open", "sites": 1,
-        "why": "前置已有 wait_for_function 判流式结束，这 300ms 再等文本节点落定后直接 "
-               "`return page.evaluate(...)`，调用方 check(\"W4…\")(@180) 消费 ⇒ 重复定长，"
-               "可折进那条 wait_for_function 的谓词里"},
-    "storage_resilience_check.py::page.wait_for_timeout(600)": {
+        "why": "点 #btn-face-close 后读 running/hudHidden/liveStreams/mist ⇒ live===0 且 hud 隐藏可等"},
+    "face_check.py::page.wait_for_timeout(400)": {
+        "verdict": "debt-open", "sites": 2,
+        "why": "F4 摄像头总闸关/重开两腿，读入口显隐 + ui.reason/ui.state ⇒ 都由同一状态机驱动可等"},
+    "face_check.py::p8.wait_for_timeout(600)": {
         "verdict": "debt-open", "sites": 1,
-        "why": "计数槽由 rAF/事件回写（源码注释自陈「给一拍」），写进 res 容器后 @223 的 if 消费 ⇒ "
-               "容器写入的污点这条 r101 才追得到；可等「计数文本变了」"},
+        "why": "F8 无设备面：等 ui.reason='no-video-device' 落定 + #face-status 有文案（现在读的就是它们）"},
+    "face_check.py::p9.wait_for_timeout(1200)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "F9 被阻止面：读 #face-status 文案 ⇒ 等它相对点击前**翻面**（存旧值等变化，无阈值）"},
+    "face_check.py::pg.wait_for_timeout(800)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "公网关闭腿：读 running/live ⇒ live===0 可等（同 366 那条的形状）"},
 }
 
 
@@ -702,20 +700,37 @@ def _st_cross_face(expect, bucket_of):
         recs, _t, _e = classify(p.read_text(encoding="utf-8", errors="replace"), fname)
         return sum(1 for r in recs if r["bucket"] == "C1_HARD")
 
-    before = {n: hard_of(n) for n in ("clean_clone_check.py", "public_check.py")}
+    # r102 换样本：原样本 clean_clone/public_check/stream_contract 的等待点本轮已改成完成态
+    #（离开 C1_HARD，这正是改造的目的）⇒ 变异腿改盯**仍在分子里且只靠一条新面**的形状：
+    #   j4_memory_check.py —— 跨块消费（mem_off 读在 @102、决策在 @127）⇒ 只靠执行流上溯；
+    #   合成 XFER 夹具   —— 取数直接长在 return 表达式里，由调用方断言 ⇒ 只靠返回值消费。
+    # 两条新面**分别**打桩（原来是一起打）：一起打只能证明"有用"，分开打才证明"各自有用"。
+    before = hard_of("j4_memory_check.py")
     keep = (globals()["forward_flow"], globals()["return_consumed"])
+    XFER = ('def drive(pg):\n'
+            '    pg.wait_for_timeout(4000)\n'
+            '    return pg.evaluate("() => 1")\n'
+            'def main(pg):\n'
+            '    v = drive(pg)\n'
+            '    assert v\n')
     try:
         globals()["forward_flow"] = lambda *a, **k: []
+        mid = hard_of("j4_memory_check.py")
+        expect("变异腿① 只把「执行流上溯」打桩成恒空 ⇒ j4（跨块消费）必须掉出分子"
+               "（证明这条读数是新面产出的，不是原本就在）",
+               bool(before) and mid == 0)
+        globals()["forward_flow"] = keep[0]
         globals()["return_consumed"] = lambda *a, **k: None
-        after = {n: hard_of(n) for n in ("clean_clone_check.py", "public_check.py")}
-        expect("变异腿 把两条新面打桩成恒空 ⇒ clean_clone/public_check 必须掉出分子"
-               "（证明这些读数是新面产出的，不是原本就在）",
-               all(before[n] is not None and before[n] > 0 for n in before)
-               and all(after[n] == 0 for n in after))
+        mid_x = classify(XFER, "f.py")[0][0]["bucket"]
+        expect("变异腿② 只把「跨函数返回值消费」打桩成恒空 ⇒ return 交接必须掉出分子"
+               "（且 j4 的跨块腿不受影响 ⇒ 两条面互不顶替）",
+               mid_x == "READ_NO_DECIDE"
+               and hard_of("j4_memory_check.py") == before)
     finally:
         globals()["forward_flow"], globals()["return_consumed"] = keep
-    expect("  还原后同一批文件回到原读数（动的是尺不是期望值）",
-           {n: hard_of(n) for n in before} == before)
+    expect("  还原后同一输入回到原读数（动的是尺不是期望值）",
+           hard_of("j4_memory_check.py") == before
+           and classify(XFER, "f.py")[0][0]["bucket"] == "C1_HARD")
 
 
 def selftest():
@@ -854,15 +869,16 @@ def selftest():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--baseline", type=int, default=22,
+    ap.add_argument("--baseline", type=int, default=18,
                     help="C1_HARD 棘轮上界（只降不升）。r98 建尺实测 16 却把上界写成 28 —— "
                          "help 原文「取实测值钉住」与磁盘不符；r99 改掉 7 处误等后现读 9，"
                          "基线随之 28→9（余量清零才是本意：留 19 的空档等于给新增误等发通行证）。"
                          "⚠️ **22 是 r101 的口径变更值，与旧 9 不可比**：被审面从「同块」扩到"
                          "「同块 → 执行流后续块 → 跨函数返回值消费」后，r100 被 LOC 搬家掩掉的 "
                          "4 处与另外 12 处存量真债一起回到分子。旧 9 不是「当时只有 9 处」而是"
-                         "「当时只看得见 9 处」。下一轮的正解是把 12 条 debt-open 改成完成态等待"
-                         "（改完自动离开分子 ⇒ 棘轮自己降），不是抬基线。")
+                         "「当时只看得见 9 处」。r101 留的正解（改完成态等待、不抬基线）本轮执行："
+                         "12 条 debt-open 结掉 11 条（j4:101 改判 unobservable）、face_check 新进 "
+                         "7 条全部登记 ⇒ 现读与基线同步落到 18。")
     ap.add_argument("--only", default="", help="逗号分隔的文件名子集（定位/演习用）")
     ap.add_argument("--json", default="")
     ap.add_argument("--selftest", action="store_true")

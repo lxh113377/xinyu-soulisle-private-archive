@@ -19,7 +19,11 @@ A 腿已红「LLM 精判失败 → 词典兜底」，印出 `J2-CONTRACT-FAIL`�
 """
 import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+import os
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from settle_wait import wait_reply, before_send   # r102：与 browser_check 等共源的完成态等待
 
 BASE = "http://127.0.0.1:8123/index.html"
 TEXT = "今天被导师批评了，心情很低落"
@@ -43,11 +47,18 @@ def run(browser, proxy):
       localStorage.removeItem('peiliao.history.v1');
     }""", proxy)
     page.reload(wait_until="networkidle")
-    page.wait_for_timeout(600)
+    # r102：原 600ms 押"配置生效了"。改等 **ChatAgent 真就绪**（cfg 注入了、
+    # isOnline 可调）——读的就是它，等的是它自己站出来，不是猜的时长。
+    page.wait_for_function(
+        "() => !!window.ChatAgent && typeof window.ChatAgent.isOnline === 'function'",
+        timeout=10000)
     online = page.evaluate("() => window.ChatAgent.isOnline()")
     page.fill("#chat-input", TEXT)
+    before_send(page)                      # r102：先标记后发送（时序反了会把标记打到本轮终态上）
     page.click("#chat-form button[type=submit]")
-    page.wait_for_timeout(10000)
+    # r102：原 10000ms 定长 → 终态气泡（与 browser_check/public_check 共源实现）。
+    # 异常路（友好错误态）也收，B 组回落失败时仍能读到具体气泡文案，不退化成超时。
+    wait_reply(page, timeout=30000)
     msgs = page.eval_on_selector_all(".msg.ai", "els => els.map(e => e.textContent)")
     page.close()
     return online, (msgs[-1] if msgs else "")

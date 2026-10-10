@@ -16,9 +16,13 @@
 """
 import json
 import sys
+import os
 import urllib.request
 
 sys.stdout.reconfigure(encoding="utf-8")
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from settle_wait import wait_reply, before_send   # r102：与 browser_check 等共源的完成态等待
 
 BASE = "http://127.0.0.1:8123"
 API = BASE + "/api/chat"
@@ -120,8 +124,13 @@ def main():
             page.reload(wait_until="networkidle")
             page.wait_for_timeout(500)
             page.fill("#chat-input", "论文被拒了三次，感觉努力全白费")
+            before_send(page)              # r102：先标记后发送（时序反了会标记到本轮终态上）
             page.click("#chat-form button[type=submit]")
-            page.wait_for_timeout(14000)
+            # r102：原 14000ms 定长 → 终态气泡（与 browser_check/public_check 共源实现）。
+            # 本件测的就是逐字流式：终态谓词要求最后一条带 data-emotion，而流式泡在终态泡
+            # push 前一刻已被移除（同一同步块）⇒ "等终态"本身就蕴含"流已结束"；
+            # __seenStreamingBubble 在流式期间置位，等终态时它必然早已置位 —— 采样点不丢。
+            wait_reply(page, timeout=45000)
             msgs = page.eval_on_selector_all(".msg.ai", "els => els.map(e => e.textContent)")
             # 采样：生成过程中是否出现过「逐字生成中」气泡（流式的前端可见证据）
             had_stream = page.evaluate("() => !!window.__seenStreamingBubble")

@@ -38,6 +38,9 @@ from pathlib import Path
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from settle_wait import before_send        # r102：先标记后发送的时序（同 browser_check 共源）
+
 ROOT = Path(__file__).resolve().parents[1]
 BASE = os.environ.get("XINYU_BASE", "http://127.0.0.1:8123")
 LAUNCH_ARGS = [a for a in os.environ.get("XINYU_BROWSER_ARGS", "").split() if a]
@@ -171,9 +174,21 @@ def probe_case(browser, case, fault, click_clear):
         res["arm_error"] = page.evaluate("() => window.__armError || ''")
         res["dock"] = page.is_visible("#chat-dock")
         page.fill("#chat-input", "今天被导师批评了，心情很低落")
+        # r102：旧值必须在**办事前**取（原来放在 settle 之后 ⇒ settle 等到 count>0 时
+        # UI 那一拍可能已经回写成 1，旧值取样拿到"1"，随后等 `!== 1` 永不成立 ——
+        # 本轮只记 1 条，五个用例全部 8s 超时。这是取样点位置缺陷，不是谓词缺陷）。
+        mem_before = page.evaluate(
+            "() => { const el = document.getElementById('mem-count');"
+            " return el ? el.textContent : null; }")
+        before_send(page)                  # r102：先标记后发送（时序反了会标记到本轮终态上）
         page.click("#chat-form button[type=submit]")
         settle(page, "() => (window.MemoryStore && MemoryStore.count()) > 0")
-        page.wait_for_timeout(600)          # 计数槽由 rAF/事件回写，给一拍
+        # r102：计数槽由 rAF/事件回写（原 600ms 定长"给一拍"）。改等**它真的变了**：
+        # 办事前存旧文本、等文本翻面——只问"变了吗"，不含任何阈值（settle_wait 契约①）。
+        # 旧写法的两个盲区：太快 ⇒ 读到上一拍；太慢 ⇒ 白等 600ms（CI 慢机上红、本机永远绿）。
+        page.wait_for_function(
+            "(v) => { const el = document.getElementById('mem-count');"
+            " return !!el && el.textContent !== v; }", arg=mem_before, timeout=15000)
         res["ui_count"] = page.evaluate(
             "() => { const el = document.getElementById('mem-count');"
             " return el ? Number(el.textContent) : null; }")

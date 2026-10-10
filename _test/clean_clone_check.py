@@ -119,7 +119,13 @@ def drive_page(b, port, nav_timeout_ms):
     try:
         resp = pg.goto("http://127.0.0.1:%d/index.html" % port,
                        wait_until="networkidle", timeout=nav_timeout_ms)
-        pg.wait_for_timeout(2500)
+        # r102：原 2500ms 定长押"脚本都跑完了"。改等**被读的那四件事自身就位**：
+        # THREE/gsap/ScrollTrigger 三个全局 + #chat-input 在 DOM 里 —— 少一个都说明
+        # vendor 没加载完或页面没起来，等的是事实不是猜的时长（判据读的就是这四项）。
+        pg.wait_for_function(
+            "() => typeof THREE !== 'undefined' && typeof gsap !== 'undefined'"
+            " && typeof ScrollTrigger !== 'undefined' && !!document.querySelector('#chat-input')",
+            timeout=15000)
         st = pg.evaluate("""() => ({
             three: typeof THREE, gsap: typeof gsap, st: typeof ScrollTrigger,
             acts: document.querySelectorAll('section.act').length,

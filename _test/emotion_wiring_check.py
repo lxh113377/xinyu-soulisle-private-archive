@@ -22,6 +22,7 @@
 import argparse
 import hashlib
 import json
+import os
 import sys
 import urllib.request
 import urllib.error
@@ -29,10 +30,18 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from settle_wait import wait_reply, before_send   # r102：完成态等待与 public_check 等共源
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 PUB = ROOT / "deploy" / "xinyu"
-BASE = "http://127.0.0.1:8123"
+# r102：端口可配（默认 8123）。动机是一手实测：整跑电池与我并行作业时，共享端口 8123
+# 会被另一会话的 build_jar.stop_holders() 按端口杀掉 ⇒ 判据连级超时，红因完全不可归因。
+# 有独立端口才能把"仪器被外部杀掉"与"产品真缺陷"分开。
+BASE = os.environ.get("XINYU_BASE", "http://127.0.0.1:8123")
+# 终态气泡选择器（读数用）：排除 thinking 占位泡与 streaming 流式泡
+TERM = "#chat-log .msg.ai:not(.streaming):not(.thinking)"
 results = []
 
 
@@ -149,20 +158,19 @@ def send(page, text, timeout=90000):
     踩坑固化（两版假红的真根因）：app.js 在等待期会先插一个 `.msg.ai.thinking` 占位泡，
     流式期再换成 `.msg.ai.streaming` —— **两者都是 .msg.ai**。
     只判 `.msg.ai` 出现 ⇒ 读到 "心屿正在感受你的话…"；只排除 .streaming ⇒ 仍读到 thinking 占位泡。
-    故终态选择器必须同时排除 .streaming 与 .thinking，且要求不再有 streaming 泡在飞。
+    r102：终态判定上收 `settle_wait.wait_reply`（私有标记 + data-emotion / 友好错误态），
+    本地的 TERM 计数与 300ms 定长一并退役——计数法判不出"新气泡"，定长法押的是渲染拍。
+    原 300ms 经一手推演确认本就是装饰：thinking→streaming→final 的替换在同一个同步块里，
+    轮询器（rAF）不可能观察到"流式泡已删、终态泡未插"的中间态。
+    ⚠️ 时序（r102 一手教训）：before_send 必须在 click **之前**——离线模板 ~15ms 回完，
+    click 后再标会把标记打到本轮终态上，谓词永久不成立（超时 30s）。
     """
-    TERM = "#chat-log .msg.ai:not(.streaming):not(.thinking)"
-    count_js = "() => document.querySelectorAll('" + TERM + "').length"
-    before = page.evaluate(count_js)
+    before_send(page)
     page.fill("#chat-input", text)
     page.click("#chat-form button[type=submit]")
-    page.wait_for_function(
-        "(n) => document.querySelectorAll('" + TERM + "').length > n"
-        " && !document.querySelector('#chat-log .msg.ai.streaming')", arg=before, timeout=timeout)
-    page.wait_for_timeout(300)
+    wait_reply(page, timeout=timeout)
     return page.evaluate("() => { const m=document.querySelectorAll('" + TERM + "');"
                          "return m.length? m[m.length-1].textContent : ''; }")
-
 
 def e2e(browser):
     page = browser.new_page(viewport={"width": 1280, "height": 800})

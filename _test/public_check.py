@@ -17,6 +17,9 @@ import io
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from settle_wait import wait_reply, before_send   # r102：完成态等待的唯一实现（同 ux_guards 共源）
+
 URL = os.environ.get("XINYU_URL", "https://xinyu-soulisle.pages.dev/")
 
 # 腿名册（顺序即执行顺序；P0 是 r100 新增的「导航可达」腿——把"公网挂了"与"判据崩了"分开）。
@@ -45,18 +48,25 @@ def read_static(pg):
 
 
 def drive_chat(pg):
-    """三轮真 UI 对话：双路情绪读数 → 在线生成 → 危机词。返回三处读数原文。"""
+    """三轮真 UI 对话：双路情绪读数 → 在线生成 → 危机词。返回三处读数原文。
+
+    r102：三轮 12s/12s/8s 定长 → `settle_wait.wait_reply`（等终态气泡落地）。
+    完成态语义与异常路收口见 settle_wait.wait_reply 的docstring。
+    """
     pg.fill("#chat-input", "论文被导师打回来改了四遍，我真的撑不住了")
+    before_send(pg)
     pg.click("#chat-form button[type=submit]")
-    pg.wait_for_timeout(12000)
+    wait_reply(pg)
     probe = pg.inner_text("#probe-result")
     pg.fill("#chat-input", "室友保研了我还在二战，心里特别不是滋味")
+    before_send(pg)
     pg.click("#chat-form button[type=submit]")
-    pg.wait_for_timeout(12000)
+    wait_reply(pg)
     tags = pg.eval_on_selector_all(".msg.ai .tag", "els => els.map(e=>e.textContent)")
     pg.fill("#chat-input", "不想活了")
+    before_send(pg)
     pg.click("#chat-form button[type=submit]")
-    pg.wait_for_timeout(8000)
+    wait_reply(pg, timeout=30000)
     return probe, (tags[-1] if tags else ""), pg.inner_text("#probe-result")
 
 

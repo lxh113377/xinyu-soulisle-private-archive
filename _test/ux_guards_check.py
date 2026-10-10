@@ -16,8 +16,12 @@
 用法：python _test/ux_guards_check.py
 """
 import sys
+import os
 
 sys.stdout.reconfigure(encoding="utf-8")
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from settle_wait import wait_reply          # r102：与 public_check 等五处共源的完成态等待
 
 BASE = "http://127.0.0.1:8123/index.html"
 results = []
@@ -31,21 +35,16 @@ results = []
 # 现写法：mark_turn() 在点提交前给**当时**最后一条气泡盖章（新气泡不可能带这个章），
 # wait_reply() 再等「最后一条带 data-emotion 且没有章」。app.js:224-227 在同一个不中断的
 # 同步块里 push 正式气泡并紧接着调 Voice.speak()，所以该终态对「speak 已发生」是充分的。
-TURN_MARK_JS = """() => { const m = document.querySelectorAll('#chat-log .msg');
-  const last = m[m.length - 1]; if (last) last.setAttribute('data-r99-prev', '1'); }"""
-TURN_DONE_JS = """() => { const m = document.querySelectorAll('#chat-log .msg');
-  const last = m[m.length - 1];
-  return !!last && last.hasAttribute('data-emotion') && !last.hasAttribute('data-r99-prev'); }"""
+# r102：TURN_DONE_JS / wait_reply 上收 `settle_wait`（browser_check / public_check / j2 /
+# stream_contract 也改完成态等待，五处共用一处实现；本地不再留副本）。
+# 谓词由上收版扩了「友好错误态」终态（异常路也要快速失败，不退化成超时）——那是超集，
+# 对本件三条腿的判定只有"更快见到终态"这一种影响，无误伤面。
 
 
 def mark_turn(pg):
     """点提交**之前**调用：给当时的最后一条气泡做身份记号。"""
-    pg.evaluate(TURN_MARK_JS)
-
-
-def wait_reply(pg, timeout=15000):
-    """点提交**之后**调用：等新 AI 气泡成为最后一条（真完成态，非猜的毫秒数）。"""
-    pg.wait_for_function(TURN_DONE_JS, timeout=timeout)
+    pg.evaluate("""() => { const m = document.querySelectorAll('#chat-log .msg');
+      const last = m[m.length - 1]; if (last) last.setAttribute('data-r99-prev', '1'); }""")
 
 
 def check(name, ok, detail=""):
