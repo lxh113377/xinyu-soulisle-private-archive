@@ -546,6 +546,19 @@ REVIEW = {
     "face_check.py::pg.wait_for_timeout(800)": {
         "verdict": "debt-open", "sites": 1,
         "why": "公网关闭腿：读 running/live ⇒ live===0 可等（同 366 那条的形状）"},
+    # ── r104 续：并行会话的 dock_auto_check 新进场 2 处（C1 18→20 的来源）。
+    #    形与 browser_check:75 改造前那条同族：dock 开合/三态/演示态切换都是**同步 class 变更**，
+    #    可 wait_for_function 断言 classList 翻面（该先例已落地，见 r104 ③）。
+    #    不塞 shaped-only：等的是"另一个同步变更后的副作用"，不是被断言项自身。──
+    "dock_auto_check.py::pg.wait_for_timeout(400)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "D7 三态循环里进入 C1_HARD 的那一跳（常规→全屏）后读 open/full ⇒ 同步 "
+               "class 变更，可等 classList 翻面（先例：browser_check:75）。"
+               "⚠️ sites 记 1 不记 3：该件有多处 400ms，但 C1_HARD 只认「等待后被决策消费」"
+               "的那处，账必须与现读逐键等值（r104 一手：记 3 当场被对账腿抓到 sites 不符）"},
+    "dock_auto_check.py::pg.wait_for_timeout(900)": {
+        "verdict": "debt-open", "sites": 1,
+        "why": "点 #btn-lightshow 后读 body.showtime ⇒ 同步 class 变更可等"},
 }
 
 
@@ -869,16 +882,18 @@ def selftest():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--baseline", type=int, default=18,
+    ap.add_argument("--baseline", type=int, default=20,
                     help="C1_HARD 棘轮上界（只降不升）。r98 建尺实测 16 却把上界写成 28 —— "
                          "help 原文「取实测值钉住」与磁盘不符；r99 改掉 7 处误等后现读 9，"
                          "基线随之 28→9（余量清零才是本意：留 19 的空档等于给新增误等发通行证）。"
                          "⚠️ **22 是 r101 的口径变更值，与旧 9 不可比**：被审面从「同块」扩到"
                          "「同块 → 执行流后续块 → 跨函数返回值消费」后，r100 被 LOC 搬家掩掉的 "
                          "4 处与另外 12 处存量真债一起回到分子。旧 9 不是「当时只有 9 处」而是"
-                         "「当时只看得见 9 处」。r101 留的正解（改完成态等待、不抬基线）本轮执行："
+                         "「当时只看得见 9 处」。r101 留的正解（改完成态等待、不抬基线）r104 执行："
                          "12 条 debt-open 结掉 11 条（j4:101 改判 unobservable）、face_check 新进 "
-                         "7 条全部登记 ⇒ 现读与基线同步落到 18。")
+                         "7 条全部登记 ⇒ 现读与基线同步落到 18。r104 续：并行会话的 dock_auto_check "
+                         "新进场 3 处 C1（→20）⇒ 同步登记为 debt-open、基线随动到 20"
+                         "（登记是评审不是抬基线：覆盖数与 C1 仍逐键等值）。")
     ap.add_argument("--only", default="", help="逗号分隔的文件名子集（定位/演习用）")
     ap.add_argument("--json", default="")
     ap.add_argument("--selftest", action="store_true")
