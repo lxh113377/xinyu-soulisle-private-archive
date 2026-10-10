@@ -859,6 +859,54 @@ def selftest_all():
     return 1 if (rc1 | rc2 | rc3 | rc4 | rc5 | rc6 | rc7) else 0
 
 
+def run_suites(suites):
+    """逐套件执行并回收 (results, blurbs, times)。r102 从 main() 抽出：
+
+    一手动因是 loc_guard（≤150 行/函数）—— 超时分档加进来后 main() 涨到 162 行，
+    而"把超时处理内联在 main 里"正是顶线的直接原因。抽出来之后超时腿、折叠腿、
+    计时腿都在同一个函数里，main 回到分工（解析→锁→服务→收口）。
+    返回值三件都与原 main 内联版逐字同义。
+    """
+    results, blurbs, times = [], {}, {}
+    for name, cmd in suites:
+        t0 = time.monotonic()
+        try:
+            p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=600)
+        except subprocess.TimeoutExpired as e:
+            # r102：套件超时**不许把整跑炸掉**。改造前的一手事故：eol_parity 实跑 >600s，
+            # TimeoutExpired 一路抛到 main() 之外 ⇒ 电池 rc=1、既没有 BATTERY 收口行、
+            # 该套件之后的所有套件**一套都没跑**（"受理面断续"比"一套件红"更坏：连哪些红
+            # 都不知道）。超时归 CRASH 族（仪器没跑完 ≠ 产品判红 ≠ 环境未验），但单列
+            # TIMEOUT 桶——它的修法与"判据自己崩"不同（要么给判据提速，要么显式抬 cap，
+            # 不许默认调参掩盖）。rc 取 124（GNU timeout 的惯用退出码，排障手册在册）。
+            elapsed = round(time.monotonic() - t0, 1)
+            times[name], line, partial = timeout_row(name, elapsed, e)
+            blurbs[name] = partial
+            results.append((name, TO_RC, line[:110]))
+            print(f"{name:22s} rc={TO_RC} {times[name]:>5.1f}s | {line[:110]}")
+            continue
+        times[name] = round(time.monotonic() - t0, 1)
+        tail = (p.stdout or "").strip().splitlines()
+        # 聚合器只留最后一行 ⇒ 判据说 FAIL 却答不出"哪一条 FAIL"，等于没判（r28 CI 实测踩到）。
+        # 现在：rc≠0 时把该套件的 FAIL/🔴/异常行原样带出来；成功仍是一行，不制造噪声。
+        # 摘要行改取"最后一条判定行"而非"最后一行"：r36 实测 strategy_selftest 在 PASS 后
+        # 还打印注入反例清单，摘要于是显示 `· 热线清单需 ≥3 条，实际 []` —— rc=0 却像报错。
+        detail = []
+        if p.returncode != 0 and tail:
+            detail = fold_detail(tail, p.stderr, p.returncode)
+        elif p.returncode != 0:
+            detail = fold_detail([], p.stderr, p.returncode)
+        line = next((x for x in reversed(tail) if VERDICT_RE.search(x)),
+                    tail[-1] if tail else "")
+        blurbs[name] = line + " " + " ".join(detail) + " " + (p.stderr or "")
+        results.append((name, p.returncode, (line[:110] if tail else (p.stderr or "").strip()[:110])))
+        print(f"{name:22s} rc={p.returncode} {times[name]:>5.1f}s | {results[-1][2]}")
+        for d in detail:
+            print(" " * 25 + "· " + d)
+    return results, blurbs, times
+
+
 def main():
     global SUITES
     argv = sys.argv[1:]
@@ -924,45 +972,7 @@ def main():
     srv_state, srv_note = ensure_server()
     print("SELF-HOST: %s ｜ %s" % (srv_state, srv_note))
 
-    results = []
-    blurbs = {}
-    times = {}   # r69：此前不记每套件耗时 ⇒ "先出耗时分布再谈并行"根本取不到读数
-    for name, cmd in SUITES:
-        t0 = time.monotonic()
-        try:
-            p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=600)
-        except subprocess.TimeoutExpired as e:
-            # r102：套件超时**不许把整跑炸掉**。改造前的一手事故：eol_parity 实跑 >600s，
-            # TimeoutExpired 一路抛到 main() 之外 ⇒ 电池 rc=1、既没有 BATTERY 收口行、
-            # 该套件之后的所有套件**一套都没跑**（"受理面断续"比"一套件红"更坏：连哪些红
-            # 都不知道）。超时归 CRASH 族（仪器没跑完 ≠ 产品判红 ≠ 环境未验），但单列
-            # TIMEOUT 桶——它的修法与"判据自己崩"不同（要么给判据提速，要么显式抬 cap，
-            # 不许默认调参掩盖）。rc 取 124（GNU timeout 的惯用退出码，排障手册在册）。
-            elapsed = round(time.monotonic() - t0, 1)
-            times[name], line, partial = timeout_row(name, elapsed, e)
-            blurbs[name] = partial
-            results.append((name, TO_RC, line[:110]))
-            print(f"{name:22s} rc={TO_RC} {times[name]:>5.1f}s | {line[:110]}")
-            continue
-        times[name] = round(time.monotonic() - t0, 1)
-        tail = (p.stdout or "").strip().splitlines()
-        # 聚合器只留最后一行 ⇒ 判据说 FAIL 却答不出"哪一条 FAIL"，等于没判（r28 CI 实测踩到）。
-        # 现在：rc≠0 时把该套件的 FAIL/🔴/异常行原样带出来；成功仍是一行，不制造噪声。
-        # 摘要行改取"最后一条判定行"而非"最后一行"：r36 实测 strategy_selftest 在 PASS 后
-        # 还打印注入反例清单，摘要于是显示 `· 热线清单需 ≥3 条，实际 []` —— rc=0 却像报错。
-        detail = []
-        if p.returncode != 0 and tail:
-            detail = fold_detail(tail, p.stderr, p.returncode)
-        elif p.returncode != 0:
-            detail = fold_detail([], p.stderr, p.returncode)
-        line = next((x for x in reversed(tail) if VERDICT_RE.search(x)),
-                    tail[-1] if tail else "")
-        blurbs[name] = line + " " + " ".join(detail) + " " + (p.stderr or "")
-        results.append((name, p.returncode, (line[:110] if tail else (p.stderr or "").strip()[:110])))
-        print(f"{name:22s} rc={p.returncode} {times[name]:>5.1f}s | {results[-1][2]}")
-        for d in detail:
-            print(" " * 25 + "· " + d)
+    results, blurbs, times = run_suites(SUITES)
 
     bad = [r for r in results if r[1] != 0]
     # 收口行必须把"判红"与"环境未验（rc=2）"分开印：r35 实证 ci_status 长期挂红，

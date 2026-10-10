@@ -67,6 +67,56 @@ def same_reading(a, b, keys=()):
     return all(a.get(k) == b.get(k) for k in keys)
 
 
+# ── r102：对话回合的完成态（从 ux_guards_check 上收，五处判据共用一处实现）──
+# 为什么上收：r101 的同族教训是「同一个事实三处各写一份，改了 2 个忘 1 个」
+# （gh_cred.py 就是这么从三个探针里收出来的）。TURN_DONE_JS 原在 ux_guards，
+# r102 起 browser_check / public_check / j2 / stream_contract 全改完成态等待，
+# 再各抄一份就等于给那个教训开门。
+TURN_DONE_JS = """() => { const m = document.querySelectorAll('#chat-log .msg');
+  const last = m[m.length - 1];
+  if (!last || last.hasAttribute('data-r99-prev')) return false;
+  if (last.hasAttribute('data-emotion')) return true;
+  const tag = last.querySelector('.tag');
+  return !!tag && tag.textContent === '友好错误态'; }"""
+
+
+def mark_last(pg):
+    """给**当前**最后一条消息打私有标记。必须在点提交**之前**调用。
+
+    为什么必须在 click 前（r102 一手实测的缺陷，本函数上收前的写法把它放在 click 后）：
+    离线共情模板 ~15ms 就回完 => click 之后再 mark，标记会打到**本轮新产生的终态气泡**
+    上 => 谓词里的 `!last.hasAttribute('data-r99-prev')` 永不成立 => 30s 超时。
+    现场：emotion_wiring W3b 危机腿，`n` 已 +2、`data-emotion=crisis` 已就位、
+    `pendingTurns` 归零，唯一卡住的是"标记打错了对象"——判据崩在一个本来是对的谓词上。
+    标记只服务判据（产品代码不读它）；没有消息时无害（空列表取不到 last）。
+    """
+    pg.evaluate("""() => { const m = document.querySelectorAll('#chat-log .msg');
+      if (m.length) m[m.length-1].setAttribute('data-r99-prev', '1'); }""")
+
+
+def before_send(pg):
+    """点提交**之前**调用：给当时的最后一条气泡做身份记号（ux_guards 形态，唯一正确时序）。
+
+    这个名字比 `mark_last` 更值得用：它把"必须先标记再发送"的时序要求写进函数名，
+    下一位读者不会再把顺序搞反（搞反的代价是 30s 超时 + 一条无法归因的红）。
+    """
+    mark_last(pg)
+
+
+def wait_reply(pg, timeout=20000):
+    """点提交**之后**调用：等这一轮的**终态**气泡落地（渲染完成），不押毫秒数。
+
+    前置：调用方必须先 `before_send(pg)`（或自己 mark_last）再 click。
+    两种终态都收（缺一种就是把后门当前门）：
+      · 正常路 = 最后一条带 `data-emotion`（app.js 渲染回包时写；#probe-result 的
+        renderReadout 在同一同步块内随后执行 => 看到标记时探针读数必然已更新）；
+      · 异常路 = 最后一条带「友好错误态」标签（app.js catch 里的气泡）。
+    中途的 thinking / 逐字流式气泡两者都不满足 => 不会被误判成立。
+    故障路径因此仍是"快速明确的断言失败"，不会退化成超时（红因文案不丢）。
+    """
+    pg.wait_for_function(TURN_DONE_JS, timeout=timeout, polling="raf")
+
+
 def _counter(start=0):
     """假读数器：每次都吐新值（模拟"到预算点仍在写"）。
     ⚠️ 这里原来直接用 `_scripted([0,1,2,3,…])` —— 那个夹具用完会**重复最后一个值**，

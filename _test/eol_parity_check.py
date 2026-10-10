@@ -59,6 +59,92 @@ def is_binary(rel):
     return out.strip().endswith(": binary: set")
 
 
+def _parse_check_attr_z(raw):
+    """`git check-attr -z --stdin` 的输出 → {path: bool}（纯函数，可被 selftest 喂合成字节）。
+
+    输出是 `<path> NUL binary NUL <set|unspecified> NUL` 三元组流；`-z` 让中文/空格路径
+    不进引号歧义（本仓 `交付物/AIC/...` 一带大量此类路径）。
+    """
+    parts = raw.split(b"\0")
+    out = {}
+    for i in range(0, len(parts) - 2, 3):
+        out[parts[i].decode("utf-8", "replace")] = (parts[i + 2] == b"set")
+    return out
+
+
+def _parse_cat_file(buf):
+    """`git cat-file --batch` 的输出 → [bytes|None, ...]（按请求顺序；missing 记 None）。
+
+    按**声明的 size** 精确切字节 ⇒ 二进制内容里含形如 `blob 3\\n` 的序列也不会让流错位
+    （字节级判据被"内容里恰好有响应头形状"骗过，是本仓反复吃过的形态）。
+    截断/解析失败 ⇒ 该条起之后一律不返回（调用方据缺失路径回落单文件函数，不猜字节）。
+    """
+    out, i = [], 0
+    while i < len(buf):
+        j = buf.find(b"\n", i)
+        if j < 0:
+            break
+        header = buf[i:j].decode("utf-8", "replace").split(" ", 2)
+        i = j + 1
+        if len(header) >= 2 and header[1] == "missing":
+            out.append(None)
+            continue
+        if len(header) < 3:
+            break
+        try:
+            size = int(header[2])
+        except ValueError:
+            break
+        if len(buf) < i + size + 1:                 # 内容+尾换行不齐 ⇒ 截断，宁缺勿错
+            break
+        out.append(buf[i:i + size])
+        i += size + 1
+    return out
+
+
+def check_attr_binary(paths):
+    """一次 `git check-attr` 问完所有路径 → {path: bool}。
+
+    r102 动因（一手实测）：逐文件 spawn 在 730 个被跟踪文件上单独跑 **140s**（本机空载），
+    而 run_all_suites 的套件硬顶是 600s ⇒ 并发达载下 eol_parity 直接把整跑电池炸掉
+    （TimeoutExpired 无捕获，见 runner 的 TIMEOUT 桶）。批处理后是 1 个进程。
+    整体失败（rc≠0）返回 {} ⇒ 调用方逐路径回落 is_binary()，判据语义一字不改。
+    """
+    if not paths:
+        return {}
+    inp = b"\0".join(p.encode("utf-8") for p in paths)
+    p = subprocess.run(["git", "check-attr", "binary", "-z", "--stdin"],
+                       input=inp, capture_output=True, cwd=str(ROOT))
+    if p.returncode != 0:
+        return {}
+    return _parse_check_attr_z(p.stdout)
+
+
+def _cat_file_batch(revs):
+    """一组 rev → {rev: bytes|None}（一个 `git cat-file --batch` 进程）。
+
+    按键位对应（响应头带 oid 不带 rev）；任一条缺失/解析中断 ⇒ 该 rev 记 None。
+    """
+    if not revs:
+        return {}
+    p = subprocess.run(["git", "cat-file", "--batch"],
+                       input=b"\n".join(r.encode("utf-8") for r in revs) + b"\n",
+                       capture_output=True, cwd=str(ROOT))
+    vals = _parse_cat_file(p.stdout)
+    return {rev: (vals[k] if k < len(vals) else None) for k, rev in enumerate(revs)}
+
+
+def blob_batch(paths):
+    """{path: bytes}：索引（`:path`）优先、索引缺失回落 HEAD —— 语义与逐文件 blob_of() 一致，
+    但只用至多两个 cat-file 进程（替代 ~700 次 `git show`）。"""
+    idx = _cat_file_batch([":" + p for p in paths])
+    miss = [p for p in paths if idx.get(":" + p) is None]
+    head = _cat_file_batch(["HEAD:" + p for p in miss]) if miss else {}
+    return {p: (idx.get(":" + p) if idx.get(":" + p) is not None
+                else (head.get("HEAD:" + p) if head.get("HEAD:" + p) is not None else b""))
+            for p in paths}
+
+
 def audit(paths, reader=None, bin_check=None, blob_reader=None, dirty=None):
     """纯函数主体：返回 (问题清单, 统计字典)。
 
@@ -197,12 +283,26 @@ def selftest() -> int:
     _, stu0 = audit_untracked([], reader=rd({}), bin_check=fake_bin)
     if stu0["total"] != 0:
         bad.append("未入库面零输入却算出非零分母")
+    # ── r102：批处理解析腿（纯函数 + 合成字节流，敌意内容喂进去）──
+    # 正例：三元组流，set/unspecified 各归各位
+    m = _parse_check_attr_z(b"a.py\x00binary\x00unspecified\x00b.mp4\x00binary\x00set\x00")
+    if not (m.get("a.py") is False and m.get("b.mp4") is True):
+        bad.append("check-attr 三元组解析错：%r" % (m,))
+    # 敌例：二进制内容里含形似响应头的字节 ⇒ 按声明 size 精确切，流不许错位
+    payload = b"blob 3\nxx" + b"\x00binary\x00set\x00" * 4
+    vals = _parse_cat_file(b"aaa blob %d\n%s\nbbb missing\n" % (len(payload), payload))
+    if not (len(vals) == 2 and vals[0] == payload and vals[1] is None):
+        bad.append("cat-file 敌意内容错位：%r" % ([v[:20] if v else v for v in vals],))
+    # 截断：内容+尾换行不齐 ⇒ 宁缺勿错（缺的那条由调用方回落单文件，不许编字节）
+    if _parse_cat_file(b"aaa blob 10\nonly3") != []:
+        bad.append("cat-file 截断腿没兜住：解析出了不存在的字节")
     if bad:
         print("EOL-PARITY-SELFTEST-FAIL: " + " ; ".join(bad))
         return 1
     print("EOL-PARITY-SELFTEST-PASS: %d 类已跟踪样本 + %d 类未入库样本各归各位"
           "（合规文本放行 / 工作树 CRLF 判红 / binary 的 0D0A 放行与不要求 / 未声明 binary 判红 /"
           " 仓库侧 CRLF 判红 / 未入库+CRLF 判红 / 未入库+LF 放行）+ 两面零输入分母为 0"
+          " + 3 条批处理解析腿（三元组流 / 敌意内容不错位 / 截断宁缺勿错）"
           % (len(cases), len(u_cases)))
     return 0
 
@@ -235,9 +335,23 @@ def main() -> int:
         code, rel = rec[:2], rec[3:]
         if code.strip() and code.strip() != "??":
             dirty.add(rel)                    # 有未提交内容改动：只查 CRLF，不查与仓库侧相等
-    e2, st = audit(paths, dirty=dirty)
+    # r102：批量化默认 IO —— 逐文件 spawn 两个 git（check-attr + show）在 730 个文件上实测
+    # 140s（本机空载）/并下载体下突破 600s 硬顶 ⇒ 曾把整跑电池炸掉。批处理后是 1+2 个进程。
+    # 判据语义一字未改：任一路批结果缺失 → 该路径回落单文件函数（加速，不改判）。
+    attr = check_attr_binary(paths)
+    blobs = blob_batch(paths)
+    attr_u = check_attr_binary(untracked)
+
+    def bin_batched(rel, _attr=attr):
+        return _attr[rel] if rel in _attr else is_binary(rel)
+
+    def blob_batched(rel, _blobs=blobs):
+        return _blobs[rel] if rel in _blobs else blob_of(rel)
+
+    e2, st = audit(paths, bin_check=bin_batched, blob_reader=blob_batched, dirty=dirty)
     bad += e2
-    e2u, stu = audit_untracked(untracked)
+    e2u, stu = audit_untracked(untracked,
+                               bin_check=lambda rel, _a=attr_u: _a.get(rel, is_binary(rel)))
     bad += e2u
     if st["text"] + st["binary"] != st["total"]:
         bad.append("E4 分母不闭合：text %d + binary %d != total %d"
