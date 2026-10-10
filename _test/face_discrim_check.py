@@ -39,6 +39,17 @@ CASES = [
     ("sadness", {"mouthFrownLeft": .8, "mouthFrownRight": .8, "browInnerUp": .6}, "sadness"),
     ("crying", {"mouthFrownLeft": .9, "mouthFrownRight": .9, "browInnerUp": .85,
                 "eyeSquintLeft": .6, "eyeSquintRight": .6}, "sadness"),
+    # r103 新增：**真脸实测形态**。Commons 目检后的真悲伤照（走真 MediaPipe）：
+    #   真悲伤#1 browInnerUp .85 / browOuterUp .60/.34 / mouthFrown .13/.09 / jawOpen **0**
+    #   真悲伤#2 browInnerUp .98 / browOuterUp .88/.85 / mouthFrown .27/.20 / jawOpen **0**
+    # 合成向量给 sadness 配了 0.8 的 mouthFrown，真实照片里那两维只有 0.1~0.27 ——
+    # 正是这个差别让旧权重漏判（被 surprise 抢走）。
+    ("sad_real_1", {"browInnerUp": .85, "browOuterUpLeft": .60, "browOuterUpRight": .34,
+                    "mouthFrownLeft": .13, "mouthFrownRight": .09,
+                    "eyeSquintLeft": .15, "eyeSquintRight": .18}, "sadness"),
+    ("sad_real_2", {"browInnerUp": .98, "browOuterUpLeft": .88, "browOuterUpRight": .85,
+                    "mouthFrownLeft": .27, "mouthFrownRight": .20,
+                    "eyeSquintLeft": .2, "eyeSquintRight": .25}, "sadness"),
     ("anger", {"browDownLeft": .85, "browDownRight": .85,
                "noseSneerLeft": .6, "noseSneerRight": .6}, "anger"),
     # 真愤怒的**实测形态**（r103 从 face-api.js 真照跑出来的 AU，非教科书最大值）：
@@ -425,6 +436,33 @@ def selftest():
     else:
         ran += 1
         red, msg = probe_with(m6, "反例6 anger 的 browDown 压回 1.0（真怒与专注拉不开）")
+        print("  " + msg)
+        if not red:
+            bad.append(msg)
+
+    # 反例 7：把 sadness 的 browInnerUp 从 1.2 降回 0.7（= r102 的权重）。
+    #   ⚠️ 这条原本写的是「拆掉 jawOpen 反向证据」，跑出来 **F11 没抓到** ——
+    #   查证发现 jawOpen:-1.9 在两组真悲伤上**完全不影响分数**（删掉/归零后与有它时一字不差），
+    #   它只管「悲伤+惊讶混合」的边界，不管主判。真正的 load-bearing 项是 browInnerUp。
+    #   ⇒ 反例改成测真正起作用的那一个。教训：反例没被抓到时，先查它是不是测了个摆设。
+    m7 = real_rules.replace("      browInnerUp: 1.2,", "      browInnerUp: 0.7,")
+    if m7 == real_rules:
+        bad.append("selftest 反例7 构造失败：sadness 的 jawOpen 行没匹配上")
+    else:
+        ran += 1
+        red, msg = probe_with(m7, "反例7 sadness 的 browInnerUp 降回 0.7（回到 r102 漏判态）")
+        print("  " + msg)
+        if not red:
+            bad.append(msg)
+
+    # 反例 8：把 sadness 加回 need:2（r102 旧状态）。多区要求会让只有 brow 证据的真悲伤
+    #   被打折一半 ⇒ 同样漏判。这条盯的是「多区要求被加回来」。
+    m8 = real_rules.replace("need: { fear: 2 },", "need: { fear: 2, sadness: 2 },")
+    if m8 == real_rules:
+        bad.append("selftest 反例8 构造失败：need 串没匹配上")
+    else:
+        ran += 1
+        red, msg = probe_with(m8, "反例8 把 sadness 加回 need:2（回退到漏判态）")
         print("  " + msg)
         if not red:
             bad.append(msg)

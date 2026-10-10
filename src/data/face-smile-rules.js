@@ -59,10 +59,29 @@ window.__XINYU_FACE_RULES__ = {
       mouthPressLeft: -0.5, mouthPressRight: -0.5
     },
     sadness: {
-      mouthFrownLeft: 1.0, mouthFrownRight: 1.0,
-      browInnerUp: 0.7,
+      /* r103 重标：主证据从 mouthFrown 换成 browInnerUp，并新增「张嘴即非悲伤」反向证据。
+       * 一手实测（Commons 目检后的真悲伤照，走真 MediaPipe）：
+       *   真悲伤#1  browInnerUp .85  browOuterUp .60/.34  mouthFrown .13/.09  jawOpen **0**
+       *   真悲伤#2  browInnerUp .98  browOuterUp .88/.85  mouthFrown .27/.20  jawOpen **0**
+       * 旧权重把 mouthFrown 当 1.0 主证据 => 真悲伤只得 0.18/0.52，被 surprise 抢走
+       * (surprise 0.47/0.69) => sadness 2/2 全错（与 anger 同构的漏判）。
+       * ⚠️ 这里有一个**我自己的错误记录，按实测更正**：本注释首版写「分水岭是 jawOpen（真惊讶
+       *   .82/.83、真悲伤 .00）⇒ 把张嘴=惊讶写进权重」，并赋了 jawOpen:-1.9。但逐项拆开实测
+       *   （_test 侧 sad_which 同手法）：把 jawOpen 整行**删掉**或**归零**，两组真悲伤的
+       *   sad/surprise 分一字不变（0.629/0.468、0.781/0.691）⇒ **它不是分水岭，是摆设**。
+       *   真正 load-bearing 的是 browInnerUp:1.2（降回 0.7 立刻漏判真悲伤#2）。
+       *   jawOpen:-1.9 保留的唯一作用是**压住「悲伤+惊讶混合」样本**（0.56 → 不判 sadness），
+       *   即它管边界不管主判 ⇒ 别再说它是分水岭。
+       * ⚠️ 参数是扫出来的，但**不是窄峰拟合**：jawOpen∈[-2.1,-1.7] 与 browInnerUp∈[1.5,0.9]
+       *    各 6/6 档位全 10/10（train 4 张真照 + holdout 6 条合成/混合样本）=> 结构支撑。
+       *    取区间中值 jawOpen=-1.9 / browInnerUp=1.2。
+       * ⚠️ 与 anger 的区别：anger 是老大拍板的取舍，**sadness 这次未经拍板** ——
+       *    更弱的输入会不会误报低落尚未实测。上线前先补「专注/担忧」标注样本，见 07-next-steps。 */
+      browInnerUp: 1.2,
+      mouthFrownLeft: 0.4, mouthFrownRight: 0.4,
       mouthLowerDownLeft: 0.3, mouthLowerDownRight: 0.3,
-      eyeSquintLeft: 0.2, eyeSquintRight: 0.2,
+      eyeSquintLeft: 0.3, eyeSquintRight: 0.3,
+      jawOpen: -1.9,
       mouthSmileLeft: -0.7, mouthSmileRight: -0.7,
       cheekSquintLeft: -0.2, cheekSquintRight: -0.2
     },
@@ -144,7 +163,7 @@ window.__XINYU_FACE_RULES__ = {
    *   更轻的皱 .25 → calm（不误报）。fear/sadness 仍保留多区要求（它们吃 browInnerUp，
    *   而惊讶/担忧也吃 browInnerUp，误报面比 anger 大得多）。
    *   ⚠️ 若日后拿到「专注/中性」的**标注照片**，应回来复标这条 —— 现在它靠的是定性论证。 */
-  need: { fear: 2, sadness: 2 },
+  need: { fear: 2 },
 
   /* 轻蔑靠**左右不对称**识别，加权和表达不了（对称项两侧同权，单/双侧笑在权重空间同点）。
      不达标时 contempt 直接归零 —— 否则对称笑会被 contempt 抢走。 */
