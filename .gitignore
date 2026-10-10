@@ -90,3 +90,8 @@ wflow.toml
 # （PowerShell `Out-File` 与 java 重定向都写 CRLF ⇒ 未入库即红，这是 r95 电池首跑抓到的 2 项之一）。
 交付物/对标数据/server-*.log
 交付物/对标数据/server-*.err
+
+# ===== 5. 会话临时运行态（2026-10-11 收敛轮登记） =====
+# _temp/ = 各轮一次性探针输出与对照快照（实测 163MB：pristine/ 快照 + r10x_*.txt 台账）。
+# 当日台账引用其路径属历史取证，本体均可再生 ⇒ 与 _shots/.wrangler 同理走 gitignore 豁免，不入库。
+_temp/
