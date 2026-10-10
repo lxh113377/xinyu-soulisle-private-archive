@@ -162,6 +162,13 @@
 - **分叉三条路的代价实测（只读，不动正式仓）**：merge 侧 `git merge-tree --write-tree` 现读冲突 **9 个文件**；
   force 侧作废面实测只有 `v1.8.2` 一枚 tag（`git tag --contains e8462ca`），无他人分支/工作树基于该提交；
   挂账侧改动面 **3 个文件**，且 README/ROADMAP/提交包 PDF **从未对外写过 v1.8.2** ⇒「改口径」几乎无对外代价。
+- ⚠️ **落账勘误（归属，不是内容）**：上面三条（⑤⑥⑦，即"追加段"）的**内容**随并行会话那笔
+  `263e995 feat(整批收敛): …r110…/r111…/AIC 参赛包…` 一起入库 —— 同一 worktree 下我 `git commit -- <pathspec>` 时
+  工作树已被对方提交清空，git 回 `nothing to commit, working tree clean`。已逐项在 HEAD 里核回
+  （`run_suite_cmd`／`_st_face_equivalence`／报告 §3b／本节追加段各命中，**零丢失**）。
+  留这条勘误的原因：日后 `git log -S` 或按提交说明考古会把 r105 的执行器改造算成 r110/r111 的产物；
+  **不改写他人提交、不 rebase**（那会吞掉对方内容），只在正文侧署名一次即可复算。
+
 
 ### Changed（r104 · 判据层与受理面四项工程改造，全部落在 `_test/` 与 3 份对标台账；产品源码零新增）
 
