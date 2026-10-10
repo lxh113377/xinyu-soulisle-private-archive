@@ -118,6 +118,45 @@ def f2_bad(html_src, html_dep, sw_text, headers_text, dep_files):
 
 
 # ── F5 · 真实照片判定的纯函数（可注入反例，浏览器只负责取数）──────────────
+def f12_report(rows):
+    """F12 · 真实照片逐类准确率。返回 (bad, 读数行)。
+    分两类判据：
+      · **可分性**（硬门）：每一类至少一张照片能**被检出脸**且**读数在动**
+        —— 否则说明这条类别在真模型上根本不可达，属于夹具或模型的问题。
+      · **准确率**（记账，非门）：逐类打印，供人工判断取舍。
+        anger 类**已知不可达**（原因见 browser_legs 里 F12 注释），不判红也不许悄悄抹掉。
+    """
+    bad, out = [], []
+    if not rows:
+        return ["F12 零条读数 ⇒ 没跑到，不得当绿"], out
+    by = {}
+    for r in rows:
+        by.setdefault(r["label"], []).append(r)
+    for lab in sorted(by):
+        rs = by[lab]
+        seen = [r for r in rs if r.get("faces", 0) > 0]
+        hit = [r for r in seen if r.get("got") == lab]
+        acc = (100.0 * len(hit) / len(seen)) if seen else 0.0
+        out.append("%s %d/%d(%.0f%%) 实得=%s" % (lab, len(hit), len(seen), acc,
+                                              ",".join(sorted({r.get("got") or "-" for r in seen}))))
+        if not seen:
+            bad.append("F12 类别 %s 全部没检出人脸（%d 张）⇒ 这条类在真模型上不可达"
+                       % (lab, len(rs)))
+            continue
+        # 读到脸却**一个情绪名都没有**（got 为 None/空串）⇒ 判据失灵，
+        # 不能当成"这一类不可达"混过去（首版漏了这句，被 selftest 当场抓住）。
+        if not any(r.get("got") for r in seen):
+            bad.append("F12 类别 %s 检出人脸但读数恒为空（got=None）⇒ 判据失灵，不是类别不可达"
+                       % lab)
+    return bad, out
+
+
+def f12_bad_injected(rows, mutate):
+    """给 selftest 用：注入反例后 f12_report 必须报红。"""
+    bad, _ = f12_report([mutate(dict(r)) for r in rows])
+    return bad
+
+
 def f5_bad(rows):
     """rows: [{file,label,faces,mouth,ratio,emotion,intensity,smile_kind}]
     判据：微笑组与中性组的口部微笑量必须**完全可分**（最小的笑 > 最大的不笑）。
@@ -286,6 +325,7 @@ def browser_legs():
     srv, port = serve()
     base = "http://127.0.0.1:%d" % port
     rows = []
+    rows12 = []
     try:
         with sync_playwright() as pw:
             args = list(MEDIA_ARGS)
@@ -439,6 +479,44 @@ def browser_legs():
                             })
                 ctx.close()
 
+                # ── F12：真实照片**逐类准确率**（r102 补）──────────────────────────
+                # F5 只验「微笑组 vs 中性组口部分离」，从不问"判对没有"。F12 问的就是这个：
+                # 每张照片的标注类 vs 实得主情绪，按类汇总成准确率。
+                #
+                # ⚠️ 为什么 anger 这一类是**已知红**而不是判据坏了（r102 一手实测，别再查一遍）：
+                #   真 MediaPipe 读出的真愤怒照，AU 分布是 **browDown 0.64/0.59 而其余全 0**
+                #   （无鼻翼、无抿唇、无张口）。而 r102 的 need:{anger:2} 要求"眉区之外再来一区"
+                #   才认 —— 那条规则当初是为压"专注时轻皱被判愤怒"设的，代价是**真愤怒也判不出来**。
+                #   这不是阈值没调好：真愤怒(browDown 0.64) 与 专注轻皱(browDown 0.40)
+                #   在 blendshape 空间里**结构完全相同**，只有幅度之差 ⇒ 任何阈值都在
+                #   "漏掉真愤怒"与"误报专注"之间二选一，**没有第三个正解**。
+                #   故 F12 把 anger 的已知状态显式登记在此，并记下两个待选的取舍方向，
+                #   由人决定（见 memory/07-next-steps.part133）。改动这块前先读那段。
+                if (hs or {}).get("ready"):
+                    ctx12 = browser.new_context(viewport={"width": 1280, "height": 900})
+                    pg12 = ctx12.new_page()
+                    pg12.goto(base + "/_test/face-harness.html", wait_until="load")
+                    try:
+                        pg12.wait_for_function(
+                            "window.__HARNESS__ && window.__HARNESS__.ready === true", timeout=90000)
+                    except Exception:  # noqa: BLE001
+                        bad.append("F12 宿主机迟迟不就绪")
+                    else:
+                        for img in sorted(FIX_DIR.glob("*.jpg")):
+                            lab = (labels.get(img.name) or {}).get("label", "unknown")
+                            if lab in ("smiling", "neutral"):
+                                continue          # 那两类由 F5 验，不在 F12 重复计数
+                            r = pg12.evaluate("u => window.__HARNESS__.detect(u)",
+                                              "/_test/face-fixtures/" + img.name)
+                            v = r.get("view") or {}
+                            rows12.append({
+                                "file": img.name, "label": lab, "faces": r.get("faces", 0),
+                                "got": v.get("emotion"),
+                                "intensity": round(v.get("intensity", 0), 3),
+                                "margin": round(v.get("confidence", 0), 3),
+                            })
+                    ctx12.close()
+
                 # ── F7：**授权必须排在模型加载之前**（r87c；老大实测"点了不弹授权窗"的根因）──
                 # 判据用"把 getUserMedia 拖慢 800ms + 记录调用时刻 + 记录首个 mediapipe 资源请求时刻"
                 # 来复算顺序，而不是读注释。顺序错了（先下 13MB 再要权限）会在这里红。
@@ -573,7 +651,7 @@ def browser_legs():
                 browser.close()
     finally:
         srv.shutdown()
-    return rows, bad, notes
+    return rows, bad, notes, rows12
 
 
 def public_check(base):
@@ -779,17 +857,18 @@ def main():
     rc3, bad3 = run_f3()
     bad += bad3
 
-    rows, badb, notes = [], [], []
+    rows, badb, notes, rows12 = [], [], [], []
     try:
-        rows, badb, notes = browser_legs()
+        rows, badb, notes, rows12 = browser_legs()
     except Exception as e:  # noqa: BLE001
         print("FACE-CHECK-UNVERIFIED: 浏览器腿没跑起来（%s: %s）" % (type(e).__name__, str(e).splitlines()[0][:120]))
         return 2
     bad += badb
     if rows:
         bad += f5_bad(rows)
+    bad12, rep12 = f12_report(rows12)
 
-    print("  F1 vendor 完整性 / F2 接线面 / F3 判据单测(node) / F4 摄像头开合 / F5 照片实跑 / F6 无摄像头降级")
+    print("  F1 vendor 完整性 / F2 接线面 / F3 判据单测(node) / F4 摄像头开合 / F5 照片实跑 / F6 无摄像头降级 / F12 真实照片逐类准确率")
     for n in notes:
         print("  · " + n)
     for r in rows:
@@ -804,6 +883,17 @@ def main():
                   % (min(r["mouth"] for r in smi), max(r["mouth"] for r in smi),
                      min(r["mouth"] for r in neu), max(r["mouth"] for r in neu),
                      min(r["mouth"] for r in smi) - max(r["mouth"] for r in neu)))
+    if rows12:
+        print("  F12 真实照片逐类准确率（分母=能检出人脸的张数）：")
+        for line in rep12:
+            print("    " + line)
+        print("    ⚠️ anger 类已知为 0%%：真愤怒照在 blendshape 上只有 browDown（其余全 0），")
+        print("       与「专注轻皱」结构相同只有幅度差 ⇒ 阈值取哪边都是二选一，无正解。")
+        print("       取舍待人决定，见 memory/07-next-steps.part133。此处如实打印，不调阈值凑绿。")
+    if bad12:
+        for b in bad12:
+            print("  FAIL " + b)
+        bad += bad12
     if bad:
         for b in bad:
             print("  FAIL " + b)
@@ -837,6 +927,27 @@ def selftest():
         {"file": "c.jpg", "label": "neutral", "faces": 1, "mouth": 0.09, "ratio": 0.0, "emotion": "calm", "intensity": 0.6, "smile_kind": "none"},
         {"file": "d.jpg", "label": "neutral", "faces": 1, "mouth": 0.15, "ratio": 0.0, "emotion": "calm", "intensity": 0.6, "smile_kind": "none"},
     ]
+    # F12 夹具： Anger 故意取"实得 calm"，因为那是**实测真值**（见 browser_legs 的 F12 注释）——
+    # 若这里写成 anger，F12 的反例腿就失去了"如实反映现状"的性质。
+    good_rows12 = [
+        {"file": "ag1.jpg", "label": "anger", "faces": 1, "got": "calm", "intensity": 0.23, "margin": 0.30},
+        {"file": "ag2.jpg", "label": "anger", "faces": 1, "got": "calm", "intensity": 0.24, "margin": 0.31},
+        {"file": "su1.jpg", "label": "surprise", "faces": 1, "got": "surprise", "intensity": 0.68, "margin": 0.06},
+        {"file": "su2.jpg", "label": "surprise", "faces": 1, "got": "surprise", "intensity": 0.67, "margin": 0.05},
+    ]
+    b12, _r12 = f12_report(good_rows12)
+    if b12:
+        fail.append("原样 F12 被判失败：%s" % b12)
+    else:
+        ok += 1
+    for tag, mut in (
+        ("F12 全类没检出人脸", lambda r: dict(r, faces=0)),
+        ("F12 读数恒为空", lambda r: dict(r, got=None)),
+    ):
+        if not f12_bad_injected(good_rows12, mut):
+            fail.append("反例未被抓住：%s" % tag)
+        else:
+            ok += 1
     if f5_bad(good_rows):
         fail.append("原样 F5 被判失败：%s" % f5_bad(good_rows))
     else:

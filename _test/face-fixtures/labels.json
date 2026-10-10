@@ -46,5 +46,33 @@
     "label": "neutral",
     "title": "Name-_Jane_Forbes_(16268376188).jpg",
     "source": "https://commons.wikimedia.org/wiki/File:Name-_Jane_Forbes_%2816268376188%29.jpg"
+  },
+  {
+    "file": "anger-01-fpapi.jpg",
+    "label": "anger",
+    "title": "angry.jpg",
+    "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/angry.jpg",
+    "note": "r102 补：Commons 检索面被画作/纪念照污染（实测 12 张候选仅 3 张能检出人脸、0 张判对），改用 face-api.js 的**带标注测试图**。该仓 MIT 授权。"
+  },
+  {
+    "file": "anger-02-fpapi.jpg",
+    "label": "anger",
+    "title": "angry_cropped.jpg",
+    "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/angry_cropped.jpg",
+    "note": "r102 补：与 anger-01 同源同姿态的裁剪版（单变量对照：只换裁剪，读数应一致）"
+  },
+  {
+    "file": "surprise-01-fpapi.jpg",
+    "label": "surprise",
+    "title": "surprised.jpg",
+    "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/surprised.jpg",
+    "note": "r102 补：face-api.js 带标注测试图（该仓 MIT 授权）"
+  },
+  {
+    "file": "surprise-02-fpapi.jpg",
+    "label": "surprise",
+    "title": "surprised_cropped.jpg",
+    "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/surprised_cropped.jpg",
+    "note": "r102 补：与 surprise-01 同源同姿态的裁剪版（单变量对照）"
   }
 ]

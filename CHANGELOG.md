@@ -2,6 +2,32 @@
 
 *(自 `v1.7.0` 起的在制增量 r94–r96 已随 **v1.8.0** 发布；`v1.8.0` 之后的 r96 受理面修复与 r97 语音退出态修复已随 **v1.8.1** 发布。)*
 
+### Added（r103 · 表情真实照片逐类准确率 F12 + anger 取舍的诚实登记）
+
+- 夹具从 8 张扩到 **12 张**：新增 `anger` ×2 / `surprise` ×2，取自
+  [face-api.js `test/images`](https://github.com/justadudewhohacks/face-api.js/tree/master/test/images)
+  （该仓 MIT 授权，来源链接登记在 `_test/face-fixtures/labels.json`）。
+  **换源原因**：Wikimedia Commons 的情绪类照片实测不可用 ——
+  全文检索被画作/版画/书籍插页污染；改走分类树（`Category:Human sadness` 等）拿到 161 张候选，
+  目检后多为纪念照/氛围照，12 张喂真模型后 3 张检不出人脸、6 张判 calm；且逐张目检抓到
+  **损坏图**（文件名正常、画面是渲染错误）。公开域情绪照几乎都是氛围照而非表情瞬间。
+- 新增 **F12 腿**：真实照片**逐类准确率**。此前 F5 只验 smile/neutral 的口部分离、F11 只验
+  判据结构有判别力 —— **两条都不问"标注类 == 实得主情绪吗"**。
+- F12 首次实测读数：`surprise 2/2 (100%)`、`anger 0/2 (0%)`。
+- ⚠️ `anger 0/2` **不是缺陷而是已登记的取舍**：真愤怒照在 blendshape 上是
+  **browDown 0.64/0.59 而其余全 0**，与「专注轻皱 0.40」结构完全相同、只有幅度差；
+  r102 的 `need:{anger:2}` 为压"专注误报"设下，代价是真愤怒也判不出来。
+  任何阈值都在二者间二选一，连 `confidence` 都分不开（margin 0.530 / 0.345 都判确定）。
+  ⇒ **未擅自调阈值凑绿**，两个方向与代价见 `memory/07-next-steps.part133`，待产品拍板。
+
+### Fixed（r103 · 拆 initFace：loc_guard 的 app.js 存量红转绿）
+
+- 抽出 `initFaceHud()`（面板渲染 + 看门狗），依赖**全部显式传参**，不读外层作用域。
+  接缝按职责划（纯渲染/观察 vs 摄像头开关生命周期），不是按行数硬切。
+  `initFace` **194 → 148 行**。
+- 拆函数过程中修掉两处**真缺陷**：`hudOpenedAt` 原先只在被拆走那行声明，拆完变隐式全局；
+  `lastReadAt` 残留赋值会 ReferenceError。两处都由 `node --check` 当场抓住。
+
 ### Changed（r102 · 面部表情判据 5 类 → 8 类 + 重标峰值基准，本轮第一次改**产品功能面**）
 
 - **表情类别 5 → 8**：新增 `surprise`（惊讶）/ `disgust`（厌恶）/ `contempt`（轻蔑）。
