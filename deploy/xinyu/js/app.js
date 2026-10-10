@@ -286,7 +286,78 @@
   });
 
   /* 6.1) 面部表情识别（r87）：不可用即隐藏入口（禁伪装）；画面只在内存里过一遍，零上传零落盘。 */
-  (function initFace() {
+  /* ── 表情面板渲染器（r103 从 initFace 拆出）──────────────────────────────
+   为什么拆：initFace 当时已 194 行，超过 loc_guard 的 150 行上限（存量红）。
+   真正的接缝不是"行数"，而是**职责**：这一块只做「把读数画到面板上 + 看门狗」，
+   全是纯渲染与定时观察；摄像头开关生命周期是另一件事（stopFace/startFace）。
+   r87 把两者塞进一个 IIFE 时，B 的看门狗定时器生命周期只能挂在 A 的作用域里
+   —— 那是没拆干净的债，不是"风格偏好"。
+
+   依赖靠参数显式传入（不读外层作用域）：这是拆分的全部意义 ——
+   一旦它开始偷偷读外层的 faceOn/statePill，就等于拆了个假的。 */
+function initFaceHud(deps) {
+  const { FE, setStatus, paint, gl, hud, els, isOn, openedAt } = deps;
+  const $ = (s) => document.querySelector(s);
+  const PHASE_TEXT = {
+    permission: "等待浏览器授权…（没看到弹窗？看地址栏左侧的相机图标）",
+    model: "已获授权，正在加载表情模型（首次约 13MB）…",
+    warmup: "正在识别…"
+  };
+  /* 看门狗（r87b/c）：开着摄像头但画面没人时标签不能停在初始态。
+     3s 无读数 = 没看到人脸；2.5s 无更新 = 人脸离开。 */
+  let lastReadAt = 0;
+
+  function setPill(text, cls) {
+    els.statePill.textContent = text;
+    els.statePill.className = "face-hud-state " + (cls || "off");
+  }
+  function setSwitch(on) {
+    els.switchEl.setAttribute("aria-checked", String(on));
+    els.switchWord.textContent = on ? "已开启" : "已关闭";
+    els.dockBtn.setAttribute("aria-pressed", String(on));
+  }
+  function showStage(on) { els.hudVideo.hidden = !on; els.idleBox.hidden = on; }
+
+  setInterval(() => {
+    if (!isOn()) return;
+    const st = FE.stats();
+    const emo = $("#face-hud-emo");
+    if (st.phase !== "running") {                  // 分阶段说人话，别让用户盯着一句"正在识别"
+      const t = PHASE_TEXT[st.phase] || "正在准备…";
+      emo.textContent = t;
+      setStatus(t);
+      setPill(st.phase === "permission" ? "授权中…" : "加载中…", "warn");
+      return;
+    }
+    setPill("已开启", "on");
+    if (st.samples === 0 && Date.now() - openedAt() > 3000) {
+      emo.textContent = "没有看到人脸 —— 请正对摄像头，保证光线充足";
+    } else if (st.samples > 0 && Date.now() - lastReadAt > 2500) {
+      emo.textContent = "人脸离开了 —— 回到镜头前继续";
+    }
+  }, 600);
+
+  function paintHud(view) {
+    lastReadAt = Date.now();
+    const hex = rgbHex(view.color);
+    $("#face-hud-dot").dataset.bg = hex;
+    // 独有三类走 FaceEngine.labelOf；margin 低时如实标「读数不稳」，不假装确定（r102）
+    const base = FE.labelOf(view.emotion);
+    $("#face-hud-emo").textContent = view.confident === false ? base + "（读数不稳）" : base;
+    $("#face-hud-bar").dataset.w = Math.round((view.intensity || 0) * 100);
+    $("#face-hud-bar").dataset.bg = hex;
+    const badge = $("#face-hud-smile");
+    badge.hidden = false;
+    badge.className = "face-smile-badge " + (view.smile ? "is-" + view.smile.kind : "is-none");
+    badge.textContent = (view.smile && view.smile.masking) ? "社交性微笑 · 可能是强颜欢笑"
+      : { duchenne: "真笑（眼周有参与）", social: "社交性微笑", none: "未检出微笑" }[(view.smile || {}).kind] || "—";
+    paint(hud);
+    if (gl) window.ThreeScene.setMistTint(view.color, view.intensity);
+  }
+  return { setPill, setSwitch, showStage, paintHud };
+}
+
+(function initFace() {
     const FE = window.FaceEngine;
     const probe = $("#face-probe"), scanBtn = $("#btn-face-scan"), dockBtn = $("#btn-face");
     const note = $("#face-note"), hud = $("#face-hud"), camBtn = $("#btn-cam");
@@ -294,6 +365,8 @@
     const statePill = $("#face-hud-state"), switchEl = $("#face-switch"), switchWord = $("#face-switch-word");
     const idleBox = $("#face-hud-idle"), hudVideo = $("#face-hud-video");
     let faceOn = false, starting = false;
+    /* 面板打开的时刻：看门狗据此区分「刚开还没出人脸」与「开着但人走了」 */
+    let hudOpenedAt = 0;
     if (!FE || !probe || !dockBtn) return;
     // 状态行放在**对话坞里**（用户点的地方），第二幕那块 note 只讲第二幕自己的事
     const statusEl = $("#face-status");
@@ -378,57 +451,11 @@
     });
 
     // B. 第三幕：实时表情感知（开 = 真开摄像头；关 = 真停轨道）
-    /* 看门狗（r87b/c）：开着摄像头但画面没人时标签不能停在初始态。分阶段说人话 +
-       按 stats() 读数新旧翻面（3s 无读数=没人脸；2.5s 无更新=人脸离开）。 */
-    let hudOpenedAt = 0, lastReadAt = 0;
-    const PHASE_TEXT = {
-      permission: "等待浏览器授权…（没看到弹窗？看地址栏左侧的相机图标）",
-      model: "已获授权，正在加载表情模型（首次约 13MB）…",
-      warmup: "正在识别…"
-    };
-    /* 侧边面板的状态胶囊：实时显示真实状态（不是装饰）——开=绿、过程中=琥珀、关=灰 */
-    function setPill(text, cls) { statePill.textContent = text; statePill.className = "face-hud-state " + (cls || "off"); }
-    function setSwitch(on) {
-      switchEl.setAttribute("aria-checked", String(on));
-      switchWord.textContent = on ? "已开启" : "已关闭";
-      dockBtn.setAttribute("aria-pressed", String(on));
-    }
-    function showStage(on) { hudVideo.hidden = !on; idleBox.hidden = on; }
-    setInterval(() => {
-      if (!faceOn) return;
-      const st = FE.stats();
-      const emo = $("#face-hud-emo");
-      if (st.phase !== "running") {                      // 分阶段说人话，别让用户盯着一句"正在识别"
-        const t = PHASE_TEXT[st.phase] || "正在准备…";
-        emo.textContent = t;
-        setStatus(t);
-        setPill(st.phase === "permission" ? "授权中…" : "加载中…", "warn");
-        return;
-      }
-      setPill("已开启", "on");
-      if (st.samples === 0 && Date.now() - hudOpenedAt > 3000) {
-        emo.textContent = "没有看到人脸 —— 请正对摄像头，保证光线充足";
-      } else if (st.samples > 0 && Date.now() - lastReadAt > 2500) {
-        emo.textContent = "人脸离开了 —— 回到镜头前继续";
-      }
-    }, 600);
-    function paintHud(view) {
-      lastReadAt = Date.now();
-      const hex = rgbHex(view.color);
-      $("#face-hud-dot").dataset.bg = hex;
-      // 独有三类走 FaceEngine.labelOf；margin 低时如实标「读数不稳」，不假装确定（r102）
-      const base = FE.labelOf(view.emotion);
-      $("#face-hud-emo").textContent = view.confident === false ? base + "（读数不稳）" : base;
-      $("#face-hud-bar").dataset.w = Math.round((view.intensity || 0) * 100);
-      $("#face-hud-bar").dataset.bg = hex;
-      const badge = $("#face-hud-smile");
-      badge.hidden = false;
-      badge.className = "face-smile-badge " + (view.smile ? "is-" + view.smile.kind : "is-none");
-      badge.textContent = (view.smile && view.smile.masking) ? "社交性微笑 · 可能是强颜欢笑"
-        : { duchenne: "真笑（眼周有参与）", social: "社交性微笑", none: "未检出微笑" }[(view.smile || {}).kind] || "—";
-      paint(hud);
-      if (gl) window.ThreeScene.setMistTint(view.color, view.intensity);
-    }
+    const { setPill, setSwitch, showStage, paintHud } = initFaceHud({
+      FE, setStatus, paint, gl, hud,
+      els: { statePill, switchEl, switchWord, dockBtn, hudVideo, idleBox },
+      isOn: () => faceOn, openedAt: () => hudOpenedAt,
+    });
     /** 停：默认**保留面板**（开关回"已关闭"，面板留在原地给用户再开）
      *  opts.hide = 连面板一起收起（"收起"按钮 / 离开页面）。 */
     function stopFace(opts) {
@@ -447,7 +474,7 @@
       if (faceOn) return;
       starting = true;
       hud.hidden = false;
-      hudOpenedAt = Date.now(); lastReadAt = 0;
+      hudOpenedAt = Date.now();
       showStage(true);
       $("#face-hud-emo").textContent = "正在识别…";
       setPill("授权中…", "warn");
