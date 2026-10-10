@@ -82,6 +82,17 @@ CASES = [
     # 无法区分，代价就从"闪一下红"升级成"骗人"。
     ("concentrating", {"browDownLeft": .4, "browDownRight": .4}, "anger"),
     ("speaking_frown", {"jawOpen": .4, "browDownLeft": .3, "browDownRight": .3}, "anger"),
+    # ── 「乙」取舍的已知代价（r103 老大拍板「保真悲」）──
+    # 真悲伤 2/2 换来的代价是「担忧中重误报低落」。这两条是**代价面样本**：
+    # 它们现在**预期判 sadness**（不是漏报），但它们的存在让代价在判据里可见，
+    # 而不是只活在注释里。真正不许跨的是下面两条边界：轻担忧、边担忧边说话。
+    ('worry_mid   r103 代价', {"browInnerUp": .55}, "sadness"),
+    ('worry_heavy r103 代价', {"browInnerUp": .70}, "sadness"),
+    # 边界 A：**轻担忧不得误报**（实测 innerUp .40 → calm，离 sadness 线有 0.10 余量）
+    ("worry_light_A", {"browInnerUp": .40}, "calm"),
+    # 边界 B：**边担忧边说话不得误报**（实测 jawOpen .40 把 sad 分全压到 0 ⇒ calm）
+    ("worry_speak_B1", {"browInnerUp": .55, "jawOpen": .40}, "calm"),
+    ("worry_speak_B2", {"browInnerUp": .70, "jawOpen": .40}, "surprise"),
 ]
 
 # 真愤怒 vs 专注轻皱的**强度序**：真愤怒必须更凶，否则 anger 这一路分不出"真怒"与"专注"。
@@ -95,7 +106,12 @@ SWEEP = [.25, .40, .55, .70, .85, 1.00]
 #   - joy_weak：它的标签是 calm，同上。
 POSITIVE = [c for c in CASES if c[0] not in (
     "concentrating", "speaking_frown", "speaking", "blinking", "looking_down",
-    "lips_pressed", "joy_weak")]
+    "lips_pressed", "joy_weak",
+    # r103 代价面样本：worry_* 是「乙」取舍的**代价**，不是任何一类的正样本 ——
+    # 用它们扫「某类分数随强度递增」是扫错了对象（它们量的类是随输入反向变的）。
+    # 它们在 ②c/②d/②e 里各自有专门断言，不参与这项统计。
+    "worry_mid   r103 代价", "worry_heavy r103 代价",
+    "worry_light_A", "worry_speak_B1", "worry_speak_B2")]
 # concentrating / speaking_frown 现在**预期判 anger**（r103 的已知代价），
 # 它们的分数要参与 ②b 的「真怒必须更凶」比较，但不该混进"某类分数单调性"统计 ——
 # 那项统计问的是"同一情绪随强度递增"，而它们不是 anger 的正样本。
@@ -207,6 +223,35 @@ def f11_bad(data):
         if _rg0 < 0.55:
             bad.append("F11 真愤怒 anger 分仅 %.3f < 0.55 ⇒ 离 calm 残余门槛(0.35)太近，"
                        "browDown 权重被压回就会重演 anger 0/2（r102 的漏判）" % _rg0)
+    # ②c **真悲伤的 sad 分必须够高**（r103「乙」取舍的低端保护，与 anger ②b 同构）。
+    #   sad1/sad2 实测 0.629/0.781；取门店 0.55 ⇒ 权重被压低会先在撞 calm 残余线(0.35)前报红。
+    _sad = max([c for c in cases if c["name"] in ("sad_real_1", "sad_real_2")],
+               key=lambda c: (c.get("pairs") or {}).get("sadness", 0), default=None)
+    if _sad:
+        _sv = (_sad.get("pairs") or {}).get("sadness", 0)
+        if _sv < 0.55:
+            bad.append("F11 真悲伤 sad 分仅 %.3f < 0.55 ⇒ 离 calm 残余门槛(0.35)太近，"
+                       "browInnerUp 权重被压低就会重演 sadness 0/2" % _sv)
+    # ②d **真悲伤必须比最高分担忧更凶**。若序翻负 ⇒ 读到的是担忧不是悲伤。
+    _worst = max([c for c in cases if c["name"] == "worry_heavy r103 代价"],
+                 key=lambda c: (c.get("pairs") or {}).get("sadness", 0), default=None)
+    if _sad and _worst:
+        _g = (_sad.get("pairs") or {}).get("sadness", 0)
+        _w = (_worst.get("pairs") or {}).get("sadness", 0)
+        if _g - _w < 0.08:
+            bad.append("F11 真悲伤 sad(%.3f) − 担忧重 sad(%.3f) = %.3f < 0.08 "
+                       "⇒ 真悲与担忧读不出区别，代价面就从闪一下变成骗人" % (_g, _w, _g - _w))
+    # ②e **两条边界不许跨**（「乙」的代价不是无限放大）：轻担忧、边担忧边说话**不得判 sadness**。
+    #   真正的红线是「不把常态表情误报成低落」，不是「必须判 calm」—— 实测
+    #   worry_speak_B2（边担忧边说重话）会判 surprise，那是另一回事，不算误报低落。
+    #   判据用它自己的 sad 分来断，比读 got 更准（got 会被其它类抢）。
+    for _bn in ("worry_light_A", "worry_speak_B1", "worry_speak_B2"):
+        _b = next((c for c in cases if c["name"] == _bn), None)
+        if _b:
+            _bs = (_b.get("pairs") or {}).get("sadness", 0)
+            if _bs >= 0.30:
+                bad.append("F11 %s 的 sad 分达 %.3f ≥ 0.30 ⇒ 「乙」的代价被放大到常态表情上了"
+                           % (_bn, _bs))
     for nm in ("concentrating", "speaking_frown"):
         _c = next((c for c in cases if c["name"] == nm), None)
         if not _real or not _c:
@@ -463,6 +508,55 @@ def selftest():
     else:
         ran += 1
         red, msg = probe_with(m8, "反例8 把 sadness 加回 need:2（回退到漏判态）")
+        print("  " + msg)
+        if not red:
+            bad.append(msg)
+
+    # 反例 9：browInnerUp 压回 r102 的 0.7 ⇒ 真悲伤 sad 分跌破 0.55（②c 必须红）。
+    #   【覆盖②c：真悲伤分数低端保护】
+    m9 = real_rules.replace("      browInnerUp: 1.2,", "      browInnerUp: 0.7,")
+    if m9 == real_rules:
+        bad.append("selftest 反例9 构造失败：browInnerUp 串没匹配上")
+    else:
+        ran += 1
+        red, msg = probe_with(m9, "反例9 browInnerUp 压回 0.7（真悲伤跌破 0.55）")
+        print("  " + msg)
+        if not red:
+            bad.append(msg)
+
+    # 反例 10：browInnerUp 抬到 3.0 ⇒ 轻担忧 innerUp .40 也被判成 sadness（②e 必须红）。
+    #   这是「乙」益价最真实的放大方向：有人为了"不漏真悲"一味抬高主证据。
+    m10 = real_rules.replace("      browInnerUp: 1.2,", "      browInnerUp: 3.0,")
+    if m10 == real_rules:
+        bad.append("selftest 反例10 构造失败")
+    else:
+        ran += 1
+        red, msg = probe_with(m10, "反例10 browInnerUp 抬到 3.0（轻担忧误报低落）")
+        print("  " + msg)
+        if not red:
+            bad.append(msg)
+
+    # 反例 11：jawOpen 负权从 -1.9 调小到 -0.3 ⇒ 边担忧边说话开始误报 sadness（②e 必须红）。
+    #   这条盯的是 jawOpen 在代价面上的作用 —— 上轮误判它是摆设，代价面实测才翻案。
+    m11 = real_rules.replace("      jawOpen: -1.9,", "      jawOpen: -0.3,")
+    if m11 == real_rules:
+        bad.append("selftest 反例11 构造失败")
+    else:
+        ran += 1
+        red, msg = probe_with(m11, "反例11 jawOpen 负权调小到 -0.3（边担忧边说话误报低落）")
+        print("  " + msg)
+        if not red:
+            bad.append(msg)
+
+    # 反例 12：mouthFrown 从 0.4 抬回 1.0（r102 旧权重）⇒ 合成悲伤全对，
+    #   但真悲伤的 sad 分可能被稀释。盯的是「辅证被当成主证」。
+    m12 = real_rules.replace("      mouthFrownLeft: 0.4, mouthFrownRight: 0.4,",
+                              "      mouthFrownLeft: 1.0, mouthFrownRight: 1.0,")
+    if m12 == real_rules:
+        bad.append("selftest 反例12 构造失败")
+    else:
+        ran += 1
+        red, msg = probe_with(m12, "反例12 mouthFrown 抬回 1.0（r102 旧权重回归）")
         print("  " + msg)
         if not red:
             bad.append(msg)
