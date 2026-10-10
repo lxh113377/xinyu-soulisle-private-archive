@@ -98,6 +98,10 @@ python _test/peer_release_probe.py       # 对标 r45 探针：发布与版本�
 node _test/js/emotion-engine.unit.test.mjs   # 被测件本身：node:test + vm 载入浏览器全局脚本（含跨 realm 归一与夹具自证）
 python _test/js_unit_check.py                # r58 JS 单测执行判据：枚举 _test/js/*.test.mjs 真跑，判据行自带 tests/pass/fail 计数
 python _test/js_unit_check.py --selftest     # r58 判据桩：7 类（零分母/计数不自洽/tests=0/stderr 挤行/node 缺失）+ 恒绿守卫
+python _test/face_check.py                   # r87 面部表情识别：F1 vendor 完整性（13MB wasm/模型被换字节即刻红）/ F2 接线面（ESM 桥挂号 + CSP 放行 wasm + camera 策略）/ F3 判据单测（真笑 vs 强颜欢笑可分，且阈值真参与计算 ⇒ 可证伪）/ F4 摄像头开合（假摄像头喂**真人脸 y4m**，须真出读数并驱动星雾；关闭后轨道真停、指示灯灭）/ F5 真实照片实跑（微笑组与中性组完全可分 + 真笑照片必须判 duchenne）/ F6 无摄像头降级（入口消失且有原因，不是点了报错）
+python _test/face_check.py --selftest        # r87 判据桩：逐条改坏必须红、原样必须绿（模型被换字节/拔 ESM 桥/CSP 不放行 wasm/camera 被掐/新 js 漏进 SW 预缓存/公网副本缺件/两组不可分/全没检出人脸/读数恒等/真笑被判社交笑/零读数）｜条数由脚本自己印，本行不抄数
+python _test/face_discrim_check.py           # r102 表情**分类判别力**尺（F5 只验 smile/neutral 两类的口部分离，sadness/anger/fear/surprise/disgust/contempt 的权重从没被真实数据校过 ⇒「情绪种类单一」无人拦）：分类命中 + 负样本假阳性（专注/说话/眨眼必须判 calm）+ 分数饱和率 + 置信度可分性 + **成对可分性**（fear−surprise ≥0.10、对称笑时 contempt 严格为 0 —— argmax 判据在这两种破坏下全绿，只有这一层有牙）
+python _test/face_discrim_check.py --selftest # r102 判据桩：把判据改坏必须红、原样必须绿（抽掉 disgust 证据/删掉三个新类/拆 fear-surprise 分水岭/把 peak 调小制造饱和/confidence 阈值调到恒 confident/拆掉非对称门）｜条数由脚本自己统计并印，本行不抄数
 python _test/deliverable_inventory_check.py               # r59 交付物清单面：提交包「清单声明⇄磁盘⇄口径」三方对账（缺失/空件/页数越界/时长越界/指纹漂移/品牌分叉皆红）；r90 起分母 = 交付面 + 归档面（archive/交付物-历史轮次），并认「逐字节等价的暂存搬卷」
 python _test/deliverable_inventory_check.py --selftest    # r59 判据桩：纯函数夹具 + 取数解析腿含独立通道对账 + 端到端反向腿含**真 git mv 往返**（条数由脚本自己印，本行不抄数；r90 加的搬卷五形：面外/改过内容/落点未落地/查不到/落点随后消失 皆须仍红）
 python _test/hook_wiring_check.py                          # r83 交付面在位闸的「接线回执」：_test/hooks/pre-commit 源在位 + sh -n 解析得动 + .git 副本按字节==源 + 被拦判据三态在位（CI/无 .git ⇒ 未验不判红）

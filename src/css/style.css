@@ -214,3 +214,82 @@ html[data-theme="light"] #gl{display:none}
 /* 浅色态复用既有降级层（渐变全部走令牌，自动变浅；hidden 属性由本规则显式覆盖） */
 html[data-theme="light"] #gl-fallback[hidden]{display:block}
 html[data-theme="light"] #gl-fallback{filter:none}
+
+/* ── 面部表情识别（r87 新增）─────────────────────────────────────────────
+   沿用既有「深空玻璃」令牌，不引入第二种设计语言。
+   动态色/宽度一律走 data-* + CSSOM（见 app.js 的 paint()）：
+   markup 内联 style 会被线上 CSP（style-src 'self'）拦成失效。 */
+.face-probe{margin-top:14px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.face-video{width:320px;max-width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;
+  border:1px solid var(--line);background:#05070f;transform:scaleX(-1);   /* 镜像：照镜子才不自乱左右 */
+  box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.face-note{font-size:11.5px;line-height:1.6}
+
+/* 实时小窗：右下角悬浮，避开底部对话坞 */
+.face-hud{position:fixed;right:26px;bottom:172px;z-index:40;width:176px;padding:10px;
+  display:flex;flex-direction:column;gap:8px;
+  background:var(--panel);backdrop-filter:blur(16px);border:1px solid var(--line);
+  border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.5);
+  animation:face-hud-in .18s ease-out}
+/* ⚠️ 入场动效**不能用 scale**：`getBoundingClientRect` 会把缩放算进尺寸，
+   动画期间的按钮实测只有 43px，撞本仓 44px 触屏红线（_test/mobile_check M2/M3 逐控件实测）。
+   ⇒ 只用位移 + 透明度，尺寸自始至终是 44px。 */
+@keyframes face-hud-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.face-hud-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}
+.face-hud-title{color:var(--muted);letter-spacing:.06em}
+.face-hud-state{padding:2px 9px;border-radius:999px;border:1px solid var(--line);font-size:11px;
+  color:var(--muted);transition:color .24s ease,border-color .24s ease}
+.face-hud-state.on{color:var(--accent2);border-color:rgba(57,208,196,.45);background:rgba(57,208,196,.08)}
+.face-hud-state.warn{color:#f0b354;border-color:rgba(240,179,84,.45);background:rgba(240,179,84,.08)}
+.face-hud-stage{position:relative;border-radius:10px;overflow:hidden;background:#05070f;min-height:104px}
+.face-hud video{width:100%;height:104px;object-fit:cover;border-radius:10px;background:#05070f;
+  transform:scaleX(-1);transition:opacity .3s ease}
+.face-hud-idle{position:absolute;inset:0;height:104px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:4px;font-size:12px;color:var(--ink);text-align:center;line-height:1.5}
+/* 开关：轨道 38×22，点击区 ≥44px（触屏红线，mobile_check M2/M3 实测） */
+.face-hud-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.face-switch{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 4px;background:transparent;
+  border:none;color:var(--ink);font-family:var(--font);font-size:12px;cursor:pointer}
+.face-switch .fs-track{position:relative;width:38px;height:22px;border-radius:999px;flex:0 0 auto;
+  background:rgba(138,147,178,.35);transition:background .2s ease}
+.face-switch .fs-knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;
+  background:#fff;transition:transform .2s ease}
+.face-switch[aria-checked="true"] .fs-track{background:var(--accent2)}
+.face-switch[aria-checked="true"] .fs-knob{transform:translateX(16px)}
+/* 关闭按钮必须 ≥44px（本仓触屏红线，_test/mobile_check.py M2/M3 逐控件实测）：
+   小窗是浮层里的控件，比页面正文更容易被做成"点得到但点不准"的小目标 */
+.face-hud .ghost-btn{min-height:44px;display:flex;align-items:center;justify-content:center}
+.face-hud-tag{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink)}
+.face-hud-tag .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);
+  box-shadow:0 0 10px currentColor;transition:background .24s ease}
+.face-hud .intensity-bar{width:46px}
+/* 三态徽章：真笑=暖金 / 社交性微笑=琥珀描边 / 非微笑=中性灰 */
+.face-smile-badge{font-size:11px;padding:4px 10px;border-radius:999px;text-align:center;
+  border:1px solid var(--line);color:var(--muted);transition:color .24s ease,border-color .24s ease}
+.face-smile-badge.is-duchenne{color:#ffd14d;border-color:rgba(255,209,77,.45);background:rgba(255,209,77,.08)}
+.face-smile-badge.is-social{color:#f0b354;border-color:rgba(240,179,84,.38)}
+.face-smile-badge.is-none{color:var(--muted);border-color:var(--line)}
+/* 低置信度标注：主次分贴太近时显示，如实告诉用户这一帧别当真 */
+.face-wobble{font-size:10.5px;margin-left:6px;color:var(--muted);opacity:.9}
+/* 分歧标注：文字与表情不一致时（如强颜欢笑）显式成条，一致时弱化 */
+.face-divergence{display:inline-flex;align-items:center;gap:6px;font-size:11px;
+  padding:3px 10px;border-radius:999px;margin-top:6px;border:1px solid var(--line);color:var(--muted)}
+.face-divergence.disagree{color:#f0b354;border-color:rgba(240,179,84,.35);background:rgba(240,179,84,.07)}
+.face-divergence.agree{color:var(--accent2);border-color:rgba(57,208,196,.3)}
+.face-row{font-size:12.5px;color:var(--muted);margin-top:6px}
+
+@media (max-width:768px){
+  .face-hud{left:12px;right:12px;width:auto;bottom:158px;display:grid;
+    grid-template-columns:auto 1fr;grid-template-areas:"head head" "stage tag" "act act";
+    align-items:center;gap:8px 10px}
+  .face-hud-head{grid-area:head}
+  .face-hud-stage{grid-area:stage;min-height:60px}
+  .face-hud-tag{grid-area:tag;flex:1 1 auto}
+  .face-hud-actions{grid-area:act;justify-content:space-between}
+  .face-hud video,.face-hud-idle{width:96px;height:60px}
+  .face-video{width:100%;aspect-ratio:16/9}
+  #btn-face-scan{width:100%}
+}
+@media (prefers-reduced-motion: reduce){
+  .face-hud{animation:none}
+}

@@ -1,0 +1,168 @@
+/* 心屿 · 面部表情判据（单一真相源）
+ *
+ * 映射对象：MediaPipe FaceLandmarker 的 52 维 blendshape（近似 FACS 的 AU）。
+ * 判据的**标定依据与踩坑记录**在 memory/05-feature-status r102 段与 memory/07-next-steps，
+ * 本文件只留**判据值 + 一行为何**；改阈值前先读那两处，别凭直觉调。
+ *
+ * 红线：crisis 恒 false —— 表情既不判危机，也不解除危机（危机只由文本决定）。
+ */
+window.__XINYU_FACE_RULES__ = {
+  version: "2.0",
+  generated: "2026-10-10",
+
+  /* 可输出的表情（8 类）。顺序即平分时的兜底顺序。 */
+  emotions: ["joy", "sadness", "anger", "fear", "surprise", "disgust", "contempt", "calm"],
+  /* 不可由表情判定的情绪：界面必须如实说明，不能靠表情猜 */
+  undetectable: ["love"],
+
+  /* 界面文案。文本六类的名字仍走 EmotionEngine.labelOf（那边是双端 SSOT），
+     这里只给**表情侧独有**的三类补名字 —— 放这里而不是 emotion-lexicon.js，
+     就是为了不把只用于表情的词条灌进 JS/Java 共用的词表。 */
+  labels: { surprise: "惊讶", disgust: "厌恶", contempt: "轻蔑" },
+
+  /* 与文本六情绪的语义归属：分歧标注据此对齐，避免"表情说 contempt、文字无此类"变成噪声。
+     只做映射，不新增文本情绪 —— emotion-lexicon.js 是 JS/Java 双端 SSOT，不在本文件动。
+     表情侧 8 类 ≠ 文本侧 6 类是刻意的：可辨识上限由 blendshape 决定，r102 实测
+     disgust/surprise 不新增类就会被判成 anger/fear。 */
+  family: {
+    joy: "joy", sadness: "sadness", anger: "anger", fear: "fear", calm: "calm",
+    surprise: "fear", disgust: "anger", contempt: "anger"
+  },
+
+  /* 表情侧独有三类的自持色（文本六类仍走 EmotionEngine.colorOf，避免两份色值漂移）。
+     色相避开既有六色（≥40°），同色相段靠明度/饱和度拉开。 */
+  colors: {
+    surprise: [0.30, 0.92, 1.00],
+    disgust:  [0.72, 0.80, 0.25],
+    contempt: [0.74, 0.47, 0.78]
+  },
+
+  /* 峰值基准：满强度时该情绪的平均正权 AU 激活度。
+   * ⚠️ 语义在 r102 变过：旧版是 `norm: 0.45`（除以它就是饱和点，实测 25% 的帧顶满 1.0，
+   *   "笑得很大"与"笑到极致"读数一样）。现改为除以 peak，强度随真实表情线性铺开。
+   * peak=0.60 由 F11 实测标定：饱和 0%、17/17 分类命中。⚠️ 社交笑 margin 很薄，
+   * 改 peak 前先跑 `python _test/face_discrim_check.py`。 */
+  peak: 0.60,
+
+  /* 各情绪的 blendshape 权重。负权 = 反向证据。r102 重标三处易混对：
+   *   ① disgust/anger 靠 **上唇上提**分（disgust +0.8 / anger −0.5）；
+   *   ② surprise/fear 靠 **下颌方向**分（竖直张口 vs 横向拉唇），并用 browDown 一正一负：
+   *      恐惧皱眉(AU1+2+4)、惊讶平滑上抬(AU1+2) —— 这是 fear 能判出来的唯一分水岭；
+   *   ③ contempt/joy 靠**眼周是否参与**分（见下方 asym）。 */
+  weights: {
+    joy: {
+      mouthSmileLeft: 1.0, mouthSmileRight: 1.0,
+      cheekSquintLeft: 0.5, cheekSquintRight: 0.5,
+      mouthDimpleLeft: 0.3, mouthDimpleRight: 0.3,
+      mouthUpperUpLeft: 0.2, mouthUpperUpRight: 0.2,
+      mouthFrownLeft: -0.6, mouthFrownRight: -0.6,
+      mouthPressLeft: -0.5, mouthPressRight: -0.5
+    },
+    sadness: {
+      mouthFrownLeft: 1.0, mouthFrownRight: 1.0,
+      browInnerUp: 0.7,
+      mouthLowerDownLeft: 0.3, mouthLowerDownRight: 0.3,
+      eyeSquintLeft: 0.2, eyeSquintRight: 0.2,
+      mouthSmileLeft: -0.7, mouthSmileRight: -0.7,
+      cheekSquintLeft: -0.2, cheekSquintRight: -0.2
+    },
+    anger: {
+      browDownLeft: 1.0, browDownRight: 1.0,
+      noseSneerLeft: 0.55, noseSneerRight: 0.55,
+      mouthPressLeft: 0.5, mouthPressRight: 0.5,
+      jawForward: 0.4,
+      jawOpen: 0.2,
+      mouthUpperUpLeft: -0.5, mouthUpperUpRight: -0.5,
+      mouthSmileLeft: -0.6, mouthSmileRight: -0.6
+    },
+    fear: {
+      eyeWideLeft: 1.0, eyeWideRight: 1.0,
+      mouthStretchLeft: 0.7, mouthStretchRight: 0.7,
+      browInnerUp: 0.5,
+      browDownLeft: 0.4, browDownRight: 0.4,
+      jawOpen: 0.25,
+      mouthPressLeft: 0.3, mouthPressRight: 0.3
+    },
+    surprise: {
+      browInnerUp: 1.0,
+      browOuterUpLeft: 0.8, browOuterUpRight: 0.8,
+      eyeWideLeft: 0.8, eyeWideRight: 0.8,
+      jawOpen: 0.7,
+      mouthStretchLeft: 0.3, mouthStretchRight: 0.3,
+      mouthFunnel: 0.2,
+      browDownLeft: -0.6, browDownRight: -0.6,
+      mouthPressLeft: -0.4, mouthPressRight: -0.4
+    },
+    disgust: {
+      noseSneerLeft: 1.0, noseSneerRight: 1.0,
+      mouthUpperUpLeft: 0.8, mouthUpperUpRight: 0.8,
+      mouthLowerDownLeft: 0.5, mouthLowerDownRight: 0.5,
+      mouthShrugUpper: 0.3,
+      mouthSmileLeft: -0.8, mouthSmileRight: -0.8,
+      browDownLeft: -0.5, browDownRight: -0.5
+    },
+    contempt: {
+      mouthDimpleLeft: 1.0, mouthDimpleRight: 1.0,
+      mouthSmileLeft: 0.4, mouthSmileRight: 0.4,
+      jawOpen: 0.2,
+      cheekSquintLeft: -0.6, cheekSquintRight: -0.6,
+      mouthFrownLeft: -0.5, mouthFrownRight: -0.5
+    }
+    /* calm 不进 weights：它是"其余都不高"的残余量，见 calm.baseline */
+  },
+
+  /* 多线索佐证：一类情绪须由 ≥need 个**独立区域**同时作证，单区则按 penalty 打折。
+   * 修的是「专注时压眉(AU4)被读成愤怒」这个假阳性 —— 加权求和本身不要求区域佐证。
+   * ⚠️ 默认是 1（不打折），只有下方 need 点名的三类强制多区。曾把默认值写成 2，
+   *   结果 joy 也被要求两区，而"社交性微笑按定义就是只有口部参与"⇒ 强颜欢笑被判成 calm。
+   *   别只让 joy 过一关就以为对了：social smile 的 Duchenne 三态另有判据兜着。 */
+  cues: {
+    brow: ["browDownLeft", "browDownRight", "browInnerUp", "browOuterUpLeft", "browOuterUpRight"],
+    eye:  ["eyeWideLeft", "eyeWideRight", "eyeSquintLeft", "eyeSquintRight",
+           "eyeBlinkLeft", "eyeBlinkRight", "cheekSquintLeft", "cheekSquintRight"],
+    nose: ["noseSneerLeft", "noseSneerRight"],
+    mouth:["mouthSmileLeft", "mouthSmileRight", "mouthFrownLeft", "mouthFrownRight",
+           "mouthPressLeft", "mouthPressRight", "mouthUpperUpLeft", "mouthUpperUpRight",
+           "mouthLowerDownLeft", "mouthLowerDownRight", "mouthDimpleLeft", "mouthDimpleRight",
+           "mouthFunnel", "mouthPucker", "mouthStretchLeft", "mouthStretchRight",
+           "mouthShrugLower", "mouthShrugUpper", "mouthRollLower", "mouthRollUpper",
+           "mouthClose", "jawOpen", "jawForward"]
+  },
+  cue: { min: 0.18, penalty: 0.5 },
+  /* anger 吃 AU4（专注常态）；fear/sadness 吃 browInnerUp（惊讶/担忧也吃）⇒ 都要口眼佐证 */
+  need: { anger: 2, fear: 2, sadness: 2 },
+
+  /* 轻蔑靠**左右不对称**识别，加权和表达不了（对称项两侧同权，单/双侧笑在权重空间同点）。
+     不达标时 contempt 直接归零 —— 否则对称笑会被 contempt 抢走。 */
+  asym: { mouthSmile: ["mouthSmileLeft", "mouthSmileRight"], min: 0.25 },
+
+  /* 强度增益：残余量 calm 天生接近 1，压到 0.6 免得"面无表情"被读成强烈平静 */
+  gain: { joy: 1.0, sadness: 1.0, anger: 1.0, fear: 1.0, calm: 0.6,
+          surprise: 1.0, disgust: 1.0, contempt: 1.0 },
+
+  /* calm 基线：最强非平静分量达到 0.35 时，平静分归零 */
+  calm: { baseline: 0.35 },
+
+  /* 次情绪采纳线：与 EmotionEngine.secondaryOf 同口径（≥ 主情绪 40% 且自身够强） */
+  secondary: { ratio: 0.4, floor: 0.12 },
+
+  /* 置信度 = 主分 − 次分（margin）。r102 加：旧版每帧都硬给一个情绪、没有"看不出来"
+   * 的出口（实测强度 p25 仅 0.47 ⇒ 一半帧本就不确定却输出确定结论，表现为读数乱跳）。 */
+  confidence: { on: 0.15, lowLabel: "读数不稳" },
+
+  /* ── 强颜欢笑判据（Duchenne）───────────────────────────────────────
+   * 老师提的验证难题：「表情大笑，怎么知道是真开心还是强颜欢笑」。
+   * 心理学口径：真笑（Duchenne）= 口部 AU12（颧大肌）**且**眼周参与 AU6/AU7；
+   * 社交性微笑只有口部。于是判据不是"笑得多大"，而是"眼周参与 / 口部微笑"的比值。
+   * ⚠️ ratioOn=0.20 是**实测标出来的**：首版 0.45 被 4 张真笑照当场证伪（实测比值
+   *   0.269~0.326，会把真笑全判成强颜欢笑）。样本量仅 4，扩样本必须复标。
+   * 阈值全在本块，`_test/face_check.py` 拿标注样本集复跑同一条链；阈值若不参与计算会判红。 */
+  smile: { smileOn: 0.35, ratioOn: 0.20, tensionOn: 0.30 },
+
+  /* 时序：EMA 平滑（α=0.3）防读数抖动；实时采样 8fps（不每帧推理，省电省热） */
+  smooth: { alpha: 0.3 },
+  sample: { fps: 8, minSamples: 3 },
+
+  /* 表情读数有效期：超过这个时长没新读数，就当没有表情（不拿旧脸去标新话） */
+  freshMs: 3000
+};
