@@ -95,3 +95,7 @@ wflow.toml
 # _temp/ = 各轮一次性探针输出与对照快照（实测 163MB：pristine/ 快照 + r10x_*.txt 台账）。
 # 当日台账引用其路径属历史取证，本体均可再生 ⇒ 与 _shots/.wrangler 同理走 gitignore 豁免，不入库。
 _temp/
+
+# IDE/工具运行态（R269：活跃工具运行态禁迁 _trash —— 迁走等于在别人正在用的会话目录上动手）。
+# noise_lint 对 .gitignore 命中的根部目录降级为 quarantine，不是 VIOL；先例：焚诀 .codebuddy/、.zcodeignore。
+.zcode/
