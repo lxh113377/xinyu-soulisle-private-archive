@@ -20,6 +20,25 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE = "http://127.0.0.1:8123"
 # 判定行形状：各套件统一以 <NAME>-PASS / -FAIL / -CLEAN / UNVERIFIED 收尾
 VERDICT_RE = re.compile(r"(?:PASS|FAIL|CLEAN|UNVERIFIED|OK)\b")
+# r102：套件超时专用退出码（GNU timeout 惯用值）。必须与"判据自己崩了"的任意 rc 分开——
+# 排障手册在册的 rc=3221225773 崩没有专属读数，TIMEOUT 桶只认这一个码，不然桶边界靠猜。
+TO_RC = 124
+
+
+def timeout_row(name, elapsed, exc):
+    """套件超时 → (耗时秒, 结论行, blurb)。抽成函数是为了让 selftest 能喂合成
+    TimeoutExpired（含 stdout/stderr 的 bytes/str 两种形态、None 形态各一）——
+    在册纪律：新代码路径必须有一条"会红"的腿，不能只靠真跑撞上。
+    TimeoutExpired 自带已捕获的部分输出（py3.10+），照实带进 blurb 供 fold/点名。
+    """
+    partial = ""
+    for chunk in (getattr(exc, "stdout", None), getattr(exc, "stderr", None)):
+        if isinstance(chunk, bytes):
+            chunk = chunk.decode("utf-8", "replace")
+        if chunk:
+            partial += chunk
+    line = "SUITE-TIMEOUT(>%.0fs) 仪器未跑完，判据无结论" % elapsed
+    return elapsed, line, line + " " + partial
 
 # 并发锁 TTL（秒）：整跑一遍实测约 10 分钟，留 3 倍余量；被 kill 掉的运行靠它自愈。
 LOCK_TTL = 1800
@@ -191,6 +210,17 @@ SUITES = [
     # r58 质量工程面：JS 侧从"0 个单元测试"变成有常驻执行位（node --test + 跨 realm 归一）
     ("js_unit", [sys.executable, "_test/js_unit_check.py"]),
     ("js_unit_selftest", [sys.executable, "_test/js_unit_check.py", "--selftest"]),
+    # r87 面部表情识别：F1 vendor 完整性 / F2 接线面（ESM 桥 + CSP wasm + camera 策略）/
+    # F3 判据单测（真笑 vs 强颜欢笑可证伪）/ F4 摄像头开合（关了必须真停 + 真脸流出读数）/
+    # F5 真实照片实跑（判据不是自比恒等）/ F6 无摄像头降级（入口消失而非点了报错）
+    ("face_check", [sys.executable, "_test/face_check.py"]),
+    ("face_check_selftest", [sys.executable, "_test/face_check.py", "--selftest"]),
+    # r102 新增：表情**分类判别力**尺。F5 只验 smile/neutral 两类的口部分离，
+    # sadness/anger/fear/surprise/disgust/contempt 的权重从没被真实数据校过 ⇒
+    # "情绪种类单一"没人拦。这把尺管分类命中/负样本假阳性/饱和/置信度，
+    # selftest 那条用反例证明它有牙（5 条反例必须全部被抓到）。
+    ("face_discrim_check", [sys.executable, "_test/face_discrim_check.py"]),
+    ("face_discrim_selftest", [sys.executable, "_test/face_discrim_check.py", "--selftest"]),
     ("quality_peer_selftest", [sys.executable, "_test/peer_quality_tooling_probe.py", "--selftest"]),
     # r59 交付物清单面：提交包是「要交出去的东西」，此前 91 套件里没有任何一条判据引用过成片、
     # 清单本体、渲染脚本 —— 09-28 00:19 实测 7 个被跟踪交付件从工作树消失且零告警。
@@ -782,6 +812,33 @@ def acquire_lock():
     return path, None
 
 
+def timeout_selftest():
+    """r102：超时行的 selftest —— 三种 TimeoutExpired 形态（str 输出 / bytes 输出 / 无输出）
+    都要产出同一颗 rc、结论行带 SUITE-TIMEOUT 字样、blurb 带上已捕获的部分输出供点名。
+    """
+    import subprocess as _sp
+    fails = []
+    e1 = _sp.TimeoutExpired(["x"], 600, output="半行判定-PASS\n")
+    t1, line1, blurb1 = timeout_row("s", 600.0, e1)
+    if not (t1 == 600.0 and "SUITE-TIMEOUT" in line1 and "半行判定-PASS" in blurb1):
+        fails.append("str 输出形态没进 blurb")
+    e2 = _sp.TimeoutExpired(["x"], 600, output=b"\xe5\xad\x97\xe8\x8a\x82\xe5\x9b\xbe")
+    _t2, line2, blurb2 = timeout_row("s", 12.0, e2)
+    if not ("SUITE-TIMEOUT" in line2 and "字节图" in blurb2):
+        fails.append("bytes 输出没被解码进 blurb：%r" % blurb2[:40])
+    e3 = _sp.TimeoutExpired(["x"], 600)
+    _t3, line3, blurb3 = timeout_row("s", 3.0, e3)
+    if not ("SUITE-TIMEOUT" in line3):
+        fails.append("无输出形态没有结论行")
+    if "TIMEOUT" not in " ".join([line1, line2, line3]):
+        fails.append("结论行缺 TIMEOUT 判据词（聚合器 fold 认不出来的行等于没判）")
+    for f in fails:
+        print("  · TIMEOUT-SELFTEST-FAIL " + f)
+    print("TIMEOUT-SELFTEST-%s（str / bytes / 无输出 三形态 + 判据词可 fold）"
+          % ("PASS" if not fails else "FAIL"))
+    return 1 if fails else 0
+
+
 def selftest_all():
     """`--selftest` 分派（r100 从 main 提出，纯搬家）。各档桩数由每条桩自己印，这里不抄数。"""
     rc1 = lock_selftest()
@@ -790,14 +847,16 @@ def selftest_all():
     rc4 = timing_selftest()
     rc5, serve_fails = serve_selftest()
     rc6 = blind_selftest()
-    print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s ＋ 计费分档 %s ＋ 台账写入 %s ＋ 自管决策 %s ＋ 盲红分档 %s）"
-          % ("PASS" if not (rc1 | rc2 | rc3 | rc4 | rc5 | rc6) else "FAIL",
+    rc7 = timeout_selftest()
+    print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s ＋ 计费分档 %s ＋ 台账写入 %s ＋ 自管决策 %s ＋ 盲红分档 %s ＋ 超时分档 %s）"
+          % ("PASS" if not (rc1 | rc2 | rc3 | rc4 | rc5 | rc6 | rc7) else "FAIL",
              "ok" if not rc1 else "红", "ok" if not rc2 else "红",
              "ok" if not rc3 else "红", "ok" if not rc4 else "红",
-             "ok" if not rc5 else "红", "ok" if not rc6 else "红"))
+             "ok" if not rc5 else "红", "ok" if not rc6 else "红",
+             "ok" if not rc7 else "红"))
     for f in serve_fails:
         print("  · SELF-HOST-FAIL " + f)
-    return 1 if (rc1 | rc2 | rc3 | rc4 | rc5 | rc6) else 0
+    return 1 if (rc1 | rc2 | rc3 | rc4 | rc5 | rc6 | rc7) else 0
 
 
 def main():
@@ -870,8 +929,22 @@ def main():
     times = {}   # r69：此前不记每套件耗时 ⇒ "先出耗时分布再谈并行"根本取不到读数
     for name, cmd in SUITES:
         t0 = time.monotonic()
-        p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=600)
+        try:
+            p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=600)
+        except subprocess.TimeoutExpired as e:
+            # r102：套件超时**不许把整跑炸掉**。改造前的一手事故：eol_parity 实跑 >600s，
+            # TimeoutExpired 一路抛到 main() 之外 ⇒ 电池 rc=1、既没有 BATTERY 收口行、
+            # 该套件之后的所有套件**一套都没跑**（"受理面断续"比"一套件红"更坏：连哪些红
+            # 都不知道）。超时归 CRASH 族（仪器没跑完 ≠ 产品判红 ≠ 环境未验），但单列
+            # TIMEOUT 桶——它的修法与"判据自己崩"不同（要么给判据提速，要么显式抬 cap，
+            # 不许默认调参掩盖）。rc 取 124（GNU timeout 的惯用退出码，排障手册在册）。
+            elapsed = round(time.monotonic() - t0, 1)
+            times[name], line, partial = timeout_row(name, elapsed, e)
+            blurbs[name] = partial
+            results.append((name, TO_RC, line[:110]))
+            print(f"{name:22s} rc={TO_RC} {times[name]:>5.1f}s | {line[:110]}")
+            continue
         times[name] = round(time.monotonic() - t0, 1)
         tail = (p.stdout or "").strip().splitlines()
         # 聚合器只留最后一行 ⇒ 判据说 FAIL 却答不出"哪一条 FAIL"，等于没判（r28 CI 实测踩到）。
@@ -901,6 +974,10 @@ def main():
     hard, quota = split_quota(hard, blurbs)
     soft = [b[0] for b in bad if b[1] == 2]
     crash = [(b[0], b[1]) for b in bad if b[1] not in (1, 2)]
+    # r102：超时从 crash 族里单列（rc 判定一字未改，仍归"必须修"；只把修法说清楚：
+    # 提速判据 or 显式抬 cap，不许默认调参掩盖一个 600s 的仪器）
+    timeouts = [(n, c) for n, c in crash if c == TO_RC]
+    crash = [(n, c) for n, c in crash if c != TO_RC]
     # r100 类扫（修类不修例）：rc=1 **却没有一行判据结论** = 仪器自己崩了，不是产品红。
     # 此前这类与真红同形（收口行只按 rc==1 归类），下一轮就会去「修」一段没坏的产品代码——
     # r99 三处 Playwright 超时崩在进程出口，正是这一类的现场。单列点名，rc 判定一字不改。
@@ -916,6 +993,10 @@ def main():
     if crash:
         parts.append("CRASH(判据自身崩溃，既不是判红也不是环境，必须查): "
                      + ",".join("%s=0x%08x" % (n, c & 0xFFFFFFFF) for n, c in crash))
+    if timeouts:
+        parts.append("TIMEOUT(套件跑超 600s 硬顶：仪器没跑完，判据无结论；修法=给判据提速或显式抬 cap，"
+                     "不许默认调参掩盖): "
+                     + ",".join("%s=%.0fs" % (n, times.get(n, 0)) for n, _c in timeouts))
     if quota:
         parts.append("ENV-QUOTA(上游余额/计费阻塞：响应体自证，非本仓缺陷，但仍不得记为已验): "
                      + ",".join(quota))
