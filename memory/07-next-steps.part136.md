@@ -1,5 +1,13 @@
 ## r106 入口（按优先级）
-1. 🔴 **G12 断链方向须老大选定**：(a) 把 1.8.2 落到 main（pom/ROADMAP/CHANGELOG 三源同步 + tag 前移，需 force 移动已推送 tag ⇒ 对外可见）／(b) 撤远端 tag（破坏性、对外可见）／(c) 现状挂账。前提：`git merge-base --is-ancestor e8462ca HEAD`（现非零）+ `git ls-remote --tags origin | grep v1.8.2`。
+1. 🔴 **G12 + 分叉收口方向须老大选定（本轮实测：`origin/main` 与本地 main 已分叉，不是只差 tag）**：
+   `git ls-remote origin refs/heads/main` = **e8462ca**（远端 main 正停在那笔「只改版本号三处」的 v1.8.2 发版提交上），
+   `git rev-list --left-right --count origin/main...HEAD` = **18 / 41**（远端 18 条本地没有 = r100/r101 原文；
+   本地 41 条远端没有 = r101 的 cherry-pick 重放 + r102…r105 全部成果）。⇒ 普通 push 必被拒（non-fast-forward），
+   只有三条路：**(a) merge** 把远端旧线并进来（先在副本测冲突数；本地已含同内容的 cherry-pick 版 ⇒ 可能重复/冲突）；
+   **(b) force-push** 用本地线覆盖远端（**重写已发布历史**，远端 18 条 SHA 引用与 `v1.8.2` tag 一起失效 ⇒ 须先 `git bundle` 备份远端并确认无他人基于 e8462ca 工作）；
+   **(c) 现状挂账**并把对外口径改成「v1.8.2 未生效，下一版从 v1.8.3 起」。
+   本仓 post-commit 钩子里**零 `git push`**（`grep -c` = 0）⇒ 自动推送经验不适用，未推是决策不是遗漏。
+   前提命令：`git ls-remote origin refs/heads/main` + `git rev-list --left-right --count origin/main...HEAD`。
 2. 🟠 **BLIND-RED 余下 4 条崩溃面**：`j4_memory_check` 死于未捕获 `playwright TimeoutError: wait_for_function 15000ms`（③ 同族第二形态：超时必须落「未验/点名红」而非抛栈）；`lightshow_check` 死于自己的对照组（`判据失效：未点亮时也判出这些颜色: ['低落','平静']`，指向在途调色板，**归其作者判**）；`browser_check / pixel_dual` 待定位。前提：`python _test/lightshow_check.py`。
 3. 🟠 **E2 继续降数**：现 21/基线 23（起点 31 已接 10）。最便宜的一件 = `_test/mobile_check.py`（单一 `launch()` 出口，形状同本轮三件）。每接一件跑 AST 清点（裸 `chromium.launch(`==0）。
 4. 🟠 **face_check 7 处 debt-open 结转**：前提 = 该件作者提交 + `timing_coupling_check --only face_check`；入场 TIMEOUT=630s 先解决（仪器没跑完时任何「结转成功」都不可信）。

@@ -16,9 +16,9 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - [ ] **同族坑收口**：台账 `part18`/`part20`；G9 常驻 `repo_config_check`。
 - [ ] 🔴 **E2 棘轮降数（r97 首务，r105 已降 3 件）**：`browser_engine` 统一入口现 **已接 10／未接入 21**（基线 23，起点 31）。
       逐个接走手写回退的套件；判据 `python _test/browser_engine_declare_check.py`（只降不升），每改一件跑 AST 清点。`part135`
-- [ ] 🔴 **[推荐:R105-01｜用户操作]** **G12 版本三源断链方向须老大选定**：远端已有 `v1.8.2` tag，但 `git merge-base --is-ancestor e8462ca HEAD`
-      回非零 ⇒ tag 指向 **main 之外**那笔「三源同步」提交，main 的 pom 仍 1.8.1。不是"还没切版"是"切了没落地"；
-      两个收口方向都动对外可见面（force 移 tag / 撤 tag）。前提命令见 `part136` §1。
+- [ ] 🔴 **[推荐:R105-01｜用户操作]** **G12 与「本地/远端 main 分叉」一并待选**：`git ls-remote origin refs/heads/main` = **e8462ca**
+      （远端 main 正停在只改版本号三处的 v1.8.2 提交上），`rev-list --left-right --count origin/main...HEAD` = **18 / 41**
+      ⇒ 普通 push 必被拒。三选一：merge 并回旧线 ／ force 覆盖（重写已发布历史，须先 bundle 备份）／ 现状挂账并把对外口径改成「v1.8.2 未生效，下一版从 v1.8.3 起」。全文 `part136` §1
 - [ ] 🟠 **[推荐:R105-02｜agent 自动]** **BLIND-RED 余下 4 条的崩溃面**：`j4_memory_check` 死于未捕获
       `playwright TimeoutError: wait_for_function 15000ms`（r105 ③ 同族第二形态：超时须落「未验/点名红」而非抛栈）。
       前提：`python _test/j4_memory_check.py` 复现；`lightshow` 那条归并行会话（对照组真信号）。`part136` §2
@@ -94,3 +94,5 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 
 - **卷40** `07-next-steps.part135.md` — **r105 收口（受理面假门/棘轮/崩仪器）**：G16 孤儿判据接线（两侧先测）／E2 24→21（3 件收编，判定行带引擎身份）／vendor_freshness 五字段门＋`detect:null` 显式语义／端口 8123 属主四档协议（默认只停本工具起的）。**新事实：`v1.8.2` tag 不在 main 祖先面上**。
 - **卷41** `07-next-steps.part136.md` — **r106 入口**（G12 方向待选／BLIND-RED 余 4 条崩溃面／E2 继续降／face_check 结转前提／rollup 派生件等干净窗口／peers 错峰重采）。
+- **卷42** `07-next-steps.part137.md` — 07-next-steps 分卷（R199 自动拆卷）
+
