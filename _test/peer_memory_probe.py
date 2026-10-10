@@ -340,12 +340,38 @@ def selftest():
         ok += 1
     else:
         fail.append("对偶 产品目录被误排除：%s ｜ %s" % (t7["ctxwin"], t7["summary"]))
+    # ── r102：字段级 NA 入账规则（ledger_age 豁免到期条件的可测半边）──
+    rows_fix = [
+        {"repo": "a/na", "edge": ["NA", "", 6]},
+        {"repo": "b/none", "edge": ["none-in-sample", "", 6]},
+        {"repo": "c/yes", "edge": ["yes(import)", "x", 2]},
+        {"repo": "d/missing", "edge": []},
+        {"repo": "e/nokey"},
+    ]
+    if field_na(rows_fix) == ["a/na"]:
+        ok += 1
+    else:
+        fail.append("field_na 只认 NA 哨兵：%r" % field_na(rows_fix))
+    if field_na([{"repo": "z", "edge": ["none-in-sample", "", 6]}]) == []:
+        ok += 1
+    else:
+        fail.append("field_na 反例 none-in-sample 被当成 NA（取到了不许记未验）")
     for x in fail:
         print("  SELFTEST-FAIL " + x)
-    expected = 11
+    expected = 13
     print("MEMPEER-SELFTEST: %d/%d%s" % (ok, expected,
           "" if ok + len(fail) == expected else "  ⚠️ 分支数 %d≠%d" % (ok + len(fail), expected)))
     return 0 if ok == expected and ok + len(fail) == expected else 1
+
+
+def field_na(rows):
+    """字段级 NA 名单：`edge[0] == "NA"` 的仓（引用边没取到 ⇒ 该轴未验，不当反证）。
+
+    r102 抽成纯函数：ledger_age 的 `NA_DIVERGE_WAIVED["peer-memory"]` 豁免到期条件
+    要求把它计入声明位，而入账规则必须可被 selftest 喂合成行——
+    `none-in-sample` / `yes(...)` 都不算 NA（那是取到了、结论是"没见到"）。
+    """
+    return [r["repo"] for r in rows if tuple(r.get("edge") or ("",))[0] == "NA"]
 
 
 def main():
@@ -373,6 +399,14 @@ def main():
             rows.append({"repo": p["repo"], "tier": p["tier"], "tree": t,
                          "readme": doc, "edge": list(edge), "err": err})
     n = len(rows)
+    # r102：字段级 NA（`repos[*].edge[0] == "NA"`，引用边没取到）**计入声明位**。
+    # 这是 ledger_age 的 `NA_DIVERGE_WAIVED["peer-memory"]` 豁免的到期条件之一：
+    # 旧写法只把仓库级失败（空树/截断）写进 na，字段级失败只留在 edge 里 ⇒ 顶层声明
+    # blind=0 而件内 5 处 `"NA(` 分叉（r101 一手实测：MASCOT / Mental-health-Chatbot /
+    # MER-Factory / succhia / MoodChat 五仓）。语义上引用边取不到 = **该轴未验**，
+    # 不是"该仓没做记忆回灌"的反证（见 ceiling_note）⇒ 计入 na/blind 才是如实声明。
+    edge_na = field_na(rows)
+    na = na + [{"repo": s, "why": "edge-NA(引用边未取到)"} for s in edge_na]
     print("== r52 记忆与上下文管理面对标（16 仓 + self）==")
     for r in rows:
         print("%-36s %s" % (r["repo"], verdict(r["tree"], r["readme"], tuple(r["edge"]))))
@@ -381,6 +415,8 @@ def main():
     if na:
         for x in na:
             print("  NA %s: %s" % (x["repo"], x["why"]))
+    if edge_na:
+        print("  （其中 %d 仓是**字段级** NA：引用边没取到 ⇒ 该轴未验，不当反证）" % len(edge_na))
     if a.json:
         # 必须 write_bytes：Windows 下 write_text 把 "\n" 译成 "\r\n"，而 eol_parity 判据要求
         # 工作树字节 == git blob 字节 ⇒ 一份"跑一次就把自己写脏"的产物等于给下轮留假红。
@@ -390,7 +426,10 @@ def main():
              "self_paths_scanned": sn,
              "ceiling_note": "引用边通道是**正向回执**：none-in-sample / NA 两态都不构成"
                              "「该仓没做记忆回灌」的结论；且 peers 无行为注入条件，"
-                             "本面只比「有没有制度化」，不比「做得好不好」。"},
+                             "本面只比「有没有制度化」，不比「做得好不好」。"
+                             "r102 起 NA（含字段级 edge-NA）如实计入声明位 ⇒ "
+                             "顶层 blind 数与件内 NA 哨兵数不再分叉。",
+             "edge_na_repos": edge_na},
             ensure_ascii=False, indent=1).encode("utf-8"))
         print("快照 → " + a.json)
     sys.exit(1 if na else 0)

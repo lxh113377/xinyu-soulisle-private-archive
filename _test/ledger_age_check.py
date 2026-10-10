@@ -249,12 +249,12 @@ def na_census(d):
 
 
 NA_DIVERGE_WAIVED = {
-    # 豁免必须**机器可读 + 带到期条件**（在册反例：注释式豁免等于没人认领的余量）。
-    "peer-memory": {
-        "reason": "探针把字段级 NA 只写进 repos[*].edge，不进 blind/na 声明 ⇒ 声明 blind=0 "
-                  "与件内 5 处 NA 分叉（r101 一手实测）",
-        "expiry": "peer_memory_probe.py 把字段级 NA 计入声明位 + 下一次错峰真采两件同时成立",
-        "entered": "2026-10-09"},
+    # r102 摘牌记录（原 peer-memory 豁免，到期条件两件都已实测成立 ⇒ 名单清空）：
+    #   ① peer_memory_probe.py 的字段级 NA（edge[0]=="NA"）已计入声明位
+    #      （field_na() + na 列表扩展，selftest 13/13 有专用腿）；
+    #   ② 错峰真采已跑：peer-memory-2026-10-10.json 顶层 blind=5 与件内 5 处
+    #      `"NA(` 逐一对上（MASCOT / Mental-health-Chatbot / MER-Factory / succhia / MoodChat）。
+    # 摘牌而不是删档：名单清空本身会被「死豁免」腿盯着——现在真有分叉时会照样红。
 }
 
 

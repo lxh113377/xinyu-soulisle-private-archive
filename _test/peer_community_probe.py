@@ -182,17 +182,42 @@ def api(path, token, search=False):
     return None, last or "重试耗尽"
 
 
+def row_na(v):
+    """一行台账 → 未取到原因字符串或 ""（r102 从 main 抽出：合并补采要用同一把尺判存量行）。
+
+    四路各自独立：取数错 / 树截断 / profile NA / 行为面 NA。**任一路缺失即算 NA**——
+    与 0 混同会让"没查"冒充"查了没有"（r50 一手：16 仓 15 个 NA 被读成"0 家真跑过"）。
+    """
+    miss = []
+    if v.get("err"):
+        miss.append(v["err"][:48])
+    if v.get("truncated"):
+        miss.append("树被截断⇒零命中不可信")
+    prof = v.get("profile")
+    if prof and prof.get("health") is None:
+        miss.append("profile NA")
+    beh = v.get("behavior")
+    if beh and beh.get("opened") is None:
+        miss.append("行为面 NA")
+    return "(%s)" % ";".join(miss) if miss else ""
+
+
 def probe_repo(slug, token):
     prof, e1 = api("repos/%s/community/profile" % slug, token)
     tree, e2 = api("repos/%s/git/trees/HEAD?recursive=1" % slug, token)
-    srch, e3 = api("search/issues?q=repo:%s+author:app/dependabot&per_page=30" % slug, token)
+    # r102：行为面换 **core 端点 /pulls**（self 侧 r50 起就在用，peers 侧一直漏换）。
+    # docstring 与本件 JSON 的 behavior_endpoint 字段声称"search 已弃用"，而代码里
+    # peers 路径仍在打 search/issues —— search 的 secondary rate limit 一手实测吃满 403
+    # （三轮采集固定 5 仓 blind：Open-LLM-VTuber/MASCOT/Mental-health-Chatbot/opensoul/
+    # ryza-ai-revive）；同一请求单发与 /pulls 形态均 200 ⇒ 不是权限、是端点选错。
+    prs, e3 = api("repos/%s/pulls?state=all&per_page=100" % slug, token)
     errs = [x for x in (e1, e2, e3) if x]
     if tree is None:
         return {}, None, {}, "; ".join(errs) or "tree-fail", False
     paths = [t.get("path", "") for t in tree.get("tree", []) if t.get("type") == "blob"]
-    items = (srch or {}).get("items") if isinstance(srch, dict) else None
     return classify_tree(paths), read_profile(prof if isinstance(prof, dict) else None), \
-        read_behavior(items), "; ".join(errs), bool(tree.get("truncated"))
+        read_behavior(prs if isinstance(prs, list) else None), "; ".join(errs), \
+        bool(tree.get("truncated"))
 
 
 def probe_self():
@@ -266,7 +291,38 @@ def selftest():
         ok += 1
     else:
         fail.append("边界E NA 被塌缩成零：%s" % v3)
-    n = len(FIX) + 5
+    # ── r102：row_na 四路独立 + 合并续采不缩分母 ──
+    good = {"err": "", "truncated": False, "profile": {"health": 80},
+            "behavior": {"opened": 3, "merged": 2}}
+    for label, row, want in [
+            ("全取到 ⇒ 空串", good, ""),
+            ("err 非空 ⇒ NA", dict(good, err="http=403 xxx"), "NA"),
+            ("树截断 ⇒ NA", dict(good, truncated=True), "NA"),
+            ("profile 取不到 ⇒ NA", dict(good, profile={"health": None}), "NA"),
+            ("行为面取不到 ⇒ NA", dict(good, behavior={"opened": None}), "NA")]:
+        got = row_na(row)
+        if (want == "" and got == "") or (want == "NA" and got != ""):
+            ok += 1
+        else:
+            fail.append("row_na %s：got=%r want=%r" % (label, got, want))
+    both = row_na(dict(good, err="http=403", truncated=True))
+    if "http=403" in both and "截断" in both:
+        ok += 1
+    else:
+        fail.append("row_na 两路同缺只报了一个原因：%r" % both)
+    # 反例：全好行不许报 NA（恒真即失灵）
+    if row_na(good) != "":
+        fail.append("row_na 恒真：全取到的行也报了 NA")
+    else:
+        ok += 1
+    # 分母纪律：NA 名单与 usable 必须还能配回名册数（合并续采的恒等式）
+    roster_n = len(PEERS)
+    na_names = ["a(行为面 NA)", "b(err)"]
+    if (roster_n - len(na_names)) + len(na_names) == roster_n and roster_n == 16:
+        ok += 1
+    else:
+        fail.append("合并续采恒等式不成立：usable+NA != 名册 %d" % roster_n)
+    n = len(FIX) + 5 + 8
     for x in fail:
         print("  SELFTEST-FAIL " + x)
     print("COMMUNITY-SELFTEST: %d/%d" % (ok, n))
@@ -277,6 +333,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", default="")
     ap.add_argument("--self-only", action="store_true")
+    ap.add_argument("--repo", default="",
+                    help="只补采指定仓（逗号分隔）⇒ **增量合并**进 --json 既有台账："
+                         "分母保持 16（PEERS 名册）、未列名仓的原行原样保留、"
+                         "补采行的 NA 判纲与全量跑同一把尺。⚠ 它不是'替换名册'——"
+                         "替换会把分母缩成补采数，那是 r101 登记过的失真形状")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -288,7 +349,28 @@ def main():
     if not token:
         print("COMMUNITY-ENV: 无 GitHub token ⇒ 不采数、不判绿")
         return 2
-    rows, na = {}, []
+    targets = [x.strip() for x in a.repo.split(",") if x.strip()]
+    roster = {p["repo"]: p for p in PEERS}
+    if targets:
+        unknown = [t for t in targets if t not in roster]
+        if unknown:
+            print("COMMUNITY-ENV: --repo 给了名册外的仓 %s（名册=PEERS %d 仓）⇒ 不采数"
+                  "（名册外仓混进来会改分母，而那正是要防的失真）" % (",".join(unknown), len(PEERS)))
+            return 2
+    rows = {}
+    resume_prev_ts = ""
+    if targets and a.json and Path(a.json).exists():
+        # 断点续采的存量面：不重跑没问题的仓（限流窗口有限），只把指定仓的新行盖回去
+        try:
+            old = json.loads(Path(a.json).read_text("utf-8"))
+            rows = {k: v for k, v in (old.get("repos") or {}).items()}
+            resume_prev_ts = old.get("ts", "")
+            print("[resume] 载入既有台账 %s（ts=%s，存量行 %d 个）⇒ 只补采 %s"
+                  % (a.json, resume_prev_ts or "无", len(rows), ",".join(targets)))
+        except Exception as e:
+            print("COMMUNITY-ENV: --json 存量台账读不动（%s）⇒ 不合并（半面子盖全量=造假）" % e)
+            return 2
+    na = []
     # self 先跑：它的行为面是本轮结论的主语，不能排在 16 次 search 之后被限流挤掉
     st0, slug0 = probe_self()
     prof0, _ep = api("repos/%s/community/profile" % slug0, token)
@@ -301,28 +383,30 @@ def main():
     print("[self] %-33s health=%-5s dep件=%-5s 开=%-4s 合=%-4s %s"
           % ("心屿 SoulIsle", rp0.get("health"), st0.get("dependabot"),
              bh0.get("opened"), bh0.get("merged"), verdict(st0, rp0, bh0)))
-    for p in ([] if a.self_only else PEERS):
+    run_peers = [roster[t] for t in targets] if targets else ([] if a.self_only else PEERS)
+    for p in run_peers:
         slug, tier = p["repo"], p["tier"]
         t, prof, beh, err, trunc = probe_repo(slug, token)
         rows[slug] = {"tier": tier, "tree": t, "profile": prof, "behavior": beh,
                       "truncated": trunc, "err": err}
-        miss = []
-        if err:
-            miss.append(err[:48])
-        if trunc:
-            miss.append("树被截断⇒零命中不可信")
-        if prof and prof.get("health") is None:
-            miss.append("profile NA")
-        if beh and beh.get("opened") is None:
-            miss.append("行为面 NA")
+        miss = row_na(rows[slug])
         if miss:
-            na.append("%s(%s)" % (slug, ";".join(miss)))
-        print("[%-3s] %-33s health=%-5s dep件=%-5s 开=%-4s 合=%-4s %s"
+            na.append("%s%s" % (slug, miss))
+        print("[%-3s] %-33s health=%-5s dep件=%-5s 开=%-4s 合=%-4s %s%s"
               % (tier, slug, (prof or {}).get("health"), t.get("dependabot"),
                  (beh or {}).get("opened"), (beh or {}).get("merged"),
-                 verdict(t, prof, beh)))
+                 verdict(t, prof, beh), (" " + miss) if miss else ""))
+    # NA 从**最终行集**现算（合并模式下存量行也要过同一把尺，不能只报新采的）
+    if targets:
+        na = ["%s%s" % (k, row_na(v)) for k, v in rows.items()
+              if k != "__self__" and row_na(v)]
     print("-" * 118)
-    n = len(rows) - 1
+    # 分母永远取 PEERS 名册，不取 len(rows)——合并/部分跑都不得缩水
+    n = len(roster) if not a.self_only else 0
+    have = sum(1 for k in rows if k != "__self__")
+    if have and have != n and not targets:
+        print("COMMUNITY-ENV: 行数 %d != 名册 %d（取数面塌缩）⇒ 不判绿" % (have, n))
+        return 2
     if n:
         def cnt(pred):
             return sum(1 for k, v in rows.items() if k != "__self__" and pred(v))
@@ -346,20 +430,27 @@ def main():
                   % (hs[0], hs[len(hs) // 2], hs[-1], n - len(hs)))
     if na:
         print("  NA：" + "; ".join(na))
-    print("应测 %s ｜ NA %d ｜ 恒等式 usable+NA==total：%s"
+    print("应测 %s ｜ NA %d ｜ 恒等式 usable+NA==total：%s%s"
           % (n if not a.self_only else 0, len(na),
-             "OK" if (n - len(na)) + len(na) == n else "不成立"))
+             "OK" if (n - len(na)) + len(na) == n else "不成立",
+             " ｜ [resume] 只补采 %d 仓，其余 %d 行沿用存量" % (len(targets), n - len(targets))
+             if targets else ""))
     if a.json:
+        payload = {"repos": rows, "na": na, "denominator": n, "blind": len(na),
+                   "usable": n - len(na),
+                   "behavior_endpoint": "GET /repos/{owner}/{repo}/pulls?state=all（core 限流；"
+                   "search 端点受 secondary rate limit 影响实测不可用，已弃用）",
+                   "note": "声明面(tree)与平台面(profile)与行为面(dependabot PR)三路独立取数，"
+                           "任一缺失记 NA，禁与 0 混同；漏洞告警开关仅对本仓可查(需管理权)，peers 侧不可见",
+                   "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        if targets:
+            # 合并采的机器凭据：reader 要能看出"这不是一次全量跑"，否则龄期尺会把
+            # 部分重采的件读成"刚全采过"（refresh_days 的语义是全量节奏）
+            payload["resume"] = {"repos": targets, "prev_ts": resume_prev_ts or None,
+                                 "carried_over": n - len(targets),
+                                 "endpoint_fix": "r102：peers 行为面 search/issues → /pulls"}
         Path(a.json).write_bytes(json.dumps(
-            {"repos": rows, "na": na, "denominator": n, "blind": len(na),
-             "usable": n - len(na),
-             "behavior_endpoint": "GET /repos/{owner}/{repo}/pulls?state=all（core 限流；"
-             "search 端点受 secondary rate limit 影响实测不可用，已弃用）",
-             "note": "声明面(tree)与平台面(profile)与行为面(dependabot PR)三路独立取数，"
-                     "任一缺失记 NA，禁与 0 混同；漏洞告警开关仅对本仓可查(需管理权)，peers 侧不可见",
-             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
-
-            ensure_ascii=False, indent=1).encode("utf-8"))
+            payload, ensure_ascii=False, indent=1).encode("utf-8"))
         print("快照 -> " + a.json)
     if a.self_only:
         return 0
