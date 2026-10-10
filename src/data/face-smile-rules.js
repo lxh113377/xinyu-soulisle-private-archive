@@ -67,11 +67,15 @@ window.__XINYU_FACE_RULES__ = {
       cheekSquintLeft: -0.2, cheekSquintRight: -0.2
     },
     anger: {
-      browDownLeft: 1.0, browDownRight: 1.0,
-      noseSneerLeft: 0.55, noseSneerRight: 0.55,
-      mouthPressLeft: 0.5, mouthPressRight: 0.5,
-      jawForward: 0.4,
-      jawOpen: 0.2,
+      /* r103：browDown 1.0 → 1.4，鼻翼 0.55 → 0.35、抿唇 0.5 → 0.3、下颌前推 0.4 → 0.3。
+       * 理由：真人发怒实测**只有压眉**（其余 AU 全 0），原先 noseSneer/press 权重高，
+       * 那些维度不激活就把分摊母数撑大、真实分数被压到 calm 之下。抬高主证据、压低
+       * 辅助证据的母数，等于让"只有压眉"这一种真实形态也能拿到足够分数。 */
+      browDownLeft: 1.4, browDownRight: 1.4,
+      noseSneerLeft: 0.35, noseSneerRight: 0.35,
+      mouthPressLeft: 0.3, mouthPressRight: 0.3,
+      jawForward: 0.3,
+      jawOpen: 0.15,
       mouthUpperUpLeft: -0.5, mouthUpperUpRight: -0.5,
       mouthSmileLeft: -0.6, mouthSmileRight: -0.6
     },
@@ -129,8 +133,18 @@ window.__XINYU_FACE_RULES__ = {
            "mouthClose", "jawOpen", "jawForward"]
   },
   cue: { min: 0.18, penalty: 0.5 },
-  /* anger 吃 AU4（专注常态）；fear/sadness 吃 browInnerUp（惊讶/担忧也吃）⇒ 都要口眼佐证 */
-  need: { anger: 2, fear: 2, sadness: 2 },
+  /* 需要多区佐证的情绪。**anger 已移出**（r103 老大选定「乙」）：
+   *   原先 anger 在此，是因为压眉(AU4) 是"专注思考"的常态表情，单眉区就判愤怒是假阳性。
+   *   但 r103 用 face-api.js 的**真实愤怒照**实测发现：真人发怒的 AU 分布是
+   *   **browDown 0.64/0.59 而其余全 0**（无鼻翼/抿唇/张口/眼睁大）——
+   *   也就是说「真愤怒」与「专注轻皱(0.40)」在 blendshape 空间里**结构完全相同，只有幅度差**。
+   *   要求第二区 ⇒ 真愤怒永远判不出来（F12 实测 anger 0/2）。
+   *   ⇒ 老大拍板走「保真怒」：anger 不再要求多区，代价是**专注/说话时可能闪一下烦躁**。
+   *   实测代价面（合成负样本）：专注轻皱 .40 → anger 0.41、说话+微皱 .30 → anger 0.33、
+   *   更轻的皱 .25 → calm（不误报）。fear/sadness 仍保留多区要求（它们吃 browInnerUp，
+   *   而惊讶/担忧也吃 browInnerUp，误报面比 anger 大得多）。
+   *   ⚠️ 若日后拿到「专注/中性」的**标注照片**，应回来复标这条 —— 现在它靠的是定性论证。 */
+  need: { fear: 2, sadness: 2 },
 
   /* 轻蔑靠**左右不对称**识别，加权和表达不了（对称项两侧同权，单/双侧笑在权重空间同点）。
      不达标时 contempt 直接归零 —— 否则对称笑会被 contempt 抢走。 */

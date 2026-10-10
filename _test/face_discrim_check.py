@@ -41,6 +41,10 @@ CASES = [
                 "eyeSquintLeft": .6, "eyeSquintRight": .6}, "sadness"),
     ("anger", {"browDownLeft": .85, "browDownRight": .85,
                "noseSneerLeft": .6, "noseSneerRight": .6}, "anger"),
+    # 真愤怒的**实测形态**（r103 从 face-api.js 真照跑出来的 AU，非教科书最大值）：
+    # 只有压眉，其余全 0。教科书向量给 anger 配了鼻翼+抿唇，看起来很强，
+    # 但真实照片里那两维根本是 0 —— 正是这份差别让旧权重漏判（详见 need 字段注释）。
+    ("anger_real", {"browDownLeft": .64, "browDownRight": .59}, "anger"),
     ("fear", {"eyeWideLeft": .8, "eyeWideRight": .8, "jawOpen": .6, "browInnerUp": .5,
               "browDownLeft": .3, "browDownRight": .3}, "fear"),
     ("surprise", {"jawOpen": .8, "browInnerUp": .8, "browOuterUpLeft": .7,
@@ -54,14 +58,23 @@ CASES = [
     # （"看不出情绪"就该说平静，不是硬报一个弱 joy）。这条不是判 calm 对不对，
     # 而是给下面的 sweep 口径定基准：argmax 身份翻成 calm 是合法的，只有**分数**非单调才是缺陷。
     ("joy_weak", {"mouthSmileLeft": .2, "mouthSmileRight": .2}, "calm"),
-    # ── 负样本：这些**不是情绪**，判错就是假阳性（r102 的核心诉求）──
-    ("concentrating", {"browDownLeft": .4, "browDownRight": .4}, "calm"),
-    ("speaking_frown", {"jawOpen": .4, "browDownLeft": .3, "browDownRight": .3}, "calm"),
+    # ── 负样本：这些**不是情绪**，判错就是假阳性 ──
+    # ⚠️ r103 的两处改法，理由见下面 POSITIVE 里的 concentrating_note，勿"顺手"改回去：
+    #   concentrating / speaking_frown 现在**预期判 anger**（老大拍板「保真怒」的已知代价），
+    #   它们不再是"必须判 calm"的负样本。判据仍盯着它们 —— 只是盯的内容从
+    #   「不许误报」变成「**不许比真愤怒更凶**」（见 KEEP_BELOW）。
     ("speaking", {"jawOpen": .5, "mouthFunnel": .3}, "calm"),
     ("blinking", {"eyeBlinkLeft": .9, "eyeBlinkRight": .9}, "calm"),
     ("looking_down", {"eyeLookDownLeft": .8, "eyeLookDownRight": .8}, "calm"),
     ("lips_pressed", {"mouthPressLeft": .4, "mouthPressRight": .4}, "calm"),
+    # 专注/说话：已知会误报 anger，但强度必须**低于真愤怒**，否则"专注"读数与"真发怒"读数
+    # 无法区分，代价就从"闪一下红"升级成"骗人"。
+    ("concentrating", {"browDownLeft": .4, "browDownRight": .4}, "anger"),
+    ("speaking_frown", {"jawOpen": .4, "browDownLeft": .3, "browDownRight": .3}, "anger"),
 ]
+
+# 真愤怒 vs 专注轻皱的**强度序**：真愤怒必须更凶，否则 anger 这一路分不出"真怒"与"专注"。
+KEEP_BELOW = [("concentrating", "speaking_frown", "anger_real")]
 
 # 强度扫描档位（测单调性 / 饱和）
 SWEEP = [.25, .40, .55, .70, .85, 1.00]
@@ -72,6 +85,9 @@ SWEEP = [.25, .40, .55, .70, .85, 1.00]
 POSITIVE = [c for c in CASES if c[0] not in (
     "concentrating", "speaking_frown", "speaking", "blinking", "looking_down",
     "lips_pressed", "joy_weak")]
+# concentrating / speaking_frown 现在**预期判 anger**（r103 的已知代价），
+# 它们的分数要参与 ②b 的「真怒必须更凶」比较，但不该混进"某类分数单调性"统计 ——
+# 那项统计问的是"同一情绪随强度递增"，而它们不是 anger 的正样本。
 # contempt 走**非对称门**（r102 加的），单侧向量整体缩放时两侧比值不变 ⇒
 # 门一旦通过就恒通过，它的分数单调性与其它类不同口径，不参与单调性统计（但仍参与饱和率）。
 SKIP_MONO = {"contempt"}
@@ -159,12 +175,38 @@ def f11_bad(data):
                       "; ".join("%s 期望%s 实得%s(%.2f)" % (c["name"], c["want"], c["got"], c["intensity"])
                                 for c in wrong)))
 
-    # ② 负样本假阳性必须为 0（"专注被读成愤怒"这类是本尺存在的理由）
+    # ② 负样本假阳性必须为 0（这些是**不该被读成任何情绪**的常态表情）
     negs = [c for c in cases if c["want"] == "calm" and c["name"] != "neutral"]
     fp = [c for c in negs if c["got"] != "calm"]
     if fp:
         bad.append("F11 负样本假阳性 %d/%d：%s"
                    % (len(fp), len(negs), ", ".join(c["name"] + "→" + c["got"] for c in fp)))
+
+    # ②b **真愤怒的分数必须够高**（r103 老大拍板「保真怒」的补偿判据）。
+    # 这条不是可有可无的：anger 去掉多区要求后，专注时确实会判 anger（已知代价）。
+    # 门槛量的是**绝对分数**而不是「真怒−专注」的差值 —— 这是试出来的：
+    #   把 browDown 从 1.4 压回 1.0（最可能的回退）时，差值仍有 0.191（看着很安全），
+    #   但真怒的**绝对分**从 0.631 掉到 0.547 —— 而 calm 残余门槛是 top≥0.35，
+    #   一旦真怒掉到 0.35 附近就被 calm 吃掉，anger 重演 0/2（r102 的漏判）。
+    #   ⇒ 差值答「排得开吗」（本来就排得开），绝对分才答「够不够压过平静」。
+    #   门槛 0.55：当前 0.631 有余量；回退到 1.0 时 0.547 < 0.55 ⇒ 必红。
+    _real = next((c for c in cases if c["name"] == "anger_real"), None)
+    if _real:
+        _rg0 = (_real.get("pairs") or {}).get("anger", 0)
+        if _rg0 < 0.55:
+            bad.append("F11 真愤怒 anger 分仅 %.3f < 0.55 ⇒ 离 calm 残余门槛(0.35)太近，"
+                       "browDown 权重被压回就会重演 anger 0/2（r102 的漏判）" % _rg0)
+    for nm in ("concentrating", "speaking_frown"):
+        _c = next((c for c in cases if c["name"] == nm), None)
+        if not _real or not _c:
+            continue
+        rg = (_real.get("pairs") or {}).get("anger", 0)
+        cg = (_c.get("pairs") or {}).get("anger", 0)
+        gap = rg - cg
+        if gap < 0.10:
+            bad.append("F11 真愤怒 anger(%.3f) − %s anger(%.3f) = %.3f < 0.10 "
+                       "⇒ 真怒与「%s」读数拉不开，专注时会被读成真发火（不只是闪一下红）"
+                       % (rg, nm, cg, gap, nm))
 
     # ③ 七类必须都出现（"情绪种类单一"的直接反判据）
     rules = set(data.get("rules") or [])
@@ -369,6 +411,20 @@ def selftest():
             finally:
                 globals()["ROOT"] = save
         msg = "反例5 拆掉非对称门" + (" ⇒ F11 抓到了" if red else " ⇒ **F11 没抓到，判据无牙**")
+        print("  " + msg)
+        if not red:
+            bad.append(msg)
+
+    # 反例 6：把 anger 的 browDown 权重压回 1.0（=回到 r102 的量级），
+    #   真愤怒的分数会掉到与「专注轻皱」拉不开 —— ②b 必须在此时报红。
+    #   这条模拟的是"某天有人为了压误报把权重调回去"，是最可能发生的回退。
+    m6 = real_rules.replace("browDownLeft: 1.4, browDownRight: 1.4,",
+                            "browDownLeft: 1.0, browDownRight: 1.0,")
+    if m6 == real_rules:
+        bad.append("selftest 反例6 构造失败：anger 的 browDown 权重串没匹配上")
+    else:
+        ran += 1
+        red, msg = probe_with(m6, "反例6 anger 的 browDown 压回 1.0（真怒与专注拉不开）")
         print("  " + msg)
         if not red:
             bad.append(msg)

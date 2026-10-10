@@ -126,10 +126,18 @@ test("轻蔑（单侧嘴角上提 + 眼周不参与）→ contempt", () => {
   assert.equal(v.emotion, "contempt", "单侧笑是轻蔑，不是对称的笑");
 });
 
-test("负样本：专注轻皱（压眉 0.4）必须判 calm，不得误报愤怒", () => {
-  // 这是 r102 实测到的真实假阳性：旧版这里判 anger 0.39，压过了平静
-  const v = read(vec({ browDownLeft: 0.4, browDownRight: 0.4 }));
-  assert.equal(v.emotion, "calm", "专注时的压眉不是愤怒");
+test("负样本（r103 拍板「乙」后的已知代价）：专注轻皱会判 anger，但必须比真愤怒弱", () => {
+  // r102 时这条断言是「专注轻皱必须判 calm」。r103 用真实愤怒照（face-api.js）实测发现：
+  // 真人发怒的 AU 只有 browDown 0.64/0.59 而**其余全 0**，与专注轻皱 0.40 结构完全相同、
+  // 只有幅度差 —— 要求多区佐证就必然漏判真愤怒（F12 实测 anger 0/2）。
+  // ⇒ 拍板「保真怒」。代价就是这里：专注时会判 anger。
+  // 断言从「不许误报」改成「**误报可以，但必须比真愤怒弱**」——
+  // 否则「在想事情」和「真发火」读数一样，代价就从"闪一下红"升级成"骗人"。
+  const conc = read(vec({ browDownLeft: 0.4, browDownRight: 0.4 }));
+  const real = read(vec({ browDownLeft: 0.64, browDownRight: 0.59 }));
+  assert.equal(conc.emotion, "anger", "专注轻皱会误报 anger —— 这是 r103 拍板接受的代价");
+  assert.ok(real.intensity > conc.intensity + 0.1,
+    "真愤怒必须明显强于专注轻皱：实测 " + real.intensity + " vs " + conc.intensity);
 });
 
 test("负样本：说话（张口 + 说话唇形）必须判 calm", () => {

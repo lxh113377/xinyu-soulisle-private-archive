@@ -120,7 +120,12 @@ BUDGETS = {
                                                 # （公网实测该 promise 永不 settle 会把整条开启链吊死 60s+）③ 单帧异常留痕 frameErr。
     "src/js/face-mediapipe-bridge.js": 3_996,   # r87 实测 3,806 +5%：全站唯一 type=module（ESM 桥）。3,292→3,806 = boot 改惰性
                                                 # （初版模块一执行就下 13MB，公网冷启动把能力状态卡在 boot 超 90s）+ SIMD 探测注释。
-    "src/data/face-smile-rules.js": 9_192,      # r102 实测 8,754 +5%（r87 的 5,479 之上 +59.8%）。表情 5 类→8 类：
+    "src/data/face-smile-rules.js": 11_148,      # r102 实测 8,754 +5%（r87 的 5,479 之上 +59.8%）。表情 5 类→8 类：
+                                             # r103 上调 9,192→11,148（实测 10,617 +5%）：anger 取舍的**留痕**。
+                                             # 写清「为什么 anger 不在 need 里、真愤怒实测 AU 是什么、代价面是哪
+                                             # 三条、fear/sadness 为何仍保留多区要求」。这类注释是取舍记录，
+                                             # 删掉就没人知道 anger 为何独独没有多区佐证 —— 后人会当手滑改回去
+                                             # （F11 反例6 腿专门盯这次回退）。
                                              # 权重表 4 组→7 组（新增 surprise/disgust/contempt）+ family（表情侧 8 类
                                              # 对齐文本 6 类，供分歧标注用）+ colors（独有三类自持色，不碰双端 SSOT）
                                              # + cue/need（多线索佐证）+ asym（非对称门）+ confidence + peak 基准。
@@ -131,8 +136,10 @@ BUDGETS = {
     "src/vendor/gsap.min.js": 75_825,
     "src/vendor/ScrollTrigger.min.js": 45_549,
 }
-TOTAL_KEY_PATH = 912_000  # 首屏关键路径总预算（含 vendor），2026-09-25 实测 817,859B + 5%
+TOTAL_KEY_PATH = 913_000  # 首屏关键路径总预算（含 vendor），2026-09-25 实测 817,859B + 5%
 #   r103 上调 911,000→912,000（实测 911,182 +0.02%）：拆 initFaceHud 的净增（约 +1.1KB，
+#   r103 再上调 912,000→913,000（实测 912,685 +0.07%）：anger 取舍的注释留痕（约 +1.4KB）。
+#   13.7MB 模型仍走懒加载不进 TOTAL，判据面文件全在首屏 ⇒ 这 1.4KB 是真的首屏字节。
 #   换掉的是 app.js 里 194 行单函数；判据面未动，13.7MB 模型仍走懒加载不进 TOTAL）。
 #   r102 上调 905,000→911,000（实测 910,140 +0.1%）：表情判据 5 类→8 类的真实增量
 #   （引擎 +1.7KB、规则 +3.3KB、app.js 接线 +0.7KB 净增，注释已先压过一轮）。
