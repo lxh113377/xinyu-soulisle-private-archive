@@ -37,6 +37,8 @@ python _test/strategy_check.py           # 共情策略表 ↔ 词表成对性�
 node _test/emotion_eval.js               # 前端情绪评测集复跑
 python _test/stream_contract.py          # A 非流式契约不破 / B SSE 含内容帧≥2 / C 前端逐字且回落不冒充
 python _test/ux_guards_check.py          # TTS 朗读 / 对话窗口化 / 响应式与粒子降档（逐项 21 判据）（判据条数由脚本自印「合计 N 项」，本行不抄数——抄了就会漂）⇒ 更正注 r100：U2 的 45 条连发不再 `wait_for_timeout(6000)`，改等产品自报的 `window.__pendingTurns` 归零（`src/js/chat-agent.js` 的 `turn()` 包 `respond`，异常与提前 return 都过 `finally`；轮询按 raf——`respond` 的 finally 减到 0 之后 `app.js` 的渲染在同一微任务续体里紧接着跑，所以帧边界上看到 0 时那一轮必然已渲染）。新增腿 **U2g**；双向反例实测：抹掉钩子 ⇒ 等待超时、该腿判红并印 `typeof=undefined`；真往返 ⇒ 归零通过。
+python _test/dock_auto_check.py          # 对话坞滚动收起 / 三态循环 / 演示态让位（D1-D11 逐项独立，禁聚合掩盖）。**r105 接线**：r104 立好后既不在电池也不在 CI，G16 第五腿判为孤儿判据（「文档写了」不等于有人在跑）；接线前 HEAD 面与工作树面各自实测 PASS，服务不可达自回 rc=2 不判绿。
+python _test/build_jar.py --selftest     # 停服务前的属主归类：ours / same-artifact / foreign / unknown 四档，默认只停本工具起的（`--takeover` 才接管）。纯函数离线桩，不起进程、不碰端口、不读产物。立因 r104 实测 `stop_holders()` 按端口无脑杀，把并行会话的验证服务打死三次——被打死的一方只看到「服务自己掉了」，红因无法归因。
 python _test/size_budget_check.py        # 首屏体积预算 + 「新文件必须登记」覆盖判据（漏登记即红）
 python _test/vendor_freshness_check.py   # vendor 完整性哈希 + 版本对账；--check-upstream 报上游漂移
 python _test/benchmark_metrics.py        # 对标源数据台账（16 仓指标 + 与上次快照逐字段漂移）；联网采集，人工轮次跑

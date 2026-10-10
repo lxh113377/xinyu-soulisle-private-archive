@@ -197,13 +197,18 @@ def u3(browser):
     check("U3 小屏粒子按档递减", counts["手机"] < counts["小平板"] < counts["桌面"], str(counts))
 
 
+# r105：本行的 `be_launch` 是「三处各抄一份 chromium.launch 回退」被收编后的痕迹
+# （旧注释自称"与 settings_panel_check/public_check 同一套做法"，那套做法正是 browser_engine 要消灭的）。
+ENGINE_FACE = ""
+
+
 def main():
     from playwright.sync_api import sync_playwright
+    from browser_engine import launch as be_launch, short_face
+    global ENGINE_FACE
     with sync_playwright() as p:
-        try:
-            browser = p.chromium.launch()
-        except Exception:
-            browser = p.chromium.launch(channel="msedge")
+        browser, face = be_launch(p, label="ux_guards_check")
+        ENGINE_FACE = short_face(face)
         u1(browser)
         u2(browser)
         u3(browser)
@@ -212,7 +217,7 @@ def main():
     print(f"\n合计 {len(results)} 项，失败 {len(bad)} 项")
     for n, _, d in bad:
         print("  🔴", n, d)
-    print("UX-GUARDS-PASS" if not bad else "UX-GUARDS-FAIL")
+    print("%s 引擎=%s" % ("UX-GUARDS-PASS" if not bad else "UX-GUARDS-FAIL", ENGINE_FACE))
     return 1 if bad else 0
 
 

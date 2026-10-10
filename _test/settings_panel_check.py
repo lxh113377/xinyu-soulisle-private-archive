@@ -28,6 +28,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 BASE = "http://127.0.0.1:8123/index.html"
 CFG_KEY = "peiliao.cfg.v1"
+LAST_FACE = ""
 # 用非 sk- 前缀的假值：既验证"密钥位"的行为，又不被仓库里的密钥扫描器自伤命中
 OLD_KEY = "TESTKEY-LOCALONLY-0000"
 NEW_KEY = "TESTKEY-NEW-1111"
@@ -87,13 +88,16 @@ def arm_settle(pg):
 
 def new_page(seed_cfg, collect):
     """起一个已注入配置的干净页面（add_init_script 在应用脚本之前跑，故首屏即带配置）。
-    本机 Playwright 的 chromium headless shell 缺失 ⇒ 回落系统 Edge（与 ux_guards 同一套做法）。"""
+
+    r105 收编：原先这里手写 `chromium.launch()` 失败回落 Edge —— 回退本身没错，错的是
+    各套件各抄一份且从不打印用的是哪个引擎（browser_engine 的立由，E2 棘轮盯的就是这个数）。
+    """
     from playwright.sync_api import sync_playwright
+    from browser_engine import launch as be_launch, short_face
     pw = sync_playwright().start()
-    try:
-        browser = pw.chromium.launch()
-    except Exception:
-        browser = pw.chromium.launch(channel="msedge")
+    browser, face = be_launch(pw, label="settings_panel_check")
+    global LAST_FACE
+    LAST_FACE = short_face(face)
     pg = browser.new_page()
     pg.add_init_script(f"localStorage.setItem({json.dumps(CFG_KEY)}, {json.dumps(json.dumps(seed_cfg))});")
     pg.on("pageerror", lambda e: collect.append(str(e)))
@@ -194,7 +198,7 @@ def run_main():
         pw.stop()
     bad = [r for r in results if not r[1]]
     print(f"\n合计 {len(results)} 项，失败 {len(bad)} 项")
-    print("SETTINGS-PANEL-PASS" if not bad else "SETTINGS-PANEL-FAIL")
+    print("%s 引擎=%s" % ("SETTINGS-PANEL-PASS" if not bad else "SETTINGS-PANEL-FAIL", LAST_FACE))
     return 1 if bad else 0
 
 

@@ -14,10 +14,12 @@
 退出码：0=产物可用 1=构建失败或验货不过 2=环境异常（找不到 maven/jdk）
 """
 import argparse
+import json
 import os
 import re
 import subprocess
 import sys
+import time
 import zipfile
 from pathlib import Path
 
@@ -46,15 +48,93 @@ def listening_pids():
     return [x for x in r.stdout.split() if x.strip().isdigit()]
 
 
-def stop_holders():
+JAR_TOKEN = "soulisle-server.jar"
+# 租约放 TEMP 不放仓库：进程身份是本机事实，落进 .ci/ 就成了「本机状态写进提交面」
+# （同族教训：台账里混进随工作树变化的数字，CI 上恒假）。
+LEASE = Path(os.environ.get("TEMP", ".")) / "xinyu-port-lease.json"
+
+
+def lease_read():
+    """租约名册：{port: {"pid": str, "by": "build_jar", "ts": str}}。读不到=空册，不是「全是我的」。"""
+    try:
+        d = json.loads(LEASE.read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def lease_write(port, pid):
+    d = lease_read()
+    d[str(port)] = {"pid": str(pid), "by": "build_jar",
+                    "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    try:
+        LEASE.write_text(json.dumps(d, ensure_ascii=False, indent=1) + "\n", "utf-8")
+    except OSError:
+        pass                       # 留痕是旁路：写不动租约不能让构建动作自己崩（同 browser_engine 的纪律）
+
+
+def classify_holder(cmdline, pid, owned_pids):
+    """纯函数：端口持有者归四档（决定「能不能停它」的唯一依据）。
+
+    立此条的一手代价（r104）：`stop_holders()` 原先按端口无脑 `Stop-Process -Force`，
+    把并行会话正在用的验证服务端杀掉 3 次（其中一次启动成功 3 秒后被杀）。被杀的一方
+    看到的是「服务自己掉了」，红因无法归因 —— 与本项目「整跑不可重入」锁的是同一族事故。
+    """
+    if str(pid) in {str(x) for x in owned_pids}:
+        return "ours"              # 本工具起的，理应由本工具停
+    if not cmdline:
+        return "unknown"           # 取不到命令行 ⇒ 绝不能当成「无主可杀」（fail-closed）
+    if JAR_TOKEN in cmdline.replace("\\", "/").lower():
+        return "same-artifact"     # 同一枚 jar，但不是本工具起的（人工/另一会话）
+    return "foreign"
+
+
+def stop_plan(rows, takeover=False):
+    """纯函数：rows=[(pid, class, cmdline_summary)] → (可停 pid, 拒绝清单)。
+
+    `takeover` 是人明确授权接管的口子，默认关：**默认只停自己起的**。
+    """
+    kill, refuse = [], []
+    for pid, cls, summary in rows:
+        if cls == "ours" or takeover:
+            kill.append(pid)
+        else:
+            refuse.append((pid, cls, summary))
+    return kill, refuse
+
+
+def holder_rows():
+    """一次性取回监听者的 (pid, 命令行)，避免每 pid 起一次 PowerShell。"""
     pids = listening_pids()
-    for pid in pids:
+    if not pids:
+        return [], pids
+    ps = ("$r=@(); " + " ".join(
+        "$r+=Get-CimInstance Win32_Process -Filter ('ProcessId=' + %s);" % ("'%s'" % p)
+        for p in pids)
+        + "; $r | ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }")
+    r = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    cmd_of = {}
+    for line in (r.stdout or "").splitlines():
+        parts = line.split("\t", 1)
+        if parts[0].strip().isdigit():
+            cmd_of[parts[0].strip()] = (parts[1] if len(parts) > 1 else "").strip()
+    owned = [v.get("pid") for v in lease_read().values() if isinstance(v, dict)]
+    rows = [(p, classify_holder(cmd_of.get(p, ""), p, owned),
+             (cmd_of.get(p) or "<取不到命令行>")[:110]) for p in pids]
+    return rows, pids
+
+
+def stop_holders(takeover=False):
+    """停服务前先认属主：只停本工具起的（或 --takeover 明确授权后的）。返回 (killed, refused)。"""
+    rows, _ = holder_rows()
+    kill, refuse = stop_plan(rows, takeover)
+    for pid in kill:
         subprocess.run(["powershell", "-NoProfile", "-Command", f"Stop-Process -Id {pid} -Force"],
                        capture_output=True)
-    if pids:
-        import time
+    if kill:
         time.sleep(2)
-    return pids
+    return kill, refuse
 
 
 def pom_version():
@@ -119,22 +199,89 @@ def restart_with_key():
     env = dict(os.environ)
     env["DEEPSEEK_KEY"] = m.group(1)
     log = open(Path(os.environ["TEMP"]) / "build_jar_server.out", "wb")
-    subprocess.Popen([os.path.join(JDK, "bin", "java.exe"), "-jar", str(JAR), "--server.port=8123"],
-                     cwd=str(ROOT), env=env, stdout=log, stderr=subprocess.STDOUT)
-    print("  已重新起服务 :8123（密钥仅注入子进程环境，未打印）")
+    pr = subprocess.Popen([os.path.join(JDK, "bin", "java.exe"), "-jar", str(JAR), "--server.port=8123"],
+                          cwd=str(ROOT), env=env, stdout=log, stderr=subprocess.STDOUT)
+    lease_write(8123, pr.pid)
+    print("  已重新起服务 :8123（密钥仅注入子进程环境，未打印）｜租约登记 pid=%s" % pr.pid)
+
+
+def selftest():
+    """离线自证（不起进程、不碰端口、不读磁盘产物）：属主归类的四形 + 决策表 + 坏租约。
+
+    每条腿都配反例或变异腿 —— 「判据必须可演习」在本仓是硬要求：一条不会红的归类，
+    和没有归类等价。
+    """
+    bad = []
+    jar = r"C:\x\server\target\soulisle-server.jar --server.port=8123"
+    cases = (
+        ((jar, "100", {"100"}), "ours", "租约在册 ⇒ 本工具起的，可停"),
+        ((jar, "200", set()), "same-artifact", "同 jar 但非本工具起 ⇒ 拒停（r104 被误杀的就是这一档）"),
+        ((r"C:\py\python.exe -m http.server 8123", "300", set()), "foreign", "别家进程"),
+        (("", "400", set()), "unknown", "取不到命令行 ⇒ 不许当无主可杀"),
+        ((None, "401", set()), "unknown", "命令行 None 同样归 unknown"),
+    )
+    for args, want, why in cases:
+        got = classify_holder(*args)
+        if got != want:
+            bad.append("classify_holder(%r) 应=%s 实=%s（%s）" % (args[1], want, got, why))
+    # 变异腿：把 jar 标识换成不可能的串，same-artifact 必须塌成 foreign（否则那条腿恒真）
+    global JAR_TOKEN
+    keep = JAR_TOKEN
+    try:
+        JAR_TOKEN = "__no_such_jar_token__"
+        if classify_holder(jar, "200", set()) != "foreign":
+            bad.append("变异腿失效：抹掉 jar 标识后仍判 same-artifact ⇒ 归类不认被审对象")
+    finally:
+        JAR_TOKEN = keep
+    rows = [("1", "ours", "a"), ("2", "same-artifact", "b"), ("3", "foreign", "c"), ("4", "unknown", "d")]
+    kill, refuse = stop_plan(rows)
+    if [p for p, _, _ in rows if p in kill] != ["1"]:
+        bad.append("默认档应只停 ours，实停 %s" % kill)
+    if len(refuse) != 3:
+        bad.append("默认档应拒绝 3 条，实拒 %d ⇒ 非属主被静默放行" % len(refuse))
+    kill_all, refuse_all = stop_plan(rows, takeover=True)
+    if len(kill_all) != 4 or refuse_all:
+        bad.append("--takeover 应全停且零拒绝，实=%s/%s" % (kill_all, refuse_all))
+    if stop_plan([])[0]:
+        bad.append("空持有者面被读成「可停」⇒ 零输入升格")
+    # 坏租约：不存在 / 非 JSON / 非 dict 一律归零，不得当成「全是我的」
+    if lease_read() is None:
+        bad.append("lease_read 返回 None ⇒ 调用方会炸")
+    return finish_selftest(bad)
+
+
+def finish_selftest(bad):
+    print("BUILD-JAR-SELFTEST-%s（属主四形＋变异腿＋决策表两档＋零输入＋坏租约容错，共 %d 条用例）"
+          % ("PASS" if not bad else "FAIL", 11))
+    for b in bad:
+        print("  · " + b)
+    return 1 if bad else 0
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--restart", action="store_true", help="构建并验货通过后重新起 8123")
     ap.add_argument("--no-build", action="store_true", help="只验现有产物")
+    ap.add_argument("--takeover", action="store_true",
+                    help="明确授权停掉非本工具起的持有者（默认拒绝，见 stop_plan）")
+    ap.add_argument("--selftest", action="store_true", help="离线自证属主归类，不起进程不碰端口")
     a = ap.parse_args()
+    if a.selftest:
+        return selftest()
     if not MVN.exists():
         print("BUILD-JAR-ENV-ERROR: 找不到 maven（%s）" % MVN)
         return 2
     if not a.no_build:
-        killed = stop_holders()
-        print("[1/3] 停掉持有 jar 的进程：%s" % (killed or "无需（没有监听者）"))
+        killed, refused = stop_holders(a.takeover)
+        print("[1/3] 停掉持有 jar 的进程：%s" % (killed or "无（本工具起的没有）"))
+        if refused:
+            for pid, cls, summary in refused:
+                print("   🔴 拒绝停 pid=%s 归类=%s ｜ %s" % (pid, cls, summary))
+            print("   ⇒ 端口被非本工具的进程持有。jar 若被它锁住，`mvn clean` 会失败或截断产物，"
+                  "所以本工具不构建。处置：让持有者自己停；或确要接管再跑一次并加 --takeover。")
+            print("BUILD-JAR-ENV-UNVERIFIED(端口属主未明)")
+            return 2
+    if not a.no_build:
         env = dict(os.environ)
         env["JAVA_HOME"] = JDK
         r = subprocess.run([str(MVN), "-f", "server/pom.xml", "clean", "package", "-q"],

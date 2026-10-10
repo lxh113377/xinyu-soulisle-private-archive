@@ -19,6 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from settle_wait import wait_reply, before_send   # r102：完成态等待的唯一实现（同 ux_guards 共源）
+from browser_engine import launch as be_launch, short_face  # r105：浏览器 launch 的唯一实现
 
 URL = os.environ.get("XINYU_URL", "https://xinyu-soulisle.pages.dev/")
 
@@ -129,14 +130,12 @@ def main():
 
     with sync_playwright() as p:
         try:
-            b = p.chromium.launch()
+            b, face = be_launch(p, label="public_check")
         except Exception as e_first:
-            try:
-                b = p.chromium.launch(channel="msedge")
-            except Exception as e:
-                print("PUBLIC-CHECK-ENV-UNVERIFIED 浏览器不可达（chromium/msedge 双档均败）%s ｜ %s"
-                      % (_why(e_first), _why(e)))
-                return 2
+            # browser_engine 三档（本地 chromium / 受管 chromium / 系统 Edge）全败才到这里；
+            # 报"浏览器不可达"必须带上失败原因，否则与「公网挂了」两种病共用一句话。
+            print("PUBLIC-CHECK-ENV-UNVERIFIED 浏览器不可达（三档均败）%s" % _why(e_first))
+            return 2
         ctx = b.new_context(viewport={"width": 1280, "height": 800})
         pg = ctx.new_page()
         pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)

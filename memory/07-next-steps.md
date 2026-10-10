@@ -14,8 +14,16 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - [ ] 🟠 [推荐:R83-02] **共享环境隔离待老大**：陪聊 / iCAN 门店 / 医 同居一个 CloudBase env，
       子目录避让只是止血；命名空间或独立 env 属跨项目决定，本轮未擅动。`part92` §②
 - [ ] **同族坑收口**：台账 `part18`/`part20`；G9 常驻 `repo_config_check`。
-- [ ] 🔴 **r97 首务（可执行）**：**E2 棘轮降数** —— `browser_engine` 统一入口现 0/32 已接，逐个接走手写
-      回退的套件；判据 `python _test/browser_engine_declare_check.py`（基线 32 只降不升），每改一个跑 AST 清点。`part111` §③
+- [ ] 🔴 **E2 棘轮降数（r97 首务，r105 已降 3 件）**：`browser_engine` 统一入口现 **已接 10／未接入 21**（基线 23，起点 31）。
+      逐个接走手写回退的套件；判据 `python _test/browser_engine_declare_check.py`（只降不升），每改一件跑 AST 清点。`part135`
+- [ ] 🔴 **[推荐:R105-01｜用户操作]** **G12 版本三源断链方向须老大选定**：远端已有 `v1.8.2` tag，但 `git merge-base --is-ancestor e8462ca HEAD`
+      回非零 ⇒ tag 指向 **main 之外**那笔「三源同步」提交，main 的 pom 仍 1.8.1。不是"还没切版"是"切了没落地"；
+      两个收口方向都动对外可见面（force 移 tag / 撤 tag）。前提命令见 `part136` §1。
+- [ ] 🟠 **[推荐:R105-02｜agent 自动]** **BLIND-RED 余下 4 条的崩溃面**：`j4_memory_check` 死于未捕获
+      `playwright TimeoutError: wait_for_function 15000ms`（r105 ③ 同族第二形态：超时须落「未验/点名红」而非抛栈）。
+      前提：`python _test/j4_memory_check.py` 复现；`lightshow` 那条归并行会话（对照组真信号）。`part136` §2
+- [ ] 🟡 **[推荐:R105-03｜P2 可选]** **E2 继续降数**：现 21／基线 23，最便宜的一件是 `_test/mobile_check.py`
+      （单一 `launch()` 出口）。每接一件跑 AST 清点。`part136` §3
 - [ ] 🟠 **台账重采须错峰**：`ledger_age_check` 现 16/16 在 fuse 内、契约 fuse=7 天 ⇒ ~10-12 会再超龄；
       burst 重采本轮实测撞限流。判「降级」须比对 NA 相对上一份认可台账是否**增长**。`part111` §③-2
 - [ ] 🟢 [R89+R90 已收] 门面旧名归零（`brand_consistency` 常驻）｜归档前提已解：判据读
@@ -83,3 +91,6 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - **卷38** `07-next-steps.part132.md` — **r101 部署段（公网两条线重部实测）**：Pages 直传的 Functions 取数面是 **cwd** 不是上传目录（第一发把 `/api/chat` 打成 405 的一手证据与修法）＋ Pages git 连接自 `c567ad3` 停摆（合并前先核 build output 目录）＋ `tcb hosting deploy` 被 MSYS 改写云端路径（`MSYS_NO_PATHCONV=1` 正解，误造的 1 个野对象已删并复量）＋ 桶内 24 个 09-30 野键待裁决 ＋ LFS 属性⇄裸 blob 不一致致新 clone 恒脏、rebase 被拦（绕行=临时 clone + cherry-pick）＋ linked worktree 的 `--autostash` 写的是**全仓共用** `refs/stash`
 
 - **卷39** `07-next-steps.part134.md` — **r104 收口（判据层对标杆）**：四项改造回执（整跑韧性／peers 受理面重采+端点修复+断点续采／耦合尺 C1 29→18 含 j4 改判 unobservable／peer_memory 声明位摘豁免）＋ TDZ 核验结论（并行会话已修但未入库）＋ **r105 入口**（face 7 条 debt-open 结转、perf 分桶、R1 切版待裁决、共享端口无属主协议）。
+
+- **卷40** `07-next-steps.part135.md` — **r105 收口（受理面假门/棘轮/崩仪器）**：G16 孤儿判据接线（两侧先测）／E2 24→21（3 件收编，判定行带引擎身份）／vendor_freshness 五字段门＋`detect:null` 显式语义／端口 8123 属主四档协议（默认只停本工具起的）。**新事实：`v1.8.2` tag 不在 main 祖先面上**。
+- **卷41** `07-next-steps.part136.md` — **r106 入口**（G12 方向待选／BLIND-RED 余 4 条崩溃面／E2 继续降／face_check 结转前提／rollup 派生件等干净窗口／peers 错峰重采）。

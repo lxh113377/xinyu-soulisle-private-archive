@@ -113,9 +113,19 @@ SUITES = [
     # 加了的话 java-build 照样全绿，而构建期单测已经静默不存在（本地看永远是"CI 通过"）。
     ("java_test_guard", [sys.executable, "_test/java_test_guard.py"]),
     ("java_test_guard_selftest", [sys.executable, "_test/java_test_guard.py", "--selftest"]),
+    # r105：`build_jar` 的属主归类进阻断链。它不是判据而是动作工具的纯函数桩，
+    # 但「停服务前认属主」这条一旦没人跑，下一次 rebuild 又会把并行会话的验证服务打死
+    # （r104 实测三次），而被打死的一方只看到"服务自己掉了"——红因无法归因。
+    # 该桩离线：不起进程、不碰端口、不读产物。
+    ("build_jar_selftest", [sys.executable, "_test/build_jar.py", "--selftest"]),
     ("strategy", [sys.executable, "_test/strategy_check.py"]),
     ("strategy_selftest", [sys.executable, "_test/strategy_check.py", "--selftest"]),
     ("ux_guards", [sys.executable, "_test/ux_guards_check.py"]),
+    # r105 接线：这件 r104 立好后一直「在提交面、两头不执行」（电池 0 处、CI 0 处），
+    # G16 第五腿当场把它判成孤儿判据 —— 永不开火的门比没有门更坏（r96 给 peers 判过的那类假门）。
+    # 接线前已两侧实测：HEAD 面（CI 会跑的那份）11/11 PASS、工作树面 15/15 PASS。
+    # 服务不可达时它自回 rc=2（ENV-UNVERIFIED），不会把"没服务"报成"代码坏"。
+    ("dock_auto", [sys.executable, "_test/dock_auto_check.py"]),
     # r42：无障碍从「没人量过」变成常驻阻断面。12 个审计单元=6 状态 x 2 主题，
     # 规则集必须含 experimental（默认集看不见 label-content-name-mismatch，首跑即被这一点骗过）。
     ("a11y", [sys.executable, "_test/a11y_check.py"]),

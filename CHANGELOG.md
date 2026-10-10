@@ -2,6 +2,33 @@
 
 *(自 `v1.7.0` 起的在制增量 r94–r96 已随 **v1.8.0** 发布；`v1.8.0` 之后的 r96 受理面修复与 r97 语音退出态修复已随 **v1.8.1** 发布。)*
 
+### Changed（r109 · 表情感知入坞（删侧边面板）+ 全屏态隐藏五幕 + 虚拟滚动，老大拍板）
+
+- **表情感知集成进对话坞**（老大原话：「将表情感知窗口集成到聊天窗口页面内」「📷 与 🙂 功能重叠，只保留一个」）：
+  - 右侧独立悬浮面板 `#face-hud`（fixed 定位）**整块删除**，坞内版唯一：`#face-row` 折叠行常驻
+    （「表情感知 + 状态胶囊 + 展开箭头」），点行展开/收起 `#face-hud`（预览舞台 + 情绪读数 + 微笑徽章 +
+    `#face-switch` 主控件）。**全部内部 id 未改**（`face-hud-state/video/idle/emo/dot/bar/smile`、
+    `face-switch/face-switch-word/btn-face-close`），face 判据的取证点几乎零迁移；`<aside>` 改 `<section aria-label>`
+    （region 语义不丢）。
+  - **`#btn-cam`（📷 总闸）删除**：与 🙂 功能重叠。总闸语义（关=立即真停+隐藏坞内整块+记住
+    `peiliao.face.cam.v1`；开=恢复且仍过能力探测）**原样并入设置面板**新增的
+    `#set-face-cam`（checkbox「允许心屿使用摄像头」）。🙂 成为唯一启停入口：点=启停表情感知（真开真停）。
+  - CSS：`.face-hud` 从 fixed 悬浮（含 768px grid 重排）改为坞内流式块，**本轮 CSS 反而净减 397B**；
+    坞内 `#chat-log` 加 `flex-shrink`（面板展开时压缩日志而非溢出 64vh）。
+- **全屏态 = 只剩星雾 + 对话坞**：`body.dock-full` 下 `#story/#topbar/#actnav/.scroll-hint` 整组
+  `opacity:0`（⚠️ 刻意不用 `display:none`——ScrollTrigger 量程挂在 `#story` 高度上，display:none
+  会让滚动驱动的 3D 直接断掉）。
+- **全屏虚拟滚动**（页面滚动已锁后星雾不再动的修复）：全屏态监听 `wheel/touchmove`，把滚动量映射成
+  星雾进度（`ThreeScene.setScrollProgress`，0..1 端点停）；对话日志内部仍先滚自己（日志滚到头才把
+  量交给镜头，两层滚动不打架）；退出全屏（点按钮 / 点叙事区 / 滚动自动收起 / Esc **四条路径**）都把
+  镜头还给真实滚动进度（`lastRealT`）。取数口 `window.__XINYU_SCROLL_T__`。
+- **判据**：`dock_auto_check` 11→**15 项**（新增 D10 全屏滚轮推动星雾 / D11 退出后回真实进度；
+  D11 首跑即抓到真缺陷——从全屏**收起**走的是 `setDock(false)` 而非 `setFull(false)`，恢复逻辑漏挂，
+  已修）；`face_check` F4 的总闸断言从点 `#btn-cam` 迁移到「开设置面板→切 `#set-face-cam`→关面板」。
+- **预算**：`app.js` 38,690→**42,120**（实测 40,112 +5%）、`index.html` 14,172→**15,550**（实测 14,809），
+  `style.css` 维持 31,860（实测 31,463 反降）；TOTAL 936,699 / 968,000。
+- 实跑读数见 `memory/2026-10-11.md` r109 节与 `_temp/r109_all.txt`（串跑台账）。
+
 ### Changed（r108 · 对话坞与背景融为一体 + 右上角单个三态按钮，老大拍板）
 
 - **视觉融合**：`#chat-dock` 删掉面板四件套（顶部描边 / 向上投影 / 面板底色 / `backdrop-filter`），
@@ -25,6 +52,41 @@
   既存红、非本轮引入**（对照用 `git archive HEAD src` 起独立服务，读数与工作区完全相同）。
 - **预算**：`style.css` 28,511→**31,860**、`app.js` 35,173→**38,690**（均按实测 +5%；登记前先压注释
   −357B / −35B）；TOTAL 931,658 仍在 968,000 内。`deploy/xinyu/` 三件已同步（`deploy_sync_check.py` DIFF 归零）。
+
+### Changed（r105 · 受理面三项仪器缺陷收口 + 端口属主协议，全部落在 `_test/`、`docs/`、`README.md`；产品源码零改动）
+
+- **G16 孤儿判据接线**：`_test/dock_auto_check.py`（r104 立）在提交面上存在却**两头都不执行**——
+  `grep -c dock_auto _test/run_all_suites.py` = 0、CI 接线面 = 0。G16 第五腿的措辞即是本仓给 peers 判过的那类假门：
+  「文档写了 ≠ 接线，永不开火的门比没有门更坏」。**接线前两侧先测**（否则"接线"本身就是一次引入新红）：
+  HEAD 面用 `git archive` 抽出 + 零密钥 stub + 静态服务 8213 实测 **11/11 PASS**，工作树面 **15/15 PASS**；
+  随后 SUITES 与 `docs/quality-gates.md` **同笔**登记（否则 G16 第一面反向红）。一条真红同时压着
+  `repo_config` 与 `repo_config_selftest`，接线后两条一起转绿。
+  ⚠️ 顺带一手：改 SUITES 后 `G4 电池条目数==README 声称数` 当场报红（实测 146｜README 仍写 144）——
+  找硬编码计数时我只 grep 了 `_test/ docs/ .github/`，**没扫 README**；是判据替我补上了那次漏看，不是我想到了。
+- **E2 唯一实现棘轮降数 24→21**（基线 23，起点 31 ⇒ 已接 10）：新增套件又抄了一遍
+  `try: chromium.launch() / except: launch(channel="msedge")`，红不在于多一处副本，而在于**回退从不打印用的是哪个引擎**
+  ⇒ "本地浏览器判据全绿"这句话不可归因，而受理面（CI ubuntu + 受管 chromium）跑的不是同一台浏览器。
+  收编 `ux_guards_check` / `settings_panel_check` / `public_check` 三件到 `browser_engine` 唯一入口，
+  并把引擎身份折进各自判定行（`UX-GUARDS-PASS 引擎=msedge(channel)(155.0.4283.45)`）。回执：`BROWSER-ENGINE-PASS`。
+- **仪器崩溃面收口（BLIND-RED 族）**：`vendor_freshness_check.py:58` 假设名册每条都有字符串 `detect`，
+  在途台账新增 4 条 mediapipe 条目写 `"detect": null`（模型/wasm 无版本横幅可解析）⇒ `re.search(None, …)` 抛
+  `TypeError`，判据连结论行都没印就死、`--selftest` 同死 ⇒ 电池只能记 **BLIND-RED(判红却零结论行 ⇒ 仪器崩了)**。
+  修类不修例：新增 `field_problems()` 五字段门（缺失／类型／非法正则各点名条目与字段），
+  `null` 定为**一档合法声明**（只关掉 V2 那条腿，V1 完整性照查），V2 参与数折进判定行
+  （`V2 参与 4 条／声明 detect=null 4 条`）。`--selftest` 由 5 类扩到 10 类；**变异体**（把类型门摘掉）当场
+  `KeyError: 'detect'` 复现旧崩溃 ⇒ 证明新门作用在被审对象上而非装饰。
+- **端口 8123 属主协议**：`build_jar.stop_holders()` 原先按端口取 PID 后逐个 `Stop-Process -Force`，不认属主
+  （r104 一手：把并行会话的验证服务杀了 3 次，被打死的一方只看到"服务自己掉了"，红无法归因）。
+  改为四档归类 `ours / same-artifact / foreign / unknown`——**取不到命令行归 unknown，绝不升格成"无主可杀"**；
+  默认只停本工具起的（租约 `%TEMP%/xinyu-port-lease.json`），`--takeover` 是人明确授权的接管口；
+  拒绝时 rc=2 **不构建**（jar 被锁时硬构建正是 r37 那枚 48,907B 截断件的来源）。
+  真面只读探测：pid 23828（跑本仓 jar、无登记）归 `same-artifact`、默认决策 `kill=[] / refuse=[23828]`；
+  `BUILD-JAR-SELFTEST-PASS（11 条用例，含变异腿）`，桩本身已进电池（`build_jar_selftest`）——工具桩不进阻断链＝半成品这条对自己也生效。
+- **新事实（改变对外口径）**：远端 `v1.8.2` tag 指向的 e8462ca **不在 main 的祖先面上**
+  （`git merge-base --is-ancestor e8462ca HEAD` 回非零；`git show e8462ca:server/pom.xml`=1.8.2；main 的 pom=1.8.1）
+  ⇒ `repo_config G12` 这两轮的归因"还没切版"不完整：是**切了没落地**。两个收口方向都动对外可见面，待老大选定（见 `memory/07-next-steps.part136.md`）。
+- **唯一入口地图修复**：`交付物/对标总览-合并索引` 自称唯一入口，轮次表却止于 **r96**（根目录实有 r98…r104）
+  ⇒ 补 r98–r105 行、「最新」指针改 r105；**r97、r103 经根目录与归档两侧实测都无报告文件**，只写清这件事、不补造报告。
 
 ### Changed（r104 · 判据层与受理面四项工程改造，全部落在 `_test/` 与 3 份对标台账；产品源码零新增）
 
