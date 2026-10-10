@@ -12,8 +12,9 @@
 #   全站内联 <script> 只有 1 个（r28 的离线壳注册块）⇒ 已外提成 `js/sw-register.js` 并补进 SW 预缓存
 #   （r45 就踩过"外提模块没进预缓存致断网重载报错"，同族不再踩）。
 #   实测 src/js/*.js 里动态执行面（解释器执行字符串 / Function 构造器 / 专用线程 / document.write）**全为 0**
-#   ⇒ 不需要 'unsafe-eval'、不需要 worker-src/blob:。`<style>`=0、inline style 属性=0
-#   ⇒ script-src 与 style-src 都只给 'self'。
+#   ⇒ 不需要 worker-src/blob:。`<style>`=0、inline style 属性=0 ⇒ style-src 只给 'self'。
+#   ⚠️ r87 更正：script-src 现在**带 `'unsafe-eval'`** —— 是 MediaPipe wasm 链逼出来的唯一例外，
+#      不是本站代码需要它；理由与摘除条件见下方 `CSP-EVAL-EXCEPTION` 那一段（判据认标记）。
 #   唯一需要例外的是 favicon（`data:image/svg+xml`）⇒ img-src 允许 data:。
 #   浏览器直连模式（本地演示）会打 https://api.deepseek.com ⇒ connect-src 必须带上它，
 #   否则"在线 AI"会被 CSP 静默打断成降级——那是最难查的一种坏法。
@@ -23,13 +24,23 @@
 #
 # ⚠️ 静态 `_headers` **不作用于 Pages Function**（`/api/*` 由函数自己回头），
 #   所以那一路径由判据单独取数，取不到记 UNVERIFIED 而不是"没有"。
+#
+# ── ⚠️ CSP-EVAL-EXCEPTION（r87 · 唯一一次具名放宽；判据认这个标记，勿照抄）────────
+#   script-src 里的 `'unsafe-eval'` 是**被迫**的，不是顺手放宽：MediaPipe Tasks Vision
+#   的 wasm 链在初始化时要 eval 一段字符串。实测证据：只给 `'wasm-unsafe-eval'` 时公网页面报
+#   `Evaluating a string as JavaScript violates … script-src 'self' 'wasm-unsafe-eval'`，
+#   推理器永远建不起来 —— 界面表现只是"按钮点了没反应"，最难查的那种坏法。
+#   （`'wasm-unsafe-eval'` 只管 wasm 编译，管不到这一处 ⇒ 两个都得给。）
+#   代价边界：页面仍无内联脚本、无外域脚本（script-src 仅 'self'），eval 面只由本站 vendor 使用。
+#   ⇒ 将来若换掉 MediaPipe，`'unsafe-eval'` 必须一起摘掉，并同步删掉本标记
+#     （判据 `_test/headers_csp_check.py` H3：有 `'unsafe-eval'` 却没这个标记 ⇒ 照红）。
 
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.deepseek.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; font-src 'self'; media-src 'self' blob:; connect-src 'self' https://api.deepseek.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
-  Permissions-Policy: camera=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=()
+  Permissions-Policy: camera=(self), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=()
 /
   Cache-Control: no-cache
 /index.html

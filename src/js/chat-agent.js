@@ -247,12 +247,20 @@ window.ChatAgent = (function () {
     const { lex, final, path } = cls.result;
     const emoSrc = cls.result.src || "local";
     const emo = final.emotion, intensity = final.intensity;
+    /* r87：表情是**并列第三路**——只标注，不参与裁决。
+     * 为什么不让表情覆盖 LLM/词典：表情识别的准确率低于文本双路，让它参与裁决
+     * 只会把已标定的文本链路往回拖；而"如实告诉你两路不一致"本身就是价值。
+     * 取数口径：只取**仍在有效期内**的读数（FaceEngine.last），拿几秒前的旧脸标新话属于说谎。
+     * love 心动表情侧判不出来（见 face-smile-rules 的 undetectable）⇒ 记 n/a 而不是"不一致"。 */
+    const face = (window.FaceEngine && window.FaceEngine.last) ? window.FaceEngine.last() : null;
+    const divergence = !face ? "unknown" : (emo === "love" ? "n/a" : (face.emotion === emo ? "agree" : "disagree"));
     // 次情绪一并入库：星图重放要能复现「主色 n 颗 + 次色 n/2 颗」的原始点亮形态
     const secondary = window.EmotionEngine.secondaryOf(lex.all, emo);
     if (emo === "crisis") {
       remember(text, CRISIS_REPLY);
       window.MemoryStore.record({ emotion: "crisis", intensity: 1, text: text.slice(0, 60) });
-      return { reply: CRISIS_REPLY, emotion: "crisis", mode: "guard", path, latency: 0, lexAll: lex.all, emoSrc };
+      return { reply: CRISIS_REPLY, emotion: "crisis", mode: "guard", path, latency: 0, lexAll: lex.all, emoSrc,
+               face, divergence };
     }
     let reply, mode, streamed = false;
     // 记录"本轮发给模型前已存在的记忆条数"：record 在之后才写，所以这里取到的是**此前**的条数
@@ -273,7 +281,7 @@ window.ChatAgent = (function () {
     window.MemoryStore.record({ emotion: emo, intensity, secondary, text: text.slice(0, 60) });
     // memory/dropped 只在**真的带着它们发给了模型**时才非零：降级/离线模板没走 LLM，标了就是说谎
     return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all, streamed,
-             emoSrc, memory: mode === "model" ? memBefore : 0,
+             emoSrc, face, divergence, memory: mode === "model" ? memBefore : 0,
              dropped: mode === "model" ? dropBefore : 0 };
   }
 

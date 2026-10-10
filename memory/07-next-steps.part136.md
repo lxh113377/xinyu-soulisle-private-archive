@@ -14,9 +14,11 @@
 5. 🟡 **rollup 派生件重生**：`交付物/对标数据/benchmark-rollup-r95.json` 的 `regression_suites` 仍 144（现 146）；该件被并行会话改着（8/8 diff）⇒ 等干净窗口跑 `python _test/bench_rollup.py`，**派生件最后写**。
 6. 🟡 **peers 未重采族**：`peers_build_gates` 时点 10-04（fuse 内已 7 天）、maintenance/repro/memory 多为 10-08 ⇒ 到点**错峰单族**重采，禁 burst（撞限流）。
 7. 🟡 **共享交付面纪律**：本轮 29 个文件带真实 diff（非幽灵脏件），本轮 pathspec 与其零交集；下一轮动手前仍先 `git diff --name-only` 复测在途面再定能碰什么。
-8. 🟠 **仪器挂起第三档（r105 终验一手）**：整跑停在第 117 行（`clean_clone_selftest` 之后）>18 分钟零输出，
-   而 r104 立的 `TIMEOUT(>600s 硬顶)` **没有触发** —— 同轮 `face_check=630s` 确实被拦下过，所以不是 cap 没用，
-   是**存在 cap 管不到的挂起形态**（假设：直接子进程已退、孙子进程仍持有管道 ⇒ `communicate()` 无限等）。
-   这与 `BLIND-RED(仪器崩了)` 并列成第三档：**既不红也不退**。
-   前提命令：`python _test/run_all_suites.py --only <挂起点附近>` 复现 + 读 `run_all_suites.timeout_row()` 与 `run_suites()` 的等待面；
-   修法方向＝给等待加**墙钟上限**（不等管道 EOF），且该上限必须与 600s 分档口径一致，不许另立一套。
+8. ✅ **仪器挂起第三档（r105 终验一手 → 当轮已修，实测见 part138 ⑤）**：整跑曾停在第 117 行之后 >18 分钟零输出，
+   而 r104 立的 `TIMEOUT(>600s 硬顶)` **没触发**。根因**已实测确认**（不再是假设）：
+   `subprocess.run(capture_output=True, timeout=…)` 超时那刻先 kill 直接子进程、再 `communicate()` 读空管道，
+   而判据起的孙进程攥着同一对 stdout/stderr 句柄 ⇒ EOF 永不到来 ⇒ `TimeoutExpired` 根本递不上来。
+   证据＝自证桩第三腿：同一夹具交给旧写法、由新执行器监工，到点**零结论行**（`EXEC-SELFTEST-PASS` 3 腿）；
+   换执行器后整跑跑完 ⇒ `BATTERY: 131/143 rc=1`（红 22→11、BLIND-RED 6→1）。
+   **本轮不留遗留**，但给 r106 留一条更值钱的观察：三档分类（崩/挂/超时）目前只由 `run_all_suites` 自己印，
+   没有独立判据核「收口行三档计数之和 == 红名单条数」——要做就做那条，**别去动已修好的执行器**。

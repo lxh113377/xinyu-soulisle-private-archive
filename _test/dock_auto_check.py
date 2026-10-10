@@ -12,9 +12,11 @@
   D4  点标题条展开
   D5  **焦点在坞内时不收起**（正在打字/翻记录——话没打完坞不能跑）
   D6  失焦后再向下滚仍会收起
-  D7  标题条展开与 #btn-dock 收起两条路径共存且互不打架
+  D7  三态循环：常规 --点--> 全屏 --点--> 收起 --点--> 常规（r108：#btn-dock 一个按钮管三态）
   D8  演示态（showtime）下不自动收起（演示期坞由 showtime 统一让位）
   D9  全程无 JS 异常
+  D10 全屏态滚轮推动星雾进度（r109：虚拟滚动映射，页面滚动锁死）
+  D11 退出全屏后进度回到真实滚动值（虚拟值不带出全屏）
 
 用法：python _test/dock_auto_check.py [http://127.0.0.1:8123/index.html]
 退出码：0=全过 1=判红 2=环境未验（服务起不来 ⇒ 不许判绿）
@@ -86,12 +88,49 @@ def main():
             pg.evaluate("window.scrollTo(0, 0)")
             pg.click(".dock-title")
             pg.wait_for_timeout(400)
-            pg.click("#btn-dock")             # 用既有按钮收起，确认两条路径不打架
-            pg.wait_for_timeout(400)
-            ck("D7 标题条展开与 #btn-dock 收起两条路径共存", not is_open(pg))
+            # 三态循环（老大拍板 r108）：常规 ⛶ → 全屏 ▾ → 收起 ▴ → 常规。
+            #   ⚠️ 强度不低于旧版：旧版只断言「点一下就收起」，新版断言**三跳各自到位且不跳步**
+            #   （旧版第一条在新语义下会被"进了全屏但仍 open"误判为绿，新版专门堵这个洞）。
+            is_full = lambda: pg.eval_on_selector("#chat-dock", "e => e.classList.contains('full')")  # noqa: E731
             pg.click("#btn-dock")
             pg.wait_for_timeout(400)
-            ck("D7b #btn-dock 仍能展开", is_open(pg))
+            ck("D7 常规态点 #btn-dock → 全屏（仍展开且带 .full）", is_open(pg) and is_full())
+            ck("D7a 全屏态按钮写「收起 ▾」+ aria-expanded=true",
+               pg.inner_text("#btn-dock") == "收起 ▾"
+               and pg.get_attribute("#btn-dock", "aria-expanded") == "true",
+               "%s / aria-expanded=%s" % (pg.inner_text("#btn-dock"),
+                                          pg.get_attribute("#btn-dock", "aria-expanded")))
+            pg.click("#btn-dock")
+            pg.wait_for_timeout(400)
+            ck("D7b 全屏态再点 → 收起（与点标题条两条路径共存不打架）", (not is_open(pg)) and (not is_full()))
+            pg.click("#btn-dock")
+            pg.wait_for_timeout(400)
+            ck("D7c 收起态再点 → 回到常规展开（不跳到全屏）", is_open(pg) and not is_full())
+
+            # r109：全屏态虚拟滚动（页面滚动已锁，星雾改由滚轮映射驱动；退出回真实进度）。
+            # 取数口 = window.__XINYU_SCROLL_T__（app.js 的 onProgress / fullScrollDrive 双向写）。
+            t_real = pg.evaluate("() => window.__XINYU_SCROLL_T__")
+            pg.click("#btn-dock")
+            pg.wait_for_timeout(400)
+            in_full = is_open(pg) and is_full()
+            if in_full:
+                t0 = pg.evaluate("() => window.__XINYU_SCROLL_T__")
+                pg.mouse.move(640, 400)          # 视口中央（全屏坞上、chat-log 日志区——日志为空时不吃滚轮）
+                pg.mouse.wheel(0, 900)
+                pg.wait_for_timeout(300)
+                t1 = pg.evaluate("() => window.__XINYU_SCROLL_T__")
+                ck("D10 全屏态滚轮推动星雾进度（虚拟映射，页面滚动是锁死的）",
+                   t1 is not None and t0 is not None and t1 > t0, "%s -> %s" % (t0, t1))
+            else:
+                ck("D10 全屏态滚轮推动星雾进度（虚拟映射，页面滚动是锁死的）", False, "未能进入全屏态")
+            pg.click("#btn-dock")                # 全屏 → 收起（顺带复验 D7b 路径仍通）
+            pg.wait_for_timeout(400)
+            t2 = pg.evaluate("() => window.__XINYU_SCROLL_T__")
+            ck("D11 退出全屏后进度回到真实滚动值（不把虚拟值带出全屏）",
+               t2 is not None and t_real is not None and abs(t2 - t_real) < 0.02,
+               "real=%s exit=%s" % (t_real, t2))
+            pg.click("#btn-dock")                # 收起 → 常规，恢复 D8 需要的展开态
+            pg.wait_for_timeout(400)
 
             pg.click("#btn-lightshow")        # 进演示态
             pg.wait_for_timeout(900)

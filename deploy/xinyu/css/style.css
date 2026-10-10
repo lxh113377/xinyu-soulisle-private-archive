@@ -13,6 +13,12 @@
   --dialog:rgba(12,17,36,.62); --dialog-backdrop:rgba(4,6,14,.7);
   --dock-a:rgba(8,12,26,.35); --dock-b:rgba(8,12,26,.9);
   --dock-a2:rgba(8,12,26,.5); --dock-b2:rgba(8,12,26,.94);
+  /* r108 融合渐变（只增不改，1 最淡 4 最实）；r110 老大实测"星雾看不清"⇒ 整体调透。
+     常规档留足底衬（背后是幕文案，太透会"文字叠文字"——实测截图确认过）；
+     --dock-solo-*（全屏档，星雾独处）可以再透一档，因为五幕已 opacity:0。 */
+  --dock-fade-1:rgba(7,11,24,.22); --dock-fade-2:rgba(7,11,24,.40);
+  --dock-fade-3:rgba(7,11,24,.66); --dock-fade-4:rgba(7,11,24,.84);
+  --dock-solo-1:rgba(7,11,24,.13); --dock-solo-2:rgba(7,11,24,.26); --dock-solo-3:rgba(7,11,24,.48);
   /* r104 UX 统一令牌：只增不改——旧令牌的值一字未动，新令牌供收敛「圆角/间距/动效/阴影/层级色」 */
   --ink-2:#b9c0dd;                       /* 次级正文：比 --muted 亮一档，长段落可读性（对比度 ≥10:1） */
   --r-sm:10px; --r-md:14px; --r-lg:18px; --r-pill:999px;
@@ -114,13 +120,14 @@ dialog:focus-visible,[role=switch]:focus-visible{outline:2px solid var(--accent2
 .msg .tag{display:block;font-size:11px;color:var(--muted);margin-top:6px;opacity:.8;letter-spacing:.02em}
 .msg.thinking{color:var(--muted);font-style:italic;animation:thinking 1.6s ease-in-out infinite}
 @keyframes thinking{0%,100%{opacity:.7}50%{opacity:1}}
-.chat-form{display:flex;gap:10px;padding:14px;border-top:1px solid var(--line)}
+/* r108：去掉输入区上方那条分割线——它是坞里最后一处"面板边界"，去掉才谈得上与背景融为一体 */
+.chat-form{display:flex;gap:10px;padding:14px}
 /* r104 缺陷修复：input 的默认 `min-width:auto` 会顶住 flex:1 ⇒ 390px 窄屏实测
    form.scrollWidth=438 > clientWidth=390，**发送按钮被挤到 x=392（屏幕外）**，
    而 body 的 overflow-x:hidden 把它整条裁掉 ⇒ 手机端其实点不到"发送"。 */
 .chat-form input{flex:1 1 auto;min-width:0}
 .chat-meta{display:flex;justify-content:space-between;padding:0 16px 12px;font-size:12px;color:var(--muted)}
-.demo-strip{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;border-top:1px dashed var(--line);font-size:12.5px}
+.demo-strip{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;font-size:12.5px}
 .ghost-btn.tiny{font-size:11.5px;padding:5px 10px}
 .voice-btn{font-size:16px;padding:10px 13px;border-radius:12px}
 .voice-btn.recording{color:#ff7a7a;border-color:#ff7a7a;animation:pulse 1.2s ease-in-out infinite}
@@ -146,20 +153,44 @@ dialog::backdrop{background:var(--dialog-backdrop);backdrop-filter:blur(2px)}
 .settings-form .muted{display:block;line-height:1.6;padding-top:var(--sp-2);border-top:1px dashed var(--line)}
 .dlg-actions{display:flex;justify-content:flex-end;gap:var(--sp-2);margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--line)}
 
-/* 底部常驻对话坞：固定悬浮，可折叠；收起时只留标题条 */
+/* 底部常驻对话坞：固定悬浮，三态 = 常规 / 全屏 / 收起（r108 老大拍板）
+   **与背景融为一体**：删掉面板四件套（描边 / 投影 / 面板底色 / backdrop-blur）——blur
+   会把星雾抹成一片糊，那正是"这有个面板"的第一信号；可读性改由下面的淡出渐变承担。 */
 #chat-dock{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;flex-direction:column;
-  max-height:64vh;border-top:1px solid var(--line);
-  background:linear-gradient(var(--dock-a),var(--dock-b) 22%);
-  backdrop-filter:blur(16px);box-shadow:0 -18px 50px rgba(0,0,0,.45);
-  transition:transform .32s cubic-bezier(.4,0,.2,1)}
-#chat-dock:focus-within{background:linear-gradient(var(--dock-a2),var(--dock-b2) 22%)}
-#chat-dock:not(.open){transform:translateY(calc(100% - 52px))}
+  max-height:64vh;
+  background:linear-gradient(to top,var(--dock-fade-3) 0%,var(--dock-fade-2) 36%,var(--dock-fade-1) 72%,transparent 100%);
+  backdrop-filter:blur(7px);   /* r110：常规态把背后的幕文案化开，防"文字叠文字" */
+  transition:transform .32s cubic-bezier(.4,0,.2,1),background var(--dur-2) var(--ease)}
+/* 仅在坞内打字时整层提一档：不打字最贴星雾，打字时最清楚 */
+#chat-dock:focus-within{background:linear-gradient(to top,var(--dock-fade-4) 0%,var(--dock-fade-3) 36%,var(--dock-fade-2) 72%,transparent 100%)}
+/* 收起态：只留 44px 细条，几乎透明，不打断星雾 */
+#chat-dock:not(.open){transform:translateY(calc(100% - 44px));
+  background:linear-gradient(to top,var(--dock-fade-2),transparent)}
+/* 全屏态：铺满视口（含顶栏），对话日志吃掉剩余高度 */
+/* 全屏态零 blur：五幕已隐藏，背后只有星雾 ⇒ 让星雾以原始锐度透过来（老大要的"看得清"） */
+#chat-dock.full{max-height:none;height:100vh;backdrop-filter:none;
+  background:linear-gradient(to top,var(--dock-solo-3) 0%,var(--dock-solo-2) 55%,var(--dock-solo-1) 100%)}
+#chat-dock.full .chat-log{flex:1 1 auto;height:auto;min-height:0}
+#chat-dock.full #dock-bar{padding-top:18px;padding-bottom:14px}
+body.dock-full{overflow:hidden}   /* 全屏对话时锁页面滚动：星雾改由滚轮/触摸的虚拟映射驱动（app.js） */
+/* r109（老大拍板）：全屏 = 只剩星雾 + 对话坞。五幕/顶栏/幕次导航/滚动提示整组退场。
+   ⚠️ 必须用 opacity 而非 display:none——ScrollTrigger 的量程挂在 #story 高度上，
+   display:none 会让量程归零 ⇒ 滚动驱动的 3D 直接断掉（这正是用 opacity 的原因）。 */
+body.dock-full #story,body.dock-full #topbar,body.dock-full #actnav,body.dock-full .scroll-hint{
+  opacity:0;pointer-events:none;transition:opacity .35s ease}
 #dock-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 22px 10px}
 /* r104：收起态下整个标题条都是「展开」的热区（点它展开），指针提示跟着变 */
 #chat-dock:not(.open) #dock-bar{cursor:pointer}
+/* 坞右上角唯一按钮（r108）：文案写「下一个动作」而非当前状态 */
+.dock-btn{white-space:nowrap}
+.dock-btn .db-ico{font-size:12px}
 .dock-title{display:flex;align-items:center;gap:10px;font-weight:600;font-size:14.5px;flex-wrap:wrap}
 .dock-title .muted{font-weight:400}
-#chat-dock .chat-log{height:min(34vh,300px);border-bottom:1px solid var(--line)}
+#chat-dock .chat-log{height:min(34vh,300px);flex:0 1 auto;min-height:96px}   /* flex 允许被展开的面板压缩 */
+/* r110：坞底减半透明度后，文字靠自身描边撑可读性（浅色档换白影，深字配黑影会发脏） */
+#chat-dock .dock-title,#chat-dock .msg,#chat-dock .chat-meta{text-shadow:0 1px 3px rgba(0,0,0,.55)}
+html[data-theme="light"] #chat-dock .dock-title,html[data-theme="light"] #chat-dock .msg,
+html[data-theme="light"] #chat-dock .chat-meta{text-shadow:0 1px 2px rgba(255,255,255,.9)}
 #chat-dock .chat-form,#chat-dock .chat-meta,#chat-dock .demo-strip{padding-left:22px;padding-right:22px}
 #act5{padding-bottom:220px}
 #lit-count,#mem-count,#lit-count-dock,#mem-count-dock{color:var(--accent2)}
@@ -220,7 +251,8 @@ dialog::backdrop{background:var(--dialog-backdrop);backdrop-filter:blur(2px)}
   #chat-dock .chat-log{height:min(30vh,210px)}
   /* 窄屏收图标、不藏能力（r49）：旧版整块 display:none 让手机端演示入口彻底不可达；
      文字走 sr-only 裁切而非 display:none，可访问名与桌面档逐字相同。判据 = entry_reach_check.py */
-  #btn-lightshow .ls-word{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  /* r108：规则按类名而非 id 生效——摄像头/一键点亮都挪进了输入行，两条都要「收图标不藏能力」 */
+  .ls-word{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 }
 
 /* 旧断点保留为兜底（<640px 时上述两档已覆盖大部分，这里补坞内边距与幕底留白） */
@@ -258,6 +290,10 @@ html[data-theme="light"]{
   --dialog:rgba(255,255,255,.92); --dialog-backdrop:rgba(90,100,140,.35);
   --dock-a:rgba(242,244,251,.4); --dock-b:rgba(242,244,251,.96);
   --dock-a2:rgba(242,244,251,.55); --dock-b2:rgba(242,244,251,.98);
+  /* 浅色档同名渐变：同语义（顶透底实），底色换浅雾；r110 同步调透 */
+  --dock-fade-1:rgba(242,244,251,.24); --dock-fade-2:rgba(242,244,251,.44);
+  --dock-fade-3:rgba(242,244,251,.68); --dock-fade-4:rgba(242,244,251,.84);
+  --dock-solo-1:rgba(242,244,251,.16); --dock-solo-2:rgba(242,244,251,.32); --dock-solo-3:rgba(242,244,251,.54);
 }
 html[data-theme="light"] #gl{display:none}
 /* 浅色态复用既有降级层（渐变全部走令牌，自动变浅；hidden 属性由本规则显式覆盖） */
@@ -268,17 +304,32 @@ html[data-theme="light"] #gl-fallback{filter:none}
    沿用既有「深空玻璃」令牌，不引入第二种设计语言。
    动态色/宽度一律走 data-* + CSSOM（见 app.js 的 paint()）：
    markup 内联 style 会被线上 CSP（style-src 'self'）拦成失效。 */
+/* r109：hidden 必须真隐藏——这些组件自带的 display:flex 会盖过 UA 的 [hidden] 规则，
+   造成「属性上收起了、画面上还挂着」（r87 起潜伏的家族缺陷，全屏取证截图抓到）。不能上全局
+   !important：浅色主题 #gl-fallback[hidden]{display:block} 是故意的覆盖，会被误伤。 */
+.face-hud[hidden],.face-hud-idle[hidden],.demo-strip[hidden],.face-probe[hidden],
+.face-smile-badge[hidden]{display:none}
 .face-probe{margin-top:14px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
 .face-video{width:320px;max-width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;
   border:1px solid var(--line);background:#05070f;transform:scaleX(-1);   /* 镜像：照镜子才不自乱左右 */
   box-shadow:0 12px 40px rgba(0,0,0,.35)}
 .face-note{font-size:11.5px;line-height:1.6}
 
-/* 实时小窗：右下角悬浮，避开底部对话坞 */
-.face-hud{position:fixed;right:26px;bottom:172px;z-index:40;width:176px;padding:10px;
+/* r109（老大拍板）：表情感知集成进对话坞——右侧独立悬浮小窗已删，坞内版唯一。
+   .face-hud 从 fixed 悬浮改为坞内流式块（#face-row 折叠行下方）；#face-switch 仍是主控件；
+   轻玻璃底 + 圆角与全站一致，但不与星雾争面板感（入坞即属坞的融合风格）。 */
+.face-row-dock{padding:0 22px}
+.face-toggle{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:6px 4px;
+  background:transparent;border:none;color:var(--muted);font-family:var(--font);font-size:12.5px;
+  cursor:pointer;transition:color var(--dur-1) var(--ease)}
+.face-toggle:hover{color:var(--ink)}
+.face-toggle .ft-word{letter-spacing:.05em}
+.face-toggle .ft-ico{margin-left:auto;font-size:11px;transition:transform var(--dur-2) var(--ease)}
+.face-toggle[aria-expanded="true"] .ft-ico{transform:rotate(90deg)}
+.face-hud{width:100%;padding:10px;margin-bottom:6px;
   display:flex;flex-direction:column;gap:8px;
-  background:var(--panel);backdrop-filter:blur(16px);border:1px solid var(--line);
-  border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.5);
+  background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--line);
+  border-radius:14px;
   animation:face-hud-in .18s ease-out}
 /* ⚠️ 入场动效**不能用 scale**：`getBoundingClientRect` 会把缩放算进尺寸，
    动画期间的按钮实测只有 43px，撞本仓 44px 触屏红线（_test/mobile_check M2/M3 逐控件实测）。
@@ -290,10 +341,10 @@ html[data-theme="light"] #gl-fallback{filter:none}
   color:var(--muted);transition:color .24s ease,border-color .24s ease}
 .face-hud-state.on{color:var(--accent2);border-color:rgba(57,208,196,.45);background:rgba(57,208,196,.08)}
 .face-hud-state.warn{color:#f0b354;border-color:rgba(240,179,84,.45);background:rgba(240,179,84,.08)}
-.face-hud-stage{position:relative;border-radius:10px;overflow:hidden;background:#05070f;min-height:104px}
-.face-hud video{width:100%;height:104px;object-fit:cover;border-radius:10px;background:#05070f;
+.face-hud-stage{position:relative;border-radius:10px;overflow:hidden;background:#05070f;min-height:120px}
+.face-hud video{width:100%;height:120px;object-fit:cover;border-radius:10px;background:#05070f;
   transform:scaleX(-1);transition:opacity .3s ease}
-.face-hud-idle{position:absolute;inset:0;height:104px;display:flex;flex-direction:column;align-items:center;
+.face-hud-idle{position:absolute;inset:0;height:120px;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:4px;font-size:12px;color:var(--ink);text-align:center;line-height:1.5}
 /* 开关：轨道 38×22，点击区 ≥44px（触屏红线，mobile_check M2/M3 实测） */
 .face-hud-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -328,14 +379,10 @@ html[data-theme="light"] #gl-fallback{filter:none}
 .face-row{font-size:12.5px;color:var(--muted);margin-top:6px}
 
 @media (max-width:768px){
-  .face-hud{left:12px;right:12px;width:auto;bottom:158px;display:grid;
-    grid-template-columns:auto 1fr;grid-template-areas:"head head" "stage tag" "act act";
-    align-items:center;gap:8px 10px}
-  .face-hud-head{grid-area:head}
-  .face-hud-stage{grid-area:stage;min-height:60px}
-  .face-hud-tag{grid-area:tag;flex:1 1 auto}
-  .face-hud-actions{grid-area:act;justify-content:space-between}
+  /* 入坞后（r109）窄屏不再需要另配 grid 定位：面板天然满坞宽，只压小预览高度 */
+  .face-row-dock{padding:0 14px}
   .face-hud video,.face-hud-idle{width:96px;height:60px}
+  .face-hud-stage{min-height:60px}
   .face-video{width:100%;aspect-ratio:16/9}
   #btn-face-scan{width:100%}
 }

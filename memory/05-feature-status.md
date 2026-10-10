@@ -10,20 +10,7 @@
 
 ## ✅ 已实现（r80，2026-09-29 · 一键点亮默认打开）
 
-- [x] **一键点亮默认打开**：每次加载自动播一次「清屏→六色逐颗点亮」（`src/js/app.js` 4.6 节 `startOpeningShow()`）。
-      与手动演示态两处差异：不加 `body.showtime`（叙事/对话坞全程可点）、播完自动回到「我的记忆」；
-      `prefers-reduced-motion: reduce` 下不自动播（判据 `a11y_check` A5b）。手动那条路行为逐字未变。
-      验收 = `AC-OBS-24` + `_test/lightshow_check.py` 判据⑧（四态同步点 `window.__XINYU__.opening`）。
-
 ## ✅ 已实现（r90，2026-10-02 · 产物在位闸认搬卷 + 发布留痕唯一性）
-
-- [x] **归档通路打通**：`_test/deliverable_inventory_check.py` 现读 `git diff --cached -M --name-status -z HEAD`，
-      把「逐字节等价的暂存搬卷」与「丢失」分开；`ARCHIVE_ROOTS=("交付物","archive/交付物-历史轮次")` 一处两用
-      （既是 ④ 腿分母，也是被认落点）⇒ 搬走仍在守面内。落盘：两个重复打包 zip → `archive/`，交付物 184.8→**129.5 MB**。
-      反例三条皆仍红（面外 / `score<100` / 新落点不在磁盘），git 取不到 ⇒ 不替任何搬迁背书。
-- [x] **R7 版本段唯一性**：`release_governance_check.py` 新增一条「一个版本号只许一个 `## [x.y.z]` 段」，
-      真面当场抓出 `1.7.0@行57,102`；同时把 tag 之后的轮次（r83续/r84/r85）从 1.7.0 段搬回 `[Unreleased]`（正文零删除）。
-      验收 = `RELEASE-GOV-SELFTEST: 24/24` + `RELEASE-GOV-PASS` + `HOOK-DRILL-PASS`。
 
 ## ✅ 已实现（对标轮第二轮 2026-09-24：把首轮"赛后再做"直接落地）
 
@@ -47,4 +34,8 @@
 
 > 卷数以磁盘现读为准，本行不抄清单：`ls memory/05-feature-status.part*.md | wc -l`
 > （上一版这里写「卷1–8」时磁盘已有 9 卷 —— 与"文档手抄数字脱节"同族，改为给复算命令。）
+- **卷15** `05-feature-status.part15.md` — 05-feature-status 分卷（R199 自动拆卷）
+- **卷16** `05-feature-status.part16.md` — 05-feature-status 分卷（R199 自动拆卷）
+- **卷17** `05-feature-status.part17.md` — 05-feature-status 分卷（R199 自动拆卷）
+- **卷18** `05-feature-status.part18.md` — 05-feature-status 分卷（R199 自动拆卷）
 

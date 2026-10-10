@@ -85,6 +85,7 @@ python _test/j4_remote_down_check.py     # J4 熔断对照：服务端没有 /ap
 python _test/online_check.py             # 在线模式全链路回归：徽章 + 双路情绪探针 + 在线对话 + 危机拦截 + console 0 报错
 python _test/public_check.py             # 公网版验收：评委打开即在线AI（走服务端代理），密钥零暴露，console 0 ⇒ 更正注 r100：裸 `assert` 改判据链——腿名册 `LEGS`（10 条）是唯一分母，未走到的腿逐条记未验，`report()` 单出口保证结论行在任何出口都印出来，`PX` 兜底腿接住未预期异常；退出码补成三态 0/1/2（playwright 或浏览器双档不可达 ⇒ rc=2 并印 `PUBLIC-CHECK-ENV-UNVERIFIED`）。在册对外 token `PUBLIC-ONLINE-ALL-PASS` 与 `KEY_LEAK: False` 两行**一字未动**（CONTRIBUTING.md / SECURITY.md / pull_request_template.md / AGENTS.md 的 AC-OBS-11 按它们取证），计数按 r40b 折进同一结论行：`PUBLIC-ONLINE-ALL-PASS 判红=0 未验=0 腿名册=10`。演习口 `--nav-timeout`：`1` ⇒ 真实导航超时 （P0 判红 + 其余 9 条记未验，rc=1）；`abc` ⇒ 仪器自崩，出 `PX` 结论行。
 node _test/emotion_eval.js               # 情绪引擎评测：词典层准确率（技术实现维度的可复现数字）
+python _test/core_capability_baseline_check.py   # r111 双核心能力基线棘轮（用户立规：表情识别+语意理解=每轮第一要务）：复算 语意评测集/表情引擎单测/vendor 完整性 三面，与 `_test/core-capability-baseline.json` 对账，任一回退即判红（只降不升）；`--selftest` 抬高基线必须逐项判红（4/4）；环境未验 rc=2 不当绿。目标/指标/轨迹表 = `memory/10-core-capabilities.md`
 # ↓ 同批第二刀：G16 首跑又抓到 10 条（r35–r50 落地的判据/探针/通道件，同样从未进本文明细）
 python _test/ci_watch.py                 # push 后的 CI 回执看守（把"看 CI"从人记得住，变成一条命令必跑）
 python _test/lightshow_check.py          # 一键点亮验收：清屏（UI 让位）+ 六色各自可见 + 铺得够满够散 + 播完不自动跳回

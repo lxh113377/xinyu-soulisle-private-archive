@@ -21,12 +21,16 @@
 | `src/vendor/gsap.min.js` | GSAP **3.15.0** | **GreenSock Standard License**（非 MIT、非 OSI；免费用于非竞争性产品） | https://gsap.com / https://github.com/greensock/GSAP | 五幕滚动叙事的补间 | 随源码分发允许，但**不得**用它构建与 GSAP 竞争的动画产品；条款以 https://gsap.com/standard-license 为准 |
 | `src/vendor/ScrollTrigger.min.js` | ScrollTrigger **3.15.0** | **GreenSock Standard License**（同 GSAP 主库，成对使用） | 同上 | 滚动进度驱动与 `ScrollTrigger.refresh()` | 同上；两文件必须同版本（由 `vendor_freshness_check.py` V2 版本对账保证） |
 | `_test/vendor/axe-core-4.10.2.min.js` | axe-core **4.10.2** | **MPL-2.0**（banner 自证 `Copyright (c) 2015 - 2024 Deque Systems, Inc.` + `Mozilla Public License, v. 2.0`） | https://github.com/dequelabs/axe-core | r42 起的运行时无障碍审计引擎（`a11y_check.py` 注入用） | **不进公网 bundle**（判据依赖而非首屏载荷）；MPL 是**文件级**copyleft ⇒ 不修改该文件即无开源义务外溢，若打补丁则须按 MPL 提供该文件的源码可用版本；版权行已保留在文件头 |
+| `src/vendor/mediapipe/vision_bundle.js` | @mediapipe/tasks-vision **0.10.22-rc.20250304** | **Apache-2.0**（上游 banner 在本仓这份里已被压缩，许可全文以同目录 `LICENSE-Apache-2.0.txt` 旁证） | https://github.com/google-ai-edge/mediapipe | r87 面部表情识别：FaceLandmarker 的 ESM 入口 | **懒加载**：只在用户点开表情感知时才下载；上游文件名为 `vision_bundle.mjs`，本仓因静态托管对 `.mjs` 的 MIME 不统一而改名 `.js`（内容字节未改，sha256 与上游一致） |
+| `src/vendor/mediapipe/vision_wasm_internal.js` | MediaPipe vision wasm loader（SIMD）**0.10.22-rc.20250304** | **Apache-2.0**（同目录 `LICENSE-Apache-2.0.txt` 旁证） | 同上 | wasm 加载器（SIMD 版） | 同上；**未 vendor 非 SIMD 套件**（9.4MB）：目标浏览器自 2021 年起全支持 SIMD，非 SIMD 浏览器由 `face-engine.js` 显式探测并降级为"不可用"，不白屏 |
+| `src/vendor/mediapipe/vision_wasm_internal.wasm` | MediaPipe vision wasm binary（SIMD）**0.10.22-rc.20250304** | **Apache-2.0**（二进制无法自带 banner ⇒ 同目录 `LICENSE-Apache-2.0.txt` 旁证） | 同上 | 推理内核（9.57MB） | 懒加载；`.gitattributes` 已钉 `*.wasm binary`，字节永不被行尾改写（否则哈希类判据在他人机器上不可复算） |
+| `src/vendor/mediapipe/face_landmarker.task` | MediaPipe FaceLandmarker model **float16/1** | **Apache-2.0**（模型权重随上游 Apache-2.0 分发；同目录 `LICENSE-Apache-2.0.txt` 旁证） | https://ai.google.dev/edge/mediapipe | 人脸关键点 + 52 维 blendshape 的模型权重（3.76MB） | 懒加载；**不可再训练再分发**以外的用途均在上游许可内；本仓不修改权重、不落任何人脸数据（画面只在内存里过一遍，零上传零落盘） |
 
 ## 本项目自研代码
 
-除上表**四个**文件（`src/vendor/` 三件及其在 `deploy/xinyu/vendor/` 的逐字节副本，加上 `_test/vendor/` 的
-axe-core 测试资产）外，`src/`、`server/`、`_test/`（`_test/vendor/` 除外）、`deploy/functions/`
-等全部由心屿 MindIsle 团队原创，按 `LICENSE` 的 **MIT** 授权。
+除上表**八个**文件（`src/vendor/` 三件 + `src/vendor/mediapipe/` 四件及其在 `deploy/xinyu/vendor/` 的
+逐字节副本，加上 `_test/vendor/` 的 axe-core 测试资产）外，`src/`、`server/`、`_test/`（`_test/vendor/` 除外）、
+`deploy/functions/` 等全部由心屿 MindIsle 团队原创，按 `LICENSE` 的 **MIT** 授权。
 
 ## 参赛与展示场景的口径（本项目实际情形）
 

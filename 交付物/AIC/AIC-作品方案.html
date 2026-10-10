@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>心屿 MindIsle · AIC 作品方案</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 16mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "SimHei", "DengXian", sans-serif;
+    font-size: 10.5pt; line-height: 1.72; color: #1b2430; margin: 0; }
+  .cover { page-break-after: always; text-align: center; padding-top: 40mm; }
+  .cover h1 { font-size: 30pt; margin: 0 0 6mm; letter-spacing: 2px; }
+  .cover .sub { font-size: 13.5pt; color: #4a5b70; margin-bottom: 14mm; }
+  .cover .track { font-size: 11pt; color: #33475f; border: 1px solid #c8d4e2;
+    display: inline-block; padding: 4mm 8mm; border-radius: 3px; margin-bottom: 22mm; }
+  .cover table { margin: 0 auto; border: none; font-size: 10.5pt; }
+  .cover td { border: none; padding: 2mm 4mm; text-align: left; }
+  .cover td.k { color: #6b7c91; text-align: right; white-space: nowrap; }
+  h2.ch { font-size: 15pt; margin: 0 0 5mm; padding: 2mm 0 2mm 4mm;
+    border-left: 4px solid #2f6fbf; background: #f2f6fb; page-break-before: always; }
+  h2.ch:first-of-type { page-break-before: avoid; }
+  h3 { font-size: 12pt; margin: 6mm 0 3mm; color: #22456f; }
+  h4 { font-size: 10.8pt; margin: 4mm 0 2mm; color: #33475f; }
+  p { margin: 0 0 3mm; text-align: justify; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.5mm; }
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; font-size: 9.4pt; }
+  th, td { border: 1px solid #c3cfdd; padding: 2mm 2.5mm; text-align: left; vertical-align: top; }
+  th { background: #eef3f9; font-weight: 600; }
+  td.c, th.c { text-align: center; }
+  table.narrow { font-size: 9pt; }
+  figure { margin: 4mm 0; text-align: center; break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid #ccd7e3; border-radius: 2px; }
+  figcaption { font-size: 8.6pt; color: #6b7c91; margin-top: 1.5mm; }
+  .box { border: 1px solid #d6c9a8; background: #fdf9ef; padding: 3mm 4mm;
+         margin: 4mm 0; font-size: 9.6pt; border-radius: 2px; break-inside: avoid; }
+  .box .t { font-weight: 700; color: #8a6a1f; margin-bottom: 1.5mm; }
+  .kv { border-left: 3px solid #2f6fbf; background: #f6f9fc; padding: 2.5mm 4mm;
+        margin: 3mm 0; font-size: 9.6pt; break-inside: avoid; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: #6b7c91; }
+  .tag { display: inline-block; background: #e8f0f9; color: #2f6fbf;
+         border-radius: 2px; padding: 0 1.5mm; font-size: 8.6pt; margin-right: 1mm; }
+  .tag.warn { background: #fdeeee; color: #b23b3b; }
+  pre { background: #f5f7fa; border: 1px solid #dde5ee; padding: 3mm 4mm;
+        font-size: 8.4pt; line-height: 1.5; margin: 3mm 0; white-space: pre;
+        font-family: "Consolas", "SimSun", monospace; break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<!-- ============ 封面 ============ -->
+<div class="cover">
+  <h1>心屿 MindIsle</h1>
+  <div class="sub">对话陪聊 + 情感陪伴的 AI 网页应用<br>
+    本地微调情绪模型 × 三级共识路由 × 滚轮驱动的 3D 情绪叙事</div>
+  <div class="track">2026 第八届全球校园人工智能算法精英大赛<br>算法创新赛 · 赛题 2「AI+软件创新」</div>
+  <table>
+    <tr><td class="k">作品名称</td><td>心屿 MindIsle</td></tr>
+    <tr><td class="k">作品形态</td><td>网页应用（Web 前端 + Java 服务端 + 本地微调模型服务）</td></tr>
+    <tr><td class="k">在线演示</td><td>https://xinyu-soulisle.pages.dev</td></tr>
+    <tr><td class="k">团队成员</td><td>＿＿＿＿＿＿（队长）、＿＿＿＿＿＿、＿＿＿＿＿＿（以报名系统为准，≤3 人）</td></tr>
+    <tr><td class="k">提交日期</td><td>2026 年 10 月</td></tr>
+  </table>
+</div>
+
+<!-- ============ （一）产品概述与定位 ============ -->
+<h2 class="ch">（一）产品概述与定位</h2>
+
+<h3>1.1 背景与目标</h3>
+<p>中国科学院心理研究所发布的心理健康蓝皮书《中国国民心理健康发展报告（2021～2022）》显示，成年人群抑郁风险检出率为 <span class="num">10.6%</span>、焦虑风险检出率为 <span class="num">15.8%</span>；其中 <b>18～24 岁年龄组的抑郁风险检出率达到 24.1%</b>，显著高于其他年龄组。同系列《2020 年大学生心理健康现状与需求》调查显示，大学生中 <span class="num">18.5%</span> 有抑郁倾向、<span class="num">4.2%</span> 处于抑郁高风险；2025 年发布的《心理健康蓝皮书（2023—2024）》基于全国 79 家机构、逾 17 万份样本进一步确认了这一趋势。</p>
+<p>这些数字说明：情绪困扰在大学生群体中是<b>高频、常态、以非病理性为主</b>的状态。大部分人需要的不是临床干预，而是一个<b>随时可说话、说出来有人接住</b>的日常出口。而现有"陪伴类"产品普遍存在三个结构性缺口：</p>
+<table>
+  <tr><th style="width:14%">缺口</th><th style="width:44%">表现</th><th>后果</th></tr>
+  <tr><td><b>只聊天</b></td><td>通用聊天机器人不识别情绪，回复与情绪状态无关</td><td>用户说"我很难过"，得到的仍是通用话术</td></tr>
+  <tr><td><b>不感知</b></td><td>情绪不被结构化抽取，只隐含在上下文里</td><td>系统无法基于情绪做策略选择，无法"对症"</td></tr>
+  <tr><td><b>看不见</b></td><td>对话结束即结束，情绪没有被记录、没有趋势</td><td>用户感受不到"被持续理解"，陪伴关系无法积累</td></tr>
+</table>
+<p><b>本作品的目标</b>：把"情绪"从聊天文本里抽出来，让它被<b>识别</b>（三路证据的情绪判定）、被<b>呈现</b>（3D 星雾随情绪变色）、被<b>记住</b>（情绪曲线），并在危机信号出现时被<b>确定性兜底</b>（规则短路 + 热线转介）——让陪伴产品真正做到"懂你"，而不是"回你"。</p>
+
+<h3>1.2 产品定位</h3>
+<table>
+  <tr><th style="width:22%">维度</th><th>定位</th></tr>
+  <tr><td>产品类型</td><td>AI 赋能软件（Web 端智能应用系统，含服务端与本地 AI 模型服务）</td></tr>
+  <tr><td>目标用户</td><td>高校在校学生（18～24 岁）：学业压力、考试焦虑、人际冲突、情感困扰、疲惫空洞等高频情绪场景</td></tr>
+  <tr><td>核心功能</td><td>情绪识别（词典 + 本地微调模型 + 大模型三路证据）→ 共情对话生成 → 3D 情绪星雾可视化 → 情绪曲线记忆 → 危机拦截转介</td></tr>
+  <tr><td>差异化优势</td><td>① <b>算法精度可验证</b>：自建评测集 73 条准确率 98.6%（<code>GET /api/emotion/eval</code> 现场可复跑），自研微调模型在 237 条冻结盲测集上准确率 92.2%、单条 26.6 ms；② <b>运行效率</b>：共识快判 13–60 ms，不依赖云端即可完成情绪判定；③ <b>场景适配</b>：断网可用（本地模型腿 + 词典腿离线）、免登录体验、危机安全边界规则化</td></tr>
+</table>
+<div class="kv"><b>一句话定位</b>：一个"情绪被识别、被看见、被记住、被安全兜底"的校园情感陪伴 Web 应用——情绪判定不靠玄学，靠可复跑的评测证据。</div>
+
+<!-- ============ （二）技术架构与创新 ============ -->
+<h2 class="ch">（二）技术架构与创新</h2>
+
+<h3>2.1 整体架构</h3>
+<pre>
+用户输入（文字 / 语音）
+      │
+      ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ ① 感知层 · 三级情绪路由（服务端 Java 引擎）                │
+ │    ⓪ 危机词短路：命中 → 立即拦截转介，不调用任何模型        │
+ │    ① 词典快判（本地规则，106 触发词 + 否定/程度修正，≈0ms）  │
+ │    ② 本地微调模型（chinese-roberta-wwm-ext，≈27ms，离线）  │
+ │       共识 → 双证据采信；分歧 → 词典裁决（分歧信号入证据链）  │
+ │    ③ 大模型精判（DeepSeek，可选仲裁策略，route 开关切换）    │
+ └────────────────────────────────────────────────────────┘
+      │ 情绪标签 + 强度 + 判定路径（逐条展示）
+      ▼
+ ┌────────────────────────────┐    ┌──────────────────────────┐
+ │ ② 决策/生成层 chat-agent    │    │ ③ 呈现层 three-scene      │
+ │ 情绪条件化系统提示 + 近10轮  │───▶│ 情绪→颜色/粒子点亮数量映射  │
+ │ 上下文 → SSE 逐字流式生成    │    │ WebGL，无 WebGL 降级渐变   │
+ │ 失败 → 离线共情模板(明示)    │    └──────────────────────────┘
+ └────────────────────────────┘
+      │ 每条情绪记录
+      ▼
+ ┌────────────────────────────┐
+ │ ④ 记忆层 memory-store       │
+ │ 情绪曲线（本机默认，服务端可选）│
+ └────────────────────────────┘
+</pre>
+<p>判定路径随每条回复逐条展示（如"词典+模型共识（conf=0.86）"），情绪判定不是"模型说它理解了"，而是把每一路的证据摆出来给用户看。</p>
+
+<h3>2.2 技术选型</h3>
+<table class="narrow">
+  <tr><th style="width:18%">层次</th><th style="width:34%">选型</th><th>选型依据</th></tr>
+  <tr><td>情绪判定·模型腿</td><td>chinese-roberta-wwm-ext 本机微调（PyTorch + Transformers）</td><td>中文语义理解成熟、参数量适中（102M），单卡 12GB（RTX 5070 Ti）即可微调，6 个 epoch 约 5 分钟；推理 26.6 ms/条，可完全离线，无按次成本</td></tr>
+  <tr><td>情绪判定·词典腿</td><td>自研词典引擎（106 情绪触发词 + 9 否定词 + 10 程度副词 + 12 危机词）</td><td>零延迟、可解释、离线可用；与模型腿构成共识双证据，并为危机拦截提供确定性规则底座</td></tr>
+  <tr><td>情绪判定·LLM 腿</td><td>DeepSeek（OpenAI 兼容 API，经服务端同源代理）</td><td>语义精判与共情生成；调用受三级路由调度，共识场景下 LLM 调用次数降为 0，成本与延迟可控</td></tr>
+  <tr><td>服务端</td><td>JDK 17 / Spring Boot 3.2.5 / MyBatis-Plus 3.5.7</td><td>单体应用承载 API 与静态页；H2 文件库默认、MySQL 8 可切换</td></tr>
+  <tr><td>模型服务</td><td>FastAPI + Uvicorn（HTTP/1.1 显式强制）</td><td>与 Java 服务端解耦部署；实测中发现 JDK HttpClient 默认 HTTP/2 的 <code>Upgrade: h2c</code> 头会导致 uvicorn 丢弃请求体，显式降级 HTTP/1.1 修复</td></tr>
+  <tr><td>前端</td><td>原生 ES Module JavaScript，无构建、无前端框架；Three.js r128 + GSAP 3.12（本地 vendor）</td><td>零打包、依赖本地化、离线可跑；3D 粒子星雾与滚动叙事的渲染需求原生 JS 即可胜任</td></tr>
+  <tr><td>部署</td><td>Cloudflare Pages（主）/ 腾讯云 CloudBase（备）/ Docker 镜像（482 MB）/ Java fat jar</td><td>公网免配置体验 + 私有化部署两条路都通</td></tr>
+</table>
+<p class="muted">第三方服务如实声明：大模型能力来自 DeepSeek（OpenAI 兼容接口）。情绪词典引擎、评分公式、微调训练与推理服务、三级路由、可视化渲染、叙事交互、降级策略与危机拦截规则均为本团队自主设计与实现。</p>
+
+<h3>2.3 创新应用</h3>
+<h4>创新点 1：三级共识路由——把"模型准不准"变成一个可切换、可实测的工程问题</h4>
+<p>业界常见做法是"接一个大模型完事"。本作品把情绪判定拆成<b>危机短路 → 词典×模型共识 → LLM 可选仲裁</b>三级，并用一个 <code>route</code> 开关把两种仲裁策略（词典裁决 / LLM 仲裁）做成<b>可现场切换的对照实验</b>。两种策略的取舍不是拍脑袋，而是被在线实测否决/证实过的（见 4.3 节：分歧升 LLM 使 73 条在线准确率从 98.6% 倒退至 94.5%，故上线策略采用词典裁决）。</p>
+<h4>创新点 2：危机安全边界永不概率化</h4>
+<p>自伤/轻生类表达命中危机词表时，系统<b>跳过全部生成与判定逻辑</b>，直接返回专业求助热线（全国心理援助热线 12356 等）。危机判定是确定性规则，绝不交给模型的随机性，也绝不在该路径上等待网络——盲测集 6 条危机改写句的实测结果反过来证明了这条规则的必要性（见 6.3 节）。</p>
+<h4>创新点 3：情绪驱动的 3D 可视化闭环</h4>
+<p>情绪标签与强度实时映射为 3D 星雾的颜色与粒子点亮数量（主情绪定主色，次情绪达主情绪分值 40% 才渲染第二种颜色，避免噪声词干扰画面），对话、可视化、记忆曲线三者共享同一条情绪数据流。</p>
+<h4>创新点 4：离线可用 + 诚实降级</h4>
+<p>浏览器应用壳（Service Worker）分级缓存：断网后五幕叙事与本地词典引擎对话完整可用；大模型不可用时切换离线共情模板并<b>明示"离线"</b>，绝不允许把模板伪装成在线 AI。对标实测：16 个同类开源项目中没有一家用浏览器应用壳做网页离线可用。</p>
+
+<!-- ============ （三）功能设计与实现 ============ -->
+<h2 class="ch">（三）功能设计与实现</h2>
+
+<h3>3.1 核心功能的 AI 实现</h3>
+<h4>3.1.1 三级情绪路由（感知层）</h4>
+<p>服务端引擎对每条输入并行产出词典读数与模型读数，路由规则如下（真实实现，非伪代码）：</p>
+<pre>public Outcome classify(String text) {
+    EmotionEngine.ScanResult lex = EmotionEngine.scan(text);
+    Verdict lexVerdict = new Verdict(lex.emotion(), lex.intensity());
+    if (lex.crisis()) {                       // ⓪ 危机短路：确定性规则，不调用任何模型
+        return new Outcome(lex, null, null, new Verdict("crisis", 1), "词典·危机拦截");
+    }
+    if (!"lexicon".equalsIgnoreCase(route) && model.enabled()) {
+        ModelProxy.Verdict mv = model.classify(text);     // ① 本地微调模型腿
+        if (mv != null) return routedFromModel(lex, mv, text);
+    }
+    return legacyRoute(text, lexVerdict);     // ② 模型腿不可用 → 词典+LLM 原双路
+}
+
+private Outcome routedFromModel(ScanResult lex, Verdict mv, String text) {
+    if (mv.emotion().equals(lex.emotion())) { // 共识：双证据采信，模型置信度留证据链
+        return new Outcome(lex, mv, null, new Verdict(lex.emotion(), lex.intensity()),
+                String.format("词典+模型共识（conf=%.2f）", mv.confidence()));
+    }
+    // 分歧 → 词典裁决。在线实测（2026-10-09）：若分歧升 LLM，10 条分歧中 LLM 错 4 条，
+    // 73 条在线准确率 98.6% → 94.5% 倒退，故 LLM 不持有判定权；
+    // LLM 仲裁语义完整保留在 route=lexicon（旧双路），route 开关即两种策略的对照实验。
+    return new Outcome(lex, mv, null, new Verdict(lex.emotion(), lex.intensity()),
+            "词典与模型分歧 → 词典裁决");
+}</pre>
+<p>该设计的结构性保证：共识与分歧两条路径的最终读数都锚定词典，因此路由层在词典主场评测集上的行为<b>恒等于词典基线</b>（2026-10-09 实测：离线/在线双口径均为 98.6%，72/73，miss 集合与词典基线逐条相同）——升级模型腿<b>不会让既有准确率倒退</b>。</p>
+
+<h4>3.1.2 共情对话生成（决策/生成层）</h4>
+<p>系统把识别到的情绪注入系统提示（例如"用户刚说的话被识别为主要情绪『低落』"），拼接近 10 轮上下文后调用大模型生成共情回复，限制字数与语气并要求结尾抛出开放式问题；回复以 SSE 逐字流式返回，上游不支持流式时自动回落整包并如实变更模式标签。</p>
+
+<h3>3.2 辅助功能</h3>
+<table>
+  <tr><th style="width:24%">功能</th><th>说明</th></tr>
+  <tr><td>情绪曲线（第四幕）</td><td>每次对话的情绪（含次情绪）被记录并绘制为变化曲线，默认存本机、可选服务端留存，支持一键清除与导出</td></tr>
+  <tr><td>模式自证</td><td>界面始终明示当前判定路径与生成模式（在线大模型 / 离线共情模板）及真实耗时，逐条回复可见</td></tr>
+  <tr><td>设置面板</td><td>可切换 DeepSeek / OpenAI / 通义千问 / Kimi / 本地 Ollama 或任意 OpenAI 兼容端点；密钥框 type=password 且永不回显</td></tr>
+  <tr><td>语音输入</td><td>Web Speech API 中文语音输入</td></tr>
+  <tr><td>隐私本位</td><td>对话与情绪记录默认留在本机浏览器，不上传；公网部署版前端零密钥（密钥仅在服务端环境变量/云端 secret）</td></tr>
+</table>
+
+<figure><img src="img/s01_entrance.png"><figcaption>图 1　第一幕 · 相遇：滚轮驱动的 3D 星空叙事入口，免注册免配置直接进入</figcaption></figure>
+
+<h3>3.3 扩展性设计</h3>
+<ul>
+  <li><b>模型腿热插拔</b>：模型服务地址经 <code>model-url</code> 配置注入，未配置时引擎行为与旧双路完全一致——模型腿是增强项而非依赖项；</li>
+  <li><b>route 开关</b>：<code>route=auto</code>（共识+词典裁决）与 <code>route=lexicon</code>（词典+LLM 仲裁）两种策略可切换，天然支持答辩现场做策略对照演示；</li>
+  <li><b>词表单一真相源</b>：情绪词典被浏览器端引擎与 Java 服务端引擎共享，读取失败一律终止启动，绝不静默回退旧词表；一致性由守卫脚本三层比对（词表结构 / 逐条预测 / 汇总指标）；</li>
+  <li><b>评测内建</b>：<code>GET /api/emotion/eval</code> 随时复跑 73 条评测集并输出逐条结果与汇总指标，评委可现场验证。</li>
+</ul>
+
+<!-- ============ （四）开发测试与部署 ============ -->
+<h2 class="ch">（四）开发测试与部署</h2>
+
+<h3>4.1 开发流程</h3>
+<table class="narrow">
+  <tr><th style="width:16%">阶段</th><th style="width:20%">时间</th><th>内容与产出</th></tr>
+  <tr><td>需求与设计</td><td>第 1–2 周</td><td>痛点调研、三缺口分析、功能矩阵与验收方式定义（每项需求绑定可复核判据）</td></tr>
+  <tr><td>核心引擎</td><td>第 3–5 周</td><td>词典引擎与评分公式、双路仲裁、危机词表；词表单一真相源与两端一致性守卫</td></tr>
+  <tr><td>可视化与叙事</td><td>第 4–6 周</td><td>Three.js 星雾、五幕滚动叙事、情绪→颜色映射、降级链路</td></tr>
+  <tr><td>模型补强</td><td>第 7–8 周</td><td>数据管道（公开语料映射 + 生成式对抗样本）、chinese-roberta-wwm-ext 本机微调、三级共识路由、盲测对比</td></tr>
+  <tr><td>测试与加固</td><td>贯穿全程</td><td>JUnit 用例库、覆盖率门禁、契约对账、视觉/像素回归、容器化验证</td></tr>
+  <tr><td>部署与交付</td><td>第 8–9 周</td><td>三路部署、在线演示、演示视频与参赛材料</td></tr>
+</table>
+<p class="muted">团队分工按报名系统最终名单填写（≤3 人）：队长负责总体设计与服务端引擎，成员分别负责前端可视化与模型训练/评测链路（具体分工以实际报名信息为准）。</p>
+
+<h3>4.2 代码实现</h3>
+<h4>词典评分公式（可解释性来源）</h4>
+<p>词典层对每类情绪累加 <b>权重 × 修正系数</b>：取命中词前 3 字窗口，命中否定词则系数取 −0.7（否定词若被程度副词覆盖则不生效），再对窗口内命中的程度副词逐个相乘（如"非常"×1.5、"有点"×0.6）。仅总分 &gt; 0 才计入候选，取最高分为主情绪；次情绪需达到主情绪分值的 40% 才参与渲染。</p>
+<h4>本地模型代理（ModelProxy，节选）</h4>
+<pre>public Verdict classify(String text) {
+    if (!enabled()) return null;                     // 未配置 → null，路由层自动走旧双路
+    HttpRequest req = HttpRequest.newBuilder(URI.create(url + "/classify"))
+            .timeout(Duration.ofMillis(timeoutMs))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(payload, UTF_8)).build();
+    HttpResponse&lt;String&gt; resp = http.send(req, BodyHandlers.ofString(UTF_8));
+    if (resp.statusCode() != 200) { LOGGER.warn("non-200 status={}", resp.statusCode()); return null; }
+    JsonNode j = mapper.readTree(resp.body());
+    String emotion = j.path("emotion").asText("");
+    if (!EmotionLexicon.EMOTIONS.contains(emotion)) return null;   // 非法标签一律拒绝
+    double confidence = Math.max(0, Math.min(1, j.get("confidence").asDouble()));
+    return new Verdict(emotion, intensity, confidence);            // 任何失败都显式回落并留日志
+}</pre>
+<p>工程细节沉淀：回环调用必须显式 <code>NO_PROXY</code>（系统代理会转手本机请求）；JDK HttpClient 默认 HTTP/2 会发送 <code>Upgrade: h2c</code> 头导致 uvicorn 丢弃请求体（表现为 FastAPI 422），显式强制 HTTP/1.1 修复——两条都是实测踩坑后固化的修复。</p>
+
+<h3>4.3 测试与优化</h3>
+<h4>测试体系</h4>
+<table class="narrow">
+  <tr><th style="width:24%">测试类别</th><th>规模与结果</th></tr>
+  <tr><td>单元/集成测试（JUnit 5 + Mockito）</td><td><b>101 个用例全绿</b>；模型腿测试桩用 blackHole 断言证明不触碰网络</td></tr>
+  <tr><td>覆盖率门禁</td><td>LINE <b>97.00%</b> / BRANCH <b>95.21%</b>，守卫脚本复算通过（低于阈值即构建失败）</td></tr>
+  <tr><td>情绪评测集（自建，73 条）</td><td>准确率 <b>98.6%</b>（72/73），危机召回 <b>6/6</b>；离线/在线双口径恒等，<code>/api/emotion/eval</code> 可复跑</td></tr>
+  <tr><td>冻结盲测集（237 条，与训练集零交集）</td><td>四路对比见 6.3 节；模型腿 <b>92.2%</b> / 26.6 ms</td></tr>
+  <tr><td>契约对账</td><td>前端与服务端对同一接口契约 1:1 对账（j2 契约测试全绿）</td></tr>
+  <tr><td>视觉/像素回归</td><td>星雾双色像素校验、页面断言回归全绿</td></tr>
+  <tr><td>容器化验证</td><td>Docker 镜像 482 MB；重启后数据留存；镜像内密钥扫描 CLEAN</td></tr>
+</table>
+
+<h4>被实测否决的两个设计（测试驱动的优化闭环）</h4>
+<div class="box"><span class="t">否决实验 1：模型高置信主判</span><br>
+最初设想让微调模型在模型腿可用时直接做主判。实测：模型单腿在 73 条词典主场评测集上仅 86.6%（12 条 miss 集中在否定/程度对抗句，如"没什么好难过的"），切换主判会<b>倒退</b>。结论：回退为共识语义，把词典的可解释性与模型的语义鲁棒性以"双证据"方式组合。<br><br>
+<span class="t">否决实验 2：分歧升 LLM 仲裁</span>
+在线实测把 10 条词典×模型分歧升给 LLM 仲裁后，73 条在线准确率从 98.6% <b>倒退至 94.5%</b>（LLM 错 4 条）。结论：上线策略改为词典裁决，LLM 仲裁保留为 <code>route=lexicon</code> 可切换语义——这个开关本身就是两种策略的对照实验，可在答辩现场演示。</div>
+
+<h4>训练与数据管道（模型腿的产生过程，全链路脚本可复现）</h4>
+<table class="narrow">
+  <tr><th style="width:22%">环节</th><th>内容</th></tr>
+  <tr><td>公开底料</td><td>SMP2020-ECDT 中文社媒情绪语料 1500 条（标签按内容抽样实测对齐后映射到本作品六类情绪体系，surprise 类弃用）</td></tr>
+  <tr><td>生成式对抗样本</td><td>DeepSeek 生成校园倾诉域样本 2122 条，经 self-consistency 过滤去重；含否定/程度对抗专项（"没什么好难过的""我一点都不紧张"类）</td></tr>
+  <tr><td>无泄漏断言</td><td>训练/开发/盲测三件套构建时做集合交集断言，零交集才放行；最终 train=3622 / dev=970 / blind=237</td></tr>
+  <tr><td>训练</td><td>chinese-roberta-wwm-ext，6 epoch，RTX 5070 Ti（12GB）实测约 5 分钟，dev 宏 F1 <b>0.890</b></td></tr>
+  <tr><td>服务化</td><td>FastAPI 推理服务（HTTP/1.1），Java 侧 ModelProxy 接入为三级路由中坚腿</td></tr>
+</table>
+
+<h3>4.4 部署方案</h3>
+<table>
+  <tr><th style="width:24%">部署路</th><th>说明</th></tr>
+  <tr><td>Cloudflare Pages（主）</td><td>公网免配置体验地址，前端静态托管 + 同源函数代理（密钥在云端环境变量，前端零密钥）</td></tr>
+  <tr><td>腾讯云 CloudBase（备）</td><td>国内备用链路</td></tr>
+  <tr><td>Docker</td><td>镜像 482 MB，含服务端与全部接口；数据卷持久化，重启后记录留存；镜像内密钥扫描 CLEAN</td></tr>
+  <tr><td>Java fat jar / 本地</td><td>私有化部署形态，可携带本地微调模型服务（三级路由完整形态），断网可用</td></tr>
+</table>
+<figure><img src="img/s02_chat_consensus.png"><figcaption>图 2　三级路由实测：回复下方逐条展示判定路径「词典+模型共识（conf=0.86）」、生成模式与真实耗时</figcaption></figure>
+<figure><img src="img/s03_crisis.png"><figcaption>图 3　危机安全边界：命中危机表达时跳过全部生成逻辑，直接返回专业求助热线（全国心理援助热线 12356 等），实测召回 6/6</figcaption></figure>
+<figure><img src="img/s04_curve.png"><figcaption>图 4　第四幕 · 记忆：情绪曲线（图中记录为本机实测产生，红色节点为一次危机拦截记录）</figcaption></figure>
+
+<!-- ============ （五）应用价值与展望 ============ -->
+<h2 class="ch">（五）应用价值与展望</h2>
+
+<h3>5.1 应用场景</h3>
+<table>
+  <tr><th style="width:22%">场景</th><th>价值</th><th style="width:16%">付费方</th></tr>
+  <tr><td>高校心理健康中心</td><td>咨询前后的轻量前置倾诉入口；中心可（经合规授权）查看群体情绪态势</td><td>学校 / 院系</td></tr>
+  <tr><td>班级 / 社团</td><td>期末、考研季等高压时段的情绪自测与疏导</td><td>学校 / 社团</td></tr>
+  <tr><td>个人用户</td><td>隐私优先的个人情绪陪伴与长期记录</td><td>个人订阅</td></tr>
+</table>
+<h3>5.2 市场分析</h3>
+<p>AI 陪伴赛道用户增长迅速但同质化严重：多数产品把大模型直接接进聊天框，情绪不可感知、不可验证、不可视。本作品的竞争力集中在三点：<b>可验证的判定证据链</b>（评测集现场复跑 + 逐条判定路径展示）、<b>本地模型腿带来的零边际成本与离线可用</b>（LLM 调用次数在共识语义下降为 0）、<b>规则化的危机安全边界</b>（校园场景的合规刚需）。这三点是当前同类产品普遍不具备、且评委可当场验证的差异点。</p>
+<h3>5.3 成果总结</h3>
+<ul>
+  <li>情绪判定：<b>三级共识路由</b>上线；自建 73 条评测集准确率 98.6%（危机召回 6/6，双口径恒等）；自研微调模型在 237 条冻结盲测集上准确率 <b>92.2%</b>、单条 26.6 ms；</li>
+  <li>工程质量：<b>101 个 JUnit 用例全绿</b>，覆盖率 LINE 97.00% / BRANCH 95.21%（门禁化）；前后端契约 1:1 对账；三路部署全部在线可用；</li>
+  <li>安全与诚信：危机拦截规则化且永不概率化；离线降级诚实标注，绝不以模板冒充在线 AI。</li>
+</ul>
+<h3>5.4 未来规划（不足与改进）</h3>
+<p>我们如实列出当前短板与对应的改进路线：</p>
+<table>
+  <tr><th style="width:26%">当前不足（如实声明）</th><th>改进方向</th></tr>
+  <tr><td><b>域偏移</b>：上线策略以词典读数为准，而盲测显示词典在口语化生成域仅 46.3%（模型 92.2%）——词典裁决保证了"不倒退"，但也意味着域外口语表达可能被判平/误判（如"撑不住了"被判 calm）</td><td>把固定"词典裁决"升级为<b>按域自适应加权</b>：词典无情绪词命中且模型高置信时采信模型，同时保留 73 条评测集作为回归硬门，扩评测集覆盖口语域</td></tr>
+  <tr><td><b>危机词表盲区</b>：盲测 6 条危机改写句仅命中 2 条（"想消失""撑不下去"类改写未覆盖）</td><td>扩充危机词表并引入改写样本回归（安全层改进，不涉及模型，优先级最高）</td></tr>
+  <tr><td><b>尚未开展真实用户试点</b></td><td>以免费在线版积累真实使用与反馈，再与高校心理中心接洽数据合规审查后的试点</td></tr>
+  <tr><td><b>大模型依赖第三方服务</b></td><td>本地模型腿已使核心判定不依赖云端；生成层后续可接入本地开源模型作为降级选项</td></tr>
+</table>
+
+<!-- ============ （六）附录 ============ -->
+<h2 class="ch">（六）附录</h2>
+
+<h3>6.1 软件设计资料</h3>
+<p>整体架构见 2.1 节；三级路由数据流：输入 → 危机短路（命中即拦截）→ 词典扫描与本地模型推理（并行证据）→ 共识/分歧裁决 → 判定路径标签随回复下发 → 前端渲染层与记忆层共享同一情绪数据流。降级时序：大模型不可用 → 离线共情模板（界面明示）；模型腿不可用 → 词典+LLM 原双路；两者皆不可用 → 仅词典（离线）；无 WebGL → CSS 渐变。</p>
+
+<h3>6.2 核心代码</h3>
+<p>三级路由核心实现见 3.1.1 节（真实源码节选）；本地模型代理见 4.2 节。完整代码包随作品材料提交（网盘链接，命名"参赛团队编号-赛题名称-作品名称-源码"）。</p>
+
+<h3>6.3 测试数据</h3>
+<h4>（1）73 条自建评测集（词典主场，判定回归硬门）</h4>
+<table class="narrow">
+  <tr><th>指标</th><th class="c">数值</th><th>说明</th></tr>
+  <tr><td>准确率</td><td class="c"><b>98.6%（72/73）</b></td><td>离线/在线双口径恒等；<code>GET /api/emotion/eval</code> 现场可复跑</td></tr>
+  <tr><td>危机召回</td><td class="c"><b>6/6</b></td><td>危机词表短路层</td></tr>
+  <tr><td>路由路径分布</td><td class="c">共识 57 / 分歧 10 / 危机 6</td><td>73 条实测分布</td></tr>
+</table>
+<h4>（2）237 条冻结盲测集四路对比（与训练集零交集，口语化生成域）</h4>
+<table class="narrow">
+  <tr><th>判定腿</th><th class="c">accuracy（非危机 231 条）</th><th class="c">macro-F1</th><th class="c">危机召回</th><th class="c">平均延迟</th><th class="c">离线可用</th></tr>
+  <tr><td>词典引擎（规则）</td><td class="c">46.3%</td><td class="c">0.433</td><td class="c">2/6</td><td class="c">≈0 ms</td><td class="c">✅</td></tr>
+  <tr><td><b>本地微调模型</b>（自研）</td><td class="c"><b>92.2%</b></td><td class="c">0.913</td><td class="c">0/6*</td><td class="c"><b>26.6 ms</b></td><td class="c">✅</td></tr>
+  <tr><td>DeepSeek LLM（云端）</td><td class="c">97.0%</td><td class="c">0.974</td><td class="c">0/6*</td><td class="c">646.8 ms</td><td class="c">❌</td></tr>
+  <tr><td>三级路由（上线策略）</td><td class="c">46.3%</td><td class="c">0.433</td><td class="c">2/6</td><td class="c">30.5 ms</td><td class="c">✅</td></tr>
+</table>
+<p class="muted">* 模型与 LLM 未训危机类：危机识别由词典规则短路层专职负责，永不概率化。两个基准结论相反（词典主场 98.6% ≫ 模型 86.6%，生成域盲测模型 92.2% ≫ 词典 46.3%）正是<b>域偏移的量化证据</b>，已列为 5.4 节第一项改进。</p>
+<h4>（3）性能指标（自有环境实测）</h4>
+<table class="narrow">
+  <tr><th>指标</th><th class="c">数值</th><th>说明</th></tr>
+  <tr><td>情绪判定（共识路径）</td><td class="c">13–60 ms</td><td>含本地模型推理</td></tr>
+  <tr><td>危机拦截</td><td class="c">14 ms</td><td>规则短路，不调用模型</td></tr>
+  <tr><td>在线对话端到端</td><td class="c">约 1.0–1.4 s</td><td>含情绪识别与大模型流式生成</td></tr>
+  <tr><td>离线回落</td><td class="c">约 3 ms</td><td>离线共情模板</td></tr>
+  <tr><td>容器镜像</td><td class="c">482 MB</td><td>Docker 构建产物</td></tr>
+</table>
+<h4>（4）三级路由逐条实测样例（当次实测，判定路径随响应返回）</h4>
+<table class="narrow">
+  <tr><th>输入</th><th class="c">词典</th><th class="c">本地模型</th><th>判定路径</th><th class="c">最终</th></tr>
+  <tr><td>明天就要答辩了，压力好大</td><td class="c">fear</td><td class="c">fear (0.86)</td><td>词典+模型共识（conf=0.86）</td><td class="c">fear</td></tr>
+  <tr><td>凭什么每次都是我背锅，太气人了</td><td class="c">anger</td><td class="c">anger (1.00)</td><td>词典+模型共识（conf=1.00）</td><td class="c">anger</td></tr>
+  <tr><td>好累，什么都没意思</td><td class="c">sadness</td><td class="c">sadness (1.00)</td><td>词典+模型共识（conf=1.00）</td><td class="c">sadness</td></tr>
+  <tr><td>没什么好难过的</td><td class="c">sadness</td><td class="c">calm (0.99)</td><td>词典与模型分歧 → 词典裁决</td><td class="c">sadness</td></tr>
+  <tr><td>我一点都不紧张</td><td class="c">calm</td><td class="c">calm (0.99)</td><td>词典+模型共识（conf=0.99）</td><td class="c">calm</td></tr>
+  <tr><td>不想活了</td><td class="c">crisis</td><td class="c">—（短路）</td><td>词典·危机拦截</td><td class="c">crisis</td></tr>
+</table>
+<h4>（5）数据声明（诚信条款）</h4>
+<p>① 第 1.1 节心理健康数据来自公开出版物，已在文中标注；② 98.6%、92.2% 等均为团队在<b>自建评测集/盲测集与自有环境</b>下的实测，用于回归与一致性校验，不代表真实用户分布或第三方权威测评；③ 演示界面中的情绪曲线如标注"示例数据"则为演示样例；④ 5.1/5.2 节的商业模式为规划与估算，未经试点验证，不作为效果承诺；⑤ 尚未开展真实用户试点，相关用户反馈类佐证材料将随试点进展补充。</p>
+
+<h3>6.4 参考文献</h3>
+<ol class="narrow">
+  <li>中国科学院心理研究所《中国国民心理健康发展报告（2021～2022）》（心理健康蓝皮书，2023 年 2 月）</li>
+  <li>《2020 年大学生心理健康现状与需求》（心理健康蓝皮书系列）</li>
+  <li>《心理健康蓝皮书：中国国民心理健康发展报告（2023—2024）》（社会科学文献出版社，2025 年 4 月）</li>
+  <li>SMP2020-ECDT 中文社媒情绪分类公开数据集（用于训练底料，标签映射已声明）</li>
+  <li>Devlin et al., <i>BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding</i>, NAACL 2019；及其中文权重 hfl/chinese-roberta-wwm-ext（Apache-2.0）</li>
+  <li>2026 第八届全球校园人工智能算法精英大赛·算法创新赛竞赛通知与赛题规则（官方文件）</li>
+</ol>
+
+<h3>6.5 其他材料</h3>
+<p>专利/软著/用户使用证明等佐证材料按官方要求合并为单独 PDF 提交；完整代码包经百度网盘提交，网盘内文件统一命名"参赛团队编号-赛题名称-作品名称-XX（材料名称）"。</p>
+
+</body>
+</html>

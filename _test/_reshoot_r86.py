@@ -67,7 +67,12 @@ with sync_playwright() as p:
             shot(pg, "s01")
 
         # --- s06 收起坞的纯第一幕 ---
-        pg.click("#btn-dock")
+        # r108：#btn-dock 是三态循环（常规→全屏→收起），点到收起为止（最多 3 跳）
+        for _hop in range(3):
+            if not pg.eval_on_selector("#chat-dock", "e => e.classList.contains('open')"):
+                break
+            pg.click("#btn-dock")
+            pg.wait_for_timeout(600)
         pg.wait_for_timeout(900)
         pg.evaluate("() => window.scrollTo(0, 0)")
         pg.wait_for_timeout(1200)

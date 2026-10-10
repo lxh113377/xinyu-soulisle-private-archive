@@ -34,6 +34,11 @@ window.ThreeScene = (function () {
   let cursor = 0;        // 有序点亮的游标（沿螺旋由内向外推进 → 每色形成一圈色环）
   let blackoutT0 = 0;    // 「清屏」黑屏的截止时刻（performance.now() 毫秒）
   let showTimers = [];
+  /* 表情雾底色（r87）：实时表情感知开启时，让**未点亮**的暗星整体染上当前表情色并呼吸。
+     为什么只染未点亮的星：已点亮的那颗 = 被记住的某一瞬的情绪色，改写它等于篡改记忆；
+     为什么默认 null：null 时逐帧计算与 r87 之前**逐位相同**（暗星仍是无彩中性灰），
+     既有的双色像素判据不会因为加了这块而漂移。 */
+  let mistCur = null, mistTarget = null, mistKCur = 0, mistKTarget = 0;
 
   function init(canvas) {
     if (!window.THREE) return false;
@@ -269,6 +274,19 @@ window.ThreeScene = (function () {
       dimK = left > 0 ? 0 : Math.min(1, (now - blackoutT0) / 600);
       if (dimK >= 1) blackoutT0 = 0;
     }
+    // 表情雾：向目标色缓动（≈300ms 收敛），关掉时衰回 0 并置空 ⇒ 暗星回到中性灰
+    if (mistTarget) {
+      if (!mistCur) mistCur = mistTarget.slice();
+      for (let j = 0; j < 3; j++) mistCur[j] += (mistTarget[j] - mistCur[j]) * 0.12;
+      mistKCur += (mistKTarget - mistKCur) * 0.12;
+    } else if (mistCur) {
+      mistKCur -= mistKCur * 0.12;
+      if (mistKCur < 0.004) { mistCur = null; mistKCur = 0; }
+    }
+    const mK = mistCur ? mistKCur : 0;
+    const d0 = mistCur ? DIM[0] + (mistCur[0] - DIM[0]) * mK : DIM[0];
+    const d1 = mistCur ? DIM[1] + (mistCur[1] - DIM[1]) * mK : DIM[1];
+    const d2 = mistCur ? DIM[2] + (mistCur[2] - DIM[2]) * mK : DIM[2];
     const attr = colorAttr || points.geometry.attributes.aColor;
     const arr = attr.array;
     for (let i = 0; i < COUNT; i++) {
@@ -283,7 +301,7 @@ window.ThreeScene = (function () {
           cr *= boost; cg *= boost; cb *= boost;
         }
       } else {
-        cr = DIM[0] * dimK; cg = DIM[1] * dimK; cb = DIM[2] * dimK;
+        cr = d0 * dimK; cg = d1 * dimK; cb = d2 * dimK;
       }
       arr[i * 3]     = Math.min(1, cr * tw + pulse);
       arr[i * 3 + 1] = cg * tw * (1 - crisisPulse * 0.7);
@@ -306,5 +324,16 @@ window.ThreeScene = (function () {
     return out;
   }
 
-  return { init, setScrollProgress, setEmotion, setCrisis, lightUp, lightShow, cancelShow, douse, litInfo, sampleColors };
+  /** 表情雾底色：rgb=null 即关闭（回落到无彩暗星）。只影响未点亮的星。 */
+  function setMistTint(rgb, intensity) {
+    if (!rgb) { mistTarget = null; mistKTarget = 0; return false; }
+    mistTarget = [rgb[0], rgb[1], rgb[2]];
+    // 0.12~0.50：能看出「星雾跟着表情变色」，又不至于盖过已点亮的记忆色
+    mistKTarget = 0.12 + 0.38 * Math.min(1, Math.max(0, intensity || 0));
+    return true;
+  }
+  function mistInfo() { return { on: !!mistTarget, k: +mistKCur.toFixed(3), rgb: mistTarget ? mistTarget.slice() : null }; }
+
+  return { init, setScrollProgress, setEmotion, setCrisis, setMistTint, mistInfo,
+    lightUp, lightShow, cancelShow, douse, litInfo, sampleColors };
 })();

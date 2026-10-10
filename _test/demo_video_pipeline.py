@@ -120,9 +120,12 @@ def run_recording():
         timeout_hint = 25
 
         def dock(want_open):
-            """对话坞默认展开；只在状态不符时点 #btn-dock，防误折叠致控件出视口"""
-            is_open = pg.eval_on_selector("#chat-dock", "e => e.classList.contains('open')")
-            if is_open != want_open:
+            """对话坞默认展开；只在状态不符时点 #btn-dock，防误折叠致控件出视口。
+            r108：#btn-dock 是三态循环（常规→全屏→收起→常规）⇒ 一跳未必到位，最多点 3 次。"""
+            for _hop in range(3):
+                is_open = pg.eval_on_selector("#chat-dock", "e => e.classList.contains('open')")
+                if is_open == want_open:
+                    break
                 pg.click("#btn-dock"); pg.wait_for_timeout(600)
 
         # S1 片头：首屏星雾呼吸

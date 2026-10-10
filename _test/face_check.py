@@ -421,26 +421,34 @@ def browser_legs():
                         bad.append("F4 关闭后星雾底色没收回 ⇒ 表情色留在了星云上")
                     # 摄像头总闸（r87b）：关 = 入口全隐 + 状态 unavailable + 选择被记住；
                     # 再开 = 入口恢复（能否真用仍由能力探测说了算）。开关按钮必须永远可点。
-                    page.click("#btn-cam")
-                    page.wait_for_timeout(400)
-                    off = page.evaluate("""({pressed: document.getElementById('btn-cam').getAttribute('aria-pressed'),
+                    def set_cam(allow):
+                        """r109：总闸的家搬到设置面板（#set-face-cam）——开面板、切换、关面板。
+                        用 DOM click() 而非直接赋值 checked，保证 change 事件真触发（applyEnabled 才会跑）。"""
+                        page.click("#btn-settings")
+                        page.wait_for_timeout(300)
+                        page.evaluate("(v) => { const c = document.getElementById('set-face-cam');"
+                                      " if (c.checked !== v) c.click(); }", allow)
+                        page.wait_for_timeout(400)
+                        page.keyboard.press("Escape")          # 关设置面板（dialog 原生行为）
+                        page.wait_for_timeout(300)
+                    set_cam(False)
+                    off = page.evaluate("""({allowed: document.getElementById('set-face-cam').checked,
                         faceHidden: document.getElementById('btn-face').hidden,
                         scanHidden: document.getElementById('btn-face-scan').hidden,
                         ui: window.__XINYU_FACE_UI__, running: window.FaceEngine.isRunning(),
                         live: Array.from(document.querySelectorAll('video')).filter(v => !!v.srcObject).length,
                         stored: localStorage.getItem('peiliao.face.cam.v1')})""")
-                    if off["pressed"] != "false" or off["stored"] != "off":
+                    if off["allowed"] or off["stored"] != "off":
                         bad.append("F4 摄像头开关关闭未生效：aria-pressed=%s stored=%r" % (off["pressed"], off["stored"]))
                     if not (off["faceHidden"] and off["scanHidden"]) or (off["ui"] or {}).get("reason") != "cam-disabled":
                         bad.append("F4 关总闸后摄像头入口没消失/原因没写明：%s" % json.dumps(off, ensure_ascii=False))
                     if off["running"] or off["live"]:
                         bad.append("F4 关总闸后摄像头还在跑（running=%s live=%s）⇒ 开关是假的" % (off["running"], off["live"]))
-                    page.click("#btn-cam")
-                    page.wait_for_timeout(400)
-                    on = page.evaluate("""({pressed: document.getElementById('btn-cam').getAttribute('aria-pressed'),
+                    set_cam(True)
+                    on = page.evaluate("""({allowed: document.getElementById('set-face-cam').checked,
                         faceHidden: document.getElementById('btn-face').hidden,
                         ui: window.__XINYU_FACE_UI__})""")
-                    if on["pressed"] != "true" or on["faceHidden"] or (on["ui"] or {}).get("state") != "ready":
+                    if (not on["allowed"]) or on["faceHidden"] or (on["ui"] or {}).get("state") != "ready":
                         bad.append("F4 重开总闸后入口没恢复：%s" % json.dumps(on, ensure_ascii=False))
                 if errs:
                     bad.append("F4 页面运行时异常 %d 条：%s" % (len(errs), " | ".join(errs[:2])[:180]))

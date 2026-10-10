@@ -1,12 +1,12 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 140,
+ "suites": 148,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
   "jar8123": {
-   "n": 44,
+   "n": 48,
    "seconds": 623.8,
    "members": [
     "preflight",
@@ -22,7 +22,9 @@
     "offline_shell",
     "offline_shell_selftest",
     "engine_consistency",
+    "build_jar_selftest",
     "ux_guards",
+    "dock_auto",
     "a11y",
     "a11y_selftest",
     "data_rights",
@@ -44,6 +46,8 @@
     "pixel_dual",
     "lightshow",
     "online_check",
+    "core_capability_baseline",
+    "core_capability_selftest",
     "storage_resilience",
     "storage_resilience_selftest",
     "ci_perf_wiring",
@@ -56,7 +60,7 @@
    ]
   },
   "free": {
-   "n": 94,
+   "n": 98,
    "seconds": 294.4,
    "members": [
     "disclaimer_forensics",
@@ -118,6 +122,10 @@
     "emotion_eval_js",
     "js_unit",
     "js_unit_selftest",
+    "face_check",
+    "face_check_selftest",
+    "face_discrim_check",
+    "face_discrim_selftest",
     "quality_peer_selftest",
     "deliverable_inventory",
     "deliverable_inventory_selftest",
@@ -567,6 +575,18 @@
    "exclusive": []
   },
   {
+   "suite": "build_jar_selftest",
+   "target": "_test/build_jar.py",
+   "mode": "stub",
+   "facets": [
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
    "suite": "strategy",
    "target": "_test/strategy_check.py",
    "mode": "real",
@@ -583,6 +603,18 @@
   {
    "suite": "ux_guards",
    "target": "_test/ux_guards_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "dock_auto",
+   "target": "_test/dock_auto_check.py",
    "mode": "real",
    "facets": [
     "browser",
@@ -1063,6 +1095,28 @@
    "exclusive": []
   },
   {
+   "suite": "core_capability_baseline",
+   "target": "_test/core_capability_baseline_check.py",
+   "mode": "real",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "core_capability_selftest",
+   "target": "_test/core_capability_baseline_check.py",
+   "mode": "stub",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
    "suite": "js_unit",
    "target": "_test/js_unit_check.py",
    "mode": "real",
@@ -1072,6 +1126,40 @@
   {
    "suite": "js_unit_selftest",
    "target": "_test/js_unit_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "face_check",
+   "target": "_test/face_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "own_server"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "face_check_selftest",
+   "target": "_test/face_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "own_server"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "face_discrim_check",
+   "target": "_test/face_discrim_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "face_discrim_selftest",
+   "target": "_test/face_discrim_check.py",
    "mode": "stub",
    "facets": [],
    "exclusive": []

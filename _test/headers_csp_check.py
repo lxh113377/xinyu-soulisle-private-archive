@@ -45,6 +45,17 @@ MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=ut
 # Cloudflare Pages 的 `_headers` 路径语义：`/*` 匹配全部；其余按字面路径匹配（不做前缀）
 SAFE_RATCHET = ("script-src", "style-src")
 FORBIDDEN = ("'unsafe-inline'", "'unsafe-eval'")
+# 具名豁免标记（r87）：MediaPipe Tasks Vision 的 wasm 链在初始化时要 eval 一段字符串，
+# 实测不放行 `'unsafe-eval'` 时推理器永远建不起来（公网表现为"按钮点了没反应"），
+# 而 `'wasm-unsafe-eval'` 只管 wasm 编译、管不到这一处 ⇒ 两个都得给。
+# 规矩不变：**放宽必须留名**。判据认 `_headers` 里的这个标记；
+# 没有标记却出现 `'unsafe-eval'` ⇒ 照红，绝不允许"悄悄加回"。
+EVAL_MARK = "CSP-EVAL-EXCEPTION"
+
+
+def eval_sanctioned(headers_text):
+    """'unsafe-eval' 是否处于具名豁免之下（标记 + 原因都在 _headers 正文里）。"""
+    return EVAL_MARK in (headers_text or "")
 # 夹具用的一条干净 CSP。写成模块常量而不是就地内联，是因为 `"...'self'"}` 这种
 # 「引号紧跟右花括号」的邻接在写盘路径上会被吞掉一个引号（本仓台账在册的同族第 14 次，
 # 这次是 Write 自己吞的），当场 SyntaxError 才暴露。
@@ -158,9 +169,17 @@ def assess(probe):
         if dirs is None:
             bad.append("H3 CSP 缺 %s 指令（缺省会回落到 default-src，不能靠回落）" % d)
             continue
-        hit = [f for f in FORBIDDEN if f in dirs]
+        hit = []
+        for f in FORBIDDEN:
+            if f not in dirs:
+                continue
+            # 唯一的具名豁免：'unsafe-eval' 为 r87 的 MediaPipe wasm 链所必需，但必须留名
+            if f == "'unsafe-eval'" and eval_sanctioned(probe.get("headers_text", "")):
+                continue
+            hit.append(f)
         if hit:
-            bad.append("H3 %s 含 %s ⇒ 放宽需改判据并留名，不许悄悄加回" % (d, ",".join(hit)))
+            bad.append("H3 %s 含 %s ⇒ 放宽需改判据并留名（%s 的唯一豁免是 _headers 里带 %s 标记），不许悄悄加回"
+                       % (d, ",".join(hit), "'unsafe-eval'", EVAL_MARK))
     # H4 前置不变量
     n = probe.get("inline_scripts")
     if n != 0:
@@ -404,6 +423,9 @@ def _finalize_probe(probe, observed, rules):
     入参，搬到 `finally` 之后计算与在 `try` 内计算同值（唯一差别是不再依赖 `b.close()` 的先后）。
     """
     probe["strict"] = csp_map(observed["/"].get("content-security-policy", ""))
+    # H3 的具名豁免要看 _headers **正文**（标记写在注释里，不在响应头里）
+    _hd = ROOT / "deploy" / "xinyu" / "_headers"
+    probe["headers_text"] = _hd.read_text("utf-8") if _hd.exists() else ""
     probe["declared"] = {p: merged(p, rules) for p in observed}
     probe["observed"] = observed
     probe["inline_scripts"] = len(re.findall(
@@ -422,11 +444,14 @@ def run_live(url):
         return ["L1 线上入口没有 Content-Security-Policy（头实测=%s）"
                 % ",".join(sorted(k for k in h if "-" in k))[:120]], h
     bad = []
+    # 具名豁免：'unsafe-eval' 是 r87 MediaPipe wasm 链逼出来的唯一例外，_headers 里留了标记 ⇒ 不算放宽
+    hd_txt = (ROOT / "deploy" / "xinyu" / "_headers")
+    sanctioned = eval_sanctioned(hd_txt.read_text("utf-8") if hd_txt.exists() else "")
     for d in ("script-src", "style-src"):
         dirs = csp_map(csp).get(d) or []
-        hit = [f for f in FORBIDDEN if f in dirs]
+        hit = [f for f in FORBIDDEN if f in dirs and not (f == "'unsafe-eval'" and sanctioned)]
         if hit:
-            bad.append("L2 线上 %s 含 %s" % (d, ",".join(hit)))
+            bad.append("L2 线上 %s 含 %s（%s 只在带 %s 标记时可豁免）" % (d, ",".join(hit), "'unsafe-eval'", EVAL_MARK))
     return bad, h
 
 
@@ -442,6 +467,7 @@ def selftest():
                 "dot_bg": "rgb(142, 168, 255)", "crisis_chip": True, "crisis_w": "rgb(255, 122, 122)",
                 "csp_vios_after_crisis": 0, "readout_wait": True},
         "strict": csp_map("default-src 'none'; script-src 'self'; style-src 'self'"),
+        "headers_text": EVAL_MARK + " 具名豁免（夹具）",
         "inline_scripts": 0}
     if not assess(base_probe)[0]:
         ok += 1
@@ -472,6 +498,25 @@ def selftest():
         ok += 1
     else:
         fail.append("反例③ unsafe-inline 未被棘轮拦住：%s" % assess(m3)[0])
+    # 反例③b（r87）：'unsafe-eval' **没有具名豁免标记** ⇒ 必须红（否则谁都能悄悄放宽）
+    m3b = json.loads(json.dumps(base_probe))
+    m3b["strict"] = csp_map("script-src 'self' 'unsafe-eval'; style-src 'self'")
+    m3b["observed"]["/"]["content-security-policy"] = "script-src 'self' 'unsafe-eval'; style-src 'self'"
+    # ⚠️ 这句里**不能出现标记字面量**：判据是按子串匹配的，把标记拼进夹具会让反例自己带豁免
+    m3b["headers_text"] = "（本夹具故意不带豁免标记：" + "CSP-EVAL-"[:-1] + "XXX）"
+    # 声明面也要跟着改：否则先红的会是 H1（声明≠回放），H3 那条腿根本没被走到
+    m3b["declared"]["/"]["content-security-policy"] = "script-src 'self' 'unsafe-eval'; style-src 'self'"
+    if any("H3" in x for x in assess(m3b)[0]):
+        ok += 1
+    else:
+        fail.append("反例③b 无标记的 unsafe-eval 未被拦住 ⇒ 放宽可悄悄加回：%s" % assess(m3b)[0])
+    # 反例③c：带标记 ⇒ 应当**放行**（不然 r87 的 MediaPipe 例外会被自己的判据卡死）
+    m3c = json.loads(json.dumps(m3b))
+    m3c["headers_text"] = EVAL_MARK + "（r87 MediaPipe wasm 链必需）"
+    if not any("H3" in x for x in assess(m3c)[0]):
+        ok += 1
+    else:
+        fail.append("反例③c 具名豁免未生效（把必需的那条放宽也判红了）：%s" % assess(m3c)[0])
     # 反例④⑤⑥⑦ H6 的四形：有 violation / 宽度取不到 / 分支没驱动 / 字段整个没了
     # （④ 就是本轮修掉的那个真实缺陷形 —— 旧 H2 对它全盲，这条腿存在的唯一理由就是它会红一次）
     m4 = json.loads(json.dumps(base_probe))
@@ -533,7 +578,7 @@ def selftest():
         fail.append("边界 空取数面判绿")
     # 8 → 13：r82 加 H6 的五形（violation / 宽度取不到 / 危机分支未驱动 / 字段整个缺失 / 恒满格但比例错）。
     # 这个数由下方 `ok + len(fail) == expected` 双向钉：多加一条不计数会红，静默少跑一条也会红。
-    expected = 13
+    expected = 15   # r87：+2 = ③b（无标记的 unsafe-eval 必须红）/ ③c（带标记必须放行）
     for x in fail:
         print("  SELFTEST-FAIL " + x)
     print("HEADSEC-SELFTEST: %d/%d%s" % (ok, expected,

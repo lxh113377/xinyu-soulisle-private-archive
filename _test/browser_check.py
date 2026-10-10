@@ -73,12 +73,20 @@ with sync_playwright() as p:
     crisis_readout = page.inner_text("#probe-result")
 
     # 6) 坞折叠后再一键清除 → 星星熄灭（坞展开时会遮住第四幕按钮，必须能收起）
-    _dock_open_before = page.eval_on_selector("#chat-dock", "e => e.classList.contains('open')")
-    page.click("#btn-dock")
-    # r102：等的是**这个开关自己的状态翻转**（class 变更即同步），不是猜的 500ms。
-    # 形态同 ux_guards U1b 的 aria-pressed 翻转腿：先存旧值、等它变，超时才判红。
-    page.wait_for_function("(v) => document.getElementById('chat-dock').classList.contains('open') !== v",
-                           arg=_dock_open_before, timeout=5000)
+    #    r108：#btn-dock 改三态循环（常规→全屏→收起），点一次只到全屏 ⇒ 点到收起为止（最多 3 跳）。
+    #    r102 的「等状态翻转而不是猜秒数」保留：每一跳都等 class 真的变了再走下一跳。
+    for _hop in range(3):
+        _dock_open_before = page.eval_on_selector("#chat-dock", "e => e.classList.contains('open')")
+        if not _dock_open_before:
+            break
+        page.click("#btn-dock")
+        try:
+            page.wait_for_function("(v) => document.getElementById('chat-dock').classList.contains('open') !== v"
+                                   " || document.getElementById('chat-dock').classList.contains('full')",
+                                   arg=_dock_open_before, timeout=5000)
+        except Exception:  # noqa: BLE001
+            pass            # 常规→全屏那一跳 open 不变（只加 .full），由下一跳继续收
+        page.wait_for_timeout(400)
     dock_collapsed = not page.eval_on_selector("#chat-dock", "e => e.classList.contains('open')")
     page.click("#btn-clear")
     page.wait_for_timeout(600)

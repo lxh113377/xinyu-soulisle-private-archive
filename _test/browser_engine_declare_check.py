@@ -444,6 +444,49 @@ def _st_portable_face(eq, sites):
        "cors_probe.py" in sites, False)
 
 
+def _st_face_equivalence(eq, src_real):
+    """r98 换尺取证 + r105 改判的方向对账（抽成独立桩的原因＝本仓 ≤150 行/函数门，不是审美）。
+
+    r105 改判（一手代价 = 本轮迁移三件套件后原腿必红）：原断言「AST 面 ⇄ 旧子串面 **对称差为空**」
+    不是不变量，它只是 r98 换尺那一刻的一次性迁移取证。紧接其后的变异腿自己就证明了子串规则会
+    虚增分母（注释里写一次该串，子串面认、AST 面判零）—— 两把尺**结构上**不等价。
+    后果：任何人把一件套件迁移干净后，只要在注释里留下旧写法（本仓「一手代价必须登记在案」的制度
+    要求这样做），这条腿就必然翻红 ⇒ 它实际在**逼后人删证据**。
+    正解＝改成方向断言 + 差集逐个解释义务：
+      ① AST ⊆ 子串（调用点必然也是文本出现）——反方向出现即尺坏；
+      ② 差集里的每个文件都必须实测「AST 调用点=0 且文本命中>0」，即确属注释/docstring 提及；
+      ③ 一条变异腿证明①不是空话（`launch (` 换行让 AST 认到调用而子串认不到）。
+    """
+    ast_face = set(scan_sources(src_real)[0])
+
+    def old_substring_face():
+        tr = git_tracked(TEST_DIR)
+        return {p.name for p in sorted(TEST_DIR.glob("*.py"))
+                if p.name not in SELF_NAMES and (tr is None or p.name in tr)
+                and "chromium.launch(" in p.read_text(encoding="utf-8", errors="replace")}
+
+    sub_face = old_substring_face()
+    eq("取数面方向对账①：AST − 子串 必须为空（出现即尺坏，不是迁移的正常结果）",
+       sorted(ast_face - sub_face), [])
+    unexplained = []
+    for name in sorted(sub_face - ast_face):
+        try:
+            text = (TEST_DIR / name).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            unexplained.append(name + ":读不到")
+            continue
+        if launch_points(ast.parse(text)) or "chromium.launch(" not in text:
+            unexplained.append(name + ":非注释形")
+    eq("取数面方向对账②：差集逐个须为纯文本提及（有调用点却不在 AST 面 = 尺漏）",
+       unexplained, [])
+
+    def _ast_vs_sub(text):
+        return (1 if launch_points(ast.parse(text)) else 0,
+                1 if "chromium.launch(" in text else 0)
+    eq("取数面方向对账③（变异腿）：反方向可构造 —— `launch (` 换行使 AST 认到而子串认不到 ⇒ ①有牙",
+       _ast_vs_sub("b = p.chromium.launch (\n)\n"), (1, 0))
+
+
 def selftest():
     cases = []
 
@@ -465,16 +508,7 @@ def selftest():
     # ── r98 新腿①：换尺取证 = 与**被替换掉的旧子串规则**独立复算交叉，不是拿新尺自比新尺 ──
     # r99b 修正：旧子串那侧也必须走**同一个面**，否则"AST 面（git 跟踪）vs 子串面（本机磁盘）"
     # 比的不再是两把尺，而是两个分母 —— 那会把本轮刚修的缺陷伪装成"两把尺不等价"。
-    ast_face = set(scan_sources(src_real)[0])
-
-    def old_substring_face():
-        tr = git_tracked(TEST_DIR)
-        return {p.name for p in sorted(TEST_DIR.glob("*.py"))
-                if p.name not in SELF_NAMES and (tr is None or p.name in tr)
-                and "chromium.launch(" in p.read_text(encoding="utf-8", errors="replace")}
-
-    eq("取数面切换等价：AST 集 ⇄ 旧子串集 对称差为空（两把尺各自独立复算）",
-       ast_face ^ old_substring_face(), set())
+    _st_face_equivalence(eq, src_real)   # 两把尺方向对账＋差集解释义务＋变异腿（r105 抽出，避 ≤150 行/函数门）
     _st_portable_face(eq, sites)
     COMMENT_ONLY = "def f():\n    # chromium.launch( 只是注释\n    pass\n"
     eq("变异体 旧子串规则确实会虚增分母（夹具：注释里写该串的子串面会认）",

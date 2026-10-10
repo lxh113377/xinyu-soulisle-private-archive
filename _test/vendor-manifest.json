@@ -52,10 +52,63 @@
       "note": "r42 引入的运行时无障碍审计引擎。不进 src/vendor：它是判据依赖而非首屏载荷，进公网 bundle 等于给评委多下 553KB。落 _test/vendor 由 _test/a11y_check.py 读磁盘后add_script_tag 注入。⚠️ 本条是 r43 补登记：r42 当时 vendor 判据的枚举面只有 src/vendor，这件第三方资产在治理面外躺了一整轮（sha 钉默认关闭 = 被替换看不见）。",
       "sha256": "b511cd9dec01c76f4b2ad1723b66b6db37d4c2eb4ed199076e1829d9ee7b75e3",
       "size": 553290
+    },
+    {
+      "file": "src/vendor/mediapipe/face_landmarker.task",
+      "name": "MediaPipe FaceLandmarker model",
+      "version": "float16/1",
+      "upstream_repo": "google-ai-edge/mediapipe",
+      "upstream_kind": "release",
+      "detect": null,
+      "status": "pinned",
+      "note": "r87 面部表情识别引入。落 src/vendor/mediapipe/ **子目录**：vendor_freshness_check V3 与 size_budget 都只 glob 顶层，懒加载大块不污染首屏预算。13MB 只在用户真的开启表情感知时才拉。来源 storage.googleapis.com/mediapipe-models（2026-10-10 实测 200）。",
+      "sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+      "size": 3758596,
+      "upstream_seen": "float16/1 (2026-10-10 实测)"
+    },
+    {
+      "file": "src/vendor/mediapipe/vision_bundle.js",
+      "name": "@mediapipe/tasks-vision",
+      "version": "0.10.22-rc.20250304",
+      "upstream_repo": "google-ai-edge/mediapipe",
+      "upstream_kind": "release",
+      "detect": null,
+      "status": "current",
+      "note": "r87 引入，ESM 包。本站零构建 ⇒ 由 js/face-mediapipe-bridge.js（全站唯一 type=module）import 后挂 window，其余脚本一字不改。⚠️ 上游文件名是 vision_bundle.mjs，本仓**刻意改名 .js**：静态托管对 .mjs 的 MIME 不统一（本机 python http.server 实测 text/plain ⇒ 浏览器拒绝执行模块脚本，功能静默消失）。内容仍是 ESM，sha256 与上游文件一致。",
+      "sha256": "3252b10e0fd26c4095e4b6ee545c1c898120b3a3813388ecd4876abe6f1399a9",
+      "size": 137809,
+      "upstream_seen": "0.10.22-rc.20250304 (2026-10-10 实测)"
+    },
+    {
+      "file": "src/vendor/mediapipe/vision_wasm_internal.js",
+      "name": "MediaPipe vision wasm loader (SIMD)",
+      "version": "0.10.22-rc.20250304",
+      "upstream_repo": "google-ai-edge/mediapipe",
+      "upstream_kind": "release",
+      "detect": null,
+      "status": "current",
+      "note": "只 vendor 了 SIMD 版（非 SIMD 的 nosimd 套件 9.4MB 未落盘：目标浏览器自 2021 起全支持 SIMD）。非 SIMD 浏览器由 face-engine 的 SIMD 探测显式降级为「不可用」并隐藏入口，不会白屏。",
+      "sha256": "4a97e2520ba506c680ecd6ba6acfb146888afa0e2746d57f205352bc6ebb82eb",
+      "size": 204284,
+      "upstream_seen": "0.10.22-rc.20250304 (2026-10-10 实测)"
+    },
+    {
+      "file": "src/vendor/mediapipe/vision_wasm_internal.wasm",
+      "name": "MediaPipe vision wasm binary (SIMD)",
+      "version": "0.10.22-rc.20250304",
+      "upstream_repo": "google-ai-edge/mediapipe",
+      "upstream_kind": "release",
+      "detect": null,
+      "status": "current",
+      "note": "9.57MB 二进制。.gitattributes 已补 *.wasm binary ⇒ 字节永不被行尾改写（同族教训见 content-hash 那条记忆）。",
+      "sha256": "f00ec4731faa23b3e714d00e88d4d10e2df5c0a427d3a2b4ae6e3526fdd14ef7",
+      "size": 9574032,
+      "upstream_seen": "0.10.22-rc.20250304 (2026-10-10 实测)"
     }
   ],
   "vendor_dirs": [
     "src/vendor",
+    "src/vendor/mediapipe",
     "_test/vendor"
   ]
 }

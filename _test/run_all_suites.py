@@ -12,7 +12,7 @@
   口径见 docs/quality-gates.md 的「文档条数须挂责任方」）。
 """
 import os
-import subprocess, sys, io, re, time, json, shutil, atexit
+import subprocess, sys, io, re, time, json, shutil, atexit, tempfile, types
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from pathlib import Path
 
@@ -23,6 +23,87 @@ VERDICT_RE = re.compile(r"(?:PASS|FAIL|CLEAN|UNVERIFIED|OK)\b")
 # r102：套件超时专用退出码（GNU timeout 惯用值）。必须与"判据自己崩了"的任意 rc 分开——
 # 排障手册在册的 rc=3221225773 崩没有专属读数，TIMEOUT 桶只认这一个码，不然桶边界靠猜。
 TO_RC = 124
+# r105：单套件墙钟上限。env 口 `XINYU_SUITE_TIMEOUT` 有两个用途：① 自证桩用 2-3s 的小 cap
+# （常驻桩不许真等 600s）；② 某套件确实需要更久时**显式抬**并留痕 —— 在册纪律：
+# 不许用默认调参掩盖一个慢仪器，抬 cap 是要署名的动作。
+SUITE_TIMEOUT = int(os.environ.get("XINYU_SUITE_TIMEOUT") or 600)
+
+
+def _kill_tree(pr):
+    """杀掉我起的这棵进程树。归属确定：PID 由本次 Popen 创建，不是"按端口/按名字找人"。
+
+    在册反例（r90）：同一 worktree 里按脚本名 taskkill 会杀掉别人的整跑 —— 那种找不到属主的
+    清理一律禁止。这里反过来：**先记下 pid，再只杀这棵树**。
+    Windows 必须 `taskkill /T`：只杀直接子进程的话，判据起的浏览器/Java 孙子还活着，
+    正是 r105 那次「cap 管不到的挂起」的现场（孙子攥着输出句柄，管道 EOF 永不到来）。
+    """
+    if os.name == "nt":
+        try:
+            subprocess.run(["taskkill", "/PID", str(pr.pid), "/T", "/F"],
+                           capture_output=True, timeout=30)
+        except Exception:                                         # noqa: BLE001
+            pass
+    else:
+        try:
+            pr.kill()
+        except Exception:                                         # noqa: BLE001
+            pass
+    try:
+        return pr.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        try:
+            pr.kill()
+        except Exception:                                         # noqa: BLE001
+            pass
+        return None
+
+
+def run_suite_cmd(cmd, cap, env_extra=None):
+    """跑一个套件并**保证在 cap 附近返回**，即使它留下了还活着的孙进程（r105 修）。
+
+    一手代价（r105 终验整跑）：原先这里是 `subprocess.run(capture_output=True, timeout=600)`。
+    超时时 CPython 的动作是「kill 直接子进程 → communicate() 把管道读空」；而判据自己起的
+    chrome/edge/java **孙**进程继承了同一对 stdout/stderr 句柄且没跟着死 ⇒ 管道 EOF 永不到来 ⇒
+    `communicate()` 无限等 ⇒ **TimeoutExpired 根本递不上来**。现场就是本轮：整跑停在第 117 行
+    （`clean_clone_selftest` 之后）18 分钟零输出，r102 立的 600s 硬顶一次都没触发 ——
+    cap 存在，但它管不到这种挂法（既不判红也不退，是 BLIND-RED「崩了」之外的第三档）。
+
+    正解两条：① 输出**不走管道**，重定向到临时文件 —— 读文件不需要 EOF；
+    ② 到点用进程树杀（`_kill_tree`），把攥着句柄的孙进程一起收掉。
+    返回 (rc, stdout, stderr, timed_out)；timed_out 时 rc=None。
+    """
+    env = dict(os.environ)
+    if env_extra:
+        env.update(env_extra)
+    tmpd = os.environ.get("TEMP") or os.environ.get("TMP") or "."
+    fo = tempfile.NamedTemporaryFile(mode="wb", suffix=".out", delete=False, dir=tmpd)
+    fe = tempfile.NamedTemporaryFile(mode="wb", suffix=".err", delete=False, dir=tmpd)
+    out_path, err_path = fo.name, fe.name
+    timed_out, rc = False, None
+    try:
+        with fo, fe:
+            pr = subprocess.Popen(cmd, cwd=ROOT, stdout=fo, stderr=fe, env=env)
+            try:
+                rc = pr.wait(timeout=cap)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                rc = _kill_tree(pr)
+    finally:
+        out = _read_tmp(out_path)
+        err = _read_tmp(err_path)
+        for x in (out_path, err_path):
+            try:
+                os.remove(x)                     # 只删本轮自己建的临时件（%TEMP% 内，非项目内容）
+            except OSError:
+                pass
+    return rc, out, err, timed_out
+
+
+def _read_tmp(path):
+    try:
+        return open(path, "rb").read().decode("utf-8", "replace")
+    except OSError:
+        return ""
 
 
 def timeout_row(name, elapsed, exc):
@@ -217,6 +298,10 @@ SUITES = [
     # 「在线大模型生成」才算过——防止 stub 被改回已死的 service 域名而无人知晓。
     ("backup_online", [sys.executable, "_test/backup_online_check.py"]),
     ("emotion_eval_js", ["node", "_test/emotion_eval.js"]),
+    # r111 用户立规：表情识别 + 语意理解 = 多轮迭代核心优先级（每轮第一要务）。
+    #   本尺是**棘轮**：复算双能力基线并拒收任何回退；目标/指标/轨迹 = memory/10-core-capabilities.md。
+    ("core_capability_baseline", [sys.executable, "_test/core_capability_baseline_check.py"]),
+    ("core_capability_selftest", [sys.executable, "_test/core_capability_baseline_check.py", "--selftest"]),
     # r58 质量工程面：JS 侧从"0 个单元测试"变成有常驻执行位（node --test + 跨 realm 归一）
     ("js_unit", [sys.executable, "_test/js_unit_check.py"]),
     ("js_unit_selftest", [sys.executable, "_test/js_unit_check.py", "--selftest"]),
@@ -849,6 +934,80 @@ def timeout_selftest():
     return 1 if fails else 0
 
 
+def exec_selftest():
+    """r105：执行器自证 —— 「套件留下了还活着的孙进程」这一档必须**保证返回**。
+
+    三条腿各有专属输入面（在册纪律：每条腿要能单独因失去被审对象而翻红）：
+      L1 正例：正常套件 ⇒ rc 透传、输出读得到（换执行器不许改变正常语义）。
+      L2 挂起例：子进程 spawn 一个攥着输出句柄的孙进程后自己长睡 ⇒ 新执行器必须在 cap 附近
+          返回 timed_out，且挂起前那行输出仍读得到（读文件不需要 EOF）。
+      L3 对照（旧机制）：同样的夹具交给 `subprocess.run(capture_output=True, timeout=…)`，
+          由新执行器从旁监工。旧机制卡在「kill 完子进程还要把管道读空」⇒ 到点**一行结论都没有**
+          ⇒ 这就是 r105 终验现场（18 分钟零输出、600s 硬顶没触发）的形状复现。
+    cap 全走 env 小值（常驻桩不许真等 600s）；夹具脚本建在 %TEMP%，用完即删，孙进程自带短睡。
+    """
+    tmpd = os.environ.get("TEMP") or os.environ.get("TMP") or "."
+    grand = os.path.join(tmpd, "xinyu_exec_grand_r105.py")
+    probe = os.path.join(tmpd, "xinyu_exec_pipe_r105.py")
+    fails = []
+    try:
+        open(grand, "w", encoding="utf-8").write(
+            "import subprocess, sys, time\n"
+            "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(25)'])\n"
+            "print('GRAND-ALIVE', flush=True)\n"
+            "time.sleep(25)\n")
+        open(probe, "w", encoding="utf-8").write(
+            "import subprocess, sys, os\n"
+            "cap = float(os.environ.get('XINYU_PROBE_CAP', '3'))\n"
+            "try:\n"
+            "    subprocess.run([sys.executable, sys.argv[1]], capture_output=True,\n"
+            "                   text=True, timeout=cap)\n"
+            "    print('PIPE-PROBE-RETURNED')\n"
+            "except subprocess.TimeoutExpired:\n"
+            "    print('PIPE-PROBE-TIMEOUT')\n")
+        py = sys.executable
+        # L1 正例
+        rc1, out1, _e1, to1 = run_suite_cmd([py, "-c", "print('EXEC-L1-PASS')"], 30)
+        if not (rc1 == 0 and not to1 and "EXEC-L1-PASS" in out1):
+            fails.append("L1 正例坏：rc=%s timed_out=%s out=%r ⇒ 换执行器改变了正常语义" % (rc1, to1, out1[:40]))
+        # L2 挂起例（新执行器）
+        cap2 = 4
+        t0 = time.monotonic()
+        rc2, out2, _e2, to2 = run_suite_cmd([py, grand], cap2)
+        el2 = time.monotonic() - t0
+        if not to2:
+            fails.append("L2 没判成超时（rc=%s）⇒ 挂起夹具没构造出『孙进程攥着句柄』的形态，这条腿是空的" % rc2)
+        if el2 > cap2 + 20:
+            fails.append("L2 返回太慢：%.1fs > cap%d+20 ⇒ 执行器仍会被孙进程拖住" % (el2, cap2))
+        if "GRAND-ALIVE" not in out2:
+            fails.append("L2 挂起前的输出没读到（out=%r）⇒ 读文件这条腿没接上" % out2[:40])
+        # L3 对照（旧机制，由新执行器监工）
+        env3 = {"XINYU_PROBE_CAP": "3"}
+        os.environ["XINYU_PROBE_CAP"] = "3"
+        try:
+            rc3, out3, _e3, to3 = run_suite_cmd([py, probe, grand], 12, env_extra=env3)
+        finally:
+            os.environ.pop("XINYU_PROBE_CAP", None)
+        # 期望形状（这是"旧机制会挂"的正面证据）：探针进程**自己拿不到结论** ⇒ 被监工执行器
+        # 在 12s 杀掉（to3=True），且输出里一行 PIPE-PROBE-* 都没有（探针从未走到 print 分支）。
+        # 若 to3=False 或出现了 PIPE-PROBE 行 ⇒ 挂起形态没复现，这条腿就是空腿（必须报，不许静默）。
+        if not to3 or "PIPE-PROBE" in out3:
+            fails.append("L3 对照失效：旧机制侧应『到点无结论、被监工杀掉』，实 timed_out=%s out=%r"
+                         "（探针自己走完了 ⇒ 挂起形态没复现，这条腿判定力为零）" % (to3, out3[:60]))
+        n_leg = 3
+    finally:
+        for x in (grand, probe):
+            try:
+                os.remove(x)
+            except OSError:
+                pass
+    for f in fails:
+        print("  · EXEC-SELFTEST-FAIL " + f)
+    print("EXEC-SELFTEST-%s（%d 腿：正例 rc 透传／挂起例保证返回＋部分输出可读／旧机制对照拿不到结论）"
+          % ("PASS" if not fails else "FAIL", n_leg))
+    return 1 if fails else 0
+
+
 def selftest_all():
     """`--selftest` 分派（r100 从 main 提出，纯搬家）。各档桩数由每条桩自己印，这里不抄数。"""
     rc1 = lock_selftest()
@@ -858,15 +1017,18 @@ def selftest_all():
     rc5, serve_fails = serve_selftest()
     rc6 = blind_selftest()
     rc7 = timeout_selftest()
-    print("BATTERY-SELFTEST-%s（锁 %s ＋ 折叠 %s ＋ 计费分档 %s ＋ 台账写入 %s ＋ 自管决策 %s ＋ 盲红分档 %s ＋ 超时分档 %s）"
-          % ("PASS" if not (rc1 | rc2 | rc3 | rc4 | rc5 | rc6 | rc7) else "FAIL",
-             "ok" if not rc1 else "红", "ok" if not rc2 else "红",
-             "ok" if not rc3 else "红", "ok" if not rc4 else "红",
-             "ok" if not rc5 else "红", "ok" if not rc6 else "红",
-             "ok" if not rc7 else "红"))
+    rc8 = exec_selftest()
+    # 收口行 ≤110B（`run_all_suites.py` 的 `line[:110]` 会把尾巴吃掉）：PASS 带八档名册，
+    # FAIL 把名册换成「红档=…」——哪一档红必须留在**这一行**上，不能靠"上面某行印过"（r40b 折叠教训）。
+    names = ("锁", "折叠", "计费", "台账", "自管", "盲红", "超时", "执行器")
+    rcs = (rc1, rc2, rc3, rc4, rc5, rc6, rc7, rc8)
+    bad8 = [n for n, r in zip(names, rcs) if r]
+    print("BATTERY-SELFTEST-%s" % (
+        "PASS（8 档：" + "/".join(names) + "）" if not bad8
+        else "FAIL 红档=" + ",".join(bad8)))
     for f in serve_fails:
         print("  · SELF-HOST-FAIL " + f)
-    return 1 if (rc1 | rc2 | rc3 | rc4 | rc5 | rc6 | rc7) else 0
+    return 1 if any(rcs) else 0
 
 
 def run_suites(suites):
@@ -880,10 +1042,10 @@ def run_suites(suites):
     results, blurbs, times = [], {}, {}
     for name, cmd in suites:
         t0 = time.monotonic()
-        try:
-            p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=600)
-        except subprocess.TimeoutExpired as e:
+        # r105：执行面从 `subprocess.run(capture_output=True, timeout=600)` 换成 `run_suite_cmd`
+        # —— 不是换写法，是换**能不能保证返回**（详见该函数头注的 r105 一手现场）。
+        rc, out, err, timed_out = run_suite_cmd(cmd, SUITE_TIMEOUT)
+        if timed_out:
             # r102：套件超时**不许把整跑炸掉**。改造前的一手事故：eol_parity 实跑 >600s，
             # TimeoutExpired 一路抛到 main() 之外 ⇒ 电池 rc=1、既没有 BATTERY 收口行、
             # 该套件之后的所有套件**一套都没跑**（"受理面断续"比"一套件红"更坏：连哪些红
@@ -891,11 +1053,13 @@ def run_suites(suites):
             # TIMEOUT 桶——它的修法与"判据自己崩"不同（要么给判据提速，要么显式抬 cap，
             # 不许默认调参掩盖）。rc 取 124（GNU timeout 的惯用退出码，排障手册在册）。
             elapsed = round(time.monotonic() - t0, 1)
-            times[name], line, partial = timeout_row(name, elapsed, e)
+            exc = types.SimpleNamespace(stdout=out, stderr=err)
+            times[name], line, partial = timeout_row(name, elapsed, exc)
             blurbs[name] = partial
             results.append((name, TO_RC, line[:110]))
             print(f"{name:22s} rc={TO_RC} {times[name]:>5.1f}s | {line[:110]}")
             continue
+        p = types.SimpleNamespace(returncode=rc, stdout=out, stderr=err)
         times[name] = round(time.monotonic() - t0, 1)
         tail = (p.stdout or "").strip().splitlines()
         # 聚合器只留最后一行 ⇒ 判据说 FAIL 却答不出"哪一条 FAIL"，等于没判（r28 CI 实测踩到）。

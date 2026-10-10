@@ -9,6 +9,8 @@
 J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.9 环境实证（含 JAVA_HOME=JDK8 的坑）全文 `part17`。
 
 ## P0 — 必须做
+- [ ] 🔴 **每轮第一要务：表情识别 · 语意理解**（用户 2026-10-11 立规）—— 每轮必跑
+      `python _test/core_capability_baseline_check.py`（棘轮只降不升）；目标/指标/轨迹 = `memory/10-core-capabilities.md`
 - [ ] WF-r97-v1.8.1发布链 推 main+tag v1.8.1+CI 回执+Release（Pages 面未发布，CI 电池不豁免 live 面）（由 flow 登记；状态: blocked）
 - [ ] **J3/J4 变现** [推荐:R35-02]：① ② ③ 三件均已实测就绪 ⇒ **唯一阻塞 = 老大给目标机器**（IP/登录/安全组）。`part17`
 - [ ] 🟠 [推荐:R83-02] **共享环境隔离待老大**：陪聊 / iCAN 门店 / 医 同居一个 CloudBase env，
@@ -94,5 +96,6 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 
 - **卷40** `07-next-steps.part135.md` — **r105 收口（受理面假门/棘轮/崩仪器）**：G16 孤儿判据接线（两侧先测）／E2 24→21（3 件收编，判定行带引擎身份）／vendor_freshness 五字段门＋`detect:null` 显式语义／端口 8123 属主四档协议（默认只停本工具起的）。**新事实：`v1.8.2` tag 不在 main 祖先面上**。
 - **卷41** `07-next-steps.part136.md` — **r106 入口**（G12 方向待选／BLIND-RED 余 4 条崩溃面／E2 继续降／face_check 结转前提／rollup 派生件等干净窗口／peers 错峰重采）。
+- **卷42** `07-next-steps.part138.md` — **r105 追加段**：执行器改造（挂起第三档根因实测确认，换后整跑跑完 131/143、红 22→11、BLIND-RED 6→1）＋ 一条"把一次性迁移取证当不变量"的腿改判（AST ⊆ 子串 + 差集解释义务 + 变异腿）＋ **分叉三条路代价实测**（merge 冲突 9 文件／force 仅作废 v1.8.2 一枚 tag／挂账改口径几乎零对外代价）。
 - **卷42** `07-next-steps.part137.md` — 07-next-steps 分卷（R199 自动拆卷）
 

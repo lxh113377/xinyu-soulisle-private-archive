@@ -17,12 +17,16 @@
   const tb = $("#topbar");
   const AUTO_HIDE_PX = 80;
   let autoHideY = scrollY;
+  /* r109 全屏态虚拟滚动：页面滚动被锁后，滚轮/触摸量映射成星雾进度（0..1 端点停），
+     退出全屏回真实进度；lastRealT 由 ScrollStory 的 onProgress 持续刷新。 */
+  let lastRealT = 0, virtT = 0, touchLastY = 0;
   addEventListener("scroll", () => {
     tb.classList.toggle("solid", scrollY > 8);
     const y = scrollY, moved = y - autoHideY;
     if (Math.abs(moved) > AUTO_HIDE_PX) autoHideY = y;  // 基准只在真正挪动过一段后刷新，防临界抖动反复触发
     if (moved < AUTO_HIDE_PX || !dockOpen()) return;
     if (document.body.classList.contains("showtime")) return;
+    if (dockFull()) return;   // r108：全屏对话时页面滚动已被锁，这里再收一次会把人从全屏踢出去
     const a = document.activeElement;
     if (a && a.closest && a.closest("#chat-dock")) return;
     setDock(false);
@@ -30,7 +34,13 @@
 
   // 2) 滚动叙事
   window.ScrollStory.init(
-    (t) => { if (gl) window.ThreeScene.setScrollProgress(t); },
+    (t) => {
+      lastRealT = t; window.__XINYU_SCROLL_T__ = t;   // 判据取数口（dock_auto_check D10/D11）
+      // ⚠️ 这里**不能引用 dockFull()**：reload 恢复滚动位置≠0 时 ScrollTrigger 会在 boot 早期
+      //    同步触发本回调，那时后文的 const 还在 TDZ —— 一抛则整页 boot 停摆（browser_check
+      //    实测抓到：Cannot access 'dockFull' before initialization）。只查 body class，任何时刻可读。
+      if (gl && !document.body.classList.contains("dock-full")) window.ThreeScene.setScrollProgress(t);
+    },
     // r61 遮挡：见 CHANGELOG；r104：顺带点亮幕次导航当前项（同样只切 class）
     (act) => {
       if (act === 4) { window.Chart.render(); if (dockOpen()) setDock(false); }
@@ -181,6 +191,7 @@
       const { palette, duration } = window.ThreeScene.lightShow(180);
       setShowLabel("↺", "回到我的记忆");
       $("#probe-result").innerHTML = `<p class="muted">正在清屏，重新点亮六种情绪…（按 Esc 或点一下画面退出）</p>`;
+      if (dockFull()) setFull(false);   // r108：演示态要的是「只剩星雾」，全屏坞先退回常规
       document.body.classList.add("showtime");   // 隐藏全部 UI，只留背景星雾
       // 播放结束**不跳回**：继续停在清屏画面欣赏，唯一退出口是右下角按钮
       showTimer = setTimeout(() => {
@@ -232,21 +243,93 @@
       setTimeout(() => { openingT = []; replayStars(); window.__XINYU__.opening = "done"; }, d + 1500)];
   }
 
-  // 底部对话坞折叠：点标题按钮切换；点叙事区自动收起（避免坞长期遮住幕内按钮）
-  const dockOpen = () => $("#chat-dock").classList.contains("open");
-  function setDock(open) {
-    $("#chat-dock").classList.toggle("open", open);
-    $("#btn-dock").textContent = open ? "收起 ▾" : "展开 ▴";
-    $("#btn-dock").setAttribute("aria-expanded", String(open));
+  // 底部对话坞三态（r108 老大拍板）：常规 ⛶ → 全屏 ▾ → 收起 ▴ → 常规。
+  //   标题栏右上角只有这一个按钮，写的是「下一个动作」不是当前状态；点标题条展开（r104）与
+  //   滚动自动收起两条老路径都保留，全屏态不参与自动收起。
+  const dockEl = $("#chat-dock");
+  const dockOpen = () => dockEl.classList.contains("open");
+  const dockFull = () => dockEl.classList.contains("full");
+  const DOCK_NEXT = {   // 键 = 当前状态，值 = 按钮此刻该显示的「下一动作」
+    normal:    { word: "全屏", ico: "⛶", expanded: "true",  tip: "进入全屏（对话铺满画面）" },
+    full:      { word: "收起", ico: "▾", expanded: "true",  tip: "收起对话坞（只留一条细条）" },
+    collapsed: { word: "展开", ico: "▴", expanded: "false", tip: "展开对话坞" },
+  };
+  const dockState = () => dockFull() ? "full" : (dockOpen() ? "normal" : "collapsed");
+  function paintDock() {
+    const s = DOCK_NEXT[dockState()], b = $("#btn-dock");
+    b.querySelector(".db-word").textContent = s.word;
+    b.querySelector(".db-ico").textContent = s.ico;
+    b.setAttribute("aria-expanded", s.expanded);
+    b.title = s.tip + "（三态循环）";
   }
-  $("#btn-dock").addEventListener("click", () => setDock(!dockOpen()));
+  function setDock(open) {          // 既有入口：滚动自动收起 / 点叙事区 / 点标题条 / 全屏态点按钮
+    const wasFull = dockFull();
+    dockEl.classList.toggle("open", open);
+    if (!open) {
+      dockEl.classList.remove("full");
+      if (wasFull) {   // r109：从全屏退出的**任何**路径都把镜头还给真实滚动进度（D11 判据）
+        if (gl) window.ThreeScene.setScrollProgress(lastRealT);
+        window.__XINYU_SCROLL_T__ = lastRealT;
+      }
+    }
+    document.body.classList.toggle("dock-full", dockFull());
+    paintDock();
+  }
+  function setFull(on) {
+    dockEl.classList.toggle("full", on);
+    if (on) dockEl.classList.add("open");
+    document.body.classList.toggle("dock-full", on);
+    // r109：进入全屏从真实进度出发继续推；退出时把镜头还给真实滚动进度
+    if (on) virtT = lastRealT;
+    else if (gl) window.ThreeScene.setScrollProgress(lastRealT);
+    window.__XINYU_SCROLL_T__ = on ? virtT : lastRealT;
+    paintDock();
+  }
+  $("#btn-dock").addEventListener("click", () => {
+    const s = dockState();
+    if (s === "normal") setFull(true);
+    else if (s === "full") setDock(false);
+    else setDock(true);             // 收起 → 回常规展开（不跳全屏，免得"想说话却铺满屏"）
+  });
+  // Esc 退出全屏（Esc 本职是关对话框，有 dialog 开着时不抢）
+  addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && dockFull() && !document.querySelector("dialog[open]")) setFull(false);
+  });
+  // r109：全屏态滚轮/触摸 → 星雾进度（0..1 端点停）。对话日志自己还能滚：
+  // 只有日志滚到头（或滚动的目标不在日志里）才把滚动量交给镜头，两层滚动不打架。
+  function fullScrollDrive(d) {
+    virtT = Math.min(1, Math.max(0, virtT + d));
+    window.__XINYU_SCROLL_T__ = virtT;
+    if (gl) window.ThreeScene.setScrollProgress(virtT);
+  }
+  function logWantsIt(e) {
+    const log = $("#chat-log");
+    if (!log || !log.contains(e.target) || log.scrollHeight <= log.clientHeight + 2) return false;
+    const atTop = log.scrollTop <= 1, atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 1;
+    return !((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom));
+  }
+  addEventListener("wheel", (e) => {
+    if (!dockFull() || logWantsIt(e)) return;
+    e.preventDefault();
+    fullScrollDrive(e.deltaY * 0.0011);
+  }, { passive: false });
+  addEventListener("touchstart", (e) => { touchLastY = e.touches[0] ? e.touches[0].clientY : 0; }, { passive: true });
+  addEventListener("touchmove", (e) => {
+    if (!dockFull() || !e.touches.length) return;
+    const y = e.touches[0].clientY, d = touchLastY - y;
+    touchLastY = y;
+    const log = $("#chat-log");
+    if (log && log.contains(e.target) && log.scrollHeight > log.clientHeight + 2) return;
+    fullScrollDrive(d * 0.0022);
+  }, { passive: true });
   $("#story").addEventListener("click", (e) => { if (!e.target.closest("#chat-dock")) setDock(false); });
   // r104：点标题条展开（老大拍板）—— 补鼠标/触屏路径，键盘仍走带 aria-expanded 的 #btn-dock。
-  //   刻意不给 #dock-bar 加 role=button：它内部套着三个真按钮，再套一层会撞嵌套交互规则。
+  //   刻意不给 #dock-bar 加 role=button：它内部套着真按钮，再套一层会撞嵌套交互规则。
   $("#dock-bar").addEventListener("click", (e) => {
-    if (dockOpen() || e.target.closest("#btn-dock, #btn-cam, #btn-lightshow")) return;
+    if (dockOpen() || e.target.closest("#btn-dock")) return;
     setDock(true);
   });
+  paintDock();   // 首帧把按钮刷成与初始态一致（HTML 里写的是默认态，防两处漂移）
 
   // 5) 对话（刷新后恢复历史，多轮上下文不丢）
   //    窗口化（DOM 上界 60 / 折叠配额 / 展开较早）r26 外提到 `src/js/chat-window.js`；
@@ -341,6 +424,11 @@ function initFaceHud(deps) {
   function setSwitch(on) {
     els.switchEl.setAttribute("aria-checked", String(on));
     els.switchWord.textContent = on ? "已开启" : "已关闭";
+    // r109：可见文字（已开启/已关闭）并入无障碍名——WCAG 2.5.3 要求可见标签是无障碍名的
+    //   子串，固定 aria-label 对不上动态词（a11y A7 既存红，本轮顺手修）。
+    //   ⚠️ 前缀必须短：a11y_check A7 的取数只截 aria-label 前 20 字符再比子串，
+    //   长说明会把状态词挤出截断面（首版实测就是这么复红的）。
+    els.switchEl.setAttribute("aria-label", "摄像头开关 · " + (on ? "已开启" : "已关闭"));
     els.dockBtn.setAttribute("aria-pressed", String(on));
   }
   function showStage(on) { els.hudVideo.hidden = !on; els.idleBox.hidden = on; }
@@ -387,7 +475,10 @@ function initFaceHud(deps) {
 (function initFace() {
     const FE = window.FaceEngine;
     const probe = $("#face-probe"), scanBtn = $("#btn-face-scan"), dockBtn = $("#btn-face");
-    const note = $("#face-note"), hud = $("#face-hud"), camBtn = $("#btn-cam");
+    const note = $("#face-note"), hud = $("#face-hud");
+    const row = $("#face-row"), faceToggle = $("#face-toggle"), camToggle = $("#set-face-cam");
+    // r109（老大拍板）：📷 与 🙂 只留一个——🙂 是唯一启停入口；📷 的总闸（彻底禁用+隐藏+记住）
+    // 原样并入设置面板 #set-face-cam；row=坞内折叠行（面板的家），face-toggle=展开/收起面板的行按钮
     // 面板元素与状态声明前置：applyEnabled 在 boot 时就会读写它们（后置声明会踩 TDZ）
     const statePill = $("#face-hud-state"), switchEl = $("#face-switch"), switchWord = $("#face-switch-word");
     const idleBox = $("#face-hud-idle"), hudVideo = $("#face-hud-video");
@@ -402,25 +493,30 @@ function initFaceHud(deps) {
 
     function unavailable(reason) {
       window.__XINYU_FACE_UI__ = { state: "unavailable", reason: reason };
-      scanBtn.hidden = true; dockBtn.hidden = true; hud.hidden = true;
+      scanBtn.hidden = true; dockBtn.hidden = true;
+      row.hidden = true;   // r109：坞内整块（折叠行+面板）一起消失——总闸关/能力不可用时坞里不留摄像头痕迹
       note.textContent = FE.reasonText(reason);
+    }
+    function setFacePanel(open) {
+      hud.hidden = !open;
+      if (faceToggle) faceToggle.setAttribute("aria-expanded", String(open));
     }
     function ready() {
       window.__XINYU_FACE_UI__ = { state: "ready", reason: "" };
       scanBtn.hidden = false; dockBtn.hidden = false;
-      // 侧边控制面板就位：面板本身是"开关的家"，所以默认可见（开关=已关闭，画面显示待开启）
-      hud.hidden = false;
+      // r109 入坞后：折叠行就位、面板默认收起（点行或 🙂 才展开）——不占常驻高度
+      row.hidden = false; setFacePanel(false);
       setSwitch(false); setPill("已关闭", "off"); showStage(false);
       $("#face-hud-emo").textContent = "摄像头未开启";
     }
 
-    /* 摄像头总闸（r87b）：关=立即真停+隐藏入口+记住；开=恢复入口（仍过能力探测）。按钮永远可见。 */
+    /* 摄像头总闸（r87b，r109 搬进设置面板）：关=立即真停+隐藏坞内整块+记住；开=恢复（仍过能力探测）。 */
     function applyEnabled() {
-      camBtn.setAttribute("aria-pressed", String(FE.enabled()));
+      if (camToggle) camToggle.checked = FE.enabled();
       if (!FE.enabled()) {
         if (faceOn) stopFace();
         unavailable("cam-disabled");
-        setStatus("摄像头已在开关中停用（点「📷 摄像头」可重新打开）");
+        setStatus("摄像头已在总闸中停用（设置 → 允许心屿使用摄像头，可重新打开）");
         return;
       }
       const cap = FE.capability();
@@ -445,7 +541,8 @@ function initFaceHud(deps) {
       }).catch(() => { /* 自检失败不影响主链路 */ });
       note.textContent = "画面只在你本机的内存里过一遍 —— 不拍照、不上传、不留存。";
     }
-    camBtn.addEventListener("click", () => { FE.setEnabled(!FE.enabled()); applyEnabled(); });
+    if (camToggle) camToggle.addEventListener("change", () => { FE.setEnabled(camToggle.checked); applyEnabled(); });
+    if (faceToggle) faceToggle.addEventListener("click", () => setFacePanel(hud.hidden));   // 折叠行：只管展开/收起，不碰摄像头
     // 本开关只控制"心屿用不用"；浏览器/系统层面的授权不在这里，也不能被网页改（安全设计如此）。
     // ⇒ 两件事必须说清，否则用户会把这个开关当成权限开关（老大实测就这么误会过）。
 
@@ -494,7 +591,7 @@ function initFaceHud(deps) {
       $("#face-hud-emo").textContent = "摄像头未开启";
       $("#face-hud-bar").dataset.w = 0; paint(hud);   // 强度条归零，别留着上一次的读数
       $("#face-hud-smile").hidden = true;
-      if (opts && opts.hide) hud.hidden = true;
+      if (opts && opts.hide) setFacePanel(false);   // r109：收起 = 停 + 折叠坞内面板
       if (gl) window.ThreeScene.setMistTint(null);
       setStatus("摄像头已关闭（指示灯灭）");
     }
@@ -503,7 +600,7 @@ function initFaceHud(deps) {
       if (starting) { stopFace({}); setStatus("已取消摄像头启动"); return; }
       if (faceOn) return;
       starting = true;
-      hud.hidden = false;
+      row.hidden = false; setFacePanel(true);   // r109：启动即展开坞内面板（预览+读数就在眼前）
       hudOpenedAt = Date.now();
       showStage(true);
       $("#face-hud-emo").textContent = "正在识别…";

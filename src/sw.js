@@ -22,6 +22,13 @@ const PRECACHE = [
   "/js/memory-store.js", "/js/scroll-story.js", "/js/three-scene.js",
   "/js/data-rights.js", "/js/sw-register.js",
   "/data/emotion-lexicon.js", "/data/emotion-strategy.js",
+  // r87 面部表情识别：引擎 + 判据 + ESM 桥（页面引用了就必须进壳）。
+  // ⚠️ 本数组范围内的注释**禁止出现双引号、也禁止写字面数组结束符**：判据是用源码正则
+  //    复算本清单的，注释里的引号会被当成清单项、字面结束符会把清单截断（本轮连踩两次，
+  //    第二次把注释里的正则原文写进来，直接把后三项截没了）。注释一律不用引号。
+  "/js/face-engine.js", "/js/face-mediapipe-bridge.js", "/data/face-smile-rules.js",
+  // ⚠️ vendor/mediapipe/**（13MB）不预缓存：它在 /vendor/ 前缀下走 cache-first，
+  //    且只在用户真的开启表情感知时才拉 —— 预缓存等于每个访客都先下 13MB。
 ];
 const NO_STORE = ["/js/demo-config.js"];                 // 含本机密钥，绝不落缓存
 const NETWORK_ONLY_PREFIX = ["/api/"];

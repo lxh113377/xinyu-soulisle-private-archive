@@ -212,6 +212,13 @@ def goto_state(pg, state):
     elif state == "lightshow":
         pg.evaluate("() => document.getElementById('act5').scrollIntoView({block:'center'})")
         pg.wait_for_timeout(500)
+        # r108：一键点亮随输入行挪进坞内（标题栏只留一个按钮）⇒ 坞收起时它不在视口里。
+        #   滚到第五幕会触发自动收起，所以这里先把坞展开到位再点（三态循环最多 3 跳）。
+        for _hop in range(3):
+            if pg.eval_on_selector("#chat-dock", "e => e.classList.contains('open')"):
+                break
+            pg.click("#btn-dock")
+            pg.wait_for_timeout(400)
         pg.click("#btn-lightshow")
         pg.wait_for_timeout(900)
 

@@ -11,6 +11,15 @@
 
 ---
 
+## 🎯 核心能力优先级（2026-10-11 用户立规）
+
+「**表情识别**」与「**语意理解**」确立为多轮迭代的**核心优先级**：每轮必须设定目标 / 评估指标 /
+验证标准，持续改进并作为**第一要务**跟踪落实。
+
+- 机器复算（棘轮，只降不升）：`python _test/core_capability_baseline_check.py`
+- 目标 / 指标 / 轨迹表：`memory/10-core-capabilities.md`；基线数据 `_test/core-capability-baseline.json`
+- 当前基线（r111 实测）：语意 **73 条 / 98.6% / 危机 6-6**；表情引擎单测 **18/18 pass**
+
 ## 📐 决策登记（r67）：linter 只做"可解析性"这一半，不装全量 linter
 
 - **实测分母**（本轮 `peer_quality_tooling_probe` counted=16）：peers 有 linter 配置 **2/16**、

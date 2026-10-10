@@ -33,6 +33,8 @@
 *.pptx binary
 *.docx binary
 *.mov  binary
+*.wasm binary
+*.task binary
 *.jar  binary
 *.db   binary
 *.zip  binary

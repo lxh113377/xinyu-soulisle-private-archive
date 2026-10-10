@@ -247,7 +247,11 @@ def gate_doc_audit(scripts, doc_text, on_disk, tracked=None, ci_scripts=None):
     if missing:
         bad.append("在电池里跑、却没进 quality-gates 的脚本 %d 条：%s"
                    % (len(missing), "、".join(missing[:6]) + ("…" if len(missing) > 6 else "")))
-    named = {m.split("/")[-1] for m in re.findall(r"_test/([A-Za-z0-9_.\-]+\.(?:py|js))", doc_text)}
+    # r111 修：原正则 `\.(?:py|js)` 无右界 ⇒ 文档里的 `_test/xxx.json` 被吞成 `xxx.js` 幽灵件
+    #   （本轮实测：新基线数据文件 core-capability-baseline.json 触发假红）。加负向右界，
+    #   要求 `.py/.js` 之后不得紧跟字母数字；`"_test/x.py"`/行尾/顿号等合法结尾不受影响。
+    named = {m.split("/")[-1] for m in re.findall(r"_test/([A-Za-z0-9_.\-]+\.(?:py|js))(?![A-Za-z0-9])",
+                                                  doc_text)}
     ghost = sorted(n for n in named if n not in on_disk)
     if ghost:
         bad.append("quality-gates 写了而 `_test/` 查无此件：%s" % "、".join(ghost))
@@ -474,12 +478,29 @@ def row_license(row):
 
 
 def vendor_headers(relpaths):
-    """读每个 vendored 文件的**头部 4KB**（banner 一定在最前面），作为许可的一手证据。"""
+    """读每个 vendored 文件的**头部 4KB**（banner 一定在最前面），作为许可的一手证据。
+
+    r87 补一条**二进制旁证**：wasm / 模型文件（`.wasm`、`.task`）在物理上无法自带注释 banner，
+    而 G6b 的"表中许可 vs 文件 banner"对账又要求一手证据 ⇒ 允许同目录下的 `LICENSE*`
+    文本文件作为该目录内**无 banner 件**的许可旁证（内容必须是上游许可全文，不是一句"见上游"）。
+    这不是放宽判据：缺旁证的二进制件照样红，且旁证内容要与归属表逐字对账（Apache 对 Apache）。
+    """
     out = {}
     for r in relpaths:
         p = ROOT / Path(r)
-        if p.exists():
-            out[Path(r).name] = p.read_text("utf-8", errors="replace")[:4000]
+        if not p.exists():
+            continue
+        txt = p.read_text("utf-8", errors="replace")[:4000]
+        if not header_license(txt):
+            sib = sorted(p.parent.glob("LICENSE*")) or sorted(p.parent.glob("*.LICENSE.txt"))
+            for s in sib:
+                cand = s.read_text("utf-8", errors="replace")[:4000]
+                if header_license(cand):
+                    # ⚠️ 必须**前置**：下游 header_license() 只取前 4000 字符，
+                    #    追加在后面的话会被整段截掉（首跑就这么红的，判据自己看不见证据）。
+                    txt = cand + chr(10) + txt
+                    break
+        out[Path(r).name] = txt
     return out
 
 
