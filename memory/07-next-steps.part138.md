@@ -11,6 +11,8 @@
   ⇒「对称差为空」是 r98 换尺那一刻的一次性取证被误当永久不变量，留着＝**逼后人删证据**。改判＝`AST ⊆ 子串` ＋ 差集逐个实测「调用点=0 且文本命中>0」
   ＋ 构造 `launch (` 换行证反方向可造 ⇒ `SELFTEST-PASS（45/45）`、真面 `余量 21`。
   自曝：该改动一度把 `selftest` 顶到 168 行越过 ≤150 行门（loc_guard 多报一件），抽成 `_st_face_equivalence()` 后回 133 行、门恢复 4 件（全属并行会话）。
+  **第二次终验（追加段修完，05:49）跑完**：`BATTERY: 135/145 rc=1`，RED 22→**9**、BLIND-RED 6→**1**、TIMEOUT 桶照常拦下 face_check=600s 并继续跑完；
+  `repo_config` 红只剩 G12（G4 在 SUITES 146→148 时又咬一次并同步 README ⇒ 那条纠漏改的尺确认还在工作）；九条红逐条归属见报告 §6.1b，**本轮责任面内零红**。
   ⑦ **分叉三条路代价实测（只读，未动正式仓）**：merge ＝ `git merge-tree --write-tree` 现读**冲突 9 个文件**（CHANGELOG/README/docs/quality-gates/public_check/run_all_suites/timing_coupling/ledger_age/clean_clone/07 主壳，
   其中 4 件正是本轮我改过的 ⇒ 合并轮必须逐件复验）；force ＝ 作废面实测仅 `v1.8.2` 一枚 tag（`git tag --contains e8462ca` 唯一命中），
   `git branch -a --contains` 只有远端自己、`git worktree list` 只有一个 ⇒ 无他人基于它；挂账 ＝ 对外写 v1.8.2 的地方**只有 3 个文件且全是本轮自己的记录**，
