@@ -14,3 +14,10 @@
 # 不走 .gitignore 那条腿：`.ci` 命中即降 quarantine = 把契约本体踢出版本控制，与目的相反（同 R313 记录）。
 # 也不迁 _trash：那等于删掉受理面定义。⇒ 正确处置是本项目显式声明豁免，而非改共享 allowlist。
 .ci | reason=CI 全绿契约本体（.ci/contract.json 必须入库，pre-push 钩子与 greencheck 读它）
+
+# `ml/`：项目自身的模型腿，非散落物 —— 提交 `e344d08`（2026-10-09）引入「RoBERTa 微调训练脚本 +
+# FastAPI 推理服务 + 一键双服务启动」，目录内**全部是 git 已跟踪源码**（`git ls-files ml/` 非空）。
+# noise_lint 对「含已入库文件的根部目录」判 VIOL 且自己写明处置＝「禁迁 _trash ⇒ 登记 KNOWN_CORE 或由归属方确认」；
+# KNOWN_CORE 住在共享技能根（改它要走镜像/派生件/注册表闭环，且会影响其它 10+ 个项目），
+# 而"这个目录属于本项目"这件事只有本项目能确认 ⇒ 走本文件这条项目级声明通道，不动共享 allowlist。
+ml | reason=git 已跟踪的模型腿源码目录（提交 e344d08 引入，含微调脚本与推理服务），非临时散落物
