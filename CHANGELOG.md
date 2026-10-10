@@ -2,6 +2,68 @@
 
 *(自 `v1.7.0` 起的在制增量 r94–r96 已随 **v1.8.0** 发布；`v1.8.0` 之后的 r96 受理面修复与 r97 语音退出态修复已随 **v1.8.1** 发布。)*
 
+### Changed（r108 · 对话坞与背景融为一体 + 右上角单个三态按钮，老大拍板）
+
+- **视觉融合**：`#chat-dock` 删掉面板四件套（顶部描边 / 向上投影 / 面板底色 / `backdrop-filter`），
+  改由四级自下而上淡出的渐变令牌（`--dock-fade-1..4`，深浅主题各一套）承托可读性——顶透底实，
+  对话内容直接压在星雾上。动因：`blur` 会把星雾抹成一片糊，那正是"这有个面板"的第一信号。
+  输入区上方分割线与 `demo-strip` 的虚线一并去掉（坞里最后两处"面板边界"）。
+- **右上角只有一个按钮**（原来 4 件：标题 + 📷 + ✨ + 收起）：`#btn-dock` 改**三态循环**
+  常规 ⛶ → 全屏 ▾ → 收起 ▴ → 常规，按钮文案写"下一个动作"、图标与 `aria-expanded` 随态翻面；
+  收起态文案仍是「展开 ▴」（`dock_auto_check` D2b 原文案不变）。点标题条展开（r104）与滚动自动
+  收起两条老路径保留；全屏态不参与自动收起（`if (dockFull()) return;`）；Esc 退出全屏（有 dialog 开着时不抢）。
+- **新增 `.full` 全屏态**：铺满视口（含顶栏），日志 `flex:1` 吃掉余高，`body.dock-full` 锁页面滚动；
+  收起条 52px → **44px**（与触屏红线同值）。
+- **两个按钮挪位**：`#btn-cam`（摄像头总闸）与 `#btn-lightshow`（一键点亮）从标题栏移进输入行，
+  与 🙂🎤🔊 同排；`id/class/aria/title` 一字未改，只换父节点。⚠️ 副作用如实记：它们现在**随输入行
+  一起收进坞内**，收起态不再可见 ⇒ 判据点击前须先展开坞（`a11y_check` 的 lightshow 分支已补）。
+- **判据**：`dock_auto_check` D7 从"点一下即收起"扩成 **D7/D7a/D7b/D7c 三跳断言**——旧断言在新语义下
+  会被"进了全屏但仍 open"误判为绿，专门堵这个洞（11 → 13 项）；同步更新 `browser_check`（点到收起为止）、
+  `_reshoot_r86`、`demo_video_pipeline.dock()`。实跑：**DOCK-AUTO-PASS 13/13**、ENTRY-REACH-PASS、
+  MOBILE-PASS（156 目标零横向溢出）、UX-GUARDS-PASS 22/22、BROWSER ALL-ASSERT-PASS。
+  **A11Y 的三条红经 HEAD 等价对照逐项复现（A2=20 节点 / A4 incomplete=31 / A7 face-switch）⇒ 判定为
+  既存红、非本轮引入**（对照用 `git archive HEAD src` 起独立服务，读数与工作区完全相同）。
+- **预算**：`style.css` 28,511→**31,860**、`app.js` 35,173→**38,690**（均按实测 +5%；登记前先压注释
+  −357B / −35B）；TOTAL 931,658 仍在 968,000 内。`deploy/xinyu/` 三件已同步（`deploy_sync_check.py` DIFF 归零）。
+
+### Changed（r104 · 判据层与受理面四项工程改造，全部落在 `_test/` 与 3 份对标台账；产品源码零新增）
+
+- **① 整跑韧性 + `eol_parity` 批量化（P0）**：一手事故是 `eol_parity` 实跑 >600s 触发
+  `TimeoutExpired` 无捕获 ⇒ 整跑 rc=1、**没有 BATTERY 收口行**、该套件之后一套都没跑
+  （"受理面断续"比"一套件红"更坏）。runner 改为套件级超时分档：rc=124（GNU timeout
+  惯用码）+ 单列 TIMEOUT 桶（与 CRASH 的修法不同：提速判据 or 显式抬 cap，不许默认调参
+  掩盖），blurb 带上已捕获的部分输出；per-suite 循环抽成 `run_suites()`（顺带把 main 收回
+  150 行内，loc_guard）。`eol_parity` 的逐文件双 git spawn（check-attr + show）在 730 个
+  跟踪文件上实测 140.4s（空载）/并发下破 600s ⇒ 批量化（一次 `check-attr --stdin` +
+  至多两次 `cat-file --batch`）后 **30.6s**，**16 个红项前后一条不变**（判据语义零改动，
+  任一路批结果缺失→该路径回落单文件函数）。解析器拆纯函数，selftest 喂合成字节流。
+- **② peers 受理面（P1）**：`benchmark-metrics.json` SNAP 从 10-04（r95 所采）重采到
+  **10-10 16/16**（r101 遗留第一件事：报告的 peers 列此前只能写"沿用"）。`peer_community`
+  peers 路径的行为面一直在打**已弃用的 `search/issues`**（docstring 与 JSON 的
+  `behavior_endpoint` 字段声称换了 `/pulls`，那个修复只落在 self 半边）——search 的
+  secondary rate limit 正是**三轮采集固定同样 5 仓 blind** 的根因，换 `/pulls` 后
+  应测 16｜**NA 0**。新增 `--repo` **增量合并**语义（分母恒取 PEERS 名册 16，未列名仓
+  原行保留、NA 判纲与全量同一把尺 `row_na()`）；r101 登记的"`--repo` 若替换名册会把分母
+  缩成补采数"由 selftest 恒等式腿钉住。
+- **③ 耦合尺债务结转（P1）**：入场现读 `C1=29 > 基线 22`（r87 的 `face_check` 新进 7 处
+  未登记 + r101 留的债务）。按 r101 留的正解做（**改完成态、不抬基线**）：11 条 `debt-open`
+  改成完成态等待后各自离开 C1_HARD；`j4_memory:10000` **从 debt-open 改判 unobservable**
+  （r101 的理由写错了：B 腿 `cfg.remote` 缺省=关是**阴性对照**，remote 关着时服务端计数
+  恒等于基线 ⇒ 轮询"计数到位"永不满足、轮询"静止"立即满足，**确认一件事没有发生没有
+  完成态可等**）；face_check 7 条全部登记为 debt-open（不塞 shaped-only）。完成态实现上收
+  `settle_wait.wait_reply`，ux_guards 原有的那份一并上收，五处判据共一处实现。
+- **④ `peer_memory` 声明位销账（P2）**：探针此前只把仓库级失败写进 `na`、字段级
+  （`edge[0]=="NA"`，引用边没取到）留在 `repos[*].edge` ⇒ 顶层 `blind=0` 与件内 5 处
+  NA 分叉。语义上引用边取不到 = **该轴未验**，不是"该仓没做"的反证 ⇒ `field_na()` 计入
+  声明位后摘掉 `NA_DIVERGE_WAIVED["peer-memory"]`（到期两条件均实测成立），清空名单仍由
+  "死豁免"腿守着。
+- **两次自己犯并修掉的同类错**（已写进 `settle_wait.wait_reply` docstring 防复发）：
+  `mark_last` 放在 click **之后**（离线模板 ~15ms 回完 ⇒ 标记打到本轮新终态上 ⇒ 30s 超时），
+  以及 `mem_before` 取样点放在 `settle(count>0)` **之后**（取到"1"之后等 `!== 1` 永不成立）。
+  两次现场都极具误导性：`n` 已 +2、`data-emotion` 已就位、`pendingTurns` 归零——
+  **判据崩在一个本来是对的谓词上**。教训：完成态等待的正确性不只在谓词，还在**取旧值/打标记
+  的时序点**；`before_send()` 把时序要求写进函数名。
+
 ### Added（r103 · 表情真实照片逐类准确率 F12 + anger 取舍的诚实登记）
 
 - 夹具从 8 张扩到 **12 张**：新增 `anger` ×2 / `surprise` ×2，取自
