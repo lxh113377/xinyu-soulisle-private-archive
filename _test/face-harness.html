@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>face harness（仅供 _test/face_check.py 驱动，不进公网 bundle）</title>
+</head>
+<body>
+<!-- 判据专用宿主页：给**真实照片**跑一次 IMAGE 模式推理，把 52 维 blendshape 与
+     引擎读数原样吐回 Python。为什么要单独一页：
+       ① 主页面是 VIDEO 模式（摄像头），照片要走 IMAGE 模式；
+       ② 夹具不该混进公网产物（_test/ 不参与 deploy 同步）。
+     判据与运行时**同一份**规则与引擎（直接引 src/ 下的文件），不存在"测试版判据"。 -->
+<script src="../src/data/emotion-lexicon.js"></script>
+<script src="../src/js/emotion-engine.js"></script>
+<script src="../src/data/face-smile-rules.js"></script>
+<script src="../src/js/face-engine.js"></script>
+<script type="module">
+import { FaceLandmarker, FilesetResolver } from "../src/vendor/mediapipe/vision_bundle.js";
+const BASE = new URL("../src/vendor/mediapipe/", import.meta.url).href;
+const MODEL = new URL("../src/vendor/mediapipe/face_landmarker.task", import.meta.url).href;
+window.__HARNESS__ = { ready: false, err: null };
+(async () => {
+  try {
+    const fileset = await FilesetResolver.forVisionTasks(BASE);
+    let lm;
+    try {
+      lm = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL, delegate: "GPU" }, runningMode: "IMAGE", numFaces: 1, outputFaceBlendshapes: true });
+    } catch (e) {
+      lm = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL, delegate: "CPU" }, runningMode: "IMAGE", numFaces: 1, outputFaceBlendshapes: true });
+    }
+    window.__HARNESS__ = {
+      ready: true, err: null,
+      detect: async (url) => {
+        const img = new Image();
+        img.src = url;
+        await img.decode();
+        const r = lm.detect(img);
+        const cats = (r.faceBlendshapes && r.faceBlendshapes[0]) ? r.faceBlendshapes[0].categories : null;
+        const bs = {};
+        if (cats) for (const c of cats) bs[c.categoryName] = c.score;
+        return { faces: (r.faceBlendshapes || []).length, bs, view: window.FaceEngine.read(bs) };
+      }
+    };
+  } catch (e) {
+    window.__HARNESS__ = { ready: false, err: String((e && e.message) || e) };
+  }
+})();
+</script>
+</body>
+</html>

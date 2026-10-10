@@ -1,0 +1,50 @@
+[
+  {
+    "file": "smile-01-girl-teeth.jpg",
+    "label": "smiling",
+    "title": "Smiling_young_girl_with_deciduous_teeth.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Smiling_young_girl_with_deciduous_teeth.jpg"
+  },
+  {
+    "file": "smile-02-girl-sunshine.jpg",
+    "label": "smiling",
+    "title": "Young_girl_smiling_with_teeth_in_sunshine.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Young_girl_smiling_with_teeth_in_sunshine.jpg"
+  },
+  {
+    "file": "smile-03-boy-laos.jpg",
+    "label": "smiling",
+    "title": "Smiling_little_boy_of_Laos.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Smiling_little_boy_of_Laos.jpg"
+  },
+  {
+    "file": "smile-04-woman-beer.jpg",
+    "label": "smiling",
+    "title": "Smiling_woman_holding_a_cup_of_beer.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Smiling_woman_holding_a_cup_of_beer.jpg"
+  },
+  {
+    "file": "neutral-01-ethel.jpg",
+    "label": "neutral",
+    "title": "Name-_Ethel_Penman_(17131341001).jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Name-_Ethel_Penman_%2817131341001%29.jpg"
+  },
+  {
+    "file": "neutral-02-john-clark.jpg",
+    "label": "neutral",
+    "title": "Name-_John_Clark_(20156387152).jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Name-_John_Clark_%2820156387152%29.jpg"
+  },
+  {
+    "file": "neutral-03-robert-hall.jpg",
+    "label": "neutral",
+    "title": "Name-_Robert_Hall_(16252447916).jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Name-_Robert_Hall_%2816252447916%29.jpg"
+  },
+  {
+    "file": "neutral-04-jane-forbes.jpg",
+    "label": "neutral",
+    "title": "Name-_Jane_Forbes_(16268376188).jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Name-_Jane_Forbes_%2816268376188%29.jpg"
+  }
+]
