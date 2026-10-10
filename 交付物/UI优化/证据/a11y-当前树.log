@@ -1,0 +1,46 @@
+     ! dark/landing   serious  label-content-name-mismatch n=1
+        - #face-switch
+     ! dark/act2_probe serious  label-content-name-mismatch n=1
+        - #face-switch
+     ! dark/act3_chat serious  label-content-name-mismatch n=1
+        - #face-switch
+     ! dark/crisis    serious  label-content-name-mismatch n=1
+        - #face-switch
+     ! dark/lightshow serious  label-content-name-mismatch n=1
+        - #face-switch
+     ! light/landing  serious  color-contrast             n=2
+        - #face-hud-idle
+        - #face-hud-idle > .muted
+     ! light/landing  serious  label-content-name-mismatch n=1
+        - #face-switch
+     ! light/act2_probe serious  color-contrast             n=2
+        - #face-hud-idle
+        - #face-hud-idle > .muted
+     ! light/act2_probe serious  label-content-name-mismatch n=1
+        - #face-switch
+     ! light/act3_chat serious  color-contrast             n=2
+        - #face-hud-idle
+        - #face-hud-idle > .muted
+     ! light/act3_chat serious  label-content-name-mismatch n=1
+        - #face-switch
+     ! light/crisis   serious  color-contrast             n=2
+        - #face-hud-idle
+        - #face-hud-idle > .muted
+     ! light/crisis   serious  label-content-name-mismatch n=1
+        - #face-switch
+     ! light/lightshow serious  color-contrast             n=2
+        - #face-hud-idle
+        - #face-hud-idle > .muted
+     ! light/lightshow serious  label-content-name-mismatch n=1
+        - #face-switch
+  PASS A1 每状态 passes>0                          最小 passes=18
+  FAIL A2 全状态 x 双主题零违规                          违规节点=20 红=dark/landing,dark/act2_probe,dark/act3_chat,dark/crisis,dark/lightshow,light/landing,light/act2_probe,light/act3_chat,light/crisis,light/lightshow
+  PASS A3 注入缺陷必须被抓到                             抓到 6 类 aria-input-field-name,aria-required-attr,button-name,image-alt,label-content-name-mismatch,region
+  PASS A4 量不出的对比度受控且点名                          incomplete=30 上限=30 样本=.brand | .brand-sub
+  PASS A6 焦点可见（首个 Tab 落点）                       落点=A|solid|none
+  FAIL A7 可见文字须为无障碍名子串                          不匹配 1 件：face-switch[已关闭 vs 摄像头开关（开启后用摄像头识别表情）]
+  PASS A8 对话与探针须 aria-live 播报                   实测=chart-receipt,chat-log,face-hud-smile,face-hud-state,face-status,probe-result
+  PASS A5a 正常态确实在动（否则 A5b 是空判）                  delta=0.74250
+  PASS A5b reduce 态显著降档                         normal=0.74250 reduce=0.00000 比值=0.000
+============================================================================
+A11Y-FAIL 审计面=12项 违规节点=20 红状态=10 passes最小=18 对比度量不出=30 动效比=0.0 未验=0 红在=A2 全状态 x 双主题零违规,A7 可见文字须为无障碍名子串

@@ -4,8 +4,9 @@
  * 判据 = _test/data_rights_check.py（D1-D4）。
  */
 window.DataRights = (function () {
-  const REMOTE_TXT = "情绪与对话会同步到**本演示实例的服务端**（为的是跨设备也记得你），可随时一键清除并当场核验归零，也可打包导出带走。";
-  const LOCAL_TXT = "所有情绪与对话**只留在本机浏览器**（不上传），可随时一键清除。";
+  // r104：清掉正文里的 Markdown 星号 —— textContent 是纯文本，星号会原样显示在界面上（截图实测过）
+  const REMOTE_TXT = "情绪与对话会同步到本演示实例的服务端（为的是跨设备也记得你），可随时一键清除并当场核验归零，也可打包导出带走。";
+  const LOCAL_TXT = "所有情绪与对话只留在本机浏览器（不上传），可随时一键清除。";
 
   function el(id) { return document.getElementById(id); }
 

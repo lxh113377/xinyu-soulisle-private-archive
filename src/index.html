@@ -11,6 +11,8 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<!-- 跳转链接（键盘/读屏）：第一下 Tab 直达对话输入，不必穿过五幕叙事 -->
+<a class="skip-link" href="#chat-input">跳到对话输入</a>
 <!-- WebGL 画布：固定全屏，滚动驱动镜头 -->
 <canvas id="gl" aria-hidden="true"></canvas>
 <div id="gl-fallback" hidden></div>
@@ -24,6 +26,15 @@
     <button id="btn-theme" class="ghost-btn" aria-label="深色主题，点击切换"><span id="theme-ico" aria-hidden="true">☾</span> <span id="theme-word">深色</span></button>
   </div>
 </header>
+
+<!-- 幕次导航（≤900px 由 CSS 隐藏）：五幕此前只能靠滚，回头看某一幕要走回头路 -->
+<nav id="actnav" aria-label="幕次导航">
+  <a href="#act1" data-i="1" aria-label="第一幕 · 相遇"><i aria-hidden="true"></i><span>相遇</span></a>
+  <a href="#act2" data-i="2" aria-label="第二幕 · 感知"><i aria-hidden="true"></i><span>感知</span></a>
+  <a href="#act3" data-i="3" aria-label="第三幕 · 陪伴"><i aria-hidden="true"></i><span>陪伴</span></a>
+  <a href="#act4" data-i="4" aria-label="第四幕 · 记忆"><i aria-hidden="true"></i><span>记忆</span></a>
+  <a href="#act5" data-i="5" aria-label="第五幕 · 边界"><i aria-hidden="true"></i><span>边界</span></a>
+</nav>
 
 <!-- 滚动叙事容器：每个 section 为一幕 -->
 <main id="story">

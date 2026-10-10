@@ -10,11 +10,32 @@
     $("#gl-fallback").hidden = false;
   }
 
+  // r104：顶栏滚动态（滚过 8px 加深）+ 进入叙事后自动收起对话坞（老大拍板）；只切 class。
+  //   三条护栏：① 焦点在坞内不收（话没打完坞不能跑）；② 向下挪够 AUTO_HIDE_PX 才收，
+  //   向上滚**不自动展开**（只收不放，防来回抖动反复弹）；③ 演示态（showtime）不动坞。
+  //   注：用到后文声明的 dockOpen/setDock —— 回调在事件循环里跑，不踩 TDZ（本轮刚修过一例）。
+  const tb = $("#topbar");
+  const AUTO_HIDE_PX = 80;
+  let autoHideY = scrollY;
+  addEventListener("scroll", () => {
+    tb.classList.toggle("solid", scrollY > 8);
+    const y = scrollY, moved = y - autoHideY;
+    if (Math.abs(moved) > AUTO_HIDE_PX) autoHideY = y;  // 基准只在真正挪动过一段后刷新，防临界抖动反复触发
+    if (moved < AUTO_HIDE_PX || !dockOpen()) return;
+    if (document.body.classList.contains("showtime")) return;
+    const a = document.activeElement;
+    if (a && a.closest && a.closest("#chat-dock")) return;
+    setDock(false);
+  }, { passive: true });
+
   // 2) 滚动叙事
   window.ScrollStory.init(
     (t) => { if (gl) window.ThreeScene.setScrollProgress(t); },
-    // r61 遮挡：见 CHANGELOG
-    (act) => { if (act === 4) { window.Chart.render(); if (dockOpen()) setDock(false); } }
+    // r61 遮挡：见 CHANGELOG；r104：顺带点亮幕次导航当前项（同样只切 class）
+    (act) => {
+      if (act === 4) { window.Chart.render(); if (dockOpen()) setDock(false); }
+      document.querySelectorAll("#actnav a").forEach(a => a.classList.toggle("on", +a.dataset.i === act));
+    }
   );
 
   // 3) 引擎徽章
@@ -220,6 +241,12 @@
   }
   $("#btn-dock").addEventListener("click", () => setDock(!dockOpen()));
   $("#story").addEventListener("click", (e) => { if (!e.target.closest("#chat-dock")) setDock(false); });
+  // r104：点标题条展开（老大拍板）—— 补鼠标/触屏路径，键盘仍走带 aria-expanded 的 #btn-dock。
+  //   刻意不给 #dock-bar 加 role=button：它内部套着三个真按钮，再套一层会撞嵌套交互规则。
+  $("#dock-bar").addEventListener("click", (e) => {
+    if (dockOpen() || e.target.closest("#btn-dock, #btn-cam, #btn-lightshow")) return;
+    setDock(true);
+  });
 
   // 5) 对话（刷新后恢复历史，多轮上下文不丢）
   //    窗口化（DOM 上界 60 / 折叠配额 / 展开较早）r26 外提到 `src/js/chat-window.js`；
@@ -423,9 +450,11 @@ function initFaceHud(deps) {
     // ⇒ 两件事必须说清，否则用户会把这个开关当成权限开关（老大实测就这么误会过）。
 
     /* 入口可见性只看**能不能用**（摄像头接口 + 安全上下文）与用户开关，不预载 13MB 模型：
-       模型由 `whenReady` 在用户真点开时才拉（bridge 的 ensure()），
-       否则每个访客每次打开页面都要先下 13MB —— 那是把"可选功能"做成"首屏税"。 */
-    applyEnabled();
+       模型由 `whenReady` 在用户真点开时才拉（bridge 的 ensure()），否则每个访客每次打开页面
+       都要先下 13MB —— 那是把"可选功能"做成"首屏税"。
+       ⚠️ 首次调用**必须排在下方的 initFaceHud 解构之后**（r104 修，缺陷非本轮引入）：
+       ready() 用的 setSwitch/setPill/showStage 是 initFaceHud 返回的 const，写在前面踩 TDZ；
+       initFace 在顶层同步执行 ⇒ 一抛则 boot/开场/对话接线全不执行，表现是**整页打不开**。 */
 
     // A. 第二幕：扫描一次
     scanBtn.addEventListener("click", async () => {
@@ -456,6 +485,7 @@ function initFaceHud(deps) {
       els: { statePill, switchEl, switchWord, dockBtn, hudVideo, idleBox },
       isOn: () => faceOn, openedAt: () => hudOpenedAt,
     });
+    applyEnabled();   // 首次应用摄像头总闸状态（位置不能上移，理由见上方注释）
     /** 停：默认**保留面板**（开关回"已关闭"，面板留在原地给用户再开）
      *  opts.hide = 连面板一起收起（"收起"按钮 / 离开页面）。 */
     function stopFace(opts) {
