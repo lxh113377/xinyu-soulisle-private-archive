@@ -2,6 +2,137 @@
 
 *(自 `v1.7.0` 起的在制增量 r94–r96 已随 **v1.8.0** 发布；`v1.8.0` 之后的 r96 受理面修复与 r97 语音退出态修复已随 **v1.8.1** 发布。)*
 
+### Changed（r116 · 老大纠正参照物「我要的是微信**视频聊天**那样的效果」→ 悬浮小窗 + 整屏两态，取代 r115 的侧边栏）
+
+- **我做错了什么**：r115 把「微信那种可以侧边显示和隐藏的」读成了**微信电脑版的侧边栏**（小面板里嵌一块画面），
+  老大要的是**微信视频通话**（画面是主角：整屏大视频 + 角落小浮层）。参照物搞错，按新口径重做。
+- **悬浮小窗（默认态）**：`#face-pip` 浮在页面上 —— 拖标题条移位置、拖右下角改大小（200~640px），
+  页面照常聊天照常滚。桌面默认 360 宽贴右上；手机默认只占屏宽 78%（满屏宽的小窗既拖不动也没意义）。
+- **整屏态**：点「全屏」→ 画面铺满视口（实测 1440×900 / 390×844 / 320×568 三档全占满），
+  标题条与情绪读数/开关/隐私声明浮在画面上下两层 scrim 上；**右上角小缩略图复用同一条 MediaStream**
+  （一个流可挂多个 video 元素），点它收回小窗。
+- **一手踩坑两条（都补了探针腿防复发）**：
+  ① **挂上流 ≠ 在放** —— 缩略图首版一片黑：`face-engine` 只对主 video 调过 `play()`。
+     修＝`syncMini()` 补 `miniVideo.play().catch()`，探针加断言 `videoWidth>0 && !paused`。
+  ② **`0` 不能当"还没量过"的哨兵** —— 首版把未初始化写成 `w=0`，被 `Math.max(0, MIN_W)` 钳成 260 宽，
+     小窗画面只剩 212×159。改 `null` 哨兵，并把「坏值回落默认」与「越界才钳制」拆成两步
+     （`sane()` + `Math.min/max`），三档画面回到 312×234 / 260×195 / 206×190。
+- **遮挡这条又咬一次（r115 教训的回归腿）**：320×568 档探针 `trial click #chat-input` 超时，
+  用 `elementFromPoint` 抓到的是**小窗自己的隐私声明段** —— 是窗体高度没给底部输入行留净空，
+  不是"矮屏无解"。修＝`@media (max-height:700px){.face-pip{max-height:calc(100vh - 300px)}}`，
+  并**保留三档全验**（没有靠放宽断言变绿）。另把窗口钳底改成按**实际渲染高度**算，
+  否则拖一下就把右下角手柄和隐私声明推到视口外，用户既缩不了也关不掉。
+- **保留的三件**（老大认可）：emoji→SVG 精灵、坞标题条的常驻「表情面板」键、手机优先字阶与顶栏换行。
+  `#face-hud` 及全部子件 id 与「已开启/已关闭」文案仍一字未动（`_test/face_check.py` F10 断言点）。
+- **判据**：`_test/lightshow_check.py` 的取样遮罩清单同步把 `#face-drawer` 换成 `#face-pip` + `#pip-mini`
+  —— r115 立的「新增顶层浮层必须进遮罩清单」本轮立刻第二次用上。实跑全绿：size_budget
+  （style.css 38,180→41,310，TOTAL 1,013,589）/ inline_style（34 文件命中 0）/ emotion_wiring /
+  mobile_check（144 目标零溢出）/ entry_reach（visible=10/17，state_gated 7）/ ux_guards（22/0）/
+  dock_auto（15/0）/ browser_check **ALL-ASSERT-PASS** / lightshow_check / offline_shell / pixel_dual /
+  a11y（12 审计单元 0 违规）。探针 `_temp/r116_shots.py` 三视口 **R116-PIP-PASS**
+  （显隐/移窗/改大小/出屏钳制/整屏铺满/缩略图取流且在放/不抢点击/点回小窗/关窗摘流/位置尺寸记忆/
+  44px/零报错），另跑 `_temp/r116_live_shots.py` 打**线上**同口径复验，同样 PASS。
+- **部署**：Pages 新部署 **`7115b3fe`**（回滚锚 = 上一版 `f63649e0`）；`public_check` **ALL-PASS**
+  （10 腿，判红 0 / 未验 0）· `live_sync_check` **25/25 逐字节相等**。
+- **存量红（未制造、未为变绿去动）**：① `loc_guard --enforce` 在 HEAD 即报 3 项，本轮 `initFace`
+  162→171（+9 行接线）。顺带一条口径发现：`(function initFace() {` 因带函数名，被
+  `loc_guard._classify` 判成 **named function 而非 IIFE/module**，所以它的长度**确实在门内** ——
+  与 r103 注释里「IIFE 不计函数长」的直觉相反，值得下轮核一遍同类命名 IIFE。
+  ② `eol_parity` 49 项全在他人未入库件，本轮三件源码零命中。③ `deploy_sync` 报 1 项 DIFF =
+  `data/psych-kb.js`，属 **r114 知识库在途件**（src 22:11 重生、deploy 21:45），非本轮改动，未代其同步。
+- **未提交**：同 r115 —— 工作区并存 r113（代码 9 件）+ r114（知识库，仍在写）的在途 hunk，
+  且 `src/index.html`/`src/js/app.js`/`_test/size_budget_check.py`/`CHANGELOG.md` 是同一批文件；
+  老大当轮拍板「先不提交，等 r114 跑完一起收」。本地与 `origin/main` 分叉 18/48 亦待老大解。
+
+### Changed（r115 · 老大报「界面太小 / 手机端难找入口」：表情感知改侧边抽屉 + emoji 换 SVG + 手机优先重排）
+
+> ⚠️ **本节的「侧边抽屉」形态已被 r116 取代**（老大纠正参照物：要的是微信**视频通话**，不是侧边栏）。
+> emoji→SVG、常驻功能键、手机优先重排三件保留。原文按当日为真保留不改写。
+
+
+- **侧边抽屉（老大原话「做成微信聊天的那种可以在侧边显示和隐藏的，而且要动态可调节大小」）**：
+  表情感知面板从对话坞里那条 120px 高的横条搬进 `#face-drawer`。桌面从右缘滑出、拖左缘变宽
+  （300~760px），手机转底部抽屉、拖上缘变高（34~92vh）；另有「大小」键在 常规/大/特大 三档循环
+  （键盘与不便拖拽的用户走这条）。尺寸与开合分离：**开合的唯一权威仍是 `#face-hud.hidden`**
+  （`_test/face_check.py` F10 按它断言），尺寸走 `:root` 的 `--fd-w/--fd-h` 并由 app.js 用
+  **CSSOM 逐属性**写入（markup 内联 style 会被线上 CSP `style-src 'self'` 拦成失效，
+  `_test/inline_style_check.py` 对新增写法直接判红）；尺寸存 `peiliao.facedrawer.v1`，
+  **开合态刻意不持久化**（刷新回到「摄像头没在拍」的画面）。隐私声明 `.fd-note` 摆在滚动区之外，
+  矮屏（320×568）面板内滚时它也不会滚出视野。
+- **画面为什么之前只剩半张脸（一手实测）**：`.face-hud video{height:120px;object-fit:cover}`
+  把 4:3 的画面横着切一刀；手机档更写成 `width:96px;height:60px`。现按 `aspect-ratio:4/3`
+  随抽屉缩放：实测桌面 345×259（可拖到 720 宽）、手机 390 档 340×255、320 档 270×203。
+- **常驻功能键**：对话坞标题条新增 `#btn-face-panel`（坞收起时那一格仍在视口里），
+  抽屉内另有 `#btn-fd-size`（大小）与 `#btn-fd-close`（关闭并停摄像头）。
+- **emoji 全换内联 SVG**：设置/主题/表情/一键点亮/语音/朗读/扫描/隐私锁/折叠箭头九处 emoji 字形
+  → 12 个 `<symbol>` 精灵 + `<use>` 引用（比逐个内联 path 省一半字节），
+  `stroke:currentColor` 跟随主题色，跨平台不会渲染成方框或色块。**刻意没动的两处**：
+  `#btn-dock` 的 `▴/▾/⛶` 是几何文字不是 emoji，且 `_test/dock_auto_check.py` 断言其 `inner_text`
+  恰为「展开 ▴」/「收起 ▾」；`#btn-lightshow` 的 `.ls-word` 被 `lightshow_check` 逐字断言，
+  只把图标段 `.ls-ico` 换成 SVG。主题切换原来改 `#theme-ico` 的 `textContent`（☾/☀），
+  现改为换那个 `<use>` 的 `href`（`#i-moon` ⇄ `#i-sun`）。
+- **手机优先重排**：顶栏 ≤480 改 `flex-wrap` + `white-space:nowrap`（实测 320px 下「心屿/在线 AI/
+  模型设置/深色」挤成两行是老大手机截图里的原状）；`.msg` 14.5→16px、`.lead` 14.5→15.5px、
+  坞内 `chat-log` 加高、`.chat-meta` 12px。删掉两条零引用死规则 `.face-hud-head`/`.face-hud-title`
+  （grep `src/` `deploy/` `_test/` 三面确认无使用者）。
+- **本轮踩到并修掉的真 bug（抽屉遮挡）**：抽屉刚做出来时盖住了输入行的 🙂✨🎤🔊 与顶栏按钮 ——
+  Playwright 点 `#btn-face` 被 `#face-hud` intercepts 卡满 30s 超时。改为抽屉打开时加 `body.fd-open`
+  让 `#chat-dock`/`#topbar`/`#story` 向右让位（手机档不让位，否则输入行被挤出视口）。
+  与 memory 里 `#btn-clear` 被坞遮挡是同族缺陷：**新增浮层必须当场验「它有没有吃掉别人的点击」**。
+- **判据改造（R263：先修判据不动数据）**：`_test/lightshow_check.py` 的取样遮罩 `overlay()`
+  漏了 `#actnav` —— 幕次导航的 `.on` 点是 `--accent2`（青，hue≈170=「平静」）、未激活点是
+  `rgba(138,147,178)`（蓝灰，hue≈226=「低落」），正好落进取样容差。一手归因：把本轮改动**完全不含**
+  的 HEAD 基线单独起服务跑同一套件，同样报「对照 31/2 有效像素」红；补上 `#actnav` 遮罩后对照归零
+  （0/0）⇒ 是遮罩清单漏项，不是星图或本轮 UI 的问题。**含义比表面严重**：这条判据的负例控制自 r104
+  起一直失效，等于「六色可分辨」从未被本套件真正证明过。顺带把 r115 新增的顶层浮层 `#face-drawer`
+  一并纳入遮罩清单。
+- **预算**：size_budget 三条按实测+5% 上调并留理由（index.html 15,550→20,920 / style.css
+  33,980→38,180 / app.js 42,120→47,970；TOTAL 988,898 ≤1,023,000）。**本轮零新增文件**，
+  故 `sw.js` PRECACHE 与首屏请求数一字未动。
+- **判据读数**：size_budget **BUDGET-PASS** / inline_style **PASS**（扫描 34 文件 命中 0）/
+  deploy_sync **PASS**（missing=0 diff=0 extra=0，`js/demo-config.js` 零密钥红线复核在位）/
+  emotion_wiring **PASS** / mobile_check **PASS**（4 视口×两态零溢出，144 个交互目标 ≥44px）/
+  entry_reach **PASS**（visible=10/16，state_gated 排除 6 含抽屉内三键）/ ux_guards **PASS**（22/0）/
+  dock_auto **PASS**（15/0）/ a11y **PASS**（12 审计单元 违规节点 0）/ offline_shell **17/17** /
+  pixel_dual **PASS** / browser_check **ALL-ASSERT-PASS** / lightshow_check **PASS**（修判据后）。
+- **存量红（本轮未制造、也未为了变绿去动它们）**：① `loc_guard` `--enforce` 在 HEAD 就报 3 项
+  （`src/js/app.js` 的 `initFace` 162 行、`_test/face_check.py` 的 `browser_legs` 348 行、
+  `_test/face_discrim_check.py` 的 `selftest` 222 行）；本轮把 `initFace` 从 162 抬到 168
+  （抽屉接线 6 行），已用 `git show HEAD:` 复算确证红不是本轮引入。② `eol_parity` 剩 50 项，
+  全部落在 `交付物/AIC/`、`交付物/UI优化/` 等他人未入库件与 `nul` 上，本轮改的三件源码零命中。
+- **临时件处置**：本轮产生的 21 个 `_tmp_*.txt` 判据输出走 `handoff.py recycle` 入系统回收站
+  （method=recycle_bin，可还原）—— 它们曾被 `eol_parity` 读成「未入库文件含 CRLF」进分母。
+  探针与截图留在 `_temp/r115_shots.py` / `_temp/r115_shots/`（`_temp/` 已登记运行态豁免）。
+
+
+- **功能①「回答更专业有据」**：新增 `_test/psych_kb_build.py`（构建器+判据：解析 `交付物/心理学知识库/`
+  条目卡 → 生成 `src/data/psych-kb.js`（28,192B / 32 条 A-D 级，E 级未查证条目**构建期即排除**）；
+  缺字段/ID 重复/0 条一律 BUILD-FAIL，`--check` 钉住源与产物一致）+ `chat-agent.js kbBlockFor()`：
+  求解释型消息（问号/为什么/原理…）或话题二元组命中 ≥2 时，向回复提示词注入 top-3 相关条目
+  （纯倾诉轮不注入，防共情变说教），回复可带〔依据:编号·级〕标注。注入体量被 context_budget X3
+  双向管住（实测两态 357 / 1,401 字符 ≤1600）。
+- **功能②「表情识别更抗造」**：质量门四信号（暗光/模糊/侧脸/嘴部平坦=口罩嫌疑）——
+  `rules.quality` 阈值（首版保守值，标定债留痕注释）+ `face-engine.js assessQuality/applyQuality`
+  （纯函数，unit 新增 4 腿）+ 面板文案「（画面模糊…，仅供参考）」+ 嘴部遮挡时微笑三态停用。
+  命中只降置信+改文案，**不参与任何裁决**（r87 第三路红线不动）。
+- **判据**：size_budget 26 文件 PASS（TOTAL 968,000→1,023,000，psych-kb.js 首登 29,602）/
+  face-engine unit **22/22** / context_budget **X1-X6 PASS** / browser_check **ALL-ASSERT-PASS** /
+  face_check selftest PASS（全套本机环境卡点在案，按 r109 先例以定向探针取证：帧循环 0 异常、
+  文案诚实；探针 `_temp/r113_face_probe.py`）/ 基线棘轮 **CORE-CAP-BASELINE-PASS**（语意 73 条
+  98.6% 危机 6-6 无回退；表情单测 18→22 只升）/ deploy_sync **PASS** / offline_shell **17/17** /
+  public_check **10 腿 ALL-PASS** / live_sync **25/25 逐字节相等**。
+- **部署**：Pages 新部署 `48a0d3be`（回滚锚=上一版）+ CloudBase 备用线（psych-kb.js 在线确认）。
+- **顺带**：`_test/face_check.py:582` 死引用 `ctx10.close()` 移除（静态确证的 NameError，此前阻塞全套
+  浏览器腿）；`deploy/xinyu/.wrangler` 运行缓存经回收站通道移出公网交付目录（备份
+  `_temp/r113_wrangler_backup/`，回收站可还原）。
+
+### Changed（r112 · 心理学知识库第 1 轮：32 条入库，「多轮迭代对话」机制确立）
+
+- 新增 `交付物/心理学知识库/`：README 总纲（**五级可信度制 A-E**：A 权威共识/B 强实证/C 有限实证/
+  D 观点争议/E 未验证；条目卡模板；编号规则 PSY-<域>-<序>）+ 索引 + 6 篇章 **32 条**（A:8 B:15 C:2 D:7），
+  规范核对员两批整改 11 处。由 dynamic workflow 产出（5 研究员并行→入库员落盘→规范核对闭环→
+  总撰/独立审读/修订）。产品注入面见 r113；下一轮候选：04 篇补厚、METT/SETT 与判别准确率缺补。
+
 ### Changed（r111 · 双核心能力确立为每轮第一要务 + 基线棘轮落地，用户立规）
 
 - **立规**（用户原话）：「将『表情识别』和『语意理解』确立为项目多轮迭代优化的核心优先级，并在每一轮

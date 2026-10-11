@@ -90,12 +90,17 @@ with sync_playwright() as p:
 
     def overlay(hide):
         # ⚠️ #gl 是全屏画布，元素截图 = 整屏，会把浮在上面的 UI（含右下角返回按钮）一起拍进去，
-        #    必须在取样时一并遮掉，否则按钮的紫边与亮字会被当成「点亮的星」
+        #    必须在取样时一并遮掉，否则按钮的紫边与亮字会被当成「点亮的星」。
+        # r115 补 #actnav（一手归因见下），r116 把 #face-drawer 换成 #face-pip + #pip-mini。
+        #   ⚠️ **新增顶层浮层必须同步加进这个清单** —— 幕次导航的点在 1280 档可见，其 .on 点是
+        #   --accent2（青，hue≈170=「平静」）、未激活点是 rgba(138,147,178)（蓝灰，hue≈226=「低落」），
+        #   正好落进取样容差 ⇒ 「未点亮对照」被读成 31~32 个有效像素、套件判红。
+        #   一手归因（2026-10-11）：同一改动**未落地**的 HEAD 基线跑本套件同样红（对照 31/2），
+        #   把 #actnav 一并遮掉后对照归零（0/0）⇒ 是遮罩清单漏项，不是星图或本轮 UI 改动的问题。
+        #   按 R263 修判据，不改数据凑绿。#face-drawer 是 r115 新增的顶层浮层，一并纳入遮罩。
         page.evaluate("""(hide) => { const v = hide ? 'hidden' : 'visible';
-                          document.getElementById('story').style.visibility = v;
-                          document.getElementById('topbar').style.visibility = v;
-                          document.getElementById('chat-dock').style.visibility = v;
-                          document.getElementById('btn-exit-show').style.visibility = v; }""", hide)
+                          ['story','topbar','chat-dock','btn-exit-show','actnav','face-pip','pip-mini'].forEach(
+                            id => { const e = document.getElementById(id); if (e) e.style.visibility = v; }); }""", hide)
 
     def ui_state():
         return page.evaluate("""() => ({

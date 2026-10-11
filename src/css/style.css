@@ -55,6 +55,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1
 #story{position:relative;z-index:10}
 /* 演示态（一键点亮）：全部 UI 让位，页面上只留背景星雾；
    播完**不自动跳回**——只有右下角这一个按钮能退出，滚动欣赏不会中断 */
+/* r115：表情抽屉同属 UI，演示态一并让位（否则侧边浮层会盖在纯星雾上） */
 body.showtime #topbar,body.showtime #story,body.showtime #chat-dock{
   opacity:0;pointer-events:none;transition:opacity .45s ease}
 #btn-exit-show{display:none;position:fixed;right:26px;bottom:26px;z-index:60;
@@ -181,6 +182,8 @@ body.dock-full #story,body.dock-full #topbar,body.dock-full #actnav,body.dock-fu
 #dock-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 22px 10px}
 /* r104：收起态下整个标题条都是「展开」的热区（点它展开），指针提示跟着变 */
 #chat-dock:not(.open) #dock-bar{cursor:pointer}
+/* 坞右上角按钮组（r115 加了「表情面板」常驻键）：不随标题换行而被挤走 */
+.dock-acts{display:flex;align-items:center;gap:6px;flex:0 0 auto}
 /* 坞右上角唯一按钮（r108）：文案写「下一个动作」而非当前状态 */
 .dock-btn{white-space:nowrap}
 .dock-btn .db-ico{font-size:12px}
@@ -225,17 +228,25 @@ html[data-theme="light"] #chat-dock .chat-meta{text-shadow:0 1px 2px rgba(255,25
   #chat-dock .chat-log{height:min(30vh,260px)}
 }
 @media(max-width:768px){
+  /* r115 手机优先：正文字阶与对话气泡整体抬一档（旧值 14.5px 在 6 寸屏上要眯眼），
+     坞内可视行数靠 chat-log 加高补回来，不因字号把对话挤没。 */
   #topbar{padding:12px 18px}
   .act{padding:80px 16px 132px}
   .act-copy{padding:32px 26px}
-  .lead{font-size:14.5px}
-  .chat-log{padding:14px;gap:10px}
-  .msg{font-size:14.5px;max-width:88%}
-  #chat-dock .chat-log{height:min(34vh,240px)}
+  .lead{font-size:15.5px}
+  .chat-log{padding:16px;gap:12px}
+  .msg{font-size:16px;max-width:90%}
+  .dock-title{font-size:14px}
+  #chat-dock .chat-log{height:min(38vh,300px)}
   #mood-chart{max-width:100%}
 }
 @media(max-width:480px){
-  #topbar{padding:10px 14px}
+  #topbar{padding:10px 12px;flex-wrap:wrap;gap:8px 10px}
+  /* 顶栏窄屏**换行而不是挤压**：实测 320px 下「心屿 / 在线 AI / 模型设置 / 深色」挤在一行会
+     把每个词都劈成两行（老大 2026-10-11 手机截图即此）。nowrap + wrap 让它整齐落两行，
+     横向不溢出（_test/mobile_check.py M1 的溢出红线）。 */
+  .brand,#topbar .ghost-btn,#topbar .badge{white-space:nowrap}
+  #topbar .ghost-btn{font-size:12.5px;padding:8px 11px}
   .brand-sub,.dock-title .muted{display:none}
   .act{padding:72px 12px 190px;min-height:92vh}
   .act-copy{padding:26px 20px;border-radius:14px}
@@ -248,7 +259,8 @@ html[data-theme="light"] #chat-dock .chat-meta{text-shadow:0 1px 2px rgba(255,25
   .primary-btn{padding:11px 16px;font-size:14px}
   .voice-btn{padding:9px 11px;font-size:15px}
   #chat-dock{max-height:72vh}
-  #chat-dock .chat-log{height:min(30vh,210px)}
+  #chat-dock .chat-log{height:min(32vh,240px)}
+  .chat-meta{font-size:12px}
   /* 窄屏收图标、不藏能力（r49）：旧版整块 display:none 让手机端演示入口彻底不可达；
      文字走 sr-only 裁切而非 display:none，可访问名与桌面档逐字相同。判据 = entry_reach_check.py */
   /* r108：规则按类名而非 id 生效——摄像头/一键点亮都挪进了输入行，两条都要「收图标不藏能力」 */
@@ -315,18 +327,85 @@ html[data-theme="light"] #gl-fallback{filter:none}
   box-shadow:0 12px 40px rgba(0,0,0,.35)}
 .face-note{font-size:11.5px;line-height:1.6}
 
-/* r109（老大拍板）：表情感知集成进对话坞——右侧独立悬浮小窗已删，坞内版唯一。
-   .face-hud 从 fixed 悬浮改为坞内流式块（#face-row 折叠行下方）；#face-switch 仍是主控件；
-   轻玻璃底 + 圆角与全站一致，但不与星雾争面板感（入坞即属坞的融合风格）。 */
+/* r115（老大拍板）：emoji 字形图标换内联 SVG —— 继承 currentColor、跨平台不会渲染成
+   一个色块或方框；.ico 走 fill:none + stroke:currentColor，与全站线性描边风格一致。 */
+.ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;
+  stroke-linejoin:round;flex:0 0 auto;vertical-align:-.22em}
+.voice-btn .ico{width:20px;height:20px}
+.ls-ico{display:inline-flex;align-items:center}
+
+/* r116（老大纠正参照物）：表情感知 = **微信视频通话式悬浮小窗**（可拖位置、可拖大小、小窗↔整屏）。
+   ⚠️ 位置/尺寸只读 :root 的 --pip-x/--pip-y/--pip-w，由 app.js 用 CSSOM 逐属性写入 —— markup 内联 style
+   会被线上 CSP（style-src 'self'）拦成失效（判据 _test/inline_style_check.py）。
+   开合的唯一权威仍是 #face-hud.hidden（_test/face_check.py F10 按它断言），body.pip-open 跟随它。 */
 .face-row-dock{padding:0 22px}
 .face-toggle{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:6px 4px;
-  background:transparent;border:none;color:var(--muted);font-family:var(--font);font-size:12.5px;
+  background:transparent;border:none;color:var(--muted);font-family:var(--font);font-size:13px;
   cursor:pointer;transition:color var(--dur-1) var(--ease)}
 .face-toggle:hover{color:var(--ink)}
 .face-toggle .ft-word{letter-spacing:.05em}
-.face-toggle .ft-ico{margin-left:auto;font-size:11px;transition:transform var(--dur-2) var(--ease)}
+.face-toggle .ft-ico{margin-left:auto;transition:transform var(--dur-2) var(--ease)}
 .face-toggle[aria-expanded="true"] .ft-ico{transform:rotate(90deg)}
-.face-hud{width:100%;padding:10px;margin-bottom:6px;
+/* r116（老大纠正参照物：要的是**微信视频通话**，不是 r115 那个侧边栏）：可拖位置、可拖大小的
+   悬浮小窗；body.pip-full 切整屏态，整屏时角落 #pip-mini 复用同一条流、点它回小窗。
+   位置与尺寸只走 :root 的 --pip-x/--pip-y/--pip-w（CSSOM 逐属性 —— markup 内联 style 撞线上 CSP，
+   判据 _test/inline_style_check.py）。默认落在顶栏下方右侧，**不压对话坞输入行**（r115 一手教训：
+   浮层盖住控件时样式判据全绿、真点击却卡满 30s 超时）。 */
+.face-pip{position:fixed;z-index:46;left:var(--pip-x,16px);top:var(--pip-y,76px);width:var(--pip-w,360px);
+  max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);
+  display:flex;flex-direction:column;gap:8px;padding:10px 12px 12px;
+  background:var(--panel-hover);backdrop-filter:blur(16px);border:1px solid var(--line);
+  border-radius:var(--r-lg);box-shadow:var(--sh-3);
+  visibility:hidden;opacity:0;transition:opacity var(--dur-2) var(--ease)}
+/* ⚠️ 显隐只动 opacity，别加 scale/translate：getBoundingClientRect 把缩放算进尺寸，
+   动画期间按钮实测会掉到 43px，撞本仓 44px 触屏红线（_test/mobile_check M2/M3 逐控件实测）。 */
+body.pip-open .face-pip{visibility:visible;opacity:1}
+.face-pip.pip-dragging{transition:none}
+.pip-bar{display:flex;align-items:center;gap:8px;flex:0 0 auto;cursor:grab;touch-action:none}
+.pip-bar:active{cursor:grabbing}
+.pip-title{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:600;letter-spacing:.04em}
+.pip-acts{margin-left:auto;display:flex;align-items:center;gap:6px}
+.pip-note{font-size:11.5px;line-height:1.6;flex:0 0 auto}
+/* 右下角缩放手柄：刻意不做成 <button>——它是连续量尺，不是离散动作 */
+.pip-grip{position:absolute;right:1px;bottom:1px;width:22px;height:22px;cursor:nwse-resize;touch-action:none}
+.pip-grip::after{content:"";position:absolute;right:6px;bottom:6px;width:9px;height:9px;
+  border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);border-radius:0 0 3px 0}
+.pip-grip:hover::after{border-color:var(--accent2)}
+/* ── 整屏态：画面铺满视口，标题条与读数/开关浮在画面上下两层 scrim 上 ── */
+body.pip-full .face-pip{left:0;top:0;width:100vw;height:100vh;max-width:none;max-height:none;
+  gap:0;padding:0;border:none;border-radius:0;backdrop-filter:none;background:#05070f}
+body.pip-full .pip-bar{position:absolute;left:0;right:0;top:0;z-index:3;padding:12px 14px;
+  background:linear-gradient(rgba(4,6,14,.66),transparent)}
+body.pip-full .pip-note{position:absolute;left:0;right:0;bottom:10px;z-index:3;text-align:center;
+  padding:0 16px;color:var(--ink);text-shadow:0 1px 3px rgba(0,0,0,.85)}
+body.pip-full .pip-grip{display:none}
+body.pip-full .face-hud{flex:1 1 auto;padding:0;border:none;background:none;backdrop-filter:none;
+  border-radius:0;overflow:hidden;position:relative}
+body.pip-full .face-hud-stage{position:absolute;inset:0;width:100%;height:100%;
+  aspect-ratio:auto;min-height:0;max-height:none;border-radius:0}
+body.pip-full .face-hud-actions{position:absolute;left:0;right:0;bottom:44px;z-index:3;padding:0 16px}
+body.pip-full .face-hud-tag{position:absolute;left:16px;bottom:112px;z-index:3;padding:6px 12px;
+  border-radius:var(--r-pill);background:rgba(4,6,14,.55)}
+body.pip-full .face-smile-badge{position:absolute;left:16px;bottom:152px;z-index:3;background:rgba(4,6,14,.55)}
+/* 角落小缩略图：与主画面同一条 MediaStream；点它 = 收回悬浮小窗（微信那个角就是退出口） */
+.pip-mini{display:none}
+body.pip-full.pip-open .pip-mini{display:block;position:fixed;z-index:47;right:14px;top:60px;
+  width:96px;height:128px;padding:0;overflow:hidden;border:1px solid var(--line);border-radius:14px;
+  background:#05070f;box-shadow:var(--sh-2);cursor:pointer}
+.pip-mini video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.pip-mini .pip-mini-ico{position:absolute;left:6px;bottom:5px;color:var(--ink);opacity:.9}
+.pip-mini .ico{width:16px;height:16px}
+/* 演示态（一键点亮）让位：整条规则**必须排在 pip-open 之后** —— 两者特异度相同，
+   靠顺序压过，否则演示时悬浮窗会浮在纯星雾上。 */
+body.showtime .face-pip,body.showtime .pip-mini{opacity:0;pointer-events:none}
+/* 矮屏（320×568 这类）：小窗封顶到让出对话坞的输入行。
+   实测不封顶时窗底 y=408 压住 #chat-input（rect y=371），elementFromPoint 抓到的是
+   小窗自己的 .pip-note —— 即遮挡真凶是窗体高度，不是"矮屏无解"，故按净空重算而非放宽断言。 */
+@media (max-height:700px){
+  .face-pip{max-height:calc(100vh - 300px)}
+  body.pip-full .face-pip{max-height:none}
+}
+.face-hud{width:100%;padding:10px;flex:1 1 auto;min-height:0;overflow-y:auto;
   display:flex;flex-direction:column;gap:8px;
   background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--line);
   border-radius:14px;
@@ -335,17 +414,18 @@ html[data-theme="light"] #gl-fallback{filter:none}
    动画期间的按钮实测只有 43px，撞本仓 44px 触屏红线（_test/mobile_check M2/M3 逐控件实测）。
    ⇒ 只用位移 + 透明度，尺寸自始至终是 44px。 */
 @keyframes face-hud-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.face-hud-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}
-.face-hud-title{color:var(--muted);letter-spacing:.06em}
+/* 画面按 4:3 走、随抽屉一起缩放。旧版写死 height:120px + object-fit:cover，等于把 4:3 的画面
+   横着切一刀只剩半张脸（老大 2026-10-11 实测截图即此），手机更被压成 96×60 缩略图。 */
+.face-hud-stage{position:relative;width:100%;aspect-ratio:4/3;min-height:150px;max-height:56vh;
+  flex:0 0 auto;border-radius:10px;overflow:hidden;background:#05070f}
+.face-hud video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:10px;
+  background:#05070f;transform:scaleX(-1);transition:opacity .3s ease}
+.face-hud-idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:4px;font-size:13px;color:var(--ink);text-align:center;line-height:1.5}
 .face-hud-state{padding:2px 9px;border-radius:999px;border:1px solid var(--line);font-size:11px;
   color:var(--muted);transition:color .24s ease,border-color .24s ease}
 .face-hud-state.on{color:var(--accent2);border-color:rgba(57,208,196,.45);background:rgba(57,208,196,.08)}
 .face-hud-state.warn{color:#f0b354;border-color:rgba(240,179,84,.45);background:rgba(240,179,84,.08)}
-.face-hud-stage{position:relative;border-radius:10px;overflow:hidden;background:#05070f;min-height:120px}
-.face-hud video{width:100%;height:120px;object-fit:cover;border-radius:10px;background:#05070f;
-  transform:scaleX(-1);transition:opacity .3s ease}
-.face-hud-idle{position:absolute;inset:0;height:120px;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:4px;font-size:12px;color:var(--ink);text-align:center;line-height:1.5}
 /* 开关：轨道 38×22，点击区 ≥44px（触屏红线，mobile_check M2/M3 实测） */
 .face-hud-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .face-switch{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 4px;background:transparent;
@@ -359,12 +439,12 @@ html[data-theme="light"] #gl-fallback{filter:none}
 /* 关闭按钮必须 ≥44px（本仓触屏红线，_test/mobile_check.py M2/M3 逐控件实测）：
    小窗是浮层里的控件，比页面正文更容易被做成"点得到但点不准"的小目标 */
 .face-hud .ghost-btn{min-height:44px;display:flex;align-items:center;justify-content:center}
-.face-hud-tag{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink)}
+.face-hud-tag{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink)}
 .face-hud-tag .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);
   box-shadow:0 0 10px currentColor;transition:background .24s ease}
 .face-hud .intensity-bar{width:46px}
 /* 三态徽章：真笑=暖金 / 社交性微笑=琥珀描边 / 非微笑=中性灰 */
-.face-smile-badge{font-size:11px;padding:4px 10px;border-radius:999px;text-align:center;
+.face-smile-badge{font-size:12px;padding:6px 10px;border-radius:999px;text-align:center;
   border:1px solid var(--line);color:var(--muted);transition:color .24s ease,border-color .24s ease}
 .face-smile-badge.is-duchenne{color:#ffd14d;border-color:rgba(255,209,77,.45);background:rgba(255,209,77,.08)}
 .face-smile-badge.is-social{color:#f0b354;border-color:rgba(240,179,84,.38)}
@@ -379,10 +459,12 @@ html[data-theme="light"] #gl-fallback{filter:none}
 .face-row{font-size:12.5px;color:var(--muted);margin-top:6px}
 
 @media (max-width:768px){
-  /* 入坞后（r109）窄屏不再需要另配 grid 定位：面板天然满坞宽，只压小预览高度 */
   .face-row-dock{padding:0 14px}
-  .face-hud video,.face-hud-idle{width:96px;height:60px}
-  .face-hud-stage{min-height:60px}
+  /* 手机：悬浮窗收窄内边距，宽度由 max-width:calc(100vw-16px) 自动兜住；
+     整屏态与桌面同构（画面铺满 + 角落小缩略图），不再需要底部抽屉那一套。 */
+  .face-pip{padding:8px 10px 10px;gap:6px}
+  body.pip-full.pip-open .pip-mini{right:10px;top:54px;width:84px;height:112px}
+  .face-hud-stage{min-height:190px;max-height:46vh}
   .face-video{width:100%;aspect-ratio:16/9}
   #btn-face-scan{width:100%}
 }

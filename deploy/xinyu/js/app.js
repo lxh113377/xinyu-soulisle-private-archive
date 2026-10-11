@@ -124,6 +124,8 @@
      chip / 强度条 / 配色渲染，不新增第二种视觉语言。 */
   function smileBadgeHtml(s) {
     if (!s) return "";
+    // r113 质量门：嘴部区域看不清时微笑三态停用，如实说明而不是报一个「未检出微笑」
+    if (s.occluded) return `<span class="face-smile-badge is-none">嘴部看不清（可能被遮挡），微笑判读暂停</span>`;
     const map = { duchenne: ["真笑（眼周有参与）", "is-duchenne"], social: ["社交性微笑", "is-social"], none: ["未检出微笑", "is-none"] };
     const one = map[s.kind] || map.none;
     const extra = s.masking ? " · 伴紧张线索，可能是强颜欢笑" : "";
@@ -326,7 +328,7 @@
   // r104：点标题条展开（老大拍板）—— 补鼠标/触屏路径，键盘仍走带 aria-expanded 的 #btn-dock。
   //   刻意不给 #dock-bar 加 role=button：它内部套着真按钮，再套一层会撞嵌套交互规则。
   $("#dock-bar").addEventListener("click", (e) => {
-    if (dockOpen() || e.target.closest("#btn-dock")) return;
+    if (dockOpen() || e.target.closest("#btn-dock,#btn-face-panel")) return;
     setDock(true);
   });
   paintDock();   // 首帧把按钮刷成与初始态一致（HTML 里写的是默认态，防两处漂移）
@@ -396,7 +398,82 @@
   });
 
   /* 6.1) 面部表情识别（r87）：不可用即隐藏入口（禁伪装）；画面只在内存里过一遍，零上传零落盘。 */
-  /* ── 表情面板渲染器（r103 从 initFace 拆出）──────────────────────────────
+  /* ── r116（老大纠正参照物：要的是**微信视频通话**，不是 r115 那个侧边栏）──────
+   悬浮小窗：拖标题条移位、拖右下角改大小、点「全屏」升到整屏，整屏时角落那枚缩略图点回小窗。
+   只管「窗口」这一件事 —— 开合的权威仍是 #face-hud.hidden（_test/face_check.py F10 按它断言），
+   由 initFace 的 setFacePanel 统一驱动，这里不另存一份开合状态。
+   ⚠️ 位置/尺寸只能走 CSSOM 逐属性（root.style.setProperty）：markup 内联 style 会被线上 CSP
+   （style-src 'self'）拦成失效，且 _test/inline_style_check.py 对新增写法当场判红。 */
+function initFacePip(deps) {
+  const { win, bar, grip, mainVideo, miniVideo, modeBtn, closeBtn, miniBtn, root, onClose } = deps;
+  const KEY = "peiliao.facepip.v1";
+  const MIN_W = 200, MAX_W = 640;   // 200 而非 260：320 宽的手机上限是 vw-16=304，下限留不出余量就「拖不动」
+  // 坏值（非数字/Infinity）回落默认，**越界则钳制** —— 两件事不能混成一个 clamp：
+  // 把 0 当哨兵会被钳成 MIN_W（实测小窗被压成 260 宽、画面只剩 212×159），所以未量过一律用 null
+  const sane = (v, d) => ((typeof v === "number" && isFinite(v)) ? v : d);
+  let w = null, x = null, y = null, full = false;
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (s && typeof s === "object") { w = s.w; x = s.x; y = s.y; full = !!s.full; }
+  } catch (e) { /* 隐私模式禁读：落回默认位，功能不受影响 */ }
+  function place() {
+    const vw = innerWidth, vh = innerHeight;
+    // 手机默认只占屏宽 78%：满屏宽的小窗既拖不动也没意义（那是整屏态的活），留出可移的余量
+    const defW = Math.min(vw >= 769 ? 360 : Math.max(MIN_W, Math.round(vw * 0.78)), vw - 16);
+    w = Math.min(Math.max(sane(w, defW), MIN_W), Math.max(MIN_W, Math.min(MAX_W, vw - 16)));
+    x = Math.min(Math.max(sane(x, vw - w - 18), 8), Math.max(8, vw - w - 8));
+    // 按**实际渲染高度**钳底：只钳「顶边不出屏」会把窗体推到视口外，
+    // 结果右下角手柄与隐私声明一起掉到屏外，用户既缩不了也关不掉（实测拖一次就复现）
+    y = Math.min(Math.max(sane(y, 76), 8), Math.max(8, vh - win.offsetHeight - 8));
+    root.style.setProperty("--pip-w", w + "px");
+    root.style.setProperty("--pip-x", x + "px");
+    root.style.setProperty("--pip-y", y + "px");
+    try { localStorage.setItem(KEY, JSON.stringify({ w: w, x: x, y: y, full: full })); } catch (e) {}
+  }
+  place();
+  /* 缩略图复用**同一条** MediaStream（一个流可挂多个 video 元素）；收回小窗时摘掉，
+     别让已经停掉的流继续占着缩略图。 */
+  function syncMini() {
+    miniVideo.srcObject = full ? mainVideo.srcObject : null;
+    // 挂上流 ≠ 开播：face-engine 只对主 video 调过 play()，缩略图不自己点就是一片黑（实测）
+    if (full && miniVideo.srcObject) miniVideo.play().catch(() => {});
+  }
+  function setFull(on) {
+    full = on;
+    document.body.classList.toggle("pip-full", on);
+    modeBtn.setAttribute("aria-label", on ? "返回悬浮小窗" : "全屏显示摄像头画面");
+    syncMini();
+    place();
+  }
+  modeBtn.addEventListener("click", () => setFull(!full));
+  miniBtn.addEventListener("click", () => setFull(false));
+  closeBtn.addEventListener("click", onClose);
+  /* 拖标题条 = 移窗，拖右下角 = 改大小。按下落在 <button> 上就不拖（否则点关闭会顺手挪窗）。 */
+  function drag(el, onMove) {
+    el.addEventListener("pointerdown", (ev) => {
+      if (full || (ev.target.closest && ev.target.closest("button"))) return;
+      const sx = ev.clientX, sy = ev.clientY;
+      el.setPointerCapture(ev.pointerId);
+      win.classList.add("pip-dragging");
+      const move = (e) => { onMove(e.clientX - sx, e.clientY - sy); place(); };
+      const up = () => {
+        el.removeEventListener("pointermove", move);
+        el.removeEventListener("pointerup", up);
+        el.removeEventListener("pointercancel", up);
+        win.classList.remove("pip-dragging");
+      };
+      el.addEventListener("pointermove", move);
+      el.addEventListener("pointerup", up);
+      el.addEventListener("pointercancel", up);
+    });
+  }
+  drag(bar, (dx, dy) => { x += dx; y += dy; });
+  drag(grip, (dx) => { w += dx; });
+  addEventListener("resize", place);
+  return { syncMini: syncMini, setFull: setFull };
+}
+
+/* ── 表情面板渲染器（r103 从 initFace 拆出）──────────────────────────────
    为什么拆：initFace 当时已 194 行，超过 loc_guard 的 150 行上限（存量红）。
    真正的接缝不是"行数"，而是**职责**：这一块只做「把读数画到面板上 + 看门狗」，
    全是纯渲染与定时观察；摄像头开关生命周期是另一件事（stopFace/startFace）。
@@ -458,13 +535,19 @@ function initFaceHud(deps) {
     $("#face-hud-dot").dataset.bg = hex;
     // 独有三类走 FaceEngine.labelOf；margin 低时如实标「读数不稳」，不假装确定（r102）
     const base = FE.labelOf(view.emotion);
-    $("#face-hud-emo").textContent = view.confident === false ? base + "（读数不稳）" : base;
+    /* r113 质量门：画面靠不住（暗/糊/侧脸/嘴被挡）时说清原因并降为参考，不硬报笃定结论 */
+    const q = view.quality;
+    const qTxt = (q && !q.ok) ? "（" + q.reasons.map((r) => ({ lighting: "光线太暗或太亮", blur: "画面模糊",
+      profile: "侧脸幅度大", "mouth-flat": "嘴部区域被遮挡" }[r] || r).join("、")) + "，仅供参考）"
+      : (view.confident === false ? "（读数不稳）" : "");
+    $("#face-hud-emo").textContent = base + qTxt;
     $("#face-hud-bar").dataset.w = Math.round((view.intensity || 0) * 100);
     $("#face-hud-bar").dataset.bg = hex;
     const badge = $("#face-hud-smile");
     badge.hidden = false;
     badge.className = "face-smile-badge " + (view.smile ? "is-" + view.smile.kind : "is-none");
-    badge.textContent = (view.smile && view.smile.masking) ? "社交性微笑 · 可能是强颜欢笑"
+    badge.textContent = (view.smile && view.smile.occluded) ? "嘴部看不清（可能被遮挡），微笑判读暂停"
+      : (view.smile && view.smile.masking) ? "社交性微笑 · 可能是强颜欢笑"
       : { duchenne: "真笑（眼周有参与）", social: "社交性微笑", none: "未检出微笑" }[(view.smile || {}).kind] || "—";
     paint(hud);
     if (gl) window.ThreeScene.setMistTint(view.color, view.intensity);
@@ -477,6 +560,7 @@ function initFaceHud(deps) {
     const probe = $("#face-probe"), scanBtn = $("#btn-face-scan"), dockBtn = $("#btn-face");
     const note = $("#face-note"), hud = $("#face-hud");
     const row = $("#face-row"), faceToggle = $("#face-toggle"), camToggle = $("#set-face-cam");
+    const panelBtn = $("#btn-face-panel");   // r116：面板本体=悬浮小窗 #face-pip，坞里只留状态行
     // r109（老大拍板）：📷 与 🙂 只留一个——🙂 是唯一启停入口；📷 的总闸（彻底禁用+隐藏+记住）
     // 原样并入设置面板 #set-face-cam；row=坞内折叠行（面板的家），face-toggle=展开/收起面板的行按钮
     // 面板元素与状态声明前置：applyEnabled 在 boot 时就会读写它们（后置声明会踩 TDZ）
@@ -493,17 +577,20 @@ function initFaceHud(deps) {
 
     function unavailable(reason) {
       window.__XINYU_FACE_UI__ = { state: "unavailable", reason: reason };
-      scanBtn.hidden = true; dockBtn.hidden = true;
-      row.hidden = true;   // r109：坞内整块（折叠行+面板）一起消失——总闸关/能力不可用时坞里不留摄像头痕迹
+      scanBtn.hidden = true; dockBtn.hidden = true; panelBtn.hidden = true;
+      row.hidden = true; setFacePanel(false);   // r115：入口全撤 + 抽屉不留空壳
       note.textContent = FE.reasonText(reason);
     }
     function setFacePanel(open) {
       hud.hidden = !open;
+      document.body.classList.toggle("pip-open", open);
+      if (open) pip.syncMini();   // 整屏态重开面板时把流补挂回角落缩略图
       if (faceToggle) faceToggle.setAttribute("aria-expanded", String(open));
+      panelBtn.setAttribute("aria-expanded", String(open));
     }
     function ready() {
       window.__XINYU_FACE_UI__ = { state: "ready", reason: "" };
-      scanBtn.hidden = false; dockBtn.hidden = false;
+      scanBtn.hidden = false; dockBtn.hidden = false; panelBtn.hidden = false;
       // r109 入坞后：折叠行就位、面板默认收起（点行或 🙂 才展开）——不占常驻高度
       row.hidden = false; setFacePanel(false);
       setSwitch(false); setPill("已关闭", "off"); showStage(false);
@@ -542,7 +629,7 @@ function initFaceHud(deps) {
       note.textContent = "画面只在你本机的内存里过一遍 —— 不拍照、不上传、不留存。";
     }
     if (camToggle) camToggle.addEventListener("change", () => { FE.setEnabled(camToggle.checked); applyEnabled(); });
-    if (faceToggle) faceToggle.addEventListener("click", () => setFacePanel(hud.hidden));   // 折叠行：只管展开/收起，不碰摄像头
+    if (faceToggle) faceToggle.addEventListener("click", () => setFacePanel(hud.hidden));   // 折叠行：只管开合抽屉，不碰摄像头
     // 本开关只控制"心屿用不用"；浏览器/系统层面的授权不在这里，也不能被网页改（安全设计如此）。
     // ⇒ 两件事必须说清，否则用户会把这个开关当成权限开关（老大实测就这么误会过）。
 
@@ -582,6 +669,11 @@ function initFaceHud(deps) {
       els: { statePill, switchEl, switchWord, dockBtn, hudVideo, idleBox },
       isOn: () => faceOn, openedAt: () => hudOpenedAt,
     });
+    const pip = initFacePip({ win: $("#face-pip"), bar: $("#pip-bar"), grip: $("#pip-grip"),
+      mainVideo: hudVideo, miniVideo: $("#pip-mini-video"), modeBtn: $("#btn-pip-mode"),
+      closeBtn: $("#btn-pip-close"), miniBtn: $("#pip-mini"), root: document.documentElement,
+      onClose: () => stopFace({ hide: true }) });
+    panelBtn.addEventListener("click", () => setFacePanel(hud.hidden));   // 坞标题条的常驻键
     applyEnabled();   // 首次应用摄像头总闸状态（位置不能上移，理由见上方注释）
     /** 停：默认**保留面板**（开关回"已关闭"，面板留在原地给用户再开）
      *  opts.hide = 连面板一起收起（"收起"按钮 / 离开页面）。 */
@@ -680,7 +772,7 @@ function initFaceHud(deps) {
       if (light) { document.documentElement.dataset.theme = "light"; }
       else { delete document.documentElement.dataset.theme; }
       const ico = $("#theme-ico"), word = $("#theme-word");
-      if (ico) ico.textContent = light ? "☀" : "☾";
+      if (ico) ico.setAttribute("href", light ? "#i-sun" : "#i-moon");   // r115：emoji 换 SVG 精灵，切的是 <use> 的引用
       if (word) word.textContent = light ? "浅色" : "深色";
       btn.setAttribute("aria-label", (light ? "浅色" : "深色") + "主题，点击切换");
     }

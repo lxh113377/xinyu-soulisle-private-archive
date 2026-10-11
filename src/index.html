@@ -9,8 +9,27 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%237c6cff'/><circle cx='12' cy='12' r='4' fill='%23b9aefe'/></svg>">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/voice-call.css">
 </head>
 <body>
+<!-- r115（老大拍板）：界面 emoji 换内联 SVG 精灵。symbol 定义一次、各处 <use> 引用，
+     比逐个内联 path 省字节；精灵本体 aria-hidden + hidden（不渲染仍可被 <use> 解析）。 -->
+<svg id="ico-sprite" aria-hidden="true" hidden>
+<symbol id="i-cam" viewBox="0 0 24 24"><rect x="2.5" y="6.5" width="19" height="13" rx="2.6"/><circle cx="12" cy="13" r="3.4"/><path d="M8.4 6.5 9.9 4h4.2l1.5 2.5"/></symbol>
+<symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M8.2 13.8c.85 1.5 2.1 2.3 3.8 2.3s2.95-.8 3.8-2.3"/><path d="M9.1 9.4h.01M14.9 9.4h.01"/></symbol>
+<symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M11 3.4 12.6 8.3 17.5 9.9 12.6 11.5 11 16.4 9.4 11.5 4.5 9.9 9.4 8.3z"/><path d="M18.2 15.6l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7z"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9.2" y="2.6" width="5.6" height="11" rx="2.8"/><path d="M5.4 11.4a6.6 6.6 0 0 0 13.2 0"/><path d="M12 18v3.4M8.6 21.4h6.8"/></symbol>
+<symbol id="i-volume" viewBox="0 0 24 24"><path d="M3.8 9.4h3.4l4.6-3.9v13l-4.6-3.9H3.8z"/><path d="M15.4 9.1a4.1 4.1 0 0 1 0 5.8"/><path d="M18 6.5a7.7 7.7 0 0 1 0 11"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v2.7M12 18.7v2.7M21.4 12h-2.7M5.3 12H2.6M18.6 5.4l-1.9 1.9M7.3 16.7l-1.9 1.9M18.6 18.6l-1.9-1.9M7.3 7.3 5.4 5.4"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.4v2.6M12 19v2.6M21.6 12H19M5 12H2.4M18.8 5.2 17 7M7 17l-1.8 1.8M18.8 18.8 17 17M7 7 5.2 5.2"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="M9.4 5.4 16 12l-6.6 6.6"/></symbol>
+<symbol id="i-expand" viewBox="0 0 24 24"><path d="M14.5 3.5h6v6M9.5 20.5h-6v-6M20.5 3.5 14.1 9.9M3.5 20.5l6.4-6.4"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.4"/><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7"/></symbol>
+<symbol id="i-call" viewBox="0 0 24 24"><path d="M6.2 3.6h3l1.5 4-2 1.4a12.4 12.4 0 0 0 5.9 5.9l1.4-2 4 1.5v3a2 2 0 0 1-2.2 2A16.6 16.6 0 0 1 4.2 5.8a2 2 0 0 1 2-2.2z"/></symbol>
+<symbol id="i-collapse" viewBox="0 0 24 24"><path d="M3.5 9.5h6v-6M20.5 14.5h-6v6M9.5 9.5 3.5 3.5M14.5 14.5l6 6"/></symbol>
+</svg>
 <!-- 跳转链接（键盘/读屏）：第一下 Tab 直达对话输入，不必穿过五幕叙事 -->
 <a class="skip-link" href="#chat-input">跳到对话输入</a>
 <!-- WebGL 画布：固定全屏，滚动驱动镜头 -->
@@ -22,8 +41,8 @@
   <div class="brand"><span class="brand-dot"></span>心屿<span class="brand-sub">MindIsle</span></div>
   <div class="top-right">
     <span id="mode-badge" class="badge">● 在线 AI</span>
-    <button id="btn-settings" class="ghost-btn" aria-label="模型设置"><span aria-hidden="true">⚙</span> 模型设置</button>
-    <button id="btn-theme" class="ghost-btn" aria-label="深色主题，点击切换"><span id="theme-ico" aria-hidden="true">☾</span> <span id="theme-word">深色</span></button>
+    <button id="btn-settings" class="ghost-btn" aria-label="模型设置"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg> 模型设置</button>
+    <button id="btn-theme" class="ghost-btn" aria-label="深色主题，点击切换"><svg class="ico" aria-hidden="true"><use id="theme-ico" href="#i-moon"/></svg> <span id="theme-word">深色</span></button>
   </div>
 </header>
 
@@ -57,7 +76,7 @@
       <div id="probe-result" class="probe-result" aria-live="polite">还没有对话记录 —— 在页面底部说第一句话试试。</div>
       <!-- 第二幕 · 摄像头表情扫描（无摄像头 / 拒绝授权 / 模型缺失时整块**隐藏**，不置灰报错） -->
       <div id="face-probe" class="face-probe" hidden>
-        <button id="btn-face-scan" class="ghost-btn" type="button" aria-label="摄像头扫描一次面部表情"><span aria-hidden="true">📷</span> 摄像头扫描一次</button>
+        <button id="btn-face-scan" class="ghost-btn" type="button" aria-label="摄像头扫描一次面部表情"><svg class="ico" aria-hidden="true"><use href="#i-cam"/></svg> 摄像头扫描一次</button>
         <video id="face-video" class="face-video" playsinline muted hidden aria-label="摄像头预览"></video>
         <p class="muted face-note" id="face-note">画面只在你本机的内存里过一遍 —— 不拍照、不上传、不留存。</p>
       </div>
@@ -118,44 +137,38 @@
     </div>
     <!-- r108（老大拍板）：坞右上角只留这一个按钮，三态循环 常规⛶→全屏▾→收起▴→常规；
          写「下一个动作」而非当前状态；收起态文案仍是「展开 ▴」（dock_auto_check D2b） -->
-    <button id="btn-dock" class="ghost-btn tiny dock-btn" type="button" aria-expanded="true" title="全屏 / 收起 / 展开（三态循环）"><span class="db-word">全屏</span> <span class="db-ico" aria-hidden="true">⛶</span></button>
+    <div class="dock-acts">
+      <!-- r115（老大「好难找到入口」）：表情面板的常驻功能键。坞收起时标题条仍在视口里，
+           所以这一格在手机上也永远点得到；≤480 只把文字收进 sr-only，图标与无障碍名不动。 -->
+      <button id="btn-face-panel" class="ghost-btn tiny dock-btn" type="button" aria-controls="face-pip"
+              aria-expanded="false" aria-label="表情面板" title="显示/隐藏表情感知面板（画面仅本机处理）"><svg class="ico" aria-hidden="true"><use href="#i-smile"/></svg><span class="fdp-word">表情面板</span></button>
+      <button id="btn-dock" class="ghost-btn tiny dock-btn" type="button" aria-expanded="true" title="全屏 / 收起 / 展开（三态循环）"><span class="db-word">全屏</span> <span class="db-ico" aria-hidden="true">⛶</span></button>
+    </div>
   </header>
   <!-- r109：加 tabindex —— chat-log 入坞后被 flex 压缩成真正可滚区域，axe 的
        scrollable-region-focusable 要求可滚区域必须键盘可达（a11y A2 实测新增） -->
   <div id="chat-log" class="chat-log" role="log" aria-live="polite" tabindex="0"></div>
-  <!-- r109（老大拍板）：表情感知集成进坞——右侧独立面板已删，坞内版唯一。折叠行 #face-toggle
-       常驻一行，点它展开/收起 #face-hud；输入行 🙂 是启停开关（同一动作，状态互相同步）。 -->
+  <!-- r116（老大纠正参照物）：#face-hud 住在**悬浮小窗** #face-pip 里（见文末），坞里只留这一行状态条，
+       点它开合小窗。子件 id 与「已开启/已关闭」文案一字未动
+       （_test/face_check.py F10 按 #face-hud 的 hidden 属性与逐字文案断言）。 -->
   <div id="face-row" class="face-row-dock" hidden>
-    <button id="face-toggle" class="face-toggle" type="button" aria-expanded="false" aria-controls="face-hud"
+    <button id="face-toggle" class="face-toggle" type="button" aria-expanded="false" aria-controls="face-pip"
             title="展开/收起表情感知面板（画面仅本机处理）">
-      <span aria-hidden="true">🙂</span><span class="ft-word">表情感知</span>
+      <svg class="ico" aria-hidden="true"><use href="#i-smile"/></svg><span class="ft-word">表情感知</span>
       <span id="face-hud-state" class="face-hud-state off" role="status">已关闭</span>
-      <span class="ft-ico" aria-hidden="true">▸</span>
+      <svg class="ico ft-ico" aria-hidden="true"><use href="#i-chev"/></svg>
     </button>
-    <section id="face-hud" class="face-hud" aria-label="面部表情感知（画面仅本机处理）" hidden>
-      <div class="face-hud-stage">
-        <video id="face-hud-video" playsinline muted aria-label="表情感知预览"></video>
-        <div id="face-hud-idle" class="face-hud-idle">摄像头未开启<br><span class="muted">打开下方开关即可</span></div>
-      </div>
-      <div class="face-hud-tag"><i class="dot" id="face-hud-dot"></i><span id="face-hud-emo">正在识别…</span><span class="intensity-bar"><i id="face-hud-bar"></i></span></div>
-      <div id="face-hud-smile" class="face-smile-badge" hidden aria-live="polite">—</div>
-      <div class="face-hud-actions">
-        <button id="face-switch" class="face-switch" type="button" role="switch" aria-checked="false" aria-label="摄像头开关（开启后用摄像头识别表情）">
-          <span class="fs-track" aria-hidden="true"><i class="fs-knob"></i></span>
-          <span class="fs-word" id="face-switch-word">已关闭</span>
-        </button>
-        <button id="btn-face-close" class="ghost-btn tiny" type="button" aria-label="收起面板并关闭摄像头">收起</button>
-      </div>
-    </section>
   </div>
   <form id="chat-form" class="chat-form">
     <input id="chat-input" type="text" maxlength="500" placeholder="和心屿说说今天…" autocomplete="off" aria-label="对话输入">
     <!-- r109（老大拍板）：📷 与 🙂 功能重叠只留一个 —— 🙂 是唯一入口（点=启停表情感知）；
          📷 的总闸语义（彻底禁用+隐藏全部入口+记住）原样并入设置面板 #set-face-cam -->
-    <button type="button" id="btn-face" class="ghost-btn voice-btn" aria-label="实时表情感知" aria-pressed="false" title="开启后用摄像头读取你的表情（仅本机处理）">🙂</button>
-    <button id="btn-lightshow" class="ghost-btn voice-btn" type="button" title="六种情绪各点亮一簇（仅演示，不写入记忆）"><span class="ls-ico">✨</span> <span class="ls-word">一键点亮</span></button>
-    <button type="button" id="btn-voice" class="ghost-btn voice-btn" aria-label="语音输入" title="语音输入">🎤</button>
-    <button type="button" id="btn-speak" class="ghost-btn voice-btn" aria-label="朗读回复" aria-pressed="false" title="朗读回复（需浏览器支持语音合成）">🔊</button>
+    <button type="button" id="btn-face" class="ghost-btn voice-btn" aria-label="实时表情感知" aria-pressed="false" title="开启后用摄像头读取你的表情（仅本机处理）"><svg class="ico" aria-hidden="true"><use href="#i-smile"/></svg></button>
+    <button id="btn-lightshow" class="ghost-btn voice-btn" type="button" title="六种情绪各点亮一簇（仅演示，不写入记忆）"><span class="ls-ico"><svg class="ico" aria-hidden="true"><use href="#i-sparkle"/></svg></span> <span class="ls-word">一键点亮</span></button>
+    <button type="button" id="btn-voice" class="ghost-btn voice-btn" aria-label="语音输入" title="语音输入"><svg class="ico" aria-hidden="true"><use href="#i-mic"/></svg></button>
+    <!-- r116（老大裁定）：语音通话入口。连续听→听懂→出声→再听；摄像头开不开都能用。 -->
+    <button type="button" id="btn-call" class="ghost-btn voice-btn btn-call" aria-label="语音通话" aria-pressed="false" title="语音通话（边说边聊，可打断）"><svg class="ico" aria-hidden="true"><use href="#i-call"/></svg></button>
+    <button type="button" id="btn-speak" class="ghost-btn voice-btn" aria-label="朗读回复" aria-pressed="false" title="朗读回复（需浏览器支持语音合成）"><svg class="ico" aria-hidden="true"><use href="#i-volume"/></svg></button>
     <button type="submit" class="primary-btn">发送</button>
   </form>
   <div class="chat-meta">
@@ -164,13 +177,84 @@
     <span id="face-status" role="status" class="muted"></span>
   </div>
   <div class="demo-strip" id="demo-strip" hidden>
-    <span class="muted">🔒 评委体验模式 · 本机已预置在线模型，无需配置</span>
+    <span class="muted"><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg> 评委体验模式 · 本机已预置在线模型，无需配置</span>
     <button id="btn-demo-clear" class="ghost-btn tiny">清除本机配置</button>
   </div>
 </aside>
 
+<!-- r116（老大纠正参照物：要的是**微信视频通话**，不是 r115 那个侧边栏）：
+     表情感知 = 可拖位置、可拖大小的悬浮小窗；点「全屏」升到整屏，整屏时角落那枚小缩略图点回小窗。
+     位置/尺寸写 :root 的 --pip-x/--pip-y/--pip-w，由 app.js 走 CSSOM 逐属性赋值 —— markup 内联 style
+     会被线上 CSP（style-src 'self'）拦成失效（判据 _test/inline_style_check.py）。
+     开合的唯一权威仍是 #face-hud.hidden（_test/face_check.py F10 按它断言，子件 id 一字未动）。 -->
+<aside id="face-pip" class="face-pip" aria-label="表情感知悬浮窗">
+  <header class="pip-bar" id="pip-bar">
+    <span class="pip-title"><svg class="ico" aria-hidden="true"><use href="#i-cam"/></svg>表情感知</span>
+    <span class="pip-acts">
+      <button id="btn-pip-mode" class="ghost-btn tiny" type="button" aria-label="全屏显示摄像头画面"
+              title="升到整屏 / 收回悬浮小窗"><svg class="ico" aria-hidden="true"><use href="#i-expand"/></svg></button>
+      <button id="btn-pip-close" class="ghost-btn tiny" type="button" aria-label="关闭表情感知并停止摄像头"
+              title="关闭并停止摄像头（指示灯会灭）"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </span>
+  </header>
+  <section id="face-hud" class="face-hud" aria-label="面部表情感知（画面仅本机处理）" hidden>
+    <div class="face-hud-stage">
+      <video id="face-hud-video" playsinline muted aria-label="表情感知预览"></video>
+      <div id="face-hud-idle" class="face-hud-idle">摄像头未开启<br><span class="muted">打开下方开关即可</span></div>
+    </div>
+    <div class="face-hud-tag"><i class="dot" id="face-hud-dot"></i><span id="face-hud-emo">正在识别…</span><span class="intensity-bar"><i id="face-hud-bar"></i></span></div>
+    <div id="face-hud-smile" class="face-smile-badge" hidden aria-live="polite">—</div>
+    <div class="face-hud-actions">
+      <button id="face-switch" class="face-switch" type="button" role="switch" aria-checked="false" aria-label="摄像头开关（开启后用摄像头识别表情）">
+        <span class="fs-track" aria-hidden="true"><i class="fs-knob"></i></span>
+        <span class="fs-word" id="face-switch-word">已关闭</span>
+      </button>
+      <button id="btn-face-close" class="ghost-btn tiny" type="button" aria-label="收起面板并关闭摄像头">收起</button>
+    </div>
+  </section>
+  <!-- 隐私声明在小窗滚动区之外：把窗拖到很矮时面板内滚，这句话不能滚出视野 -->
+  <p class="muted pip-note">画面只在你本机的内存里过一遍 —— 不拍照、不上传、不留存。</p>
+  <div id="pip-grip" class="pip-grip" aria-hidden="true"></div>
+</aside>
+<!-- 整屏态角落小缩略图：复用**同一条** MediaStream（一个流可挂多个 video 元素），点它收回小窗 -->
+<button id="pip-mini" class="pip-mini" type="button" aria-label="返回悬浮小窗" title="点一下收回悬浮小窗">
+  <video id="pip-mini-video" playsinline muted aria-hidden="true"></video>
+  <span class="pip-mini-ico" aria-hidden="true"><svg class="ico"><use href="#i-collapse"/></svg></span>
+</button>
+
 <!-- 演示态唯一的退出口：右下角，点了回页面但保留点亮的星雾 -->
 <button id="btn-exit-show" type="button">← 回到心屿（保留星雾）</button>
+
+<!-- r116（老大裁定）：语音通话层。听→听懂→出声→再听；音色可选；摄像头开不开都能用
+     （判据 _test/voice_call_check.py C5/C6 正反两腿）。z-index 70 压在坞(40)与表情抽屉之上，
+     坞里的清除类入口不会被它永久挡住 —— 通话层收起即恢复。尺寸/音量读数走 CSSOM 的 --lvl。 -->
+<div id="call-layer" class="call-layer" role="dialog" aria-modal="true" aria-label="语音通话" hidden>
+  <div class="call-card">
+    <div class="call-head">
+      <span class="call-title"><svg class="ico" aria-hidden="true"><use href="#i-call"/></svg>语音通话</span>
+      <span id="call-state" class="call-pill" role="status"></span>
+      <span id="call-metrics" class="call-metrics" role="status"></span>
+    </div>
+    <div id="call-live" class="call-live" aria-live="polite" aria-label="我说的话（实时）"></div>
+    <div id="call-level" class="call-level" aria-hidden="true"></div>
+    <div id="call-captions" class="call-captions" role="log" aria-live="polite" tabindex="0"></div>
+    <div class="call-opts">
+      <label>机器人音色
+        <select id="call-timbre" aria-label="机器人音色"></select>
+      </label>
+      <button id="btn-timbre-preview" class="ghost-btn tiny" type="button" title="用当前音色念一句样例">试听</button>
+      <button id="btn-call-duplex" class="ghost-btn tiny" type="button" role="switch" aria-checked="true"
+              title="可随时打断：它说话时你开口它就闭嘴／讲完再听：它念完才轮到你">可随时打断</button>
+    </div>
+    <div class="call-acts">
+      <button id="btn-call-mic" class="ghost-btn" type="button" aria-pressed="true" aria-label="麦克风开关"><svg class="ico" aria-hidden="true"><use href="#i-mic"/></svg> 麦克风</button>
+      <button id="btn-call-done" class="ghost-btn" type="button" title="不等停顿，立刻按这句话收口">说完啦</button>
+      <button id="btn-call-end" class="ghost-btn call-end" type="button">结束通话</button>
+    </div>
+    <p class="call-face" id="call-face">摄像头未开启 · 不影响语音通话</p>
+    <p class="call-note" id="call-note" role="status"></p>
+  </div>
+</div>
 
 <!-- 设置面板 -->
 <dialog id="dlg-settings">
@@ -208,6 +292,7 @@
 <script src="data/emotion-lexicon.js"></script>
 <script src="data/emotion-strategy.js"></script>
 <script src="data/face-smile-rules.js"></script>
+<script src="data/psych-kb.js"></script>
 <script src="js/emotion-engine.js"></script>
 <script src="js/emotion-remote.js"></script>
 <script src="js/memory-store.js"></script>
@@ -217,6 +302,7 @@
 <script src="js/three-scene.js"></script>
 <script src="js/scroll-story.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/voice-call.js"></script>
 <script src="js/chart.js"></script>
 <script src="js/chat-window.js"></script>
 <script src="js/settings.js"></script>
