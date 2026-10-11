@@ -99,3 +99,9 @@ _temp/
 # IDE/工具运行态（R269：活跃工具运行态禁迁 _trash —— 迁走等于在别人正在用的会话目录上动手）。
 # noise_lint 对 .gitignore 命中的根部目录降级为 quarantine，不是 VIOL；先例：焚诀 .codebuddy/、.zcodeignore。
 .zcode/
+
+# r116 收口：Windows 保留设备名垃圾（他轮 `>nul` 误用产物，0 字节、未跟踪、git 里从来没有它）。
+# 走 R269 例外通道登记为忽略而非迁 _trash —— 实测 handoff.py recycle 自身在保留名上崩
+# （recycle.py:182 os.path.relpath 抛 ValueError: path is on mount '\\.\\nul'），
+# 而磁盘直删是本仓致命纪律 #21 禁项。登记后噪声门降级 quarantine，savepoint 可继续。
+nul
