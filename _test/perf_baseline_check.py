@@ -14,10 +14,12 @@
 退出码：0=在预算内 1=超预算（性能回归）2=服务不可达/样本不足（未验，不得当通过）
 """
 import argparse
+import glob
 import json
 import os
 import platform
 import statistics
+import subprocess
 import sys
 import time
 import urllib.error
@@ -44,6 +46,16 @@ MIN_RPS = 50.0     # 实测 8×6=48 并发下 ~2200 rps ⇒ 地板只防"塌了"
 # 为什么不按实测的 90% 设阈：本轮同机噪声一手在册（ramp 档内带宽 9.2%~38.4%），
 # 贴着读数设地板＝给下一轮埋一条会自己踩穿的红。
 MIN_RPS_EMOTION = 50.0
+# r122：资源占用率两条上限。对标维度 4 原文是「响应时间、资源占用率及并发处理能力」三块，
+# 本判据此前只有时延（p95）+ 并发（rps）两块，**资源这块从来没有读数**——不是量了达标，是没量。
+# 一手实测（jar sha256=a145cbd5、pid 由 8147 端口反查、独立 H2）连跑 4 轮：
+#   工作集 240.8 / 259.0 / 262.2 / 272.6 / 286.0 MB，峰值工作集恒 333.8 MB；
+#   单请求 CPU 2278.1 / 3092.7 / 2115.6 / 2278.1 / 651.0 µs（窗口 CPU 增量 ÷ 96 请求）。
+# ⚠️ 那个 µs/请求**不是纯业务耗时**：窗口里 JVM 的 JIT、GC、H2 后台线程都算在内，
+#    所以它天然比时延维脏（五轮 651.0~3092.7，跨 4.7 倍）。据此只设"数量级退化才红"的两条上限，
+#    贴着读数设阈值＝给下一轮埋一条会自己踩穿的红（同 r96/r100 的噪声一手在册）。
+MAX_RSS_MB = 1200.0            # ≈观测峰值 333.8MB 的 3.6x ⇒ 抓泄漏/无界缓存，不抓抖动
+MAX_US_CPU_PER_REQ = 12000.0   # ≈观测最坏 3092.7µs 的 3.9x ⇒ 抓每请求计算量的数量级退化
 CONC = {"threads": 8, "per_thread": 6}
 # r96：单点并发**必须把档位写进读数本身**。立因是 r95 报告自相矛盾——§1 维度 4 印
 # `吞吐 1013.9 rps`，§5 又写「并发维度仍无读数」（依据是 grep k6/locust 全仓 0 命中）。
@@ -65,6 +77,80 @@ RAMP_BUDGET_S = 60         # 整段阶梯的硬上限；到点即停并把未跑
 # （实测见 perf-ramp-2026-10-07d.json），整段阶梯 1.2s ⇒ 5 次重复的代价是秒级，不是分钟级。
 RAMP_REPS = 5              # 参与中位数的次数
 RAMP_WARMUP = 1            # 每档先丢掉的冷启次数（r99 首轮 986.6 rps 的冷启离群点就是这么来的）
+
+
+def resolve_pid(base):
+    """按**被测端口**反查服务进程（不是"随便挑一个 java"）。取不到 ⇒ (None, 通道, 原因)，
+    由调用方把这一子项记成未验——禁止折算成 0 或"没有占用"。"""
+    try:
+        port = int(str(base).rstrip("/").rsplit(":", 1)[-1])
+    except (ValueError, IndexError):
+        return None, "base", "base 里解析不出端口（%s）" % str(base)[:40]
+    if platform.system() == "Windows":
+        cmd = ("$c=Get-NetTCPConnection -LocalPort %d -State Listen -ErrorAction SilentlyContinue;"
+               "$p=@($c.OwningProcess | Sort-Object -Unique);if($p.Count -gt 0){$p[0]}else{'NONE'}" % port)
+        try:
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True,
+                               text=True, encoding="utf-8", errors="replace", timeout=25)
+        except Exception as e:
+            return None, "powershell", "%s: %s" % (type(e).__name__, str(e)[:60])
+        txt = (r.stdout or "").strip()
+        if r.returncode != 0 or not txt or txt == "NONE":
+            return None, "powershell", ((r.stderr or "").strip()[:60] or "该端口无监听进程")[:60]
+        try:
+            return int(txt.splitlines()[0]), "powershell:Get-NetTCPConnection", ""
+        except ValueError:
+            return None, "powershell", "pid 解析失败：%s" % txt[:30]
+    for f in glob.glob("/proc/[0-9]*/cmdline"):          # Linux（CI 里 jar 与判据同容器）
+        try:
+            cl = open(f, "rb").read().replace(bytes([0]), b" ").decode("utf-8", "replace")
+        except OSError:
+            continue
+        if "soulisle-server.jar" in cl:
+            try:
+                return int(f.split("/")[2]), "proc:cmdline", ""
+            except ValueError:
+                continue
+    return None, "proc", "/proc 里没有 soulisle-server.jar 进程"
+
+
+def proc_read(pid):
+    """读进程自己的资源量：工作集 / 峰值工作集 / 累计 CPU 毫秒。取不到 ⇒ None（记未验）。"""
+    if pid is None:
+        return None
+    if platform.system() == "Windows":
+        cmd = ("$p=Get-Process -Id %d -ErrorAction SilentlyContinue;"
+               "if($p){[pscustomobject]@{ws=$p.WorkingSet64;peak=$p.PeakWorkingSet64;"
+               "cpu=[math]::Round($p.TotalProcessorTime.TotalMilliseconds,1)}|ConvertTo-Json -Compress}"
+               "else{'NONE'}" % pid)
+        try:
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True,
+                               text=True, encoding="utf-8", errors="replace", timeout=25)
+            d = json.loads((r.stdout or "").strip())
+        except Exception:
+            return None
+        if not isinstance(d, dict) or "ws" not in d:
+            return None
+        return {"rss_mb": float(d["ws"]) / 1048576.0, "rss_peak_mb": float(d.get("peak") or 0) / 1048576.0,
+                "cpu_ms": float(d.get("cpu") or 0)}
+    try:
+        st = open("/proc/%d/status" % pid, encoding="utf-8", errors="replace").read()
+        raw = open("/proc/%d/stat" % pid, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return None
+    rss = hwm = None
+    for ln in st.splitlines():
+        if ln.startswith("VmRSS:"):
+            rss = float(ln.split()[1]) / 1024.0
+        elif ln.startswith("VmHWM:"):
+            hwm = float(ln.split()[1]) / 1024.0
+    try:
+        fields = raw[raw.rindex(")") + 2:].split()      # comm 可含空格 ⇒ 从最后一个 ) 之后切
+        hz = os.sysconf("SC_CLK_TCK")
+        cpu_ms = (int(fields[11]) + int(fields[12])) * 1000.0 / hz   # utime + stime
+    except (ValueError, IndexError):
+        return None
+    return {"rss_mb": rss, "rss_peak_mb": hwm if hwm is not None else rss, "cpu_ms": cpu_ms}
 
 
 def timed(fn):
@@ -124,6 +210,9 @@ def measure(base, reps):
                 out[name]["guard"] = "UNVERIFIED:%s" % e
     # 吞吐：只测 health（最轻，测的是服务端并发而非上游）
     if not fatal:
+        # r122：资源占用率读数 ⇒ 窗口前后各读一次**被测进程自己**的计数器
+        pid, pid_how, pid_note = resolve_pid(base)
+        r0 = proc_read(pid)
         def hit():
             return timed(lambda: get(base + "/api/health"))[0]
         t0 = time.perf_counter()
@@ -146,7 +235,31 @@ def measure(base, reps):
         wall2 = time.perf_counter() - t1
         out["throughput_emotion"] = {"rps": round(len(lat2) / wall2, 1),
                                      "p95_ms": round(pct(lat2, 95), 1), "n": len(lat2)}
+        r1 = proc_read(pid)
+        if r0 and r1:
+            n_req = 2 * CONC["threads"] * CONC["per_thread"]     # health 与 emotion 两轮闭环
+            cpu_ms = max(0.0, r1["cpu_ms"] - r0["cpu_ms"])
+            out["resource"] = {"pid": pid, "pid_how": pid_how,
+                               "rss_mb": round(r1["rss_mb"], 1),
+                               "rss_peak_mb": round(r1["rss_peak_mb"] or r1["rss_mb"], 1),
+                               "cpu_ms_window": round(cpu_ms, 1), "requests": n_req,
+                               "us_cpu_per_req": round(cpu_ms * 1000.0 / n_req, 1)}
+        else:
+            out["resource"] = None
+            out["resource_na"] = pid_note or ("进程计数器读不到（pid=%s，通道 %s）" % (pid, pid_how))
     return out, fatal
+
+
+def resource_state(m):
+    """资源子项的状态：ok / na(带原因)。**取不到 ≠「没有占用」**，也不是红——它是一条未验通道。
+    main 与 --selftest 共用这一把尺（同一事实只许一处判）。"""
+    r = m.get("resource")
+    if not r:
+        return "na", m.get("resource_na") or "未尝试取数"
+    if r.get("rss_mb") is None or r.get("us_cpu_per_req") is None:
+        return "na", "读数缺字段（%s）" % ",".join(
+            k for k in ("rss_mb", "us_cpu_per_req") if r.get(k) is None)
+    return "ok", ""
 
 
 def judge(m):
@@ -168,6 +281,14 @@ def judge(m):
     elif te["rps"] < MIN_RPS_EMOTION:
         bad.append("并发吞吐(emotion) %.0f rps < 地板 %.0f ⇒ 词典引擎在并发下塌方"
                    % (te["rps"], MIN_RPS_EMOTION))
+    res = m.get("resource")
+    if res:
+        if res["rss_mb"] > MAX_RSS_MB:
+            bad.append("资源占用 工作集 %.0fMB > 上限 %.0fMB ⇒ 数量级膨胀（泄漏/无界缓存），"
+                       "峰值 %sMB" % (res["rss_mb"], MAX_RSS_MB, res["rss_peak_mb"]))
+        if res["us_cpu_per_req"] > MAX_US_CPU_PER_REQ:
+            bad.append("单请求 CPU %.0fµs > 上限 %.0fµs ⇒ 每请求计算量数量级退化（窗口 %sms / %d 请求）"
+                       % (res["us_cpu_per_req"], MAX_US_CPU_PER_REQ, res["cpu_ms_window"], res["requests"]))
     ec = m.get("emotion_crisis", {})
     if ec.get("llm_used") is True:
         bad.append("危机路径走了 LLM ⇒ 本判据口径失效（数字不再可比），先修短路再说性能")
@@ -339,6 +460,19 @@ def selftest():
         bad.append("⑥c 词典引擎吞吐 12 rps（远低于地板）仍判通过 ⇒ 有地板没咬")
     if not judge(dict(_ok, throughput_emotion=None)) and not judge(_ok):
         bad.append("⑥d emotion 吞吐缺样本却没判红 ⇒ 把「没量到」读成达标")
+    # r122 资源占用率四腿（形状取自本轮 spare 实测：rss 294.4MB／峰值 333.8MB／单请求 3580.2µs）
+    _res = {"rss_mb": 294.4, "rss_peak_mb": 333.8, "cpu_ms_window": 343.8,
+            "requests": 96, "us_cpu_per_req": 3580.2, "pid": 3560}
+    if judge(dict(_ok, resource=_res)):
+        bad.append("⑦a 正常资源读数被误判红 ⇒ 阈值贴着噪声，下一轮必自己踩穿")
+    if not judge(dict(_ok, resource=dict(_res, rss_mb=MAX_RSS_MB + 1))):
+        bad.append("⑦b 工作集超上限仍判通过 ⇒ 上限是装饰（泄漏类退化漏报）")
+    if not judge(dict(_ok, resource=dict(_res, us_cpu_per_req=MAX_US_CPU_PER_REQ + 1))):
+        bad.append("⑦c 单请求 CPU 超上限仍判通过 ⇒ 每请求计算量退化无人管")
+    if judge(dict(_ok, resource=None)) or resource_state({"resource": None})[0] != "na":
+        bad.append("⑦d 资源取不到却走绿、或没被识别成未验 ⇒「没量到」会被读成达标")
+    if resource_state({"resource": _res})[0] != "ok":
+        bad.append("⑦e 有读数时 resource_state 没判 ok ⇒ main 会把量到的资源误报成未验")
 
     # ── r96 阶梯三腿（正例 / 变异 / 边界）：judge_ramp 是新写的，没自证就是没接线 ──
     def tier(n, rps, p95, llm=False):
@@ -407,6 +541,7 @@ def selftest():
         bad.append("⑲变异体失效：16 档中位数读数里 llm_used=None 没被 judge_ramp 点名 ⇒ 中位数把偷换抹平了")
     print("SELFTEST-%s" % ("PASS: 百分位/空样本/恒慢/缺面/口径漂移 + 阶梯 正例/双地板/LLM偷换/NA不冒充绿"
                            " + 中位数 取中/带宽/LLM从严/冷启不掺/空样本/接线双证"
+                           " + 资源 正常/超工作集/超单请求CPU/缺数不判绿/有数不误未验"
                            if not bad else "FAIL: " + "; ".join(bad)))
     return 1 if bad else 0
 
@@ -521,6 +656,10 @@ def main():
         print("PERF-RAMP-UNVERIFIED: 未跑全的档=%s ⇒ 阶梯这一半记未验（取数不全不得判绿）"
               % "; ".join(ramp_na))
         return 2
+    if resource_state(m)[0] == "na":
+        print("PERF-RESOURCE-UNVERIFIED: 资源占用这一子项无读数（%s）⇒ 维度 4 的资源那一半未验，不得记为通过"
+              % m.get("resource_na", "未尝试取数"))
+        return 2
     # 实测值必须挤进这一行：电池只保留最后一条含判据词的 stdout，逐项明细行在 CI 里会被丢掉
     # ⇒ 判据是棘轮，看不见被检环境的数字就无从判断"该不该重定基线"（07 在册 P2）。
     # r96：吞吐数**必须同行带并发档**（r95 那条矛盾就是这么产生的）。
@@ -538,11 +677,15 @@ def main():
                      "｜档内带宽最坏 %s%%" % (line, round(max(p95s), 1) if p95s else "-",
                                              a.ramp_reps, a.ramp_warmup,
                                              worst_band if worst_band is not None else "-"))
+    rs = m.get("resource") or {}
+    res_note = ("资源 工作集=%sMB 峰值=%sMB 单请求CPU=%sµs（pid %s 由端口反查）"
+                % (rs.get("rss_mb", "NA"), rs.get("rss_peak_mb", "NA"),
+                   rs.get("us_cpu_per_req", "NA"), rs.get("pid", "NA"))) if rs else "资源 未验"
     print("PERF-BASELINE-PASS（%d 个目标在预算内｜实测峰值 p95=%.1fms，最紧余量 %.0fms｜"
-          "吞吐 并发%d线程×%d请求：health=%s rps／emotion=%s rps（词典引擎真实路径%s）｜"
+          "吞吐 并发%d线程×%d请求：health=%s rps／emotion=%s rps（词典引擎真实路径%s）｜%s｜"
           "口径=本地无外网 + 危机路径不调 LLM；这是自身棘轮不是跨项目对比）"
           % (len(BUDGETS), peak, tightest, CONC["threads"], CONC["threads"] * CONC["per_thread"],
-             tp.get("rps", "取不到"), te.get("rps", "取不到"), tier_note))
+             tp.get("rps", "取不到"), te.get("rps", "取不到"), tier_note, res_note))
     return 0
 
 

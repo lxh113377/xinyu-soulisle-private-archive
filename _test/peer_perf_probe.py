@@ -81,13 +81,23 @@ def gh_api(path, token):
     return json.loads(req.stdout or "{}")
 
 
-def tree_paths(slug, token):
-    """一次 API 拿全树。truncated 必须原样带出来——名册里 lobehub 这类大仓一定截断，
-    截断面的"没有"不等于"真没有"（禁把盲区读成零）。"""
+def tree_entries(slug, token):
+    """一次 API 拿全树**条目**（含 blob 的 size）。返回 (entries, truncated)。
+
+    r122：文档面探针 `_test/peer_docs_probe.py` 共用这一条取数通道——**取数机制只此一处**
+    （同一事实两把尺会各自漂，r119 的"取数归口"就是为这个立的）。
+    truncated 必须原样带出来：名册里 lobehub 这类大仓一定截断，截断面的"没有"不等于"真没有"。
+    """
     meta = gh_api("repos/" + slug, token)
     ref = meta.get("default_branch") or "main"
     t = gh_api("repos/%s/git/trees/%s?recursive=1" % (slug, ref), token)
-    return [x.get("path", "") for x in t.get("tree") or []], bool(t.get("truncated"))
+    return (t.get("tree") or []), bool(t.get("truncated"))
+
+
+def tree_paths(slug, token):
+    """树的路径清单（通道 A/B 的名册面）。"""
+    entries, trunc = tree_entries(slug, token)
+    return [x.get("path", "") for x in entries], trunc
 
 
 def ci_files_from_tree(paths):

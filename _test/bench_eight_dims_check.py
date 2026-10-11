@@ -97,6 +97,34 @@ def sref(pat):
     return stamp(p, payload)
 
 
+def docs_peers_val(path, payload):
+    """第 7 维 peers 格。取数面＝`_test/peer_docs_probe.py` 的一次 git tree 快照。
+
+    改前每轮写「本件不重采 ⇒ 引用 NA」——那是**没有分母**，不是"对手文档差"。
+    四类位＝API 规范 / 使用教程 / 贡献指南 / 独立文档区（老大原话里的三项 + 文档区），
+    另带 self 的同尺读数（self 与 peers 共用 classify_docs，口径不分开）。"""
+    if path is None or not isinstance(payload, dict) or not payload.get("rows"):
+        return ("NA-DECLARED：缺 peer-docs 台账 ⇒ 文档维无分母；"
+                "补法 python _test/peer_docs_probe.py --json 交付物/对标数据/peer-docs-<date>.json")
+    if payload.get("__unreadable__"):
+        return "NA-DECLARED：peer-docs 台账读不动（%s）⇒ 不折算成结论" % payload["__unreadable__"]
+    # 逐位在册数**在本格现算**（台账里没存聚合位）：聚合由行导出，
+    # 存两份就等于同一事实两把尺——台账重采而聚合字段没跟上时，格会抄着旧聚合说谎。
+    rows = payload.get("rows") or []
+    peer_rows = [r for r in rows if not str(r.get("repo", "")).startswith("self")]
+    bits = {k: sum(1 for r in peer_rows if r.get(k))
+            for k in ("api_spec", "guide", "contributing", "docs_site")}
+    dist = payload.get("class_dist") or {}
+    self_row = next((r for r in rows if str(r.get("repo", "")).startswith("self")), None)
+    blind = len(payload.get("blind_or_na") or [])
+    return ("四类位在册（分母 %s 仓）：API 规范 %s、教程 %s、贡献指南 %s、独立文档区 %s；"
+            "形态 %s；失明/未验 %d 仓｜self 同尺=%s（缺项＝独立 quickstart 文件，本仓入门写在 docs/README.md 里）"
+            % (payload.get("denominator"), bits.get("api_spec", "NA"), bits.get("guide", "NA"),
+               bits.get("contributing", "NA"), bits.get("docs_site", "NA"),
+               " ".join("%s=%d" % kv for kv in sorted(dist.items())), blind,
+               (self_row or {}).get("class", "NA")))
+
+
 def cell(label, value, source):
     return {"label": label, "value": value, "source": source}
 
@@ -236,11 +264,16 @@ def build_dims():
              len((ir or {}).get("rows") or {}), stamp(ir_p, ir) if ir_p else "—"),
     ]})
 
+    dc_p, dc = ledger("peer-docs-*.json")          # r122：第 7 维的 peers 分母第一次有数
     n_docs, api_paths, api_ends = docs_self()
     dims.append({"dim": DIM_ORDER[6], "cells": [
-        cell("self 文档件数 / openapi⇄端点", "%d 件｜openapi %d paths ⇄ Java %d 映射（差 %d）" % (
-            n_docs, api_paths, api_ends, api_paths - api_ends), "HEAD 面 git ls-tree + docs/openapi.yaml + 控制器注记"),
-        cell("peers docs 面", "本件不重采 ⇒ 引用 NA；补法 python _test/benchmark_metrics.py（docs 字段在 runs[-1].repos[].docs）", m_src),
+        cell("self 文档件数 / openapi⇄端点", "%d 件｜openapi %d paths ⇄ Java %d 映射（差 %d）｜"
+             "同尺四类位=%s（HEAD 面取数，与 peers 同一条 classify_docs）" % (
+            n_docs, api_paths, api_ends, api_paths - api_ends,
+            (next((r for r in (dc or {}).get("rows") or []
+                   if str(r.get("repo", "")).startswith("self")), {}) or {}).get("class", "NA")),
+             "HEAD 面 git ls-tree + docs/openapi.yaml + 控制器注记；四类位＝_test/peer_docs_probe.py self_only()"),
+        cell("peers docs 面", docs_peers_val(dc_p, dc), "本件不重采 ⇒ 引用 NA；补法 python _test/benchmark_metrics.py（docs 字段在 runs[-1].repos[].docs）"),
     ]})
 
     why = ", ".join("%s(%s)" % (r.get("repo", "?").split("/")[-1], r.get("tier", "-")) for r in peers[:6])
@@ -442,6 +475,77 @@ def drift_selftest():
     return bad
 
 
+REMEDY_RX = re.compile(r"python\s+(?:\S*/)?_test/([A-Za-z0-9_.\-]+\.py)")
+
+
+def remedy_audit(dims, head_files, on_disk):
+    """NA-DECLARED 格里的「补法 python _test/x.py」必须是**真能跑的脚本**。
+
+    为什么装这条腿：NA 是这张表唯一"诚实的出口"，而出口本身没人验。
+    死链的 NA 长得像"照这句跑一下就补上了"，实际跑起来 file not found ⇒ 下一轮继续抄 NA，
+    而且抄得更心安理得（毕竟"补法"写在那儿）。r122 装这条腿的直接动因：本轮把第 4 维
+    的 NA 换成实测后，剩余 NA 格里点的脚本名成了唯一还没被机器核过的东西。
+
+    两侧分别判（承 r120「同一判据量两面」）：
+      · 工作树也没有 ⇒ **死链**，判红（补法指向一个不存在的出口）；
+      · 工作树有、HEAD 没有 ⇒ **未入库**，点名而不判红（那是别人/本轮的在途中间态，
+        红会砸到不该砸的人身上；归属轮提交后自然消失）。
+    只判 NA 格，不判普通格的引用——普通格的 source 里常有历史描述（"改前写的是…"），
+    拿这条腿打死会让判据变成拦正常改表的闸门（爆炸半径＝断言范围）。
+    """
+    red, pending = [], []
+    for d in dims:
+        for c in d.get("cells") or []:
+            if not str(c.get("value", "")).startswith("NA"):
+                continue
+            text = str(c.get("value", "")) + " " + str(c.get("source", ""))
+            names = set(REMEDY_RX.findall(text))
+            if not names and "补法" in text:
+                # 写了"补法"却没点到具体脚本（如 `python _test/<对应 probe>.py`）⇒ 出口是占位符。
+                # 点名不判红：它不是坏链，是"还没接"；判红会把老实认 NA 的格一起打死。
+                pending.append("%s/%s ⇒ 补法是占位符（没点到具体脚本）" % (d["dim"], c.get("label")))
+            for name in names:
+                rel = "_test/" + name
+                if rel not in head_files and rel not in on_disk:
+                    red.append("NA 补法死链：%s/%s ⇒ %s 既不在 HEAD 面也不在盘上" % (
+                        d["dim"], c.get("label"), rel))
+                elif rel not in head_files:
+                    pending.append("%s/%s ⇒ %s 在盘未入库" % (d["dim"], c.get("label"), rel))
+    return red, pending
+
+
+def remedy_selftest():
+    """补法腿自己也要有反例：死链必须红、活链必须绿、未入库只点名。"""
+    bad = []
+    hf = {"_test/alive_probe.py"}
+    disk = {"_test/alive_probe.py", "_test/inflight_probe.py"}
+    ok = [{"dim": DIM_ORDER[3], "cells": [
+        cell("a", "NA-DECLARED：无台账；补法 python _test/alive_probe.py --json x", "s")]}]
+    r1, p1 = remedy_audit(ok, hf, disk)
+    if r1 or p1:
+        bad.append("活补法被判红/点名：%s %s" % (r1, p1))
+    dead = [{"dim": DIM_ORDER[3], "cells": [
+        cell("a", "NA-DECLARED：无台账；补法 python _test/gone_probe.py --json x", "s")]}]
+    r2, _ = remedy_audit(dead, hf, disk)
+    if not any("死链" in x for x in r2):
+        bad.append("死链补法没判红 ⇒ 出口是假的也没人管（这条腿恒绿）")
+    infl = [{"dim": DIM_ORDER[3], "cells": [
+        cell("a", "NA-DECLARED：无台账；补法 python _test/inflight_probe.py --json x", "s")]}]
+    r3, p3 = remedy_audit(infl, hf, disk)
+    if r3 or len(p3) != 1:
+        bad.append("在盘未入库被当成死链（红=%s）或没点名（pending=%s）⇒ 面别混了" % (r3, p3))
+    noref = [{"dim": DIM_ORDER[3], "cells": [cell("a", "NA-DECLARED：本件不重采", "s")]}]
+    r4, p4 = remedy_audit(noref, hf, disk)
+    if r4 or p4:
+        bad.append("没写补法的 NA 被这条腿判红/点名 ⇒ 会拦住所有老实认 NA 的格（爆炸半径>断言范围）")
+    placeholder = [{"dim": DIM_ORDER[3], "cells": [
+        cell("a", "NA-DECLARED：缺 X，补法 python _test/<对应 probe>.py --json …", "s")]}]
+    r5, p5 = remedy_audit(placeholder, hf, disk)
+    if r5 or len(p5) != 1:
+        bad.append("占位符补法没被点名（红=%s 点名=%s）⇒ 假出口仍可以蒙过这条腿" % (r5, p5))
+    return bad
+
+
 def to_markdown(dims):
     """按格子的 side（标签前缀 `peers`）分列，出处列**不截断到字中间**：
     半截的文件名比没有文件名更坏——它长得像可核对的出处。"""
@@ -502,7 +606,9 @@ def selftest():
     if len(na) != 1:
         bad.append("NA 计数不成立：期望 1 实得 %d" % len(na))
     bad += drift_selftest()      # r121：跨轮漂移腿（只生成不比对＝表绿着漂）
-    print("EIGHT-DIMS-SELFTEST-%s（%d 类结构桩 + %d 类漂移桩 + 基线自证 + 恒绿守卫 + NA 计数）"
+    bad += remedy_selftest()
+    print("EIGHT-DIMS-SELFTEST-%s（%d 类结构桩 + %d 类漂移桩 + 基线自证 + 恒绿守卫 + NA 计数"
+          " + 补法死链 5 向：活链绿/死链红/未入库点名/无补法不拦/占位符点名）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(STUBS), len(DRIFT_STUBS)))
     return 1 if bad else 0
 
@@ -533,6 +639,15 @@ def main():
         print("EIGHT-DIMS-UNVERIFIED: git 取数面不可读（%s）⇒ 不得读成通过" % str(e)[:80])
         return 2
     bad, na, ncells, ndims = audit(dims)
+    # r122：NA 的"补法出口"自证——死链判红，在盘未入库/占位符只点名（不拦正常人改表）
+    remedy_red, remedy_pending = [], []
+    try:
+        head_files = set(BR.ls_files()) if BR is not None else set()
+        on_disk = {"_test/" + x.name for x in (ROOT / "_test").glob("*.py")}
+        remedy_red, remedy_pending = remedy_audit(dims, head_files, on_disk)
+    except Exception as e:                                  # noqa: BLE001
+        remedy_red = ["补法腿未跑成（%s: %s）⇒ 未验不判绿" % (type(e).__name__, str(e)[:60])]
+    bad += remedy_red
     payload = {"generated_by": "_test/bench_eight_dims_check.py", "round": a.round,
                "written_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                "dims": dims, "na_cells": na, "cells": ncells}
@@ -552,8 +667,9 @@ def main():
         note = "漂移=比对 %s｜退化红 %d｜变化 %d" % (prev_round, len(dbad), len(dchg))
     else:
         note = "漂移=未验(只有一份台账，不判红也不判绿)"
-    line = ("EIGHT-DIMS-PASS 维 %d/8｜格 %d｜NA声明 %d｜%s｜产物 %s" % (
-        ndims, ncells, len(na), note, out.name if not a.no_write else "未落盘(--no-write)"))
+    line = ("EIGHT-DIMS-PASS 维 %d/8｜格 %d｜NA声明 %d｜补法死链 %d｜补法待接 %d｜%s｜产物 %s" % (
+        ndims, ncells, len(na), len(remedy_red), len(remedy_pending), note,
+        out.name if not a.no_write else "未落盘(--no-write)"))
     if a.json:
         print(json.dumps({"verdict": line, "red": bad, "na": na, "cells": ncells,
                           "drift_prev": prev_round, "drift_changed": dchg[:12]}, ensure_ascii=False))

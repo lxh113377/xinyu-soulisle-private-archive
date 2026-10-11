@@ -312,3 +312,104 @@ test("嘴部不达 smileOn ⇒ 判 none，高眼周也不得单独撑出微笑",
   const r = read(vec({ mouthSmileLeft: 0.34, mouthSmileRight: 0.34, cheekSquintLeft: 0.9, cheekSquintRight: 0.9 }));
   assert.equal(r.smile.kind, "none", "整链路 read() 同样不得报微笑");
 });
+
+/* ── r122 运行时层离线面：capability / 用户摄像头开关 / 文案回落 / cueRegions 结构 ──────
+ * 为什么补这一族（对标第 3 维「实现方式」测出来的洞）：改前 26 条用例全部打在
+ * **纯函数层**（read/smileKind/assessQuality），而 `window.FaceEngine` 导出的成员里
+ * capability/enabled/setEnabled/labelOf/reasonText/cueRegions **一条都没有离线腿**——
+ * 它们此前只由 `face_check.py` 的浏览器腿覆盖，而浏览器腿按 r112 口径不进 CI 受理面。
+ * ⇒ 「摄像头关了就真停了」「拒绝后界面不空白」这两句承诺，构建期是没人验的。
+ */
+
+/** 带注入全局的启动器（globals 在 face-engine.js 载入前就位，capability/enabled 调用时才读） */
+function bootR(globals) {
+  const ctx = createContext(Object.assign({ window: {} }, globals || {}, { console }));
+  runInContext(SRC("src/data/emotion-lexicon.js"), ctx);
+  runInContext(SRC("src/js/emotion-engine.js"), ctx);
+  runInContext(SRC("src/data/face-smile-rules.js"), ctx);
+  runInContext(SRC("src/js/face-engine.js"), ctx);
+  return ctx;
+}
+const mapStore = () => {
+  const m = new Map();
+  return { m: m, api: {
+    getItem: (k) => (m.has(k) ? m.get(k) : null),
+    setItem: (k, v) => m.set(k, String(v)),
+    removeItem: (k) => m.delete(k) } };
+};
+
+test("capability() 三态：非安全上下文 / 无摄像头接口 / 齐备，两类失败原因不得混同", () => {
+  const insecure = bootR({ window: { isSecureContext: false }, navigator: { mediaDevices: { getUserMedia() {} } } });
+  assert.deepEqual(JSON.parse(JSON.stringify(insecure.window.FaceEngine.capability())),
+    { ok: false, reason: "insecure-context" });
+  const noNav = bootR({ window: { isSecureContext: true }, navigator: {} });
+  assert.equal(noNav.window.FaceEngine.capability().reason, "no-media-devices");
+  const noGum = bootR({ window: { isSecureContext: true }, navigator: { mediaDevices: {} } });
+  assert.equal(noGum.window.FaceEngine.capability().reason, "no-media-devices",
+    "有 mediaDevices 但没有 getUserMedia ⇒ 仍然不可用，不能报 ok");
+  const ok = bootR({ window: { isSecureContext: true }, navigator: { mediaDevices: { getUserMedia() {} } } });
+  assert.deepEqual(JSON.parse(JSON.stringify(ok.window.FaceEngine.capability())), { ok: true, reason: "" });
+  assert.notEqual(insecure.window.FaceEngine.capability().reason, noNav.window.FaceEngine.capability().reason,
+    "两种病的处方不同（https 配置 vs 浏览器能力），原因混同=界面给错指引");
+});
+
+test("用户摄像头开关的键形契约：默认开、关=写 off、开=删键（不是写 on）、重复关幂等", () => {
+  const s = mapStore();
+  const c = bootR({ window: { isSecureContext: true }, localStorage: s.api });
+  const FE2 = c.window.FaceEngine;
+  assert.equal(FE2.enabled(), true, "无键=默认开（关要用户显式点，不能让首次访问就没摄像头）");
+  assert.equal(s.m.has("peiliao.face.cam.v1"), false, "默认态不得预写键");
+  assert.equal(FE2.setEnabled(false), false);
+  assert.equal(s.m.get("peiliao.face.cam.v1"), "off", "关闭必须落盘成 off，刷新后才记得住");
+  assert.equal(FE2.enabled(), false);
+  assert.equal(FE2.setEnabled(false), false, "重复关幂等（不得把 off 改成别的值）");
+  assert.equal(FE2.setEnabled(true), true);
+  assert.equal(s.m.has("peiliao.face.cam.v1"), false,
+    "开启走的是**删键**而不是写 on：enabled() 判的是 !== 'off'，写 on 虽当前等效，但会把键形变成两态");
+  assert.equal(FE2.isRunning(), false, "setEnabled(false) 里 stop() 必须真把 running 落到 false");
+});
+
+test("localStorage 写不了（隐私模式）不炸：enabled 回落默认开，setEnabled 仍回布尔值", () => {
+  const boom = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); },
+                 removeItem() { throw new Error("blocked"); } };
+  const c = bootR({ window: { isSecureContext: true }, localStorage: boom });
+  assert.equal(c.window.FaceEngine.enabled(), true, "读不到存储时按默认开，不能因抛错把功能判死");
+  const after = c.window.FaceEngine.setEnabled(false);
+  assert.equal(typeof after, "boolean", "写失败也要回一个可读状态（界面拿它渲染开关文案）");
+});
+
+test("文案回落链：三类独有情绪有中文名、未知 key 不返回空串；reasonText 未知原因带原文", () => {
+  for (const e of ["surprise", "disgust", "contempt"]) {
+    const lb = FE.labelOf(e);
+    assert.ok(typeof lb === "string" && lb.length > 0, e + " 的中文标签缺失或为空串（界面会渲染成空白）");
+    assert.equal(lb, RULES.labels[e],
+      e + " 必须走**表情侧自持标签**（RULES.labels），不是回落到文本侧——回落链一旦倒置，" +
+      "表情三类会拿到没有对应词的译文");
+  }
+  const unknown = FE.labelOf("notAnEmotion");
+  assert.ok(unknown && unknown !== "", "未知情绪必须回落到一个词（文本侧 labelOf 兜底），空串=界面空白");
+  assert.ok(FE.reasonText("lighting").length > 0);
+  const r = FE.reasonText("someBrandNewReason");
+  assert.ok(r.indexOf("someBrandNewReason") >= 0, "未知原因要把原文带进文案，否则现场排查时看不到真原因");
+  assert.ok(r.length > "someBrandNewReason".length + 4, "回落文案必须是一句人话，不是光秃秃的 key");
+});
+
+test("cueRegions 结构契约：区域只在有权重且均值达门槛时入选；无权重 AU 必须零贡献", () => {
+  const R = RULES;
+  const weighted = new Set();
+  for (const emo in R.weights) for (const k in R.weights[emo]) weighted.add(k);
+  // 派生（不手抄清单）：cues 里引用但没有任何权重的 AU
+  const dead = [];
+  for (const region in R.cues) for (const k of R.cues[region]) if (!weighted.has(k)) dead.push(k);
+  // ① 空权重表 ⇒ 任何向量都不该点亮区域（区域命中必须由权重撑，不是由原始值撑）
+  assert.deepEqual(JSON.parse(JSON.stringify(FE.cueRegions({}, { mouthSmileLeft: 1, browInnerUp: 1 }))), []);
+  // ② 全量权重 + 嘴部强激活 ⇒ mouth 必入选
+  const hit = JSON.parse(JSON.stringify(FE.cueRegions(R.weights.joy,
+    { mouthSmileLeft: 1, mouthSmileRight: 1, cheekSquintLeft: 1, cheekSquintRight: 1 })));
+  assert.ok(hit.includes("mouth"), "joy 权重下真笑向量必须点亮口部区域，否则多区佐证形同虚设");
+  // ③ 那些没权重的 AU 单独拉满 ⇒ 一处区域都不该点亮（它们不参与打分，也就不该参与佐证）
+  const onlyDead = {};
+  for (const k of dead) onlyDead[k] = 1;
+  assert.deepEqual(JSON.parse(JSON.stringify(FE.cueRegions(R.weights.joy, onlyDead))), [],
+    "无权重 AU 却点亮了区域 ⇒ 区域佐证被零贡献的信号撑起来，need 规则会被骗过");
+});

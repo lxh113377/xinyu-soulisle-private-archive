@@ -436,6 +436,10 @@ SUITES = [
     #   runner 无 GH 配额保证，且八维表第 4 维的 peers 格此前**从来没有分母**，
     #   每轮写「未取到在册数 ⇒ 不做无据横比」就被一代代抄下去。本件把那一格变成可实测。
     ("perf_probe_selftest", [sys.executable, "_test/peer_perf_probe.py", "--selftest"]),
+    # r122：peers 文档面探针的**离线桩**入电池（同 r121 口径：gh api 的真跑面不入整跑）。
+    #   立因＝八维表第 7 维「文档完善程度」的 peers 格自 r112 起每轮写"本件不重采 ⇒ 引用 NA"，
+    #   与第 4 维同构：那不是"对手文档差"，是**这一格从来没有分母**。本件把它变成可复算读数。
+    ("peer_docs_selftest", [sys.executable, "_test/peer_docs_probe.py", "--selftest"]),
     ("settle_wait_selftest", [sys.executable, "_test/settle_wait.py", "--selftest"]),
     # r98：「判据把成败押在机器时刻上」这一族的普查尺。立因是 r96 连吃两条同根 CI 红
     #   （j4_memory 定长 8s 押落库时刻 / data_rights 快照⇄导出跨时刻），当时把两处升到
