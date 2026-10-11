@@ -185,30 +185,10 @@ def run_probe():
         return None, ["F11 探针输出解析失败：%s" % e]
 
 
-def f11_bad(data):
-    bad = []
-    if data is None:
-        return bad
-    cases = data.get("cases") or []
-    if not cases:
-        return ["F11 零条读数 ⇒ 没跑到，不得当绿"]
-
-    # ① 分类命中（含负样本：假阳性直接算失败）
-    wrong = [c for c in cases if c["got"] != c["want"]]
-    hits = len(cases) - len(wrong)
-    if wrong:
-        bad.append("F11 分类 %d/%d 命中，错判：%s"
-                   % (hits, len(cases),
-                      "; ".join("%s 期望%s 实得%s(%.2f)" % (c["name"], c["want"], c["got"], c["intensity"])
-                                for c in wrong)))
-
-    # ② 负样本假阳性必须为 0（这些是**不该被读成任何情绪**的常态表情）
-    negs = [c for c in cases if c["want"] == "calm" and c["name"] != "neutral"]
-    fp = [c for c in negs if c["got"] != "calm"]
-    if fp:
-        bad.append("F11 负样本假阳性 %d/%d：%s"
-                   % (len(fp), len(negs), ", ".join(c["name"] + "→" + c["got"] for c in fp)))
-
+def _f11_margin(cases, bad):
+    """②b-②e 边际判据（r103 老大拍板「保真怒」+「乙」取舍的三条补偿线，从 f11_bad 外提）：
+    真愤怒/真悲伤的绝对分门槛、真悲伤对担忧的序差、常态表情的 sad 分上界、真怒对专注的差距。
+    只往 bad 里追加，不改 cases；门槛数字的来历注释随代码迁移，逐字保留。"""
     # ②b **真愤怒的分数必须够高**（r103 老大拍板「保真怒」的补偿判据）。
     # 这条不是可有可无的：anger 去掉多区要求后，专注时确实会判 anger（已知代价）。
     # 门槛量的是**绝对分数**而不是「真怒−专注」的差值 —— 这是试出来的：
@@ -263,6 +243,34 @@ def f11_bad(data):
             bad.append("F11 真愤怒 anger(%.3f) − %s anger(%.3f) = %.3f < 0.10 "
                        "⇒ 真怒与「%s」读数拉不开，专注时会被读成真发火（不只是闪一下红）"
                        % (rg, nm, cg, gap, nm))
+
+
+def f11_bad(data):
+    bad = []
+    if data is None:
+        return bad
+    cases = data.get("cases") or []
+    if not cases:
+        return ["F11 零条读数 ⇒ 没跑到，不得当绿"]
+
+    # ① 分类命中（含负样本：假阳性直接算失败）
+    wrong = [c for c in cases if c["got"] != c["want"]]
+    hits = len(cases) - len(wrong)
+    if wrong:
+        bad.append("F11 分类 %d/%d 命中，错判：%s"
+                   % (hits, len(cases),
+                      "; ".join("%s 期望%s 实得%s(%.2f)" % (c["name"], c["want"], c["got"], c["intensity"])
+                                for c in wrong)))
+
+    # ② 负样本假阳性必须为 0（这些是**不该被读成任何情绪**的常态表情）
+    negs = [c for c in cases if c["want"] == "calm" and c["name"] != "neutral"]
+    fp = [c for c in negs if c["got"] != "calm"]
+    if fp:
+        bad.append("F11 负样本假阳性 %d/%d：%s"
+                   % (len(fp), len(negs), ", ".join(c["name"] + "→" + c["got"] for c in fp)))
+
+    # ②b-②e 真怒/真悲伤绝对分门槛、序差与边界（r103 取舍的补偿判据，实现见 _f11_margin）
+    _f11_margin(cases, bad)
 
     # ③ 七类必须都出现（"情绪种类单一"的直接反判据）
     rules = set(data.get("rules") or [])
