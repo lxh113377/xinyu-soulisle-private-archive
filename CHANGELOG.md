@@ -863,6 +863,53 @@
 但覆盖会打断他人 JVM 的 late class loading，红会算到并行会话头上）⇒ **切版 v1.8.3（G12+R1）继续挂账**，
 本轮不跑整跑电池、不重建 fat jar，浏览器腿走 spare `http.server`。
 
+### r121 — 八维对标三轮：给生成表装跨轮闸 + 把「从未有分母」的性能维量出来（对标报告：`交付物/对标分析报告-2026-10-12-r121.md`）
+
+**四项改造（排序依据：先给尺装防退化闸，再补尺没量到的另一半，最后补从未有分母的那格——闸先上，后面的读数才有可比基准）**：
+
+1. **P0 八维台账跨轮漂移闸**（`_test/bench_eight_dims_check.py`）：派生化（r119）之后的新风险是「生成器被改窄没人发现」。
+   新增 `round_key()`（轮次按**数值**排序，不用字典序也不用 mtime）+ `ledgers(limit=2)` + `drift(prev, cur, tol=3)` + 6 条漂移桩。
+   口径刻意不对称：**只把可追溯性退化判红**（维度缩水／格数缩水超容差／source 由有变无／实测退成 NA），
+   值变化只点名——把改值当回归会造出「每次正常演进都红一次」的永红判据。回执
+   `EIGHT-DIMS-PASS 维 8/8｜格 25｜NA声明 1｜漂移=比对 r120｜退化红 0｜变化 3`（三条变化逐条是本轮有意改动）。
+2. **P0 吞吐维打到词典引擎真实路径**（`_test/perf_baseline_check.py`）：性能维此前只有首屏字节 + health 往返，
+   「并发处理能力」这一子项从来没有读数。新增 `throughput_emotion`（8 线程 × 48 请求 POST `/api/emotion` 危机文本，
+   断言危机路径 `llm_used=False`）+ `MIN_RPS_EMOTION=50.0` + 「无样本⇒未验，不判绿」判据腿 + selftest 桩 ⑥b/⑥c/⑥d。
+   实测 **health=2301.5 rps／emotion=2183.8 rps（p95 4.4ms）**；被测面是本轮自起的 spare 实例
+   （TEMP 副本 jar + 独立 H2 库，`--server.port=8147`），**未打他人正服务的 8123**（那会往他人库里写消息）。
+3. **P1 模型判定分支的构建期用例**（新 `EmotionControllerModelRouteTest`，3 例）：r118 的本地模型腿只有带外 curl，
+   `/api/emotion` 的三态（采信模型／模型 5xx 回落／route=lexicon 关闭）在构建期零覆盖——正是 r77 换尺点名的分支类缺口。
+   JDK `HttpServer` 绑 `127.0.0.1:0` 回环桩（零新依赖/零公网/零密钥）。回执 `Tests run: 3, Failures: 0, Errors: 0`，
+   负例腿日志 `WARN ModelProxy -- local model classify: non-200 status=500` 证明真打到了 5xx 分支。
+4. **P0 peers 性能在册探针**（新 `_test/peer_perf_probe.py`）：八维表第 4 维的 peers 格自 r112 起每轮写
+   「未取到在册数 ⇒ 不做无据横比」，**这一格从来没有分母**。三通道合成（A 基准件 / B CI 真跑 / C 结果件，
+   **A 单独不计入在册能力**），分母直取 `benchmark_metrics.PEERS` 不手抄。首跑 16 仓 **80 份 workflow 逐份读正文**：
+   `measured*=0/16`、`files-only=2`（lobehub / NJX-njx-opensoul）、`none=14`、失明 0 ⇒ **对手池子里没人把性能基准跑进 CI**，
+   该维是空位项而非差距项；诚实的另一半是我们的尺是**自身棘轮**（本机回环、无外网、危机不调 LLM），不写成「我们比他们快」。
+   离线桩入电池（网络面承 r37 口径不入整跑）⇒ `perf_probe_selftest`，README 154→**155**。
+
+**本轮最重要的一次自我证伪（404 语义）**：首跑 6 个仓报 `workflows:gh: Not Found (HTTP 404)`，我当时判成
+「404＝该目录不存在＝这个仓没有 CI」并写了把 404 折成读数 0 的补丁。约 3 分钟后同一路径复核：
+`morettt/my-neuro` 返回 3 个 workflow、`lobehub` 返回 29 个 ⇒ 404 是**瞬时读不到**（限流/token/边缘节点）。
+我的补丁会把 6 个有 CI 的仓写成 `none`，而 `none` 正是下一轮抄进八维表的那一格。治本：workflow 名册**只认 git tree
+那一次取数**（与通道 A 同面），blob 读不到计入 `blob_errs`，新增 `finalize()` 失明闸在「缺读数 + 任一通道失明」时判
+`unverified(...)` 并登记 `blind` 清单；同时删掉原先把 err 吞成 `files-only` 的那句 `if not err or rec["bench_files"]`
+（lobehub 的错误就是这样被自己吞掉的）。selftest 补 4 条失明闸腿（含「blob 读不到仍判 none」必红）。
+
+**同轮修掉的两处「两张嘴」**：① 第 2 维 self 格从 rollup 台账抄 `regression_suites=152`，与第 3 维现算的 155 在同一张表里打架
+⇒ 第 2 维不再重述（同一事实只许一处判）；② 第 3 维把套件数标成「（HEAD 面）」，而归口的 `bench_rollup.suites_total()`
+实现是跑工作树脚本的 `--list` ⇒ 数值没错、**标签错了**，如实改标「（工作树面）」并在 source 与 `docs/quality-gates.md` 留更正注。
+
+**双核心能力**：零增量零回退（扩样本属并行会话在途，未代改）。HEAD 面语意 **85 条 / 100%**（`git archive HEAD` 副本内
+`node _test/emotion_eval.js` 复算），工作树面 105 条属他人未提交。G8 两面判据在 HEAD 面判红
+「emotion-eval-dataset.json 实际 85 条，06 声称 105 条」⇒ 归因到 `bb7ce5d`（他人只登记了磁盘实数、数据文件未入库），**非本轮引入、未代改他人数据**。
+
+**并发与阻塞**：入场 `HEAD=d72d277`、脏件 34（22+ 属 r117/r118 在途）；8123 属主 pid 34412（`foreign`）
+⇒ 不整跑电池（非可重入，TTL 1800s）、不重建 fat jar、浏览器腿不占该端口。`quote_wiring_check.py` **两面各跑一次**：
+工作树面 rc=0／HEAD 面 `QUOTE-WIRING-FAIL: 6 处` rc=1 ⇒ **不接线**（接了就是本机绿受理面红），按归属轮挂账并带前提命令。
+`EOL-PARITY-FAIL: 48 项` 全部点名他人在途文档与既存基线件，本轮 6 个改动文件不在名单内（改后逐文件按字节归一并复验）。
+G16 本轮报两条孤儿：`peer_perf_probe.py 未入库`（提交即解，属构造中间态）、`quote_wiring_check.py 两头不执行`（他人面，见 §6）。
+
 ## [1.8.1] - 2026-10-06 — 语音输入退出态真缺陷修复（r94/r95/r96 三轮挂账项落地）
 
 > **切版动因**：本版含一处 **`src/` 行为码修复**，而它正是 `v1.8.0` 发布后挂账的那一项（报告 §3 #9 /

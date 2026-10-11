@@ -198,11 +198,12 @@ CloudBase 注意事项（实测得来）：
 
 > **现状（与机器逐条对账，别手抄）**：GitHub Actions 四条门禁（`.github/workflows/ci.yml` 的 job 数；
 > 另有独立的性能基线工作流 `.github/workflows/perf-baseline.yml`，周常复跑）｜
-> ★ 全量电池（154 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
+> ★ 全量电池（155 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
 > （更正注 r111：旧值写 146；本轮按用户立规新增双核心能力基线棘轮 `core_capability_baseline` 与其 `--selftest` 两套件 ⇒ 146→148。旧值按本仓惯例保留于此，不删。）
 > （更正注 r116：语音通话层落地，新增 `voice_call` 与其 `--selftest` 两套件 ⇒ 148→150。判据 `_test/voice_call_check.py`，见 `docs/quality-gates.md` 同条目。）
 > （更正注 r117：BLIND-RED 常驻棘轮入电池，新增 `blindred_guard` 与其 `--selftest` 两套件 ⇒ 150→152（`run_all_suites.py` 实测 152）。判据 `_test/blindred_guard_check.py`，见 `docs/quality-gates.md` 同条目。）
 > （更正注 r119：八维总览表派生化入电池，新增 `bench_eight_dims` 与其 `--selftest` 两套件 ⇒ 152→154。判据 `_test/bench_eight_dims_check.py`，见 `docs/quality-gates.md` 同条目；同轮另加 `_test/js/pages-function-chat.unit.test.mjs`，走 `js_unit` 的文件枚举面 ⇒ 套件数不变。）
+> （更正注 r121：peers 性能在册探针的离线桩入电池，新增 `perf_probe_selftest` 一套件 ⇒ 154→155。判据 `_test/peer_perf_probe.py`，见 `docs/quality-gates.md` 同条目；同轮 `_test/js/memory-store.unit.test.mjs` 走 js_unit 文件枚举面 ⇒ 套件数不变。）
 > 这三处数字由 `repo_config_check.py` 的 **G2 / G4 / G14** 当场等值对账，写错即红。
 >
 > **判据清单与逐条口径全文见 [docs/quality-gates.md](docs/quality-gates.md)**（r39 起从 README 迁出）。这里只留四个『现在到底是多少』的复算入口：

@@ -38,6 +38,12 @@ BUDGETS = {
     "emotion_crisis": {"p95_ms": 400.0, "note": "/api/emotion 危机短路（必须不调 LLM）"},
 }
 MIN_RPS = 50.0     # 实测 8×6=48 并发下 ~2200 rps ⇒ 地板只防"塌了"，不防抖动
+# r121：词典引擎路径的并发地板。推导依据＝私有 spare 服务（复制 jar 到 %TEMP%，端口 8147，
+# 独立 H2 库，不碰并行会话正服务的 8123）连测 3 轮 emotion_crisis 吞吐 = 1951.1 / 1980.9 / 1978.9 rps
+# （p95 4.4~5.0ms），比 health 档（1690~2158）还稳。取与 health 同一条"塌方级"口径：50 rps ≈ 实测的 1/39。
+# 为什么不按实测的 90% 设阈：本轮同机噪声一手在册（ramp 档内带宽 9.2%~38.4%），
+# 贴着读数设地板＝给下一轮埋一条会自己踩穿的红。
+MIN_RPS_EMOTION = 50.0
 CONC = {"threads": 8, "per_thread": 6}
 # r96：单点并发**必须把档位写进读数本身**。立因是 r95 报告自相矛盾——§1 维度 4 印
 # `吞吐 1013.9 rps`，§5 又写「并发维度仍无读数」（依据是 grep k6/locust 全仓 0 命中）。
@@ -126,6 +132,20 @@ def measure(base, reps):
         wall = time.perf_counter() - t0
         out["throughput_health"] = {"rps": round(len(lats) / wall, 1),
                                     "p95_ms": round(pct(lats, 95), 1), "n": len(lats)}
+        # r121：并发维补**真实计算路径**。立因是对标维度 4 问的是"并发处理能力"，
+        # 而这里只有 /api/health 的吞吐 —— health 只做一次文件系统探针，
+        # 量到的是"JVM 还活着"，不是"词典引擎在并发下扛不扛得住"。
+        # 用同一条危机短路请求（`llm_used=False` 已在延迟维自证，不打上游、不出网）。
+        body = json.dumps({"text": CRISIS_TEXT}, ensure_ascii=False).encode("utf-8")
+
+        def hit_emotion():
+            return timed(lambda: get(base + "/api/emotion", body))[0]
+        t1 = time.perf_counter()
+        with ThreadPoolExecutor(max_workers=CONC["threads"]) as ex:
+            lat2 = list(ex.map(lambda _: hit_emotion(), range(CONC["threads"] * CONC["per_thread"])))
+        wall2 = time.perf_counter() - t1
+        out["throughput_emotion"] = {"rps": round(len(lat2) / wall2, 1),
+                                     "p95_ms": round(pct(lat2, 95), 1), "n": len(lat2)}
     return out, fatal
 
 
@@ -140,7 +160,14 @@ def judge(m):
             bad.append("%s p95=%.0fms 超预算 %.0fms（%s）" % (name, got["p95_ms"], b["p95_ms"], b["note"]))
     tp = m.get("throughput_health", {})
     if tp.get("rps") is not None and tp["rps"] < MIN_RPS:
-        bad.append("并发吞吐 %.0f rps < 地板 %.0f ⇒ 服务端塌方级退化" % (tp["rps"], MIN_RPS))
+        bad.append("并发吞吐(health) %.0f rps < 地板 %.0f ⇒ 服务端塌方级退化" % (tp["rps"], MIN_RPS))
+    te = m.get("throughput_emotion", {})
+    # r121：真实计算路径的并发读数。缺样本一律判红不判绿——"没量到"与"量到但塌了"必须可分。
+    if not te or te.get("rps") is None:
+        bad.append("throughput_emotion 无样本 ⇒ 并发维（词典引擎路径）未验，不判绿")
+    elif te["rps"] < MIN_RPS_EMOTION:
+        bad.append("并发吞吐(emotion) %.0f rps < 地板 %.0f ⇒ 词典引擎在并发下塌方"
+                   % (te["rps"], MIN_RPS_EMOTION))
     ec = m.get("emotion_crisis", {})
     if ec.get("llm_used") is True:
         bad.append("危机路径走了 LLM ⇒ 本判据口径失效（数字不再可比），先修短路再说性能")
@@ -299,6 +326,20 @@ def selftest():
     if not judge(llm_on):
         bad.append("⑥危机路径走了 LLM 却没被抓到 ⇒ 口径被悄悄换掉")
 
+    # r121：并发维（词典引擎路径）的三条腿——缺样本 / 塌方 / 正常，三态必须可分。
+    _ok = {k: {"p95_ms": 1.0} for k in BUDGETS}
+    for k in BUDGETS:
+        _ok[k] = dict(_ok[k], llm_used=False) if k == "emotion_crisis" else _ok[k]
+    _ok["throughput_health"] = {"rps": 900.0}
+    # （⑥b 首跑就是被这条判红的——我构造的"正常样本"里漏了 emotion 吞吐，新腿当场咬住我自己的桩 ⇒ 腿有牙齿，桩先补全）
+    _ok["throughput_emotion"] = {"rps": 800.0}
+    if judge(dict(_ok)):
+        bad.append("⑥b 正常样本被新增的 emotion 地板误判红 ⇒ 新腿在造永红")
+    if not judge(dict(_ok, throughput_emotion={"rps": 12.0})):
+        bad.append("⑥c 词典引擎吞吐 12 rps（远低于地板）仍判通过 ⇒ 有地板没咬")
+    if not judge(dict(_ok, throughput_emotion=None)) and not judge(_ok):
+        bad.append("⑥d emotion 吞吐缺样本却没判红 ⇒ 把「没量到」读成达标")
+
     # ── r96 阶梯三腿（正例 / 变异 / 边界）：judge_ramp 是新写的，没自证就是没接线 ──
     def tier(n, rps, p95, llm=False):
         return {"state": "ok",
@@ -424,7 +465,8 @@ def main():
     if fatal:
         print("PERF-ENV: 取数失败 %s ⇒ 未验证" % "; ".join(fatal))
         return 2
-    for name in ("static_index", "vendor_js", "health", "emotion_crisis", "throughput_health"):
+    for name in ("static_index", "vendor_js", "health", "emotion_crisis",
+                 "throughput_health", "throughput_emotion"):
         d = m[name]
         extra = ("｜llm_used=%s keys=%s" % (d.get("llm_used"), d.get("resp_keys"))) if "llm_used" in d else (
             ("｜rps=%s" % d.get("rps")) if "rps" in d else "")
@@ -485,6 +527,7 @@ def main():
     peak = max(d["p95_ms"] for k, d in m.items() if k in BUDGETS)
     tightest = min(BUDGETS[k]["p95_ms"] - d["p95_ms"] for k, d in m.items() if k in BUDGETS)
     tp = m.get("throughput_health", {})
+    te = m.get("throughput_emotion", {})
     tier_note = ""
     if ramp:
         line = "｜".join("rps@%d=%s" % (n, (ramp[n].get("health") or {}).get("rps", "NA"))
@@ -496,10 +539,10 @@ def main():
                                              a.ramp_reps, a.ramp_warmup,
                                              worst_band if worst_band is not None else "-"))
     print("PERF-BASELINE-PASS（%d 个目标在预算内｜实测峰值 p95=%.1fms，最紧余量 %.0fms｜"
-          "吞吐 并发%d线程×%d请求=%s rps%s｜口径=本地无外网 + 危机路径不调 LLM；"
-          "这是自身棘轮不是跨项目对比）"
+          "吞吐 并发%d线程×%d请求：health=%s rps／emotion=%s rps（词典引擎真实路径%s）｜"
+          "口径=本地无外网 + 危机路径不调 LLM；这是自身棘轮不是跨项目对比）"
           % (len(BUDGETS), peak, tightest, CONC["threads"], CONC["threads"] * CONC["per_thread"],
-             tp.get("rps", "取不到"), tier_note))
+             tp.get("rps", "取不到"), te.get("rps", "取不到"), tier_note))
     return 0
 
 

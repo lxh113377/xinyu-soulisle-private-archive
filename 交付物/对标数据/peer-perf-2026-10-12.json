@@ -1,0 +1,199 @@
+{
+ "generated_by": "_test/peer_perf_probe.py",
+ "denominator": 16,
+ "rows": [
+  {
+   "repo": "lobehub/lobehub",
+   "tier": "",
+   "bench_files": [
+    "packages/database/src/models/agentEval/__tests__/benchmark.test.ts",
+    "packages/database/src/models/agentEval/benchmark.ts",
+    "packages/database/src/models/userMemory/sources/__tests__/benchmarkLoCoMo.test.ts",
+    "packages/database/src/models/userMemory/sources/benchmarkLoCoMo.ts",
+    "packages/memory-user-memory/benchmarks/locomo",
+    "packages/memory-user-memory/benchmarks/locomo/README.md",
+    "packages/memory-user-memory/benchmarks/locomo/run.ts",
+    "packages/memory-user-memory/src/providers/benchmarkLocomo.test.ts"
+   ],
+   "result_files": [
+    "packages/memory-user-memory/src/providers/tests/benchmark-locomo-converted.json"
+   ],
+   "tree_truncated": false,
+   "path_count": 23127,
+   "workflow_files": 29,
+   "ci_bench_steps": [],
+   "class": "files-only"
+  },
+  {
+   "repo": "SillyTavern/SillyTavern",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 1095,
+   "workflow_files": 10,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 299,
+   "workflow_files": 6,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "morettt/my-neuro",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 797,
+   "workflow_files": 3,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "letta-ai/letta-code",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 2724,
+   "workflow_files": 17,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "hello-diana/MASCOT",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 99,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "ddxfish/sapphire",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 1446,
+   "workflow_files": 1,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "v2rockets/Loyal-Elephie",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 147,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "Rogendo/Mental-health-Chatbot",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 15,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "Lum1104/MER-Factory",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 194,
+   "workflow_files": 1,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "CheaperjamRen/leemo",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 1740,
+   "workflow_files": 1,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "NJX-njx/opensoul",
+   "tier": "",
+   "bench_files": [
+    "scripts/bench-continuity.mjs",
+    "scripts/bench-model.ts"
+   ],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 6715,
+   "workflow_files": 8,
+   "ci_bench_steps": [],
+   "class": "files-only"
+  },
+  {
+   "repo": "s-nagaev/chibi",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 334,
+   "workflow_files": 4,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "29-Cu/succhia",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 14,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "zeroa234/ryza-ai-revive",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 2467,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "Bwcx-songyu/MoodChat",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 82,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  }
+ ],
+ "na": [],
+ "measured": 0,
+ "ts": "2026-10-11T20:06:05Z"
+}

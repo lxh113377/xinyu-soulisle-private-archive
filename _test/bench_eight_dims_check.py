@@ -143,8 +143,9 @@ def build_dims():
     db = (roll or {}).get("dim_b_zero_build_cost") or {}
     sc = ((db.get("self_cost") or da.get("self") or {}))
     dims.append({"dim": DIM_ORDER[1], "cells": [
-        cell("self 零构建", "zero_build=%s｜套件 %s｜Java 测试件 %s" % (
-            sc.get("zero_build", "?"), sc.get("regression_suites", "?"), sc.get("java_test_files", "?")),
+        cell("self 零构建", "zero_build=%s｜（套件数／Java 用例数见第 3 维：同一事实只许一处判，"
+             "本格改前抄台账的 152，而第 3 维现算已是 155 ⇒ 同一张表两张嘴）" % (
+                 sc.get("zero_build", "?")),
              stamp(roll_p, roll) if roll_p else "NA-DECLARED：缺 benchmark-rollup，补法 python _test/bench_rollup.py"),
         cell("词表单源", "src/data/emotion-lexicon.js（JS/Java 各加载同一文件）",
              "HEAD 面 git show + memory/AGENTS.md 词表一致性红线"),
@@ -155,8 +156,9 @@ def build_dims():
     jt_files, jt_cases = java_tests()
     qg = jacoco_from_pom()
     dims.append({"dim": DIM_ORDER[2], "cells": [
-        cell("self 电池套件数", "%d（HEAD 面）" % suites if suites is not None else "NA(git 取不到)",
-             "git show HEAD:_test/run_all_suites.py 的 SUITES 计数"),
+        cell("self 电池套件数", "%d（工作树面）" % suites if suites is not None else "NA(runner 取不到)",
+             "_test/run_all_suites.py --list 自报（r121 更正：旧标「HEAD 面」与实现不符——"
+             "归口的 bench_rollup.suites_total() 跑的是工作树脚本，不是 git show HEAD）"),
         cell("self Java 用例", "%d 件 / %d 例｜门 LINE/BRANCH ≥ %s" % (
             jt_files, jt_cases, qg) if jt_files is not None else "NA", "git ls-tree HEAD + server/pom.xml"),
         cell("peers 有测试结构 / CI unit 步", "%d/%d ＋ %d/%d（coverage_gate 与 mutation_gate 均 0/%d）" % (
@@ -166,12 +168,27 @@ def build_dims():
         sref("peer-quality-tooling-*.json")),
     ]})
 
+    pp_p, pp = ledger("peer-perf-*.json")
+    if pp and isinstance(pp, dict) and pp.get("rows"):
+        shapes = {}
+        for r in pp["rows"]:
+            shapes[str(r.get("class"))] = shapes.get(str(r.get("class")), 0) + 1
+        blind_rows = sum(1 for r in pp["rows"] if r.get("blind"))
+        cell4 = cell("peers bench 在册数",
+                     "measured*=%s/%s 仓｜形态 %s｜失明 %d 仓｜三通道 A 基准件 / B CI 真跑 / C 结果件，"
+                     "A 单独不算在册能力（r121 首取，改 NA 为有分母）" % (
+                         pp.get("measured"), pp.get("denominator"),
+                         " ".join("%s=%d" % kv for kv in sorted(shapes.items())), blind_rows),
+                     stamp(pp_p, pp) + "（python _test/peer_perf_probe.py）")
+    else:
+        cell4 = cell("peers bench 在册数",
+                     "NA-DECLARED：台账未取到 peers 的 bench 在册数 ⇒ 不做无据横比；"
+                     "补法 python _test/peer_perf_probe.py --json 交付物/对标数据/peer-perf-<date>.json",
+                     sref("peer-perf-*.json"))
     dims.append({"dim": DIM_ORDER[3], "cells": [
         cell("self 首屏预算", json.dumps((da or {}).get("self", {}).get("first_screen_budget"), ensure_ascii=False),
              stamp(roll_p, roll) if roll_p else "—"),
-        cell("peers bench 在册数", "NA-DECLARED：台账未取到 peers 的 bench_script 在册数 ⇒ 不做无据横比；"
-             "补法 python _test/benchmark_metrics.py --doc-perf",
-             "peer-repro 台账 " + sref("peer-repro-*.json")),
+        cell4,
     ]})
 
     mem_p, mem = ledger("peer-memory-*.json")
@@ -244,7 +261,7 @@ class Inconsistent(Exception):
 
 
 def count_suites():
-    """归口 bench_rollup.suites_total()：HEAD 面 SUITES 条数的唯一算家。"""
+    """归口 bench_rollup.suites_total()：**工作树面** SUITES 条数的唯一算家（它跑 runner 的 --list 自报）。"""
     if BR is None:
         raise Unverified("bench_rollup 不可导入（%s）⇒ 拒绝回落自算" % BR_ERR)
     return BR.suites_total()
@@ -323,6 +340,108 @@ def audit(dims):
     return bad, na, ncells, len(got)
 
 
+def round_key(tag):
+    """轮次按**数字**排序，不按字典序：字典序会把 `r99` 排到 `r100` 之后 ⇒ 比对的成了两份旧台账。"""
+    m = re.search(r"(\d+)", tag or "")
+    return (int(m.group(1)) if m else -1, tag or "")
+
+
+def ledgers(limit=2):
+    """最近 N 份 eight-dims 台账，返回由新到旧的 [(轮次, Path)]。
+    排序键取**文件名轮次**而非 mtime —— checkout／搬卷会把 mtime 整体刷新（`ledger_age` 实测踩过）。"""
+    fs = []
+    for p in glob.glob(str(DATA / "eight-dims-*.json")):
+        if "_partial" + os.sep in p or "_superseded" + os.sep in p:
+            continue
+        m = re.search(r"eight-dims-(.+)\.json$", p)
+        if m:
+            fs.append((m.group(1), Path(p)))
+    fs.sort(key=lambda x: round_key(x[0]))
+    return fs[-limit:][::-1]
+
+
+def cell_map(payload):
+    out = {}
+    for d in (payload or {}).get("dims") or []:
+        for c in d.get("cells") or []:
+            out[(d.get("dim"), c.get("label"))] = c
+    return out
+
+
+def drift(prev, cur, tol=3):
+    """跨轮漂移纯函数：返回 (红因, 变化点名)。
+
+    口径故意不对称（与 `perf_ramp_delta` 同族）：
+      · **只把可追溯性退化判红**——维度数缩水／格数缩水超容差／某格 source 由有变无／
+        实测过的格退成 NA。这些是"尺变短了"，放行就等于下一轮看不见差距。
+      · **值变化只点名不判红**——变好、换取证口径、台账重采都会改值；把改值当回归判红
+        会造出"每次正常演进都红一次"的永红判据（本仓在册教训）。
+    """
+    if not prev or not cur:
+        return [], []
+    pm, cm = cell_map(prev), cell_map(cur)
+    bad, chg = [], []
+    if len({k[0] for k in cm}) < len({k[0] for k in pm}):
+        bad.append("维度数缩水：%d → %d" % (len({k[0] for k in pm}), len({k[0] for k in cm})))
+    if len(cm) - len(pm) < -tol:
+        bad.append("格数缩水 %d → %d（容差 %d）⇒ 有人在悄悄缩短分母" % (len(pm), len(cm), tol))
+    for k, c in cm.items():
+        p = pm.get(k)
+        if p is None:
+            chg.append("新增格 %s/%s" % (k[0], k[1]))
+            continue
+        if (p.get("source") or "").strip() and not (c.get("source") or "").strip():
+            bad.append("来源退化（有源→无源）：%s/%s" % (k[0], k[1]))
+        pv, cv = str(p.get("value", "")), str(c.get("value", ""))
+        if cv.startswith("NA") and not pv.startswith("NA"):
+            bad.append("实测退成 NA：%s/%s" % (k[0], k[1]))
+        if pv != cv:
+            chg.append("值变 %s/%s：%s → %s" % (k[0], k[1], pv[:30], cv[:30]))
+    for k in pm:
+        if k not in cm:
+            chg.append("格消失 %s/%s" % (k[0], k[1]))
+    return bad, chg
+
+
+DRIFT_STUBS = [
+    ("两轮齐且无退化（值变）⇒ 不红",
+     {"dims": [{"dim": "功能模块覆盖", "cells": [{"label": "a", "value": "1", "source": "x"}]}]},
+     {"dims": [{"dim": "功能模块覆盖", "cells": [{"label": "a", "value": "2", "source": "x"}]}]}, 0),
+    ("来源由有变无 ⇒ 红",
+     {"dims": [{"dim": "功能模块覆盖", "cells": [{"label": "a", "value": "1", "source": "x"}]}]},
+     {"dims": [{"dim": "功能模块覆盖", "cells": [{"label": "a", "value": "1", "source": ""}]}]}, 1),
+    ("实测退成 NA ⇒ 红",
+     {"dims": [{"dim": "性能表现", "cells": [{"label": "a", "value": "25.1s", "source": "x"}]}]},
+     {"dims": [{"dim": "性能表现", "cells": [{"label": "a", "value": "NA-DECLARED", "source": "x"}]}]}, 1),
+    ("格数小抖动（容差内）⇒ 不红",
+     {"dims": [{"dim": "功能模块覆盖", "cells": [
+         {"label": str(i), "value": "v", "source": "x"} for i in range(10)]}]},
+     {"dims": [{"dim": "功能模块覆盖", "cells": [
+         {"label": str(i), "value": "v", "source": "x"} for i in range(8)]}]}, 0),
+    ("格数大幅缩水 ⇒ 红",
+     {"dims": [{"dim": "功能模块覆盖", "cells": [
+         {"label": str(i), "value": "v", "source": "x"} for i in range(25)]}]},
+     {"dims": [{"dim": "功能模块覆盖", "cells": [
+         {"label": str(i), "value": "v", "source": "x"} for i in range(8)]}]}, 1),
+    ("维度数缩水 ⇒ 红",
+     {"dims": [{"dim": d, "cells": [{"label": "a", "value": "v", "source": "x"}]} for d in DIM_ORDER]},
+     {"dims": [{"dim": DIM_ORDER[0], "cells": [{"label": "a", "value": "v", "source": "x"}]}]}, 1),
+]
+
+
+def drift_selftest():
+    bad = []
+    for name, prev, cur, want in DRIFT_STUBS:
+        got = 1 if drift(prev, cur)[0] else 0
+        if got != want:
+            bad.append("漂移桩「%s」：期望红=%d 实得 %d（%s）" % (name, want, got, drift(prev, cur)[0][:1]))
+    if round_key("r99") >= round_key("r100"):
+        bad.append("轮次排序退回字典序 ⇒ 会比错两份旧台账")
+    if drift(None, {"dims": []})[0]:
+        bad.append("缺第二份时判了红（应为未验：不判红也不判绿）")
+    return bad
+
+
 def to_markdown(dims):
     """按格子的 side（标签前缀 `peers`）分列，出处列**不截断到字中间**：
     半截的文件名比没有文件名更坏——它长得像可核对的出处。"""
@@ -382,8 +501,9 @@ def selftest():
     na = audit(mk_dims({2: [cell("a", "NA-DECLARED：x", "s")]}))[1]
     if len(na) != 1:
         bad.append("NA 计数不成立：期望 1 实得 %d" % len(na))
-    print("EIGHT-DIMS-SELFTEST-%s（%d 类桩 + 基线自证 + 恒绿守卫 + NA 计数）"
-          % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(STUBS)))
+    bad += drift_selftest()      # r121：跨轮漂移腿（只生成不比对＝表绿着漂）
+    print("EIGHT-DIMS-SELFTEST-%s（%d 类结构桩 + %d 类漂移桩 + 基线自证 + 恒绿守卫 + NA 计数）"
+          % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(STUBS), len(DRIFT_STUBS)))
     return 1 if bad else 0
 
 
@@ -420,15 +540,32 @@ def main():
     if not a.no_write:
         DATA.mkdir(parents=True, exist_ok=True)
         dump_bytes(out, json.dumps(payload, ensure_ascii=False, indent=1) + "\n")
-    line = ("EIGHT-DIMS-PASS 维 %d/8｜格 %d｜NA声明 %d｜产物 %s" % (ndims, ncells, len(na),
-            out.name if not a.no_write else "未落盘(--no-write)"))
+    dbad, dchg, prev_round = [], [], None
+    pair = [x for x in ledgers() if x[0] != a.round]        # 排除本轮自己那份
+    if pair:
+        prev_round = pair[0][0]
+        try:
+            dbad, dchg = drift(json.loads(pair[0][1].read_text("utf-8")), payload)
+        except (OSError, ValueError) as e:
+            dbad = ["上一份台账读不动（%s）⇒ 漂移腿未验，不判绿" % type(e).__name__]
+        bad += dbad
+        note = "漂移=比对 %s｜退化红 %d｜变化 %d" % (prev_round, len(dbad), len(dchg))
+    else:
+        note = "漂移=未验(只有一份台账，不判红也不判绿)"
+    line = ("EIGHT-DIMS-PASS 维 %d/8｜格 %d｜NA声明 %d｜%s｜产物 %s" % (
+        ndims, ncells, len(na), note, out.name if not a.no_write else "未落盘(--no-write)"))
     if a.json:
-        print(json.dumps({"verdict": line, "red": bad, "na": na, "cells": ncells}, ensure_ascii=False))
+        print(json.dumps({"verdict": line, "red": bad, "na": na, "cells": ncells,
+                          "drift_prev": prev_round, "drift_changed": dchg[:12]}, ensure_ascii=False))
     if bad:
-        print("EIGHT-DIMS-FAIL 维 %d/8｜格 %d｜缺源/缺维 %d 项" % (ndims, ncells, len(bad)))
+        print("EIGHT-DIMS-FAIL 维 %d/8｜格 %d｜缺源/退化 %d 项" % (ndims, ncells, len(bad)))
         for x in bad[:8]:
             print("  - " + x)
         return 1
+    if dchg and not a.quiet:
+        print("  跨轮变化（点名不判红；把进步也判红会造出永红判据）：")
+        for x in dchg[:8]:
+            print("   · " + x)
     md = to_markdown(dims)
     if not a.no_write:
         dump_bytes(DATA / ("eight-dims-%s.md" % a.round), md)

@@ -432,6 +432,10 @@ SUITES = [
     #   取数=AST（区分 try 内外），分母=SUITES 在册脚本现读；基线只降不升（首扫 23 → 现 21）。
     ("blindred_guard", [sys.executable, "_test/blindred_guard_check.py"]),
     ("blindred_guard_selftest", [sys.executable, "_test/blindred_guard_check.py", "--selftest"]),
+    # r121：peers 性能在册探针的**离线桩**入电池（网络面承 r37 口径不入整跑：
+    #   runner 无 GH 配额保证，且八维表第 4 维的 peers 格此前**从来没有分母**，
+    #   每轮写「未取到在册数 ⇒ 不做无据横比」就被一代代抄下去。本件把那一格变成可实测。
+    ("perf_probe_selftest", [sys.executable, "_test/peer_perf_probe.py", "--selftest"]),
     ("settle_wait_selftest", [sys.executable, "_test/settle_wait.py", "--selftest"]),
     # r98：「判据把成败押在机器时刻上」这一族的普查尺。立因是 r96 连吃两条同根 CI 红
     #   （j4_memory 定长 8s 押落库时刻 / data_rights 快照⇄导出跨时刻），当时把两处升到
