@@ -33,9 +33,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-DEFAULT_MODEL_DIR = "D:/xinyu-ml/tts/vits-zh-aishell3"
+# 默认模型 = sherpa-onnx-vits-zh-ll（16kHz 全带、5 位说话人、RTF 0.33-0.47）。
+# 换掉 aishell3 的实测理由：那个模型输出是**真 8kHz 带限**（能量 100% 落在 4kHz 以下），
+# 电话级带宽，"清晰自然"这条不成立——详见 memory/03-tech-stack.md 决策 #11 的三模型对比表。
+DEFAULT_MODEL_DIR = "D:/xinyu-ml/tts/sherpa-onnx-vits-zh-ll"
 MODEL_DIR = os.environ.get("XINYU_TTS_MODEL_DIR", DEFAULT_MODEL_DIR)
-MODEL_FILE = os.environ.get("XINYU_TTS_MODEL", "vits-aishell3.onnx")
+MODEL_FILE = os.environ.get("XINYU_TTS_MODEL", "model.onnx")
 PORT = int(os.environ.get("XINYU_TTS_PORT", "8320"))
 MAX_TEXT = 300                      # 一句而已：分句朗读队列已经把长回复切短了
 # 文本规整 FST（日期/数字/电话/多音字），文件名与模型包一致；缺文件就少一条，不硬撑。
