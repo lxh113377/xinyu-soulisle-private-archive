@@ -19,6 +19,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
 from browser_engine import launch as be_launch, short_face
 from PIL import Image
+from check_instrument import unverified, instrument_red   # r112：裸 assert / 未跑完一律收口
 
 TOL_DEG = 18.0
 MIN_SHARE = 0.01
@@ -124,9 +125,12 @@ with sync_playwright() as p:
         try:
             page.wait_for_function(
                 "() => window.__XINYU__ && window.__XINYU__.opening === '%s'" % state, timeout=ms)
-        except Exception:
-            raise AssertionError(
-                "开场自动播放没有进入 %r 态（app.js 的 startOpeningShow 没跑？__XINYU__ 读数缺失也判此项失败）" % state)
+        except Exception as e:
+            # r112：原实现转成 AssertionError 抛出去 ⇒ 脚本在印结论行之前死掉（BLIND-RED）。
+            # 这是**没等到**而不是**判错了**，语义上属于「未验」，必须落 UNVERIFIED + rc=2。
+            unverified("LIGHTSHOW",
+                       "开场自动播放没有进入 %r 态（app.js 的 startOpeningShow 没跑？__XINYU__ 读数缺失同样记未验）" % state,
+                       e)
 
     wait_opening("lit")
     auto_ui = ui_state()
@@ -211,34 +215,39 @@ print("UI: 点返回后", ui_back)
 print("LIT: %d → %d → 返回后 %d → 回到记忆 %d | MEM: %d → %d" % (lit_before, lit_after, lit_keep, lit_cleared, mem_before, mem_after))
 print("CONSOLE_ERRORS:", len(errors), errors[:3])
 
-assert len(targets) == 6, f"应为六种情绪，实际 {len(targets)}"
-# --- r80：开场自动播放（一键点亮默认打开）---
-auto_missing = [l for l, v in auto_share.items() if v < MIN_SHARE]
-assert not auto_missing, f"开场自动播放缺这些情绪色: {auto_missing}（各色占比 {auto_share}）"
-assert cov_a >= MIN_CELLS, f"开场自动播放铺得不够散：只覆盖 {cov_a}/16 格"
-assert auto_lit > 0, f"开场自动播放没有点亮任何星（lit={auto_lit}）"
-assert not auto_ui["showtime"] and auto_ui["dockOpacity"] > 0.9, \
-    f"开场把 UI 遮住了 —— 默认打开不得让叙事与对话坞在开场那几秒不可点: {auto_ui}"
-assert auto_label == "一键点亮", f"开场把按钮翻成了退出态，退出语义应只归那一次手动点击: {auto_label!r}"
-assert auto_back == 0, f"开场播完没回到「我的记忆」（本套件已清空本机记忆，done 后 lit 应为 0，实际 {auto_back}）"
-assert len(pts1) > 800, f"点亮后有效像素过少（截图可能空白）: {len(pts1)}"
-missing = [l for l, v in after.items() if v < MIN_SHARE]
-assert not missing, f"这些情绪在屏幕上找不到对应颜色: {missing}"
-fake = [l for l, v in before.items() if v >= MIN_SHARE]
-assert not fake, f"判据失效：未点亮时也判出这些颜色: {fake}"
-assert len(pts_b) < 60, f"一键点亮没有清屏（黑屏帧仍有 {len(pts_b)} 个有效像素）"
-assert ui_hidden["showtime"] and ui_hidden["dockOpacity"] < 0.05, f"演示期间 UI 未隐藏: {ui_hidden}"
-# 播完不自动跳回 + 只有右下角按钮能退
-assert ui_after["showtime"], "播完自动跳回了（应保持清屏画面）"
-assert ui_after["exitVisible"], "播完后右下角返回按钮不可见"
-assert scroll_y > 100 and ui_after_scroll["showtime"], f"演示态下滚动被中断或没滚起来: scrollY={scroll_y}"
-assert ui_after_esc["showtime"], "Esc 仍能退出（应只保留右下角按钮一个退出口）"
-assert cov1 >= MIN_CELLS, f"点亮的星铺得不够散：只覆盖 {cov1}/16 格"
-assert cov0 == 0, f"判据失效：未点亮时也覆盖了 {cov0} 格"
-# 返回按钮保留星雾；清空要再点一次
-assert not ui_back["showtime"] and ui_back["dockOpacity"] > 0.9, f"点返回后 UI 未恢复: {ui_back}"
-assert lit_keep >= 6 * 170, f"点返回后星雾被清掉了（应保留）: {lit_keep}"
-assert lit_cleared == 0, f"「回到我的记忆」未清空演示点亮: {lit_cleared}"
-assert mem_after == mem_before, f"一键点亮污染了本机记忆: {mem_before} → {mem_after}"
-assert len(errors) == 0, f"console 报错: {errors}"
+# r112：这一串断言此前是裸的 —— 任一条失败就抛 AssertionError，脚本在印结论行之前死掉，
+# 电池只看到 rc=1 却拿不到原因（BLIND-RED）。收口成「点名红 + rc=1」，失败消息自带读数。
+try:
+    assert len(targets) == 6, f"应为六种情绪，实际 {len(targets)}"
+    # --- r80：开场自动播放（一键点亮默认打开）---
+    auto_missing = [l for l, v in auto_share.items() if v < MIN_SHARE]
+    assert not auto_missing, f"开场自动播放缺这些情绪色: {auto_missing}（各色占比 {auto_share}）"
+    assert cov_a >= MIN_CELLS, f"开场自动播放铺得不够散：只覆盖 {cov_a}/16 格"
+    assert auto_lit > 0, f"开场自动播放没有点亮任何星（lit={auto_lit}）"
+    assert not auto_ui["showtime"] and auto_ui["dockOpacity"] > 0.9, \
+        f"开场把 UI 遮住了 —— 默认打开不得让叙事与对话坞在开场那几秒不可点: {auto_ui}"
+    assert auto_label == "一键点亮", f"开场把按钮翻成了退出态，退出语义应只归那一次手动点击: {auto_label!r}"
+    assert auto_back == 0, f"开场播完没回到「我的记忆」（本套件已清空本机记忆，done 后 lit 应为 0，实际 {auto_back}）"
+    assert len(pts1) > 800, f"点亮后有效像素过少（截图可能空白）: {len(pts1)}"
+    missing = [l for l, v in after.items() if v < MIN_SHARE]
+    assert not missing, f"这些情绪在屏幕上找不到对应颜色: {missing}"
+    fake = [l for l, v in before.items() if v >= MIN_SHARE]
+    assert not fake, f"判据失效：未点亮时也判出这些颜色: {fake}"
+    assert len(pts_b) < 60, f"一键点亮没有清屏（黑屏帧仍有 {len(pts_b)} 个有效像素）"
+    assert ui_hidden["showtime"] and ui_hidden["dockOpacity"] < 0.05, f"演示期间 UI 未隐藏: {ui_hidden}"
+    # 播完不自动跳回 + 只有右下角按钮能退
+    assert ui_after["showtime"], "播完自动跳回了（应保持清屏画面）"
+    assert ui_after["exitVisible"], "播完后右下角返回按钮不可见"
+    assert scroll_y > 100 and ui_after_scroll["showtime"], f"演示态下滚动被中断或没滚起来: scrollY={scroll_y}"
+    assert ui_after_esc["showtime"], "Esc 仍能退出（应只保留右下角按钮一个退出口）"
+    assert cov1 >= MIN_CELLS, f"点亮的星铺得不够散：只覆盖 {cov1}/16 格"
+    assert cov0 == 0, f"判据失效：未点亮时也覆盖了 {cov0} 格"
+    # 返回按钮保留星雾；清空要再点一次
+    assert not ui_back["showtime"] and ui_back["dockOpacity"] > 0.9, f"点返回后 UI 未恢复: {ui_back}"
+    assert lit_keep >= 6 * 170, f"点返回后星雾被清掉了（应保留）: {lit_keep}"
+    assert lit_cleared == 0, f"「回到我的记忆」未清空演示点亮: {lit_cleared}"
+    assert mem_after == mem_before, f"一键点亮污染了本机记忆: {mem_before} → {mem_after}"
+    assert len(errors) == 0, f"console 报错: {errors}"
+except AssertionError as e:
+    instrument_red("LIGHTSHOW-CHECK", "断言未通过：%s" % (e or "(断言未带消息 ⇒ 不可归因，须补读数)"))
 print("LIGHTSHOW-CHECK-PASS 引擎=%s" % short_face(face))

@@ -23,6 +23,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from settle_wait import wait_reply, before_send   # r102：与 browser_check 等共源的完成态等待
+from browser_engine import launch as be_launch   # r113：手写回退收编为唯一入口
 
 BASE = "http://127.0.0.1:8123"
 API = BASE + "/api/chat"
@@ -107,10 +108,8 @@ def main():
 
     def run(proxy):
         with sync_playwright() as p:
-            try:
-                browser = p.chromium.launch()
-            except Exception:
-                browser = p.chromium.launch(channel="msedge")
+            browser, _engine_face = be_launch(p, label="stream_contract.py")
+            print("[engine] %s" % _engine_face)  # r113：引擎身份必须可见，否则「本地全绿」无法归因（CI 是另一台浏览器）
             page = browser.new_page(viewport={"width": 1280, "height": 800})
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.goto(BASE + "/index.html", wait_until="networkidle")

@@ -142,9 +142,11 @@ def compare(js, lex_java, ev_java):
 
     # ── A 词表结构 ─────────────────────────────────────────────
     problems += diff_words(js["lex"], lex_java["lex"])
-    for key in ("neg", "crisis"):
-        if js[key] != lex_java[key]:
-            problems.append(f"{key} 不同: JS={js[key]} vs Java={lex_java[key]}")
+    # r113：contrast（转折连词）进对账面 —— 它和 neg/deg 同为 SSOT，两端各存一套就会分叉，
+    # 而分叉的表现是「主情绪判错」，不比词表本身根本发现不了。
+    for key in ("neg", "crisis", "contrast"):
+        if js.get(key) != lex_java.get(key):
+            problems.append(f"{key} 不同: JS={js.get(key)} vs Java={lex_java.get(key)}")
     if list(js["deg"].items()) != list(lex_java["deg"].items()):
         problems.append(f"deg 不同: JS={list(js['deg'].items())} vs Java={list(lex_java['deg'].items())}")
 

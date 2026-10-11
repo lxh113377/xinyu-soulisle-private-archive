@@ -20,6 +20,7 @@ window.EmotionEngine = (function () {
   }
   const NEG = SRC.neg;
   const DEG = SRC.deg;
+  const CONTRAST = SRC.contrast || [];
   const CRISIS = SRC.crisis;
   const LABELS = SRC.labels;
   const CRISIS_COLOR = SRC.crisisColor;
@@ -31,7 +32,24 @@ window.EmotionEngine = (function () {
    * - 修正后：「特别难受」→ 程度副词占位，否定不生效（正确）；
    *           「别难过」  → 窗口内无程度副词，否定照常生效（正确，保留）。
    */
-  /* 否定判定缓存：hasNegation 是 before（≤3 字窗口）的纯函数，同窗重复命中直接取缓存。
+  /* 否定取词窗口（r112：3 → 4）。
+   * 旧值 3 抓不到「没什么好难过的」这一族：否定词「没」距情绪词「难过」4 字，
+   * 窗口只覆盖到「什么好」⇒ 否定不生效 ⇒ sadness 照常计分 ⇒ 判成低落（v3 唯一 miss）。
+   * 扩到 4 只多纳入一个字符，风险是「跨过标点去否定后面无关的情绪词」——首跑就踩中两条：
+   * 「解释也【没】人信，愤怒」的「没」是「没人信」的组成部分、「什么都不【不】懂，好慌」的「不」
+   * 属于「不懂」，两者都与后面的情绪词隔着一个逗号。故配 NEG_BREAK：否定词与情绪词之间
+   * 只要隔着标点/空白，修饰关系即不成立。另 2 条对抗样本钉住另一侧
+   * （「我没什么事，就是特别难受」=低落／「没什么事，但我特别生气」=烦躁）。 */
+  const NEG_WINDOW = 4;
+  /* 否定词与情绪词之间的「断点」：出现即说明二者不构成修饰关系（详见 NEG_WINDOW 注释）。 */
+  const NEG_BREAK = /[，。！？、；：…\s,.!?;:]/;
+
+  /** 转折加权的两个倍率：转折词**之前**的情绪降权、**之后**的升权（依据见 scan 内注释）。
+   *  单独提出来是因为它们与 NEG_WINDOW 同属「全局参数」——改一处要看全集会波及什么。 */
+  const CONTRAST_BEFORE = 0.6;
+  const CONTRAST_AFTER = 1.4;
+
+  /* 否定判定缓存：hasNegation 是 before（≤NEG_WINDOW 字窗口）的纯函数，同窗重复命中直接取缓存。
    * 同一条消息里同一窗口会被每个候选词各算一次，缓存后只算一次，结果逐字一致。 */
   const negCache = new Map();
   function hasNegation(before) {
@@ -46,7 +64,9 @@ window.EmotionEngine = (function () {
       let q = before.indexOf(n);
       while (q !== -1) {
         const covered = degSpans.some(([a, b]) => q < b && q + n.length > a);
-        if (!covered) { hit = true; break; }
+        // 断点：否定词与情绪词之间隔着标点/空白 ⇒ 不是修饰关系，该否定词不生效
+        const broken = NEG_BREAK.test(before.slice(q + n.length));
+        if (!covered && !broken) { hit = true; break; }
         q = before.indexOf(n, q + 1);
       }
       if (hit) break;
@@ -56,16 +76,25 @@ window.EmotionEngine = (function () {
   }
 
   function scan(text) {
+    // 转折主次（r113）：以**首个**转折词为界。转折之前的分句是让步（降权），
+    // 之后才是说话人真正要表达的情绪（升权）。倍率 0.6 / 1.4 的依据是「要让转折后的
+    // 弱情绪压过转折前的强情绪」，评测集 6 条样本就是按这个余量设计的。
+    let pivot = -1;
+    for (const c of CONTRAST) {
+      const p = text.indexOf(c);
+      if (p !== -1 && (pivot === -1 || p < pivot)) pivot = p + c.length;   // 界取转折词**之后**
+    }
     const scores = {};
     for (const [emo, cfg] of Object.entries(LEX)) {
       let s = 0;
       for (const w of cfg.words) {
         let idx = text.indexOf(w);
         while (idx !== -1) {
-          const before = text.slice(Math.max(0, idx - 3), idx);
+          const before = text.slice(Math.max(0, idx - NEG_WINDOW), idx);
           let mult = 1;
           if (hasNegation(before)) mult = -0.7;                     // 否定反转
           for (const [d, m] of Object.entries(DEG)) if (before.includes(d)) mult *= m;
+          if (pivot !== -1) mult *= (idx < pivot ? CONTRAST_BEFORE : CONTRAST_AFTER);
           s += cfg.w * mult;
           idx = text.indexOf(w, idx + w.length);
         }
@@ -113,5 +142,5 @@ window.EmotionEngine = (function () {
 
   // LEX / NEG / DEG / CRISIS 一并导出：供 `_test/engine_consistency_check.py` 与 Java 侧逐项对账
   // （一致性守卫需要比对词表**结构本身**，只比预测汇总可能因巧合相同而漏掉分叉）
-  return { scan, colorOf, labelOf, secondaryOf, palette, LEX, NEG, DEG, CRISIS };
+  return { scan, colorOf, labelOf, secondaryOf, palette, LEX, NEG, DEG, CONTRAST, CRISIS };
 })();

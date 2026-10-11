@@ -22,6 +22,8 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from settle_wait import wait_reply          # r102：与 public_check 等五处共源的完成态等待
+from check_instrument import install_excepthook   # r113：进程级兜底——任何未捕获异常都必须印出结论行，绝不裸抛栈
+install_excepthook("UX-GUARDS")
 
 BASE = "http://127.0.0.1:8123/index.html"
 results = []

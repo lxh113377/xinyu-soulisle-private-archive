@@ -37,6 +37,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from browser_engine import launch as be_launch   # r113：手写回退收编为唯一入口
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = (1280, 800)
@@ -175,10 +176,8 @@ def live_measure(base):
     from playwright.sync_api import sync_playwright
     shots = {}
     with sync_playwright() as p:
-        try:
-            browser = p.chromium.launch()
-        except Exception:
-            browser = p.chromium.launch(channel="msedge")
+        browser, _engine_face = be_launch(p, label="entry_reach_check.py")
+        print("[engine] %s" % _engine_face)  # r113：引擎身份必须可见，否则「本地全绿」无法归因（CI 是另一台浏览器）
         for w, h in [BASELINE] + NARROW:
             page = browser.new_page(viewport={"width": w, "height": h})
             page.goto(base.rstrip("/") + "/index.html", wait_until="load")

@@ -9,6 +9,7 @@
 退出码：0=LIVE-SYNC-PASS 1=漂移 2=网络/环境异常（不许把环境故障伪装成通过）
 """
 import sys
+import time
 import urllib.request
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "https://xinyu-soulisle.pages.dev"
@@ -16,10 +17,55 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 XINYU = ROOT / "deploy" / "xinyu"
 
-def fetch(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "xinyu-live-check"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return r.status, r.read()
+def fetch(url, tries=3, pause=1.5):
+    """取一次线上字节。
+
+    r113：加了重试。原因是一手实测 —— 公网（国内网络访问 Pages）SSL 握手会**间歇性超时**，
+    本判据要串行取 20+ 个资源，任一握手超时就被记成「取数失败」，进而被读成「线上缺资源」：
+    同一时刻 `public_check`（真浏览器）全绿、手动直取两个文件字节全等 ⇒ 那是网络抖动不是缺件。
+    「判据把环境抖动读成产品缺陷」属于 BLIND-RED 同族，必须在本件自己这一层挡住。
+    """
+    last = None
+    for i in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "xinyu-live-check"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return r.status, r.read()
+        except Exception as e:                       # noqa: BLE001 —— 重试针对的就是各类瞬时错误
+            last = e
+            if i < tries - 1:
+                time.sleep(pause)
+    # 兜底通道：本机实测 urllib 对 pages.dev 会**稳定**卡在 SSL 握手（`_ssl.c:983`），
+    # 而同一时刻 PowerShell 直取与 playwright（public_check）都能通 ⇒ 是 urllib 的 TLS 通道问题，
+    # 不是站点问题。换 curl 取一次；curl 也没有才判环境未验（rc=2）。
+    try:
+        return fetch_curl(url)
+    except Exception as e2:                          # noqa: BLE001
+        raise RuntimeError("urllib 失败(%s)；curl 兜底也失败(%s)" % (last, e2)) from e2
+
+
+def fetch_curl(url, timeout=25):
+    """用 curl 取 (status, body)：body 落临时文件、状态码走 -w，避免 `-w` 污染字节。"""
+    import subprocess
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False) as tf:
+        path = tf.name
+    try:
+        p = subprocess.run(
+            ["curl", "-sS", "-L", "-m", str(timeout), "-A", "xinyu-live-check",
+             "-o", path, "-w", "%{http_code}", url],
+            capture_output=True, text=True, timeout=timeout + 10)
+        code = int((p.stdout or "").strip() or 0)
+        if p.returncode != 0 or code == 0:
+            raise RuntimeError("rc=%s code=%s err=%s"
+                               % (p.returncode, code, (p.stderr or "").strip()[:120]))
+        with open(path, "rb") as fh:
+            return code, fh.read()
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
 def main():
     try:

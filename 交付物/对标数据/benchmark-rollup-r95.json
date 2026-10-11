@@ -3,7 +3,7 @@
   "dim_a_testing_repro": {
     "self": {
       "face": "git HEAD",
-      "regression_suites": 148,
+      "regression_suites": 152,
       "java_test_files": 12,
       "java_test_cases": 101,
       "jacoco_minimum": {
@@ -11,10 +11,10 @@
         "BRANCH": 0.9
       },
       "check_scripts_in_test": 0,
-      "src_code_files": 21,
+      "src_code_files": 24,
       "first_screen_budget": {
-        "files": 25,
-        "total_bytes": 968558
+        "files": 28,
+        "total_bytes": 1099994
       },
       "build_config_files": [
         "deploy/cloudbase/functions/chat/package.json"
@@ -50,7 +50,7 @@
   "dim_b_zero_build_cost": {
     "self_cost": {
       "face": "git HEAD",
-      "regression_suites": 148,
+      "regression_suites": 152,
       "java_test_files": 12,
       "java_test_cases": 101,
       "jacoco_minimum": {
@@ -58,10 +58,10 @@
         "BRANCH": 0.9
       },
       "check_scripts_in_test": 0,
-      "src_code_files": 21,
+      "src_code_files": 24,
       "first_screen_budget": {
-        "files": 25,
-        "total_bytes": 968558
+        "files": 28,
+        "total_bytes": 1099994
       },
       "build_config_files": [
         "deploy/cloudbase/functions/chat/package.json"

@@ -202,6 +202,8 @@ def wait_precache(pg, want, timeout_ms=15000):
 
 
 from browser_engine import launch as be_launch, short_face
+from check_instrument import install_excepthook   # r113：进程级兜底——任何未捕获异常都必须印出结论行，绝不裸抛栈
+install_excepthook("OFFLINE-SHELL")
 
 
 def run_static_only():

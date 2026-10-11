@@ -144,14 +144,94 @@ window.ChatAgent = (function () {
 
   const strategyOf = (emo) => (STR.strategy[emo] || STR.strategy[FALLBACK_EMO]);
 
-  const SYSTEM = (emo) => {
+  /* 心理学知识库注入（r113，老大定的「回答更专业有据」）：
+   * 数据源 = src/data/psych-kb.js（_test/psych_kb_build.py 生成；E 级未查证条目已在构建期排除）。
+   * 触发两条路：用户的话与条目标题/摘要的字符二元组重合 ≥2（聊到了库覆盖的话题），
+   * 或用户在**求解释**（问号/为什么/原理…）且条目自动关联了当前情绪 —— 纯倾诉轮不注入，
+   * 免得共情回复变成心理课（persona 规则禁说教）。
+   * 体量硬约束：context_budget_check X3 把 system 段钉在 1600 字符 ⇒ 只用剩余量，
+   * 挤不下就本轮不注入，绝不挤占记忆/概要段（那两段是判据钉死的既有能力）。 */
+  function kbBlockFor(emo, userText, budget) {
+    const KB = window.__XINYU_PSYCH_KB__;
+    if (!KB || !KB.entries || !KB.entries.length || budget < 220) return "";
+    const hay = String(userText || "");
+    const grams = new Set();
+    for (let i = 0; i < hay.length - 1; i++) {
+      const g = hay.slice(i, i + 2);
+      if (/[\u4e00-\u9fa5A-Za-z]/.test(g[0]) && /[\u4e00-\u9fa5A-Za-z]/.test(g[1])) grams.add(g);
+    }
+    if (!grams.size) return "";
+    const curious = /[?？]|为什么|怎么|如何|原理|科学|是不是|心理学/.test(hay);
+    const scored = [];
+    for (const e of KB.entries) {
+      const txt = e.title + "，" + e.summary;
+      let hits = 0;
+      grams.forEach((g) => { if (txt.indexOf(g) >= 0) hits++; });
+      const relHit = e.rel && e.rel.indexOf(emo) >= 0 ? 1 : 0;
+      if (hits >= 2 || (curious && relHit)) scored.push({ e: e, s: relHit * 2 + hits });
+    }
+    scored.sort((a, b) => b.s - a.s);
+    const head = "可依据的心理学知识条目（回答可自然融入，不说教；句末可标〔依据:编号·级〕；条目未覆盖的专业内容不要编造文献或数据，用弱化表述；D级内容须呈现争议双方）：";
+    let block = "", used = head.length, n = 0;
+    for (const p of scored) {
+      if (n >= 3) break;
+      const item = "\n[" + p.e.id + "·" + p.e.level + "]" + p.e.title + "：" + p.e.summary + p.e.content;
+      if (used + item.length > budget) break;
+      block += item; used += item.length; n++;
+    }
+    return n ? head + block : "";
+  }
+
+  /* 表达语料库注入（r117，老大定的「每轮都给候选」）：
+   * 数据源 = src/data/wit-quotes.js（_test/wit_quotes_build.py 生成；E 级构建期已排除）。
+   * 与 kbBlockFor 的差异：KB 是「按需给」（求解释才给），quote 是「每轮都给」——候选池按
+   * 当前情绪匹配（含"通用"），话题二元组命中加权排序，取 ≤5 条短句。
+   * 引用规则唯一源 = emotion-strategy.js 的 quoteRules（本函数只做拼接，不复制文案）；
+   * 规则缺失（quoteRules 空）⇒ 不注入（由 _test/strategy_check.py 钉住必须存在，禁静默降级双源）。 */
+  function quoteBlockFor(emo, userText, budget) {
+    const Q = window.__XINYU_WIT_QUOTES__;
+    if (!Q || !Q.entries || !Q.entries.length || budget < 120) return "";
+    const rules = (STR.quoteRules || []).join("；");
+    if (!rules) return "";
+    const hay = String(userText || "");
+    const grams = new Set();
+    for (let i = 0; i < hay.length - 1; i++) {
+      const g = hay.slice(i, i + 2);
+      if (/[\u4e00-\u9fa5A-Za-z]/.test(g[0]) && /[\u4e00-\u9fa5A-Za-z]/.test(g[1])) grams.add(g);
+    }
+    const scored = [];
+    for (const e of Q.entries) {
+      const emoHit = e.emo.indexOf("all") >= 0 || e.emo.indexOf(emo) >= 0;
+      let hits = 0;
+      grams.forEach((g) => { if (e.quote.indexOf(g) >= 0) hits++; });
+      if (!emoHit && hits < 2) continue;   // 情感不匹配且话题不沾边：不进候选
+      scored.push({ e: e, s: (emoHit ? 2 : 0) + hits });
+    }
+    scored.sort((a, b) => b.s - a.s || (a.e.id < b.e.id ? -1 : 1));
+    const head = "可用表达素材（" + rules + "）：";
+    let block = "", used = head.length, n = 0;
+    for (const p of scored) {
+      if (n >= 5) break;
+      const item = "\n[" + p.e.id + "·" + p.e.level + "]" + p.e.quote;
+      if (used + item.length > budget) break;
+      block += item; used += item.length; n++;
+    }
+    return n ? head + block : "";
+  }
+
+  const SYSTEM = (emo, userText) => {
     const s = strategyOf(emo);
     // 长期记忆注入（r52）：MemoryStore 原本**只写不读**，"跨设备记住你"只成立在展示层。
     // 只注入聚合摘要，不注入原话。
     const mem = (window.MemoryStore && window.MemoryStore.recall) ? window.MemoryStore.recall() : "";
-    return STR.persona + "用户刚说的话被识别为主要情绪「" + window.EmotionEngine.labelOf(emo) + "」。" +
+    const base = STR.persona + "用户刚说的话被识别为主要情绪「" + window.EmotionEngine.labelOf(emo) + "」。" +
       "当前共情要点：" + s.lead + "。要求：" + STR.rules.map((r, i) => (i + 1) + ")" + r).join("；") + "。" +
       (mem ? mem : "") + summaryOfDropped();
+    /* r117 预算切分：quote 保底优先（「每轮给候选」要成立），kb 用剩余（<220 自动让位）。 */
+    const remain = 1600 - base.length - 40;
+    const quoteBudget = Math.min(280, Math.max(180, Math.floor(remain * 0.45)));
+    const qb = remain >= 180 ? quoteBlockFor(emo, userText, quoteBudget) : "";
+    return base + qb + kbBlockFor(emo, userText, remain - (qb ? qb.length : 0));
   };
 
   /**
@@ -186,7 +266,7 @@ window.ChatAgent = (function () {
   }
 
   async function onlineReply(text, emo, onDelta) {
-    const messages = [{ role: "system", content: SYSTEM(emo) }];
+    const messages = [{ role: "system", content: SYSTEM(emo, text) }];
     for (const h of history.slice(-HISTORY_MAX)) messages.push(h);
     messages.push({ role: "user", content: text });
     const s = strategyOf(emo);

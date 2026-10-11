@@ -30,6 +30,12 @@ import static org.mockito.Mockito.when;
  * 长期只由 python 判据守着、构建期内零用例。这里把两条最不该漂的结论钉进 JUnit：
  * ① 真实评测集在 Java 侧复跑得 94.4% / 危机 3-3；② 危机词不调上游。
  *
+ * <p>r112 更正：评测集 73 → 79 条（+4 条远距离否定「没什么好/可 + 情绪词」、+2 条防扩窗误伤对抗），
+ * 且否定取词窗口 3 → 4（配「否定词与情绪词之间隔标点则不生效」的断点规则），
+ * 双端同时生效后准确率 98.6% → <b>100.0%</b>、漏判 1 → 0。本锁的价值正在于此：
+ * 评测集一动，构建期立刻红，逼着人去核对双端而不是让数字默默漂。
+ * （注：Java 侧格式化是「100.0%」一位小数，JS 侧是「100%」，格式不同非分叉。）
+ *
  * <p>形态选择：**直接调用控制器方法**而非 MockMvc——本仓四个控制器都是
  * 「入参 JSON 字符串 → 出 ResponseEntity 字节体」，判定全在方法体内；
  * 直接调用既覆盖全部行，又不把测试结果押在 MVC 装配细节上。
@@ -170,15 +176,15 @@ class EmotionControllerTest {
      * （评测集 09-23 由 36 扩到 73，标题数字没人重算）。这里按**当场实测**取值，并同步把文档更正到位。
      */
     @Test
-    @DisplayName("eval：真实评测集在 Java 侧复跑 = 73 条 / 98.6% / 危机 6-6（AC-OBS-09 的构建期锁）")
+    @DisplayName("eval：真实评测集在 Java 侧复跑 = 85 条 / 100.0% / 危机 6-6（AC-OBS-09 的构建期锁）")
     void evalOnRealDataset() throws Exception {
         ResponseEntity<byte[]> r = offline().eval(0);
         assertEquals(200, r.getStatusCode().value());
         JsonNode b = M.readTree(text(r));
-        assertEquals(73, b.path("total").asInt());
-        assertEquals("98.6%", b.path("accuracy").asText());
+        assertEquals(85, b.path("total").asInt());
+        assertEquals("100.0%", b.path("accuracy").asText());
         assertEquals("6/6", b.path("crisis_recall").asText());
-        assertEquals(1, b.path("misses").size(), "漏判数变了就必须同步双端对账判据，不许默默漂");
+        assertEquals(0, b.path("misses").size(), "漏判数变了就必须同步双端对账判据，不许默默漂");
     }
 
     @Test
@@ -190,7 +196,7 @@ class EmotionControllerTest {
         for (String k : new String[] {"text", "expect", "pred"}) {
             assertTrue(first.has(k), "逐条行缺字段 " + k);
         }
-        assertEquals("98.6%", b.path("accuracy").asText());
+        assertEquals("100.0%", b.path("accuracy").asText());
     }
 
     @Test

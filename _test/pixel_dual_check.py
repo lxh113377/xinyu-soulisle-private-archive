@@ -20,6 +20,8 @@ import sys, io, math, os, datetime
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
 from PIL import Image
+from check_instrument import instrument_red   # r112：裸 assert 收口为点名红，禁止零结论行
+from browser_engine import launch as be_launch, short_face   # r112：回退统一入口 + 引擎身份
 
 CASES = [
     ("multi", ["今天收到offer啦，太开心了！", "其实也很难过，心里空落落的", "明天答辩好焦虑，压力好大", "有点心动也很想念那个人"]),
@@ -82,10 +84,8 @@ def clusters2(path, min_v=0.18, min_s=0.12):
 out = {}
 errors = []
 with sync_playwright() as p:
-    try:
-        browser = p.chromium.launch()
-    except Exception:
-        browser = p.chromium.launch(channel="msedge")
+    # r112：同 j4 —— 手写回退不打印引擎身份，且本机与 CI 不是同一台浏览器 ⇒ 全绿不可归因。
+    browser, face = be_launch(p, label="pixel_dual_check")
     ctx = browser.new_context(viewport={"width": 1280, "height": 800})
     ctx.add_init_script(SEED_JS)  # 星位布局可复现（不改生产代码）
     page = ctx.new_page()
@@ -106,7 +106,10 @@ with sync_playwright() as p:
     # 并当场自证默认打开真的在跑（读数缺失或卡在半路一律判红，不许闷着取样）。
     page.clock.run_for(7000)
     opening_now = page.evaluate("() => window.__XINYU__ && window.__XINYU__.opening")
-    assert opening_now == "done", f"开场自动播放没落到 done 态（实际 {opening_now!r}）⇒ 取样会混入演示星"
+    try:
+        assert opening_now == "done", f"开场自动播放没落到 done 态（实际 {opening_now!r}）⇒ 取样会混入演示星"
+    except AssertionError as e:  # r112：裸断言失败 = 零结论行 = 冒充环境
+        instrument_red("LIT-COLOR-CHECK", "断言未通过：%s" % (e or "(断言未带消息 ⇒ 不可归因)"))
     page.wait_for_timeout(800)
     shots = "c:/Users/37533/Desktop/workspace/项目/陪聊/_test/_shots"
     os.makedirs(shots, exist_ok=True)
@@ -116,7 +119,10 @@ with sync_playwright() as p:
     page.locator("#gl").screenshot(path=blank)
     bn, bdist, bminority = clusters2(blank)
     print(f"[blank] 有效像素={bn} 两簇色距={bdist} 少数簇占比={bminority}")
-    assert not (bdist > 0.25 and bminority > 0.10), f"判据恒真：空白星图也被判多彩: {(bn, bdist, bminority)}"
+    try:
+        assert not (bdist > 0.25 and bminority > 0.10), f"判据恒真：空白星图也被判多彩: {(bn, bdist, bminority)}"
+    except AssertionError as e:  # r112：同上，失败必须带读数地打出来
+        instrument_red("LIT-COLOR-CHECK", "断言未通过：%s" % (e or "(断言未带消息 ⇒ 不可归因)"))
 
     def overlay(hide):
         page.evaluate("""(hide) => { const v = hide ? 'hidden' : 'visible';
@@ -157,18 +163,23 @@ mi = out["multi"]
 sg = out["single"]
 # R247：结论为「通过」前先证明输入非空
 # 阈值依据实测：4 句话点亮约 27 颗星 → 有效像素约两百量级；低于 120 视为截图空白
-assert mi[0] > 120 and sg[0] > 120, f"有效像素过少（截图可能为空白）: {out}"
 # 双条件：色距够大 且 少数簇占比够高。只比色距会被「1 个像素的抗锯齿噪点」骗过
 # （实测单一情绪用例里出现过 色距 0.21 但少数簇占比仅 0.4% 的假双色）
 def multicolor(x):
     return x[1] > 0.25 and x[2] > 0.10
 
-assert multicolor(mi), f"多样情绪历史在屏幕上没分成双色簇: {mi}"
-# 对照：单一情绪历史必须判不出两簇，否则判据恒真
-assert not multicolor(sg), f"判据失效：单一情绪历史也被判成多彩: {sg}"
-# 离线隔离注入的端点必然连接失败：只豁免该 URL（含端口）的报错，其余报错仍然致命——
-# 不做「ERR_CONNECTION_REFUSED 一律放行」的宽豁免，否则真实断链会被吞掉
-real_errors = [(txt, url) for (txt, url) in errors if "127.0.0.1:18123" not in url]
+# r112：这一串断言此前是裸的 —— 失败即抛 AssertionError，脚本在印结论行之前死掉
+# （电池只看到 rc=1 却拿不到原因 ⇒ BLIND-RED）。收口成「点名红 + rc=1」，失败消息自带读数。
+try:
+    assert mi[0] > 120 and sg[0] > 120, f"有效像素过少（截图可能为空白）: {out}"
+    assert multicolor(mi), f"多样情绪历史在屏幕上没分成双色簇: {mi}"
+    # 对照：单一情绪历史必须判不出两簇，否则判据恒真
+    assert not multicolor(sg), f"判据失效：单一情绪历史也被判成多彩: {sg}"
+    # 离线隔离注入的端点必然连接失败：只豁免该 URL（含端口）的报错，其余报错仍然致命——
+    # 不做「ERR_CONNECTION_REFUSED 一律放行」的宽豁免，否则真实断链会被吞掉
+    real_errors = [(txt, url) for (txt, url) in errors if "127.0.0.1:18123" not in url]
+    assert len(real_errors) == 0, f"console 报错: {real_errors}"
+except AssertionError as e:
+    instrument_red("LIT-COLOR-CHECK", "断言未通过：%s" % (e or "(断言未带消息 ⇒ 不可归因，须补读数)"))
 print("REAL_CONSOLE_ERRORS:", len(real_errors), real_errors[:3])
-assert len(real_errors) == 0, f"console 报错: {real_errors}"
-print("LIT-COLOR-CHECK-PASS")
+print("LIT-COLOR-CHECK-PASS 引擎=%s" % short_face(face))

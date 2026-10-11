@@ -4,16 +4,15 @@
 import io, sys, os
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
+from browser_engine import launch as be_launch   # r113：手写回退收编为唯一入口
 
 OUT = r"C:\Users\37533\Desktop\workspace\项目\陪聊\_test\_shots"
 os.makedirs(OUT, exist_ok=True)
 BASE = "http://localhost:8123/index.html"
 
 with sync_playwright() as p:
-    try:
-        b = p.chromium.launch()
-    except Exception:
-        b = p.chromium.launch(channel="msedge")
+    b, _engine_face = be_launch(p, label="screenshots_resubmit.py")
+    print("[engine] %s" % _engine_face)  # r113：引擎身份必须可见，否则「本地全绿」无法归因（CI 是另一台浏览器）
     ctx = b.new_context(viewport={"width": 1280, "height": 800})
     pg = ctx.new_page()
     # s01：第一幕初始态（全新会话，星雾 0 颗）

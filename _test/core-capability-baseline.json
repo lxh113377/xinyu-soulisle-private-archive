@@ -1,29 +1,26 @@
 {
-  "updated": "2026-10-11",
+  "updated": "2026-10-12",
   "round": "r111",
   "why": "用户 2026-10-11 立规：表情识别 + 语意理解 = 多轮迭代核心优先级、第一要务。本文件是棘轮基线，只升不降。",
   "nlu": {
-    "total": 73,
-    "accuracy": "98.6%",
-    "acc_num": 98.6,
+    "total": 85,
+    "accuracy": "100%",
+    "acc_num": 100.0,
     "crisis_hit": 6,
     "crisis_n": 6,
     "per_class": {
-      "joy": "11/11",
-      "sadness": "14/14",
-      "anger": "11/11",
+      "joy": "13/13",
+      "sadness": "18/18",
+      "anger": "12/12",
       "fear": "11/11",
-      "calm": "10/11",
+      "calm": "16/16",
       "love": "9/9",
       "crisis": "6/6"
-    },
-    "known_miss": [
-      "「没什么好难过的」expect=calm pred=sadness（否定+情绪词组合，下一轮候选）"
-    ]
+    }
   },
   "face_unit": {
-    "tests": 18,
-    "pass": 18,
+    "tests": 26,
+    "pass": 26,
     "fail": 0
   },
   "vendor": {

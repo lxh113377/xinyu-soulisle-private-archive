@@ -344,9 +344,31 @@ def run_static(baseline, roster_path=None):
 
     cur, broken = scan_sources(sources)
     if not cur:
-        rows.append(["E2 唯一实现（棘轮）", "UNVERIFIED",
-                     "分母为 0：AST 现读没有任何 launch 站点（调用点归零 ≠ 全部已接入）"])
-        return rows, red, {"denom_ok": False}
+        # r113 修尺：调用点归零**不等于**全部已接入 —— 也可能是名册里的件被删/改名躲开了分母。
+        # 故拿起点名册逐件核对三条件（在盘 ∧ import ∧ 裸点 = 0）：全齐才配叫「接完了」。
+        # 否则这个门会在终点状态上自己判自己「不可验」，把完成态读成故障。
+        _rs, _why = load_roster(roster_path)
+        if _rs is None:
+            rows.append(["E2 唯一实现（棘轮）", "UNVERIFIED",
+                         "调用点归零但名册取不到（%s）⇒ 分不清是「接完了」还是「没得判」" % _why])
+            return rows, red, {"denom_ok": False}
+        _bad = e2b(_rs["sites"], {}, sources)
+        if _bad:
+            rows.append(["E2 唯一实现（棘轮）", "UNVERIFIED",
+                         "调用点归零，但名册里这些件三条件不齐（疑似靠删件/改名躲分母）：%s"
+                         % "；".join(_bad[:4])])
+            red.append("E2")
+            return rows, red, {"denom_ok": False}
+        rows.append(["E2 唯一实现（棘轮）", "PASS",
+                     "回退余量 0（基线 %d，只降不升）｜起点名册 %d 件逐件三条件齐 ⇒ 是「真接完」不是「没站点」"
+                     % (baseline, len(_rs["sites"]))])
+        rows.append(["E2b 余量有主", "PASS",
+                     "已接 %d/%d 件逐件三条件齐（在册 ∧ import ∧ 裸 launch==0）"
+                     % (len(_rs["sites"]), len(_rs["sites"]))])
+        rows.append(["E2c 接入即无残留", "PASS", "半接入残留 0 件（已无任何站点）"])
+        return rows, red, {"denom_ok": True, "sites": [], "cur": {}, "sources": sources, "wired": [],
+                           "roster_ok": True, "adopted": len(_rs["sites"]), "n_un": 0,
+                           "roster_n": len(_rs["sites"]), "baseline": baseline}
     sites = sorted(cur)
     n_un = len(sites)
     half = wired_names(sources, sites)
@@ -500,7 +522,13 @@ def selftest():
     eq("合格 CONTRIBUTING 过 E1", e1_contrib_declares(GOOD)[0], True)
     eq("合格文本过 E5", e5_contrib_deps(GOOD, "playwright==1.60.0\nPyYAML\n")[0], True)
     sites = launch_sites(TEST_DIR)
-    eq("分母从现读：站点数 > 0（为 0 时主流程判 UNVERIFIED 而不是绿）", len(sites) > 0, True)
+    # r113 改尺：站点数归零（全部接入）是**允许的终点态**，不再判 UNVERIFIED ——
+    # 但必须由起点名册逐件三条件背书，否则「名册里的件被删/改名」会被读成「接完了」。
+    # 下面这条例是尺的牙齿：删件冒充接完 ⇒ 这里立刻翻红。
+    _rs, _why = load_roster(None)
+    eq("终点态可判：站点数为 0 时须由名册逐件三条件背书（防「删件/改名冒充接完」）",
+       (len(sites) > 0)
+       or (_rs is not None and not e2b(_rs["sites"], {}, read_sources(TEST_DIR))), True)
     eq("本件自己不算进分母（判据不给自己加站点）", "browser_engine_declare_check.py" in sites, False)
     src_real = read_sources(TEST_DIR)
     eq("半接入残留只能是 sites 的子集",

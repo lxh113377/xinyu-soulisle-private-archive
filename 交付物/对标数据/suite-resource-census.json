@@ -1,12 +1,12 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 148,
+ "suites": 150,
  "blind": [],
  "timings_from": "battery-timing.json",
  "buckets": {
   "jar8123": {
-   "n": 48,
+   "n": 50,
    "seconds": 623.8,
    "members": [
     "preflight",
@@ -42,6 +42,8 @@
     "stream_contract",
     "safety_guard",
     "safety_guard_selftest",
+    "voice_call",
+    "voice_call_selftest",
     "browser_check",
     "pixel_dual",
     "lightshow",
@@ -1000,6 +1002,30 @@
     "browser"
    ],
    "exclusive": []
+  },
+  {
+   "suite": "voice_call",
+   "target": "_test/voice_call_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "voice_call_selftest",
+   "target": "_test/voice_call_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
   },
   {
    "suite": "browser_check",

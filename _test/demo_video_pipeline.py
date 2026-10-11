@@ -88,12 +88,11 @@ def run_recording():
     errors, rec, last_t = [], [], [0]
 
     with sync_playwright() as p:
-        try:
-            browser = p.chromium.launch(args=LAUNCH_ARGS)
-        except Exception:
-            # 本机 playwright chromium headless-shell 缺失（PLAYWRIGHT_BROWSERS_PATH=D:\playwright-cache），
-            # 与 browser_check.py 同款回落：系统 Edge
-            browser = p.chromium.launch(channel="msedge", args=LAUNCH_ARGS)
+        # r113：手写回退 → browser_engine 唯一入口（三档：本地 chromium / 受管 / 系统 Edge；
+        # 原注释所述「headless-shell 缺失」正是它要拦的形态之一）
+        from browser_engine import launch as be_launch
+        browser, _engine_face = be_launch(p, args=LAUNCH_ARGS, label="demo_video_pipeline")
+        print("[engine] %s" % _engine_face)   # 引擎身份必须可见
         ctx = browser.new_context(viewport={"width": 1920, "height": 1080},
                                   record_video_dir=str(vdir), record_video_size={"width": 1920, "height": 1080})
         pg = ctx.new_page()

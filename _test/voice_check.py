@@ -10,6 +10,7 @@ import os
 import sys
 
 from playwright.async_api import async_playwright
+from browser_engine import alaunch   # r113：async 面也走统一入口（E2 唯一实现不留第二套）
 
 URL = next((a for a in sys.argv[1:] if not a.startswith("--")), "http://127.0.0.1:8125/")
 
@@ -321,13 +322,16 @@ async def main() -> int:
     fails = []
     legs, slegs = {}, {}
     async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            channel="msedge",
+        # r113：唯一的 async 套件也走统一入口（browser_engine.alaunch），并把引擎身份打出来
+        browser, _engine_face = await alaunch(
+            p,
+            label="voice_check",
             args=[
                 "--use-fake-ui-for-media-stream",      # 自动同意麦克风授权
                 "--use-fake-device-for-media-stream",  # 提供假音频输入设备
             ],
         )
+        print("[engine] %s" % _engine_face)
         ctx = await browser.new_context(permissions=["microphone"])
         await ctx.add_init_script(INIT_SCRIPT)
         page = await ctx.new_page()

@@ -1,0 +1,12 @@
+{
+  "gate_cmd": "python _test/core_capability_baseline_check.py",
+  "python": "C:/Program Files/Python312/python.exe",
+  "workers_allowlist": ["subagent:general", "subagent:explore"],
+  "max_parallel": 4,
+  "budget": {"P0": 2, "P1": 2, "P2": 1},
+  "artifact_dir": "memory/sessions/artifacts",
+  "owns_required": true,
+  "skill_allowlist": ["A-project-handoff", "A-dynamic-workflow", "A-get-memory"],
+  "ledger": "memory/09-workflow-state.md",
+  "notes": "r117 expression-corpus: broker subagents spawned by controller Trae Agent tool, submit back via dwf.py submit. gate = core capability baseline check (every-round first priority)."
+}

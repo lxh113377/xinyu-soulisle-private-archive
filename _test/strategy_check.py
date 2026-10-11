@@ -112,6 +112,19 @@ def check(lex, strat):
         if absent:
             problems.append(f"热线号未出现在话术正文里（用户看不到号码）: {absent}")
 
+    # G 引用规则（r117：表达语料库引用规范的唯一源）
+    qr = strat.get("quoteRules")
+    if not isinstance(qr, list) or len(qr) < 3:
+        problems.append("quoteRules 需 ≥3 条（引用规则唯一源；缺失/过少 ⇒ quote 注入会被静默关闭）")
+    else:
+        empt = [i for i, r in enumerate(qr) if not str(r).strip()]
+        if empt:
+            problems.append(f"quoteRules 含空条: {empt}")
+        joined = "".join(str(r) for r in qr)
+        for kw in ("契合", "一句"):
+            if kw not in joined:
+                problems.append(f"quoteRules 缺少关键约束词「{kw}」（防硬贴/防堆砌的两条底线不得被删）")
+
     # 其余必备字段
     if not str(strat.get("persona", "")).strip():
         problems.append("缺 persona")
@@ -132,9 +145,10 @@ def main():
         return 1
 
     if selftest:
-        print("【判据自检】故意注入两处分叉：删掉 love 策略 + 抹掉 crisis 热线 → 期望 FAIL")
+        print("【判据自检】故意注入三处分叉：删掉 love 策略 + 抹掉 crisis 热线 + 清空 quoteRules → 期望 FAIL")
         strat["strategy"].pop("love", None)
         strat["crisis"]["hotlines"] = []
+        strat["quoteRules"] = []
 
     problems = check(lex, strat)
     emotions = list(lex["lex"].keys())

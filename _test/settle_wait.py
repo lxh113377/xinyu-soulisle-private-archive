@@ -193,4 +193,8 @@ def selftest():
 
 
 if __name__ == "__main__":
+    # r113：本件是**公共件**（被别的判据 import），顶层装 excepthook 会污染调用方
+    # ⇒ 只在**脚本态**装。作为脚本跑时，任何未捕获异常都会印出结论行而不是裸抛栈。
+    from check_instrument import install_excepthook
+    install_excepthook("SETTLE-WAIT")
     sys.exit(selftest() if "--selftest" in sys.argv[1:] else 0)

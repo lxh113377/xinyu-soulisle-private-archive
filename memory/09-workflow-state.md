@@ -67,6 +67,14 @@
 | VOL-9E7EB | P2 | 体量治理[L3 产物] _temp/ — 目录内逐类治理：产物拆分/归档，备份残留走 recycle | todo | - | - | 2026-10-11 04:28 | - |
 | VOL-13B40 | P2 | 体量治理[L3 产物] _temp/pristine/archive/交付物-历史轮次/提交包 (2).zip — 可再生缓存目录内文件：gitignore 命中未证实 ⇒ 本轮只可见不处置（在 git 仓里会走 TTL + recycle） | todo | - | - | 2026-10-11 04:28 | - |
 | VOL-AGG-3237c7 | P2 | 体量治理[L3 产物] 体量余量聚合（53 项） — 另有 53 项待判断，合计 362326616 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-11 04:28 | - |
+| VOL-F443C | P2 | 体量治理[L3 产物] _temp/ 缓存簇 — 超上限但无超龄项（TTL 14 天内）⇒ 本轮不处置 | todo | - | - | 2026-10-11 05:53 | - |
+| VOL-AGG-db2ad9 | P2 | 体量治理[L3 产物] 体量余量聚合（41 项） — 另有 41 项待判断，合计 216450694 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-11 05:53 | - |
+| VOL-AGG-0c2511 | P2 | 体量治理[L3 产物] 体量余量聚合（42 项） — 另有 42 项待判断，合计 192208085 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-12 00:24 | - |
+| QTE-R1 | P1 | 表达语料库·文言与古诗词组（研究员：搜集+考据+条目卡落盘） | done | - | - | 2026-10-12 00:45 | 指针:memory/sessions/quote-research/run-ids.md |
+| QTE-R2 | P1 | 表达语料库·名家名句组（研究员） | done | - | - | 2026-10-12 00:44 | sha256:a8543ce0f68284eb7a3d37dc25c9a966dba94f6d18bd8da53eaae877dff730fe:交付物/表达语料库/02-名家名句.md |
+| QTE-R3 | P1 | 表达语料库·网络热句与流行文化组（研究员） | done | - | - | 2026-10-12 00:44 | 指针:memory/sessions/quote-research/run-ids.md |
+| QTE-R4 | P1 | 表达语料库·哲学思辨组（研究员） | done | - | - | 2026-10-12 00:44 | sha256:03311a99dd13ea9952c83fdd97c689eba4b7df21dcc07f011955666aec3e1ccf:交付物/表达语料库/04-哲学思辨.md |
+| QTE-V1 | P1 | 表达语料库·核对与审读（五维质检+修订闭环） | done | QTE-R1,QTE-R2,QTE-R3,QTE-R4 | - | 2026-10-12 00:54 | 指针:memory/sessions/quote-research/run-ids.md |
 
 ## 推进记录
 
@@ -103,6 +111,23 @@
 - [2026-10-09 08:58] WF-r101-对标轮 todo → doing
 - [2026-10-09 08:58] WF-r101-对标轮 doing → done
 - [2026-10-11 04:28] 体量体检登记 3 项（待判断项转任务，id 前缀 VOL-）
+- [2026-10-11 05:53] 体量体检登记 2 项（待判断项转任务，id 前缀 VOL-）
+- [2026-10-12 00:24] 体量体检登记 1 项（待判断项转任务，id 前缀 VOL-）
+- [2026-10-12 00:34] QTE-R1 新增（P1，todo）
+- [2026-10-12 00:34] QTE-R2 新增（P1，todo）
+- [2026-10-12 00:34] QTE-R3 新增（P1，todo）
+- [2026-10-12 00:34] QTE-R4 新增（P1，todo）
+- [2026-10-12 00:34] QTE-V1 新增（P1，todo）
+- [2026-10-12 00:36] QTE-R1 todo → doing
+- [2026-10-12 00:37] QTE-R2 todo → doing
+- [2026-10-12 00:37] QTE-R3 todo → doing
+- [2026-10-12 00:37] QTE-R4 todo → doing
+- [2026-10-12 00:44] QTE-R2 doing → done
+- [2026-10-12 00:44] QTE-R4 doing → done
+- [2026-10-12 00:44] QTE-R3 doing → done
+- [2026-10-12 00:45] QTE-R1 doing → done
+- [2026-10-12 00:45] QTE-V1 todo → doing
+- [2026-10-12 00:54] QTE-V1 doing → done
 
 ## 分卷目录
 

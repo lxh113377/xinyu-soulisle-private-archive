@@ -96,6 +96,8 @@ public class EmotionController {
         body.put("neg", EmotionLexicon.NEG);
         body.put("deg", EmotionLexicon.DEG);
         body.put("crisis", EmotionLexicon.CRISIS);
+        // r113：contrast 必须进导出面 —— 否则双端一致性判据比不到它，词表守卫会留一个洞
+        body.put("contrast", EmotionLexicon.CONTRAST);
         return json(200, write(body));
     }
 

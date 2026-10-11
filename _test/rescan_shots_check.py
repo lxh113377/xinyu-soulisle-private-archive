@@ -79,17 +79,15 @@ def main():
         nav_to = int(sys.argv[sys.argv.index("--nav-timeout") + 1])
 
     with sync_playwright() as p:
+        from browser_engine import launch as be_launch   # r113：回退收编为唯一入口
         try:
-            b = p.chromium.launch()
-        except Exception as e_first:
-            try:
-                b = p.chromium.launch(channel="msedge")
-            except Exception as e:
-                # r100：浏览器双档全败 = **环境**未验（rc=2）。原实现在这里二次抛错逃出进程，
-                # 电池只看到 rc=1 且没有任何 RESCAN-SHOTS-* 结论行（「无原因判红」）。
-                print("RESCAN-SHOTS-ENV-UNVERIFIED 浏览器不可达（chromium/msedge 双档均败）%s ｜ %s"
-                      % (_why(e_first), _why(e)))
-                return 2
+            b, _engine_face = be_launch(p, label="rescan_shots_check")
+        except Exception as e:
+            # r100 的语义**保留**：浏览器各档全败 = **环境**未验（rc=2）——原实现在这里二次抛错逃出进程，
+            # 电池只看到 rc=1 且没有任何 RESCAN-SHOTS-* 结论行（「无原因判红」）。
+            print("RESCAN-SHOTS-ENV-UNVERIFIED 浏览器不可达（browser_engine 三档均败）%s" % _why(e))
+            return 2
+        print("[engine] %s" % _engine_face)   # r113：引擎身份必须可见，否则全绿不可归因
         ctx = b.new_context(viewport={"width": 1280, "height": 800})
         pg = ctx.new_page()
         miss = []

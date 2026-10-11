@@ -33,6 +33,7 @@ import socketserver
 import sys
 import threading
 from pathlib import Path
+from browser_engine import launch as be_launch   # r113：手写回退收编为唯一入口
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ROOT = Path(__file__).resolve().parents[1]
@@ -264,10 +265,8 @@ def run_local():
         observed, probe = _observe_paths(base)
         errs, vios = [], []
         with sync_playwright() as pw:
-            try:
-                b = pw.chromium.launch()
-            except Exception:
-                b = pw.chromium.launch(channel="msedge")
+            b, _engine_face = be_launch(pw, label="headers_csp_check.py")
+            print("[engine] %s" % _engine_face)  # r113：引擎身份必须可见，否则「本地全绿」无法归因（CI 是另一台浏览器）
             pg = b.new_page(viewport={"width": 1200, "height": 860})
             pg.on("pageerror", lambda e: errs.append(str(e)[:110]))
             def on_console(m):

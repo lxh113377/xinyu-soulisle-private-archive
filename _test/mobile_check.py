@@ -198,14 +198,20 @@ def selftest():
     return 0 if ok == total else 1
 
 
+ENGINE_FACE = {"face": "-"}   # r112：由 launch() 写入实际引擎身份，结论行据此带出（缺省=未取到）
+
+
 def probe(base):
     from playwright.sync_api import sync_playwright
 
     def launch(pw):
-        try:
-            return pw.chromium.launch()
-        except Exception:
-            return pw.chromium.launch(channel="msedge")
+        # r112：原手写回退既不打印实际用的引擎，也让「本地浏览器判据全绿」不可归因
+        # （CI 是 ubuntu + 受管 chromium，与本机不是同一台）。改走统一入口，并把引擎身份
+        # 写进模块级 ENGINE_FACE，供结论行带出。
+        from browser_engine import launch as be_launch, short_face
+        b, face = be_launch(pw, label="mobile_check")
+        ENGINE_FACE["face"] = short_face(face)
+        return b
 
     html = (ROOT / "src" / "index.html").read_text("utf-8", errors="replace")
     rows, errs = [], []
@@ -269,13 +275,13 @@ def main():
         print("MOBILE-UNVERIFIED: 服务/页面不可达 ⇒ 不算通过（%s）" % (errs[:1] or "无读数"))
         return 2
     if bad:
-        print("MOBILE-FAIL: %d 项（视口 %d 档 目标 %d 个）" % (len(bad), st["viewports"],
-                                                            st["targets_seen"]))
+        print("MOBILE-FAIL: %d 项（视口 %d 档 目标 %d 个）引擎=%s" % (len(bad), st["viewports"],
+                                                                 st["targets_seen"], ENGINE_FACE["face"]))
         return 1
     print("MOBILE-PASS: 读数 %d 组（%d 视口 x 默认/展开两态）零横向溢出｜交互目标 %d 个：独占型全部 ≥%dpx、"
-          "等效控件豁免 %d 个（label ≥%dpx 才成立，计数不静默）｜文本输入 ≥%dpx｜viewport 允许缩放"
+          "等效控件豁免 %d 个（label ≥%dpx 才成立，计数不静默）｜文本输入 ≥%dpx｜viewport 允许缩放｜引擎=%s"
           % (st["viewports"], len(VIEWPORTS), st["targets_seen"], MIN_TARGET,
-             st["exempt"], AA_FLOOR, MIN_INPUT_FONT))
+             st["exempt"], AA_FLOOR, MIN_INPUT_FONT, ENGINE_FACE["face"]))
     return 0
 
 

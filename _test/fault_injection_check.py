@@ -293,10 +293,11 @@ def run(base):
     from playwright.sync_api import sync_playwright
 
     def launch(pw):
-        try:
-            return pw.chromium.launch()
-        except Exception:
-            return pw.chromium.launch(channel="msedge")
+        # r113：手写回退 → browser_engine 唯一入口 + 打印引擎身份（同 dock_auto_check）
+        from browser_engine import launch as be_launch
+        b, _engine_face = be_launch(pw, label="fault_injection_check")
+        print("[engine] %s" % _engine_face)
+        return b
 
     out = []
     with sync_playwright() as p:

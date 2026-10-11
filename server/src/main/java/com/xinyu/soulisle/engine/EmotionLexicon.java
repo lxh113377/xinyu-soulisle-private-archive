@@ -51,6 +51,10 @@ public final class EmotionLexicon {
     /** 程度修饰词：字面量 → 倍数（插入序与 SSOT 对象字面量一致） */
     public static final Map<String, Double> DEG = new LinkedHashMap<>();
 
+    /** 转折连词（r113）：命中即以其位置为界，之前的情绪降权、之后的主情绪升权。
+     *  与 neg/deg 同属 SSOT —— 词在 `emotion-lexicon.js` 里，两端各加载同一份。 */
+    public static final List<String> CONTRAST;
+
     /** 危机词表：独立于情绪评分，命中即最高优先级（安全边界） */
     public static final List<String> CRISIS;
 
@@ -81,6 +85,11 @@ public final class EmotionLexicon {
             DEG.put(k, degNode.get(k).asDouble());
         }
 
+        // 缺失即 fail-fast（与 neg/deg 同纪律）：词表与引擎不是同一版就必须当场炸，不许静默回落
+        if (root.get("contrast") == null || root.get("contrast").isNull()) {
+            throw new IllegalStateException("词表缺 contrast（转折连词）：请确认加载的是 r113 版 emotion-lexicon.js");
+        }
+        CONTRAST = toStringList(root.get("contrast"));
         CRISIS = toStringList(root.get("crisis"));
         CRISIS_COLOR = toDoubleArray(root.get("crisisColor"));
 

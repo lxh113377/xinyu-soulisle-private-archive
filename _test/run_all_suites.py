@@ -419,6 +419,13 @@ SUITES = [
     #   探针本体**不入电池**（16 仓 × search+comments+timeline 三层调用，承 r37「探针不入链」口径，
     #   且本轮已实测同轮 burst 重采会撞 GitHub secondary rate limit），只入零网络的判定桩。
     ("issue_probe_selftest", [sys.executable, "_test/peer_issue_response_probe.py", "--selftest"]),
+    # r112：BLIND-RED 常驻棘轮 —— 「判据抛了栈却零结论行」这一族的普查尺。
+    #   立因：r105 记了 6 条「判红但零判据结论行」，其中 4 台仪器（j4_memory / browser_check /
+    #   pixel_dual / lightshow）本轮修到零裸点（裸 assert 收进 try→instrument_red，裸 wait 换
+    #   wait_done→UNVERIFIED rc=2）。修完必须立尺，否则下一件新写的判据照样再犯。
+    #   取数=AST（区分 try 内外），分母=SUITES 在册脚本现读；基线只降不升（首扫 23 → 现 21）。
+    ("blindred_guard", [sys.executable, "_test/blindred_guard_check.py"]),
+    ("blindred_guard_selftest", [sys.executable, "_test/blindred_guard_check.py", "--selftest"]),
     ("settle_wait_selftest", [sys.executable, "_test/settle_wait.py", "--selftest"]),
     # r98：「判据把成败押在机器时刻上」这一族的普查尺。立因是 r96 连吃两条同根 CI 红
     #   （j4_memory 定长 8s 押落库时刻 / data_rights 快照⇄导出跨时刻），当时把两处升到

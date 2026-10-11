@@ -13,6 +13,8 @@ import sys, io, json, time, urllib.request
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from settle_wait import wait_quiescent   # 静止等待的唯一实现（data_rights 同用一个）
+from check_instrument import wait_done   # r112：超时一律落「未验」结论行，禁止裸抛栈
+from browser_engine import launch as be_launch, short_face   # r112：回退统一入口 + 引擎身份
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
 
@@ -46,7 +48,8 @@ def boot(page, cfg, sid):
     page.reload(wait_until="networkidle")
     # r80：一键点亮默认打开 ⇒ 每次加载有约 5.2s 开场演示。本套件的「刷新后星图仍点亮」读的是
     # 演示星还是真实记忆，取决于取样时刻，必须等被等对象的完成态（不是固定 sleep）。
-    page.wait_for_function("() => window.__XINYU__ && window.__XINYU__.opening === 'done'", timeout=15000)
+    wait_done(page, "() => window.__XINYU__ && window.__XINYU__.opening === 'done'", 15000,
+              "J4-MEMORY", "开场自动播放未回到 done 态（此时取样会读到演示星，判据不可信）")
     page.wait_for_timeout(800)
 
 
@@ -70,10 +73,9 @@ http("DELETE", f"{API}/{SID_OFF}")
 before_on, before_off = stats(SID_ON), stats(SID_OFF)
 
 with sync_playwright() as p:
-    try:
-        browser = p.chromium.launch()
-    except Exception:
-        browser = p.chromium.launch(channel="msedge")
+    # r112：原手写「先 chromium 再 msedge」的回退①不打印实际用的引擎，②与 CI 的
+    # ubuntu + 受管 chromium 不是同一台浏览器 ⇒ 「本地全绿」不可归因。改走统一入口。
+    browser, face = be_launch(p, label="j4_memory_check")
 
     # ---- 用例 A：远端开启 ----
     page = browser.new_page(viewport={"width": 1280, "height": 800})
@@ -89,7 +91,8 @@ with sync_playwright() as p:
       localStorage.removeItem('peiliao.history.v1');
     }""")
     page.reload(wait_until="networkidle")
-    page.wait_for_function("() => window.__XINYU__ && window.__XINYU__.opening === 'done'", timeout=15000)
+    wait_done(page, "() => window.__XINYU__ && window.__XINYU__.opening === 'done'", 15000,
+              "J4-MEMORY", "开场自动播放未回到 done 态（此时取样会读到演示星，判据不可信）")
     page.wait_for_timeout(3500)
     lit_after_wipe = lit(page)
     page.close()
@@ -130,7 +133,8 @@ if mem_off < 2:
 if b["emotions"] != 0 or b["messages"] != 0:
     print("FAIL-B: 默认关闭时服务端不应收到任何记录 → 判据恒真")
     ok = False
-print("J4-MEMORY-PASS" if ok else "J4-MEMORY-FAIL")
+# 引擎身份必须进结论行：否则「全绿」无法归因到具体那台浏览器（CI 与本机不是同一台）
+print(("J4-MEMORY-PASS" if ok else "J4-MEMORY-FAIL") + " 引擎=%s" % short_face(face))
 # 电池按 rc 记账，而本件此前只印结论不转退出码 ⇒ 印 FAIL 也记绿（r93 在 j2_chat_contract
 # 上抓到同型并修了那一件；r94 类扫 90 套件仍只有本件漏网，AC-OBS-10 的验收判据不能报红而记绿）。
 # 守卫形态 = G9 `import_safety` 的要求（顶层入口调用须在 `if __name__` 之后）。本件正文仍是顶层

@@ -23,6 +23,7 @@ from pathlib import Path
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
+from browser_engine import launch as be_launch   # r113：手写回退收编为唯一入口
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -40,10 +41,8 @@ def main():
         time.sleep(2.5)
         mem_requests, console_errors = [], []
         with sync_playwright() as p:
-            try:
-                browser = p.chromium.launch()
-            except Exception:
-                browser = p.chromium.launch(channel="msedge")
+            browser, _engine_face = be_launch(p, label="j4_remote_down_check.py")
+            print("[engine] %s" % _engine_face)  # r113：引擎身份必须可见，否则「本地全绿」无法归因（CI 是另一台浏览器）
             page = browser.new_page(viewport={"width": 1280, "height": 800})
             page.on("request", lambda r: mem_requests.append(r.url) if "/api/memory" in r.url else None)
             page.on("console", lambda m: console_errors.append(m.text) if m.type == "error" else None)

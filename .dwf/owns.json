@@ -1,0 +1,12 @@
+{
+  "schema": "dwf-owns-v1",
+  "updated": "2026-10-12",
+  "why": "r117 expression-corpus: each researcher subagent owns one chapter file (write isolation by chapter); reviewer owns whole corpus dir after researchers done",
+  "items": {
+    "QTE-R1": ["交付物/表达语料库/01-文言与古诗词.md", "memory/sessions/artifacts/r117/QTE-R1/"],
+    "QTE-R2": ["交付物/表达语料库/02-名家名句.md", "memory/sessions/artifacts/r117/QTE-R2/"],
+    "QTE-R3": ["交付物/表达语料库/03-网络热句与流行文化.md", "memory/sessions/artifacts/r117/QTE-R3/"],
+    "QTE-R4": ["交付物/表达语料库/04-哲学思辨.md", "memory/sessions/artifacts/r117/QTE-R4/"],
+    "QTE-V1": ["交付物/表达语料库/", "memory/sessions/artifacts/r117/QTE-V1/"]
+  }
+}

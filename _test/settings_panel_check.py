@@ -23,6 +23,8 @@
 """
 import json
 import sys
+from check_instrument import install_excepthook   # r113：进程级兜底——任何未捕获异常都必须印出结论行，绝不裸抛栈
+install_excepthook("SETTINGS-PANEL")
 
 sys.stdout.reconfigure(encoding="utf-8")
 

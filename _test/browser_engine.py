@@ -134,6 +134,49 @@ def launch(pw, args=None, label="", quiet=False):
     raise RuntimeError("三档浏览器全部起不来: %s" % (" | ".join(tried) or "无候选"))
 
 
+async def alaunch(pw, args=None, label="", quiet=False):
+    """launch() 的 async 孪生（r113）——给 `async_playwright` 的套件用。
+
+    为什么必须补这一件：E2 棘轮喊的是「唯一实现」，而 async 面若再手写一份回退，
+    这条棘轮在 async 侧就是**假的**（本仓唯一一件 async 套件 = voice_check）。
+    选序与 face 语义与同步版完全一致，不允许出现第二套实现。
+    """
+    mode = (os.environ.get(MODE_ENV) or "auto").strip().lower()
+    attempts = []
+    if mode in ("auto", "", "local", "chromium_path"):
+        exe = os.environ.get(CHROMIUM_PATH_ENV, "").strip()
+        if exe and Path(exe).is_file():
+            attempts.append(("local", exe))
+        elif mode in ("local", "chromium_path"):
+            raise RuntimeError("%s 指向不存在的文件: %r" % (CHROMIUM_PATH_ENV, exe))
+    if mode in ("auto", "", "managed", "edge"):
+        attempts.append(("managed", None))
+        attempts.append(("edge", None))
+    tried = []
+    for kind, exe in attempts:
+        try:
+            if kind == "local":
+                b = await pw.chromium.launch(executable_path=exe, args=args or [])
+                tag = TAG_LOCAL
+            elif kind == "managed":
+                b = await pw.chromium.launch(args=args or [])
+                tag = TAG_MANAGED
+            else:
+                b = await pw.chromium.launch(channel="msedge", args=args or [])
+                tag = TAG_EDGE
+        except Exception as e:                                # noqa: BLE001
+            why = "%s:%s" % (type(e).__name__, str(e).splitlines()[0][:90] if str(e) else "")
+            tried.append("%s->%s" % (kind, why[:60]))
+            continue
+        face = _mk_face(tag, b, "; ".join(tried))
+        if not quiet:
+            record({"label": label or Path(sys.argv[0]).name, "engine": tag,
+                    "version": getattr(b, "version", "unknown"),
+                    "skipped": list(tried), "face": face})
+        return b, face
+    raise RuntimeError("三档浏览器全部起不来: %s" % (" | ".join(tried) or "无候选"))
+
+
 if __name__ == "__main__":
     print(__doc__)
     sys.exit(0)

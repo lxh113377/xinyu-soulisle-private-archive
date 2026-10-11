@@ -101,6 +101,8 @@ AXE_RUN = """async (opts) => {
 
 
 from browser_engine import launch as be_launch, short_face   # r98 E2 迁移：唯一实现见 browser_engine.py
+from check_instrument import install_excepthook   # r113：进程级兜底——任何未捕获异常都必须印出结论行，绝不裸抛栈
+install_excepthook("A11Y-CHECK")
 
 
 DECO_RE = re.compile(r"[^\w一-鿿]+", re.U)

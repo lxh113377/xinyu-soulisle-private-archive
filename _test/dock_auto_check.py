@@ -29,10 +29,12 @@ res = []
 
 
 def launch(pw):
-    try:
-        return pw.chromium.launch()
-    except Exception:
-        return pw.chromium.launch(channel="msedge")
+    # r113：手写「先 chromium 再 msedge」的回退 → browser_engine 唯一入口；
+    # 并打印引擎身份 —— 不打印的话「本地全绿」无法归因（CI 跑的是另一台浏览器）。
+    from browser_engine import launch as be_launch
+    b, _engine_face = be_launch(pw, label="dock_auto_check")
+    print("[engine] %s" % _engine_face)
+    return b
 
 
 def ck(name, ok, detail=""):

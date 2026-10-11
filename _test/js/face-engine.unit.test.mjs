@@ -215,3 +215,100 @@ test("空/畸形输入不炸：read(undefined) 与未知维度都按 0 处理", 
   const v2 = read({ notABlendshape: 1, mouthSmileLeft: 0.9, mouthSmileRight: 0.9 });
   assert.equal(v2.emotion, "joy");
 });
+
+/* ── r113 质量门（assessQuality/applyQuality）：画面靠不住时读数必须降档 ────────── */
+// 跨 realm 归一：assessQuality/applyQuality 的返回值一律过一道 JSON（同本文件开头约定，
+// 否则 deepEqual 会拿 vm realm 的 Array 原型说事）
+const q = (r) => JSON.parse(JSON.stringify(r));
+
+test("质量门四信号：暗光/糊图/侧脸/嘴部平坦各命中对应 reason，干净画面全过", () => {
+  const Q = RULES.quality;
+  assert.ok(Q && typeof Q.brightMin === "number", "rules.quality 缺失：质量门没有阈值就形同虚设");
+  const good = q(FE.assessQuality({ luma: { mean: 0.5, variance: 0.03 }, yaw: 0.05, mouthFlatSamples: 0 }));
+  assert.deepEqual(good, { ok: true, reasons: [] });
+  const dark = q(FE.assessQuality({ luma: { mean: Q.brightMin - 0.01, variance: 0.03 }, yaw: 0, mouthFlatSamples: 0 }));
+  assert.ok(dark.reasons.includes("lighting"));
+  const bright = q(FE.assessQuality({ luma: { mean: Q.brightMax + 0.01, variance: 0.03 }, yaw: 0, mouthFlatSamples: 0 }));
+  assert.ok(bright.reasons.includes("lighting"), "过曝也走 lighting");
+  const blur = q(FE.assessQuality({ luma: { mean: 0.5, variance: Q.blurVarMin - 0.0001 }, yaw: 0, mouthFlatSamples: 0 }));
+  assert.ok(blur.reasons.includes("blur"));
+  const profile = q(FE.assessQuality({ luma: { mean: 0.5, variance: 0.03 }, yaw: Q.yawMax + 0.01, mouthFlatSamples: 0 }));
+  assert.ok(profile.reasons.includes("profile"));
+  const flat = q(FE.assessQuality({ luma: { mean: 0.5, variance: 0.03 }, yaw: 0, mouthFlatSamples: Q.mouthFlatSamples }));
+  assert.ok(flat.reasons.includes("mouth-flat"));
+  const below = q(FE.assessQuality({ luma: { mean: 0.5, variance: 0.03 }, yaw: 0, mouthFlatSamples: Q.mouthFlatSamples - 1 }));
+  assert.deepEqual(below, { ok: true, reasons: [] }, "平坦样本数差一档必须放行（边界腿）");
+});
+
+test("质量门可证伪：brightMax 抬到 0 后干净画面也必须被拦（阈值真在参与计算）", () => {
+  const c2 = makeCtx();
+  c2.window.__XINYU_FACE_RULES__.quality.brightMax = 0.0;
+  runInContext(SRC("src/js/face-engine.js"), c2);
+  const r = q(c2.window.FaceEngine.assessQuality(
+    { luma: { mean: 0.5, variance: 0.03 }, yaw: 0, mouthFlatSamples: 0 }));
+  assert.ok(r.reasons.includes("lighting"), "brightMax=0 还判光线正常 ⇒ 阈值没参与计算");
+});
+
+test("质量门缺证据不乱报：luma 取不到（null）时不得报 lighting/blur", () => {
+  const r = q(FE.assessQuality({ luma: null, yaw: 0, mouthFlatSamples: 0 }));
+  assert.deepEqual(r, { ok: true, reasons: [] });
+});
+
+test("质量门落点：命中强制 confident=false；嘴部平坦 ⇒ 微笑三态停用并标 occluded", () => {
+  const base = read(vec({ mouthSmileLeft: 0.8, mouthSmileRight: 0.8, cheekSquintLeft: 0.6, cheekSquintRight: 0.6 }));
+  assert.equal(base.confident, true, "干净真笑本应自信（对照组）");
+  const dark = FE.assessQuality({ luma: { mean: 0.05, variance: 0.03 }, yaw: 0, mouthFlatSamples: 0 });
+  const v1 = q(FE.applyQuality(base, dark));
+  assert.equal(v1.confident, false, "质量门命中必须强制降置信");
+  assert.ok(v1.quality && !v1.quality.ok, "quality 字段必须随读数带出（界面据此改文案）");
+  const smiley = read(vec({ mouthSmileLeft: 0.8, mouthSmileRight: 0.8 }));
+  const flat = FE.assessQuality({ luma: { mean: 0.5, variance: 0.03 }, yaw: 0, mouthFlatSamples: 999 });
+  const v2 = q(FE.applyQuality(smiley, flat));
+  assert.equal(v2.smile.kind, "none", "嘴部平坦 ⇒ 微笑判读停用");
+  assert.equal(v2.smile.occluded, true, "停用必须标 occluded（界面说明被遮挡），不是冒充「未检出微笑」");
+});
+
+/* ── r112 微笑三态的阈值邻域：真笑 vs 强颜欢笑的判别力边界 ────────────────────── */
+// 上面「真笑 / 强颜欢笑」两条用的是极端向量（眼周 0.6 vs 0.05），只证明**两端可分**：
+// 阈值若从 0.20 漂到 0.10 或 0.50，那两条照样全绿。下面四条把向量压到
+// ratioOn = 0.20 / tensionOn = 0.30 的邻域上，钉住阈值本身与 masking 的分支条件。
+const smile = (bs) => JSON.parse(JSON.stringify(FE.smileKind(bs)));
+const T = RULES.smile;
+
+test("真笑/强颜欢笑在 ratioOn 邻域内可分（同嘴幅，只差眼周）", () => {
+  const hi = smile(vec({ mouthSmileLeft: 0.5, mouthSmileRight: 0.5, cheekSquintLeft: 0.175, cheekSquintRight: 0.175 }));
+  const lo = smile(vec({ mouthSmileLeft: 0.5, mouthSmileRight: 0.5, cheekSquintLeft: 0.15, cheekSquintRight: 0.15 }));
+  assert.ok(hi.ratio > T.ratioOn && lo.ratio < T.ratioOn,
+    "两条必须落在门槛两侧，否则这条腿没压到边界：hi=" + hi.ratio + " lo=" + lo.ratio + " 门槛=" + T.ratioOn);
+  assert.equal(hi.kind, "duchenne", "眼周比值刚过门槛 ⇒ 真笑");
+  assert.equal(lo.kind, "social", "眼周比值刚掉到门槛下 ⇒ 社交性微笑");
+});
+
+test("强颜欢笑嫌疑随 tension 翻转，不是对所有社交笑一律报警", () => {
+  const base = { mouthSmileLeft: 0.6, mouthSmileRight: 0.6, cheekSquintLeft: 0.05, cheekSquintRight: 0.05 };
+  const tense = smile(Object.assign(vec(base), { mouthPressLeft: 0.5, mouthPressRight: 0.5 }));
+  const relax = smile(Object.assign(vec(base), { mouthPressLeft: 0.1, mouthPressRight: 0.1 }));
+  assert.equal(tense.kind, "social");
+  assert.equal(relax.kind, "social", "两者都是社交笑，唯一变量是紧张线索");
+  assert.ok(tense.tension >= T.tensionOn && relax.tension < T.tensionOn,
+    "两条必须跨过 tensionOn，否则测不到 masking 分支：" + tense.tension + " / " + relax.tension);
+  assert.equal(tense.masking, true, "伴紧张线索 ⇒ 标强颜欢笑嫌疑");
+  assert.equal(relax.masking, false, "无紧张线索却仍报强颜欢笑 ⇒ 该标签恒真、失去判别力");
+});
+
+test("眼周充分参与时，抿唇也不得扣「强颜欢笑」帽子", () => {
+  const v = smile(vec({ mouthSmileLeft: 0.8, mouthSmileRight: 0.8, cheekSquintLeft: 0.6, cheekSquintRight: 0.6,
+    mouthPressLeft: 0.8, mouthPressRight: 0.8 }));
+  assert.ok(v.tension >= T.tensionOn, "这条向量必须真的带紧张线索，否则测不到 masking 分支");
+  assert.equal(v.kind, "duchenne", "眼周参与 ⇒ 仍是真笑");
+  assert.equal(v.masking, false, "masking 只在 social 分支为真，真笑不得被标强颜欢笑");
+});
+
+test("嘴部不达 smileOn ⇒ 判 none，高眼周也不得单独撑出微笑", () => {
+  const v = smile(vec({ mouthSmileLeft: T.smileOn - 0.01, mouthSmileRight: T.smileOn - 0.01,
+    cheekSquintLeft: 0.9, cheekSquintRight: 0.9 }));
+  assert.equal(v.kind, "none", "嘴没笑到阈值却判微笑 ⇒ 光靠眼周也会误报");
+  assert.equal(v.ratio, 0, "未成笑时 ratio 必须归零（界面不得拿它渲染真笑文案）");
+  const r = read(vec({ mouthSmileLeft: 0.34, mouthSmileRight: 0.34, cheekSquintLeft: 0.9, cheekSquintRight: 0.9 }));
+  assert.equal(r.smile.kind, "none", "整链路 read() 同样不得报微笑");
+});

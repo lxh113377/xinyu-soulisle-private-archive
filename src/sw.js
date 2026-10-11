@@ -24,6 +24,8 @@ const PRECACHE = [
   "/data/emotion-lexicon.js", "/data/emotion-strategy.js",
   // r113 心理学知识库数据件（psych_kb_build.py 生成，源在 交付物/心理学知识库）
   "/data/psych-kb.js",
+  // r117 表达语料库数据件（wit_quotes_build.py 生成，源在 交付物/表达语料库）
+  "/data/wit-quotes.js",
   // r87 面部表情识别：引擎 + 判据 + ESM 桥（页面引用了就必须进壳）。
   // ⚠️ 本数组范围内的注释**禁止出现双引号、也禁止写字面数组结束符**：判据是用源码正则
   //    复算本清单的，注释里的引号会被当成清单项、字面结束符会把清单截断（本轮连踩两次，

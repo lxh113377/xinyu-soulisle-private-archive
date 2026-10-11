@@ -40,6 +40,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from settle_wait import before_send        # r102：先标记后发送的时序（同 browser_check 共源）
+from browser_engine import launch as be_launch   # r113：手写回退收编为唯一入口
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = os.environ.get("XINYU_BASE", "http://127.0.0.1:8123")
@@ -271,10 +272,8 @@ def run() -> int:
         print("STORAGE-RESILIENCE-UNVERIFIED: playwright 不可用（%s）" % type(exc).__name__)
         return 2
     with sync_playwright() as p:
-        try:
-            browser = p.chromium.launch(args=LAUNCH_ARGS)
-        except Exception:
-            browser = p.chromium.launch(channel="msedge", args=LAUNCH_ARGS)
+        browser, _engine_face = be_launch(p, args=LAUNCH_ARGS, label="storage_resilience_check.py")
+        print("[engine] %s" % _engine_face)  # r113：引擎身份必须可见，否则「本地全绿」无法归因（CI 是另一台浏览器）
         bad = []
         rows = []
         for case, fault, click in CASES:
@@ -338,10 +337,8 @@ def selftest() -> int:
         p_html = Path(td) / "broken.html"
         p_html.write_text(BROKEN_PAGE, encoding="utf-8", newline="\n")
         with sync_playwright() as pw:
-            try:
-                browser = pw.chromium.launch(args=LAUNCH_ARGS)
-            except Exception:
-                browser = pw.chromium.launch(channel="msedge", args=LAUNCH_ARGS)
+            browser, _engine_face = be_launch(pw, args=LAUNCH_ARGS, label="storage_resilience_check.py")
+            print("[engine] %s" % _engine_face)  # r113：引擎身份必须可见，否则「本地全绿」无法归因（CI 是另一台浏览器）
             ctx = browser.new_context()
             page = ctx.new_page()
             errs = []

@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
+from browser_engine import launch as be_launch   # r113：手写回退收编为唯一入口
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "_test" / "_shots" / "r86"
@@ -52,10 +53,8 @@ def last_label(pg):
 NEED = set(sys.argv[1:]) or {"s01", "s06", "s03", "s04", "s05", "s07", "s02", "s09", "s10"}
 
 with sync_playwright() as p:
-    try:
-        b = p.chromium.launch()
-    except Exception:
-        b = p.chromium.launch(channel="msedge")
+    b, _engine_face = be_launch(p, label="_reshoot_r86.py")
+    print("[engine] %s" % _engine_face)  # r113：引擎身份必须可见，否则「本地全绿」无法归因（CI 是另一台浏览器）
 
     # --- s01 初始态（含对话坞与开场白；等「一键点亮」开场动画播完再拍） ---
     if "s01" in NEED or "s06" in NEED:

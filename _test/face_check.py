@@ -26,6 +26,8 @@ import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from check_instrument import install_excepthook   # r113：进程级兜底——任何未捕获异常都必须印出结论行，绝不裸抛栈
+install_excepthook("FACE-CHECK")
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "_test"))
@@ -578,8 +580,9 @@ def browser_legs():
                 ctx7.close()
 
                 # ── F10：侧边控制面板的开关（实现见 leg_f10，可被 --leg F10 单独调起）──
+                # r113：删掉残留的 ctx10.close() —— leg_f10 自建自关 context，此处 ctx10 从未定义，
+                # 执行到必 NameError 崩掉整条浏览器腿（本轮静态确证后作为跑通验证链的前提移除）。
                 leg_f10(browser, base, notes, bad)
-                ctx10.close()
 
                 # ── F8：设备层/权限层的两种真实病，界面必须分开报（r87d）──
                 # 病①：一个摄像头设备都没有（enumerateDevices 空）⇒ 入口消失 + 说"检查驱动"

@@ -5,6 +5,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
 from browser_engine import launch as be_launch, short_face
 from settle_wait import wait_reply, before_send
+from check_instrument import wait_done, instrument_red   # r112：裸 assert / 裸 wait 一律收口
 
 errors = []
 
@@ -31,7 +32,8 @@ with sync_playwright() as p:
     page.reload(wait_until="networkidle")
     # r80：一键点亮默认打开 ⇒ 每次加载都有一段开场演示。星图取样前必须等它落回「我的记忆」，
     # 否则读到的是演示星（等待取被等对象的完成态，不猜时长）。
-    page.wait_for_function("() => window.__XINYU__ && window.__XINYU__.opening === 'done'", timeout=15000)
+    wait_done(page, "() => window.__XINYU__ && window.__XINYU__.opening === 'done'", 15000,
+              "BROWSER", "开场自动播放未回到 done 态（星图取样会读到演示星）")
     page.wait_for_timeout(800)
 
     # 1) 基础断言
@@ -61,7 +63,8 @@ with sync_playwright() as p:
 
     # 4) 持久化：刷新后按本机记忆把星图重建出来（点亮数应保持一致）
     page.reload(wait_until="networkidle")
-    page.wait_for_function("() => window.__XINYU__ && window.__XINYU__.opening === 'done'", timeout=15000)
+    wait_done(page, "() => window.__XINYU__ && window.__XINYU__.opening === 'done'", 15000,
+              "BROWSER", "开场自动播放未回到 done 态（星图取样会读到演示星）")
     page.wait_for_timeout(1500)
     lit_reload = lit(page)
 
@@ -154,24 +157,30 @@ print("DUAL_COLOR_GAP: raw=", round(color_gap["raw"], 3), "→ applied=", round(
 print("CONSOLE_ERRORS:", len(errors), errors[:5])
 
 real_errors = [e for e in errors if "18123" not in e and "ERR_CONNECTION_REFUSED" not in e]
-assert dock_visible, "底部对话坞不可见（第二幕+第三幕融合失败）"
-assert lit0 == 0, f"初始星图应全部未点亮，实际已点亮 {lit0}"
-assert len(last_ai) > 5, "对话无回复"
-assert lit1 > 0, "对话后星雾没有被点亮"
-assert "低落" in readout, f"情绪读数未显示识别结果: {readout}"
-assert "1 条" in chart_count or "2 条" in chart_count, f"情绪曲线未记录: {chart_count}"
-assert "双色星雾" in mist, f"混合情绪未触发双色星雾: {mist}"
-assert lit2 > lit1, f"第二次对话未继续点亮: {lit1} → {lit2}"
-assert lit_reload == lit2, f"刷新后星图未重建/数量不符: {lit2} → {lit_reload}"
-assert "危机" in crisis_readout, "危机词未拦截"
-assert dock_collapsed, "对话坞无法收起（会遮住幕内按钮）"
-assert lit_after_clear == 0, f"清除数据后星星未熄灭: {lit_after_clear}"
-assert "还没有记录" in chart_after_clear, ("清除后曲线未清空（轮询 %d 次仍未见空态）: %r"
-                                       % (chart_after_clear_tries, chart_after_clear[:120]))
-assert back3 > 0.9, f"滚到底再回滚后 act3 文案未恢复（opacity={back3}）"
-assert o_enter < 0.6, f"面板刚进屏不够淡（{o_enter}）——随滚动淡入未生效"
-assert o_center > 0.9, f"面板居中不够实（{o_center}）——影响可读性"
-assert o_leaving < 0.5 and o_leaving < o_center, f"面板还大面积可见时没明显变淡（{o_leaving}）——随滚动淡出未生效"
-assert color_gap["applied"] >= 0.4 and color_gap["applied"] > color_gap["raw"], f"同色系次色未被拉开: {color_gap}"
-assert len(real_errors) == 0, f"console 报错: {real_errors}"
+# r112：这一串断言此前是**裸**的 —— 任一条失败就抛 AssertionError，脚本在印结论行之前死掉，
+# 电池只看到 rc=1 却拿不到原因（BLIND-RED：判红冒充环境）。现在收口成「点名红 + rc=1」，
+# 且每条断言的失败消息必须自带读数（否则不可归因）。
+try:
+    assert dock_visible, "底部对话坞不可见（第二幕+第三幕融合失败）"
+    assert lit0 == 0, f"初始星图应全部未点亮，实际已点亮 {lit0}"
+    assert len(last_ai) > 5, "对话无回复"
+    assert lit1 > 0, "对话后星雾没有被点亮"
+    assert "低落" in readout, f"情绪读数未显示识别结果: {readout}"
+    assert "1 条" in chart_count or "2 条" in chart_count, f"情绪曲线未记录: {chart_count}"
+    assert "双色星雾" in mist, f"混合情绪未触发双色星雾: {mist}"
+    assert lit2 > lit1, f"第二次对话未继续点亮: {lit1} → {lit2}"
+    assert lit_reload == lit2, f"刷新后星图未重建/数量不符: {lit2} → {lit_reload}"
+    assert "危机" in crisis_readout, "危机词未拦截"
+    assert dock_collapsed, "对话坞无法收起（会遮住幕内按钮）"
+    assert lit_after_clear == 0, f"清除数据后星星未熄灭: {lit_after_clear}"
+    assert "还没有记录" in chart_after_clear, ("清除后曲线未清空（轮询 %d 次仍未见空态）: %r"
+                                           % (chart_after_clear_tries, chart_after_clear[:120]))
+    assert back3 > 0.9, f"滚到底再回滚后 act3 文案未恢复（opacity={back3}）"
+    assert o_enter < 0.6, f"面板刚进屏不够淡（{o_enter}）——随滚动淡入未生效"
+    assert o_center > 0.9, f"面板居中不够实（{o_center}）——影响可读性"
+    assert o_leaving < 0.5 and o_leaving < o_center, f"面板还大面积可见时没明显变淡（{o_leaving}）——随滚动淡出未生效"
+    assert color_gap["applied"] >= 0.4 and color_gap["applied"] > color_gap["raw"], f"同色系次色未被拉开: {color_gap}"
+    assert len(real_errors) == 0, f"console 报错: {real_errors}"
+except AssertionError as e:
+    instrument_red("ALL-ASSERT", "断言未通过：%s" % (e or "(断言未带消息 ⇒ 不可归因，须补读数)"))
 print("ALL-ASSERT-PASS 引擎=%s" % short_face(face))

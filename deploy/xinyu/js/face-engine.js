@@ -99,6 +99,64 @@
       masking: kind === "social" && tension >= T.tensionOn };
   }
 
+  /* ── 质量门（r113）：画面靠不住时读数降档。四信号全在本机帧上算，零新增依赖。 */
+  const qCanvas = (typeof document !== "undefined") ? document.createElement("canvas") : null;
+  if (qCanvas) { qCanvas.width = 24; qCanvas.height = 24; }
+  const qCtx = qCanvas ? qCanvas.getContext("2d", { willReadFrequently: true }) : null;
+
+  /** 亮度/模糊：video 缩样到 24×24 的平均灰度与方差（方差是糊图信号）。取不到帧返回 null，不猜。 */
+  function lumaStats() {
+    if (!qCtx || !videoEl || videoEl.readyState < 2) return null;
+    try {
+      qCtx.drawImage(videoEl, 0, 0, 24, 24);
+      const d = qCtx.getImageData(0, 0, 24, 24).data;
+      let sum = 0;
+      const px = d.length / 4;
+      for (let i = 0; i < d.length; i += 4) sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      const mean = sum / px / 255;
+      let vsum = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const g = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
+        vsum += (g - mean) * (g - mean);
+      }
+      return { mean: mean, variance: vsum / px };
+    } catch (e) { return null; }   // 取像素失败等：没有证据就不下结论
+  }
+
+  /** 侧脸：鼻尖(1) 偏离左右面部边界(234/454)中点的比例，正脸≈0，越大越侧。 */
+  function yawRatio(landmarks) {
+    if (!landmarks || landmarks.length < 455) return 0;
+    const nose = landmarks[1], l = landmarks[234], r = landmarks[454];
+    const w = Math.abs(r.x - l.x);
+    return w > 0.01 ? (nose.x - (l.x + r.x) / 2) / w : 0;
+  }
+
+  /** 纯函数：四信号 → {ok, reasons[]}。阈值全在 rules.quality；unit 测的就是这条。
+   *  luma 取不到（null）= 没证据 ⇒ 不判 lighting/blur，宁缺勿滥。 */
+  function assessQuality(sig) {
+    sig = sig || {};
+    const Q = R.quality;
+    if (!Q) return { ok: true, reasons: [] };
+    const reasons = [];
+    if (sig.luma && (sig.luma.mean < Q.brightMin || sig.luma.mean > Q.brightMax)) reasons.push("lighting");
+    if (sig.luma && sig.luma.variance < Q.blurVarMin) reasons.push("blur");
+    if (Math.abs(sig.yaw || 0) > Q.yawMax) reasons.push("profile");
+    if ((sig.mouthFlatSamples || 0) >= Q.mouthFlatSamples) reasons.push("mouth-flat");
+    return { ok: reasons.length === 0, reasons: reasons };
+  }
+
+  /** 质量门落点：命中 = 强制降置信（界面如实标「仅供参考」）；嘴部平坦再停用微笑三态。 */
+  function applyQuality(view, q) {
+    view.quality = q;
+    if (!q.ok) {
+      view.confident = false;
+      if (q.reasons.indexOf("mouth-flat") >= 0 && view.smile) {
+        view.smile = { kind: "none", occluded: true, mouth: 0, eye: 0, ratio: 0, tension: 0, masking: false };
+      }
+    }
+    return view;
+  }
+
   /** 表情侧独有三类查本判据的 colors；文本六类回落 EmotionEngine（避免两份色值漂移）。 */
   function colorOfFace(emo) {
     if (R.colors && R.colors[emo]) return R.colors[emo].slice();
@@ -138,6 +196,7 @@
   /* ── 运行时层：摄像头 + 推理循环 ─────────────────────────────────────────── */
 
   let stream = null, timer = null, landmarker = null, videoEl = null, running = false;
+  let mouthFlatRun = 0;   // 嘴部 blendshape 连续平坦样本数（质量门信号之一）
   let lastTs = 0, samples = 0;
   /* 会话令牌：getUserMedia / 模型创建都是**异步**的（公网首帧实测要等十几秒），
      期间用户点了「关闭」⇒ 不能因为 await 返回晚就把摄像头又开回来。
@@ -231,6 +290,19 @@
     const bs = {};
     for (const c of cats) bs[c.categoryName] = c.score;
     state.view = read(smooth(bs));
+    /* 质量门（r113）：亮度/模糊/侧脸/嘴部平坦 —— 命中只降置信+改文案，不参与任何裁决 */
+    const Q = R.quality;
+    let flat = true;
+    for (const k of ["mouthSmileLeft", "mouthSmileRight", "mouthPucker", "mouthFunnel", "jawOpen",
+      "mouthPressLeft", "mouthPressRight", "mouthFrownLeft", "mouthFrownRight"]) {
+      if ((bs[k] || 0) >= Q.mouthFlat) { flat = false; break; }
+    }
+    mouthFlatRun = flat ? mouthFlatRun + 1 : 0;
+    applyQuality(state.view, assessQuality({
+      luma: lumaStats(),
+      yaw: yawRatio(res.faceLandmarks && res.faceLandmarks[0]),
+      mouthFlatSamples: mouthFlatRun
+    }));
     state.at = Date.now();
     samples++;
     return true;
@@ -287,7 +359,7 @@
     try { landmarker = await window.__XINYU_FACE_VISION__.createLandmarker(); }
     catch (e) { stop(); state.err = "landmarker-failed"; o.onError && o.onError("landmarker-failed"); return false; }
     if (my !== session) { stop(); return false; }        // 同理：模型建完才发现已被叫停
-    running = true; state.ema = null; samples = 0; state.err = null; state.phase = "running";
+    running = true; state.ema = null; samples = 0; mouthFlatRun = 0; state.err = null; state.phase = "running";
     const period = Math.round(1000 / ((o && o.fps) || R.sample.fps));
     const tick = () => {
       if (!running) return;
@@ -386,6 +458,7 @@
 
   window.FaceEngine = {
     read: read, scores: scores, smileKind: smileKind, cueRegions: cueRegions,
+    assessQuality: assessQuality, applyQuality: applyQuality,
     labelOf: labelOfFace,
     capability: capability, whenReady: whenReady, diagnose: diagnose,
     enabled: enabled, setEnabled: setEnabled,

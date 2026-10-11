@@ -68,7 +68,8 @@ const summary = {
 
 process.stdout.write(
   JSON.stringify(
-    { lex, neg: E.NEG, deg: E.DEG, crisis: E.CRISIS, results, ...summary },
+    // r113：contrast 一并导出（与 neg/deg/crisis 同级），否则一致性守卫比不到它
+    { lex, neg: E.NEG, deg: E.DEG, contrast: E.CONTRAST, crisis: E.CRISIS, results, ...summary },
     null,
     2
   )

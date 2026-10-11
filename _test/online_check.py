@@ -3,6 +3,9 @@
 import io, sys
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from playwright.sync_api import sync_playwright
+from check_instrument import install_excepthook   # r113：进程级兜底——任何未捕获异常都必须印出结论行，绝不裸抛栈
+from browser_engine import launch as be_launch   # r113：手写回退收编为唯一入口
+install_excepthook("ONLINE-CHECK")
 
 errors = []
 
@@ -44,10 +47,8 @@ def wait_done(pg, n_before, timeout_ms=60000, require_stream_tag=True):
 
 
 with sync_playwright() as p:
-    try:
-        b = p.chromium.launch()
-    except Exception:
-        b = p.chromium.launch(channel="msedge")
+    b, _engine_face = be_launch(p, label="online_check.py")
+    print("[engine] %s" % _engine_face)  # r113：引擎身份必须可见，否则「本地全绿」无法归因（CI 是另一台浏览器）
     ctx = b.new_context(viewport={"width": 1280, "height": 800})  # 全新 profile = 无配置，触发体验模式
     pg = ctx.new_page()
     pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
