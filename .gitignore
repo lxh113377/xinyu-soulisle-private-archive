@@ -105,3 +105,7 @@ _temp/
 # （recycle.py:182 os.path.relpath 抛 ValueError: path is on mount '\\.\\nul'），
 # 而磁盘直删是本仓致命纪律 #21 禁项。登记后噪声门降级 quarantine，savepoint 可继续。
 nul
+
+# R269 例外通道（2026-10-12 face-diag 轮登记）：`_tmp_*` 是并行活跃会话的分钟级运行态临时产物
+# （28 份实测 mtime 全在写入窗口内，禁迁 _trash 会打断他方；走 gitignore 降级 quarantine）。
+/_tmp_*

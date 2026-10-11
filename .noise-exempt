@@ -21,3 +21,7 @@
 # KNOWN_CORE 住在共享技能根（改它要走镜像/派生件/注册表闭环，且会影响其它 10+ 个项目），
 # 而"这个目录属于本项目"这件事只有本项目能确认 ⇒ 走本文件这条项目级声明通道，不动共享 allowlist。
 ml | reason=git 已跟踪的模型腿源码目录（提交 e344d08 引入，含微调脚本与推理服务），非临时散落物
+
+# `.dwf/`：同族 —— 目录内 2 个 json 均为 git 已跟踪内容（`git ls-files .dwf` 实测 config.json/owns.json），
+# 工作区工具（.dwf 运行态配置）持续写它。按 noise_lint「含已入库文件的根部目录 ⇒ 禁迁 _trash ⇒ 登记」处置。
+.dwf | reason=git 已跟踪的工作区工具运行态配置目录（config.json/owns.json 在册），禁迁禁删
