@@ -182,6 +182,46 @@ window.ChatAgent = (function () {
     return n ? head + block : "";
   }
 
+  /* 表达语料库注入（r117，老大定的「每轮都给候选」）：
+   * 数据源 = src/data/wit-quotes.js（_test/wit_quotes_build.py 生成；E 级构建期已排除）。
+   * 与 kbBlockFor 的差异：KB 是「按需给」（求解释才给），quote 是「每轮都给」——候选池按
+   * 当前情绪匹配（含"通用"），话题二元组命中加权排序，取 ≤5 条短句。
+   * 引用规则唯一源 = emotion-strategy.js 的 quoteRules（本函数只做拼接，不复制文案）；
+   * 规则缺失（quoteRules 空）⇒ 不注入（由 _test/strategy_check.py 钉住必须存在，禁静默降级双源）。 */
+  function quoteBlockFor(emo, userText, budget) {
+    const Q = window.__XINYU_WIT_QUOTES__;
+    if (!Q || !Q.entries || !Q.entries.length || budget < 120) return "";
+    const rules = (STR.quoteRules || []).join("；");
+    if (!rules) return "";
+    const hay = String(userText || "");
+    const grams = new Set();
+    for (let i = 0; i < hay.length - 1; i++) {
+      const g = hay.slice(i, i + 2);
+      if (/[\u4e00-\u9fa5A-Za-z]/.test(g[0]) && /[\u4e00-\u9fa5A-Za-z]/.test(g[1])) grams.add(g);
+    }
+    const scored = [];
+    for (const e of Q.entries) {
+      const emoHit = e.emo.indexOf("all") >= 0 || e.emo.indexOf(emo) >= 0;
+      let hits = 0;
+      grams.forEach((g) => { if (e.quote.indexOf(g) >= 0) hits++; });
+      if (!emoHit && hits < 2) continue;   // 情感不匹配且话题不沾边：不进候选
+      scored.push({ e: e, s: (emoHit ? 2 : 0) + hits });
+    }
+    scored.sort((a, b) => b.s - a.s || (a.e.id < b.e.id ? -1 : 1));
+    // head 与 emotion-strategy.quoteRules 的分工：head 给"这是什么、可以怎么用"的引导，
+    // rules 给边界。r117 首轮全量盲评实测：纯禁令措辞会让模型过度避险（30 轮零引用）——
+    // 因此 head 明确"可化用半句/取其意"（低门槛形态）与"不必强用"（边界）。
+    const head = "可化用的表达素材（恰好契合时可化用半句或取其意，给回复添一点余味；不必强用。规则：" + rules + "）：";
+    let block = "", used = head.length, n = 0;
+    for (const p of scored) {
+      if (n >= 5) break;
+      const item = "\n[" + p.e.id + "·" + p.e.level + "]" + p.e.quote;
+      if (used + item.length > budget) break;
+      block += item; used += item.length; n++;
+    }
+    return n ? head + block : "";
+  }
+
   const SYSTEM = (emo, userText) => {
     const s = strategyOf(emo);
     // 长期记忆注入（r52）：MemoryStore 原本**只写不读**，"跨设备记住你"只成立在展示层。
@@ -190,7 +230,11 @@ window.ChatAgent = (function () {
     const base = STR.persona + "用户刚说的话被识别为主要情绪「" + window.EmotionEngine.labelOf(emo) + "」。" +
       "当前共情要点：" + s.lead + "。要求：" + STR.rules.map((r, i) => (i + 1) + ")" + r).join("；") + "。" +
       (mem ? mem : "") + summaryOfDropped();
-    return base + kbBlockFor(emo, userText, 1600 - base.length - 40);
+    /* r117 预算切分：quote 保底优先（「每轮给候选」要成立），kb 用剩余（<220 自动让位）。 */
+    const remain = 1600 - base.length - 40;
+    const quoteBudget = Math.min(280, Math.max(180, Math.floor(remain * 0.45)));
+    const qb = remain >= 180 ? quoteBlockFor(emo, userText, quoteBudget) : "";
+    return base + qb + kbBlockFor(emo, userText, remain - (qb ? qb.length : 0));
   };
 
   /**

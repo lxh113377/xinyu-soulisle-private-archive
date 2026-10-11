@@ -208,7 +208,10 @@ window.ChatAgent = (function () {
       scored.push({ e: e, s: (emoHit ? 2 : 0) + hits });
     }
     scored.sort((a, b) => b.s - a.s || (a.e.id < b.e.id ? -1 : 1));
-    const head = "可用表达素材（" + rules + "）：";
+    // head 与 emotion-strategy.quoteRules 的分工：head 给"这是什么、可以怎么用"的引导，
+    // rules 给边界。r117 首轮全量盲评实测：纯禁令措辞会让模型过度避险（30 轮零引用）——
+    // 因此 head 明确"可化用半句/取其意"（低门槛形态）与"不必强用"（边界）。
+    const head = "可化用的表达素材（恰好契合时可化用半句或取其意，给回复添一点余味；不必强用。规则：" + rules + "）：";
     let block = "", used = head.length, n = 0;
     for (const p of scored) {
       if (n >= 5) break;

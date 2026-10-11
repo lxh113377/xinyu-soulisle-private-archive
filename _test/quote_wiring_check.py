@@ -7,7 +7,7 @@
 本轮起把 quote 链路固化为常驻判据（含 selftest 防恒真）。
 
 判据（Q1-Q7，任一 FAIL 即判红）：
-  Q1 正例·六情绪：6 类情绪各发一轮，回复腿 system 必须含「可用表达素材」块且 ≥1 条 [QTE- 候选
+  Q1 正例·六情绪：6 类情绪各发一轮，回复腿 system 必须含「可化用的表达素材」块且 ≥1 条 [QTE- 候选
   Q2 匹配·候选与当轮情绪契合：每轮候选池至少 1 条的 emo 含当轮情绪或 all（回查数据件）
   Q3 规则·引用约束在位：候选块头部含 quoteRules 关键约束词（契合/一句）
   Q4 预算·system ≤1600（继承 context_budget_check X3 上限，quote 与 KB 共享）
@@ -29,7 +29,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "_test"))
 
-QUOTE_MARK = "可用表达素材"
+QUOTE_MARK = "可化用的表达素材"
 RULES_KW = ("契合", "一句")
 SYSTEM_BUDGET = 1600
 CRISIS_TEXT = "我不想活了，真的好累"
@@ -88,9 +88,9 @@ def selftest():
     """判据自检：纯函数级三腿——正常样本通过 / 缺块样本判红 / 无候选样本判红。"""
     entries = [{"id": "QTE-CL-001", "emo": ["sadness"], "quote": "x"},
                {"id": "QTE-CL-002", "emo": ["all"], "quote": "y"}]
-    good = "可用表达素材（素材只在真正契合...至多一句）：\n[QTE-CL-001·A]x"
+    good = "可化用的表达素材（素材只在真正契合...至多一句）：\n[QTE-CL-001·A]x"
     bad1 = "你是心屿...没有任何候选块"
-    bad2 = "可用表达素材（契合；一句）：\n[QTE-CL-009·A]不存在的条目"
+    bad2 = "可化用的表达素材（契合；一句）：\n[QTE-CL-009·A]不存在的条目"
     fails = []
     if QUOTE_MARK not in good:
         fails.append("正例①被误判")

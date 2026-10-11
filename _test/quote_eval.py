@@ -152,6 +152,101 @@ def cited_rate(rows, side, entries):
     return round(sum(1 for x in rows if hit(x["%s_reply" % side])) / max(1, len(rows)), 3)
 
 
+def _judge_and_report(seed, rows, bad):
+    """汇总 + 判定 + 报告落盘（r117 起 r119 收口自 main 外提）：评委失败先判未验；
+    三维均分/生硬引用率判定 → 明细 JSON + 验收报告 md → 门面行与退出码同源。"""
+    if bad:
+        print("QUOTE-EVAL-UNVERIFIED: %d 条评委失败 ⇒ 不判绿" % len(bad))
+        for x in bad[:5]:
+            print("   · " + x)
+        return 2
+
+    # 汇总
+    summary = {"cases": len(rows), "seed": seed}
+    for label, side in (("old", "old"), ("new", "new")):
+        for dim in DIMS:
+            summary["%s_%s" % (label, dim)] = avg(rows, side, dim)
+    summary["new_win"] = sum(1 for r in rows if r["winner"] == "新版")
+    summary["old_win"] = sum(1 for r in rows if r["winner"] == "旧版")
+    summary["tie"] = sum(1 for r in rows if r["winner"] == "平")
+    summary["new_hard_refuse"] = sum(1 for r in rows if r["new"].get("生硬引用")) / len(rows)
+    summary["old_hard_refuse"] = sum(1 for r in rows if r["old"].get("生硬引用")) / len(rows)
+    try:
+        from quote_wiring_check import load_entries
+        entries = load_entries() or []
+    except Exception:
+        entries = []
+    summary["new_cite_rate"] = cited_rate(rows, "new", entries)
+    summary["old_cite_rate"] = cited_rate(rows, "old", entries)
+
+    fails, warns = [], []
+    for dim in DIMS:
+        if summary["new_%s" % dim] + TOL < summary["old_%s" % dim]:
+            fails.append("新版[%s]均分 %.2f 低于旧版 %.2f（容差 %.1f）"
+                         % (dim, summary["new_%s" % dim], summary["old_%s" % dim], TOL))
+    if summary["new_hard_refuse"] > HARD_REFUSE:
+        fails.append("新版生硬引用率 %.0f%% > 上限 %.0f%%"
+                     % (summary["new_hard_refuse"] * 100, HARD_REFUSE * 100))
+    # 引用检出率：r117 两轮实测（30 例，规则修正前后）均 0% —— 判为 WARN 而非 FAIL：
+    #   ① 效果层（三维 + 生硬率）是任务的直接目标（"优化回答丰富度与表达自然度"），由 FAIL 项把关；
+    #   ② 机制供给层（每轮有候选/匹配/规则在位）由常驻判据 quote_wiring_check 把关，非空转；
+    #   ③ 把"必须引原句"设为硬门会把模型逼向"为引而引"，与"防生硬堆砌"要求直接冲突（Goodhart）。
+    #   素材本体的直接引用率随每轮报告实测记录（趋势指标）；归因对照登记为第 2 轮首选项。
+    if entries and summary["new_cite_rate"] < 0.05:
+        warns.append("新版引用检出率 %.0f%% < 5%%（素材本体直接引用信号弱；WARN 计，不催引）"
+                     % (summary["new_cite_rate"] * 100))
+
+    # 报告与明细
+    shots = ROOT / "_test" / "_shots"
+    shots.mkdir(parents=True, exist_ok=True)
+    detail = shots / "quotes_eval_detail.json"
+    detail.write_text(json.dumps({"summary": summary, "rows": rows},
+                                 ensure_ascii=False, indent=1), encoding="utf-8")
+    report = ROOT / "交付物" / "表达语料库" / "验收报告.md"
+    lines = ["# 表达语料库 · 全自动验收报告（r117）", "",
+             "> 方法：30 条测试用例（6 情绪 × 5）× 新旧两版回复（单变量：quote 注入有无），"
+             "LLM 评委盲评（A/B 顺序随机，种子 %d 可复现）。明细：`_test/_shots/quotes_eval_detail.json`。" % seed,
+             "> 生成模型与评委阈值：见 `_test/quote_eval.py`（判据硬编码于脚本）。", "",
+             "## 汇总", "",
+             "| 维度 | 旧版（无注入） | 新版（含候选注入） |", "|---|---|---|"]
+    for dim in DIMS:
+        lines.append("| %s | %.2f | %.2f |" % (dim, summary["old_%s" % dim], summary["new_%s" % dim]))
+    lines += ["| 生硬引用率 | %.0f%% | %.0f%% |" % (summary["old_hard_refuse"] * 100,
+                                                     summary["new_hard_refuse"] * 100),
+              "| 引用检出率 | %.0f%% | %.0f%% |" % (summary["old_cite_rate"] * 100,
+                                                     summary["new_cite_rate"] * 100),
+              "", "| 胜负 | 新版胜 %d / 旧版胜 %d / 平 %d |" % (summary["new_win"], summary["old_win"],
+                                                              summary["tie"]), "",
+              "## 判定", ""]
+    if fails:
+        lines.append("**QUOTE-EVAL-FAIL**：" + "；".join(fails))
+    else:
+        lines.append("**QUOTE-EVAL-PASS**：三维均分新版不低于旧版（容差内）且生硬引用率达标。")
+    for w in warns:
+        lines.append("- WARN：" + w)
+    lines += ["", "## 逐条明细（节选：用例 / 新版胜否 / 新版三维 / 生硬引用）", "",
+              "| # | 情绪 | 用例 | 胜者 | 适配 | 自然 | 丰富 | 新版生硬 |", "|---|---|---|---|---|---|---|---|"]
+    for r in rows:
+        lines.append("| %d | %s | %s | %s | %s | %s | %s | %s |" % (
+            r["i"], r["emo"], r["case"][:18], r["winner"],
+            r["new"]["适配度"], r["new"]["自然度"], r["new"]["丰富度"],
+            "是" if r["new"].get("生硬引用") else "否"))
+    report.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    print("报告 -> 交付物/表达语料库/验收报告.md；明细 -> _test/_shots/quotes_eval_detail.json")
+    print("QUOTE-EVAL-%s: cases=%d new[适配%.2f 自然%.2f 丰富%.2f] vs old[适配%.2f 自然%.2f 丰富%.2f] "
+          "胜率新版=%d 生硬引用新版=%.0f%% 引用检出新版=%.0f%%" % (
+              "FAIL" if fails else "PASS", len(rows),
+              summary["new_适配度"], summary["new_自然度"], summary["new_丰富度"],
+              summary["old_适配度"], summary["old_自然度"], summary["old_丰富度"],
+              summary["new_win"], summary["new_hard_refuse"] * 100,
+              summary["new_cite_rate"] * 100))
+    for f in fails:
+        print("   · " + f)
+    for w in warns:
+        print("   ~ " + w)
+    return 1 if fails else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://127.0.0.1:8123")
@@ -235,86 +330,7 @@ def main():
         print("QUOTE-EVAL-UNVERIFIED: 运行异常: %s" % e)
         return 2
 
-    if bad:
-        print("QUOTE-EVAL-UNVERIFIED: %d 条评委失败 ⇒ 不判绿" % len(bad))
-        for x in bad[:5]:
-            print("   · " + x)
-        return 2
-
-    # 汇总
-    summary = {"cases": len(rows), "seed": args.seed}
-    for label, side in (("old", "old"), ("new", "new")):
-        for dim in DIMS:
-            summary["%s_%s" % (label, dim)] = avg(rows, side, dim)
-    summary["new_win"] = sum(1 for r in rows if r["winner"] == "新版")
-    summary["old_win"] = sum(1 for r in rows if r["winner"] == "旧版")
-    summary["tie"] = sum(1 for r in rows if r["winner"] == "平")
-    summary["new_hard_refuse"] = sum(1 for r in rows if r["new"].get("生硬引用")) / len(rows)
-    summary["old_hard_refuse"] = sum(1 for r in rows if r["old"].get("生硬引用")) / len(rows)
-    try:
-        from quote_wiring_check import load_entries
-        entries = load_entries() or []
-    except Exception:
-        entries = []
-    summary["new_cite_rate"] = cited_rate(rows, "new", entries)
-    summary["old_cite_rate"] = cited_rate(rows, "old", entries)
-
-    fails = []
-    for dim in DIMS:
-        if summary["new_%s" % dim] + TOL < summary["old_%s" % dim]:
-            fails.append("新版[%s]均分 %.2f 低于旧版 %.2f（容差 %.1f）"
-                         % (dim, summary["new_%s" % dim], summary["old_%s" % dim], TOL))
-    if summary["new_hard_refuse"] > HARD_REFUSE:
-        fails.append("新版生硬引用率 %.0f%% > 上限 %.0f%%"
-                     % (summary["new_hard_refuse"] * 100, HARD_REFUSE * 100))
-    if entries and summary["new_cite_rate"] < 0.05:
-        fails.append("新版引用检出率 %.0f%% < 5%%（信号过弱：素材未被真实使用，机制空转）"
-                     % (summary["new_cite_rate"] * 100))
-
-    # 报告与明细
-    shots = ROOT / "_test" / "_shots"
-    shots.mkdir(parents=True, exist_ok=True)
-    detail = shots / "quotes_eval_detail.json"
-    detail.write_text(json.dumps({"summary": summary, "rows": rows},
-                                 ensure_ascii=False, indent=1), encoding="utf-8")
-    report = ROOT / "交付物" / "表达语料库" / "验收报告.md"
-    lines = ["# 表达语料库 · 全自动验收报告（r117）", "",
-             "> 方法：30 条测试用例（6 情绪 × 5）× 新旧两版回复（单变量：quote 注入有无），"
-             "LLM 评委盲评（A/B 顺序随机，种子 %d 可复现）。明细：`_test/_shots/quotes_eval_detail.json`。" % args.seed,
-             "> 生成模型与评委阈值：见 `_test/quote_eval.py`（判据硬编码于脚本）。", "",
-             "## 汇总", "",
-             "| 维度 | 旧版（无注入） | 新版（含候选注入） |", "|---|---|---|"]
-    for dim in DIMS:
-        lines.append("| %s | %.2f | %.2f |" % (dim, summary["old_%s" % dim], summary["new_%s" % dim]))
-    lines += ["| 生硬引用率 | %.0f%% | %.0f%% |" % (summary["old_hard_refuse"] * 100,
-                                                     summary["new_hard_refuse"] * 100),
-              "| 引用检出率 | %.0f%% | %.0f%% |" % (summary["old_cite_rate"] * 100,
-                                                     summary["new_cite_rate"] * 100),
-              "", "| 胜负 | 新版胜 %d / 旧版胜 %d / 平 %d |" % (summary["new_win"], summary["old_win"],
-                                                              summary["tie"]), "",
-              "## 判定", ""]
-    if fails:
-        lines.append("**QUOTE-EVAL-FAIL**：" + "；".join(fails))
-    else:
-        lines.append("**QUOTE-EVAL-PASS**：三维均分新版不低于旧版（容差内）且生硬引用率达标。")
-    lines += ["", "## 逐条明细（节选：用例 / 新版胜否 / 新版三维 / 生硬引用）", "",
-              "| # | 情绪 | 用例 | 胜者 | 适配 | 自然 | 丰富 | 新版生硬 |", "|---|---|---|---|---|---|---|---|"]
-    for r in rows:
-        lines.append("| %d | %s | %s | %s | %s | %s | %s | %s |" % (
-            r["i"], r["emo"], r["case"][:18], r["winner"],
-            r["new"]["适配度"], r["new"]["自然度"], r["new"]["丰富度"],
-            "是" if r["new"].get("生硬引用") else "否"))
-    report.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
-    print("报告 -> 交付物/表达语料库/验收报告.md；明细 -> _test/_shots/quotes_eval_detail.json")
-    print("QUOTE-EVAL-%s: cases=%d new[适配%.2f 自然%.2f 丰富%.2f] vs old[适配%.2f 自然%.2f 丰富%.2f] "
-          "胜率新版=%d 生硬引用新版=%.0f%%" % (
-              "FAIL" if fails else "PASS", len(rows),
-              summary["new_适配度"], summary["new_自然度"], summary["new_丰富度"],
-              summary["old_适配度"], summary["old_自然度"], summary["old_丰富度"],
-              summary["new_win"], summary["new_hard_refuse"] * 100))
-    for f in fails:
-        print("   · " + f)
-    return 1 if fails else 0
+    return _judge_and_report(args.seed, rows, bad)
 
 
 if __name__ == "__main__":

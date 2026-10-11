@@ -169,6 +169,7 @@ def main():
     ap.add_argument("--check", action="store_true", help="重建并与磁盘产物逐字节比对")
     ap.add_argument("--dir", type=Path, default=CORPUS_DIR)
     ap.add_argument("--out", type=Path, default=OUT)
+    ap.add_argument("--index", action="store_true", help="同时生成/更新 源目录/索引.md（供取号与总览）")
     args = ap.parse_args()
 
     data = parse_entries(args.dir)
@@ -186,6 +187,19 @@ def main():
         fail("--check 不一致：产物与重建结果不同（条目源被改过且未重建？）")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(text, encoding="utf-8", newline="\n")
+    if args.index:
+        rows = ["| %s | %s | %s | %s | %s |" % (
+            e["id"], e["title"][:24], e["level"], CAT_NAMES[e["cat"]], "、".join(e["emo"]))
+            for e in data["entries"]]
+        idx = args.dir / "索引.md"
+        idx.write_text(
+            "# 表达语料库 · 索引\n\n"
+            "> 自动生成（_test/wit_quotes_build.py --index），勿手改；供取号与总览。\n"
+            "> 第 1 轮（r117）：%d 条 A-D 级（E 级构建期排除 %d 条）。\n\n"
+            "| 编号 | 标题 | 可信度 | 篇章 | 适用情绪 |\n|---|---|---|---|---|\n%s\n"
+            % (data["counts"]["total"], data["counts"]["excludedE"], "\n".join(rows)),
+            encoding="utf-8", newline="\n")
+        print("INDEX -> %s（%d 行）" % (idx, len(rows)))
     print("WIT-QUOTES-BUILD-PASS 已重建 %s：%d 条（A%d/B%d/C%d/D%d，E 排除 %d）" % (
         str(args.out).replace(str(ROOT) + "\\", "").replace(str(ROOT) + "/", ""),
         data["counts"]["total"], data["counts"]["by_level"]["A"],
