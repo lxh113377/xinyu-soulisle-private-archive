@@ -440,6 +440,9 @@ SUITES = [
     #   立因＝八维表第 7 维「文档完善程度」的 peers 格自 r112 起每轮写"本件不重采 ⇒ 引用 NA"，
     #   与第 4 维同构：那不是"对手文档差"，是**这一格从来没有分母**。本件把它变成可复算读数。
     ("peer_docs_selftest", [sys.executable, "_test/peer_docs_probe.py", "--selftest"]),
+    # r123：表情引擎离线腿的**可证伪性**常驻判据（r122 那 5 条新用例是靠一次性 TEMP 探针自证的，
+    #   下一轮不带记忆的人重跑不了 ⇒ 固化进仓，断言「定向破坏必各自翻红 + 不破坏时全绿」两侧都在）。
+    ("js_engine_mut", ["node", "_test/js_engine_mut.mjs"]),
     ("settle_wait_selftest", [sys.executable, "_test/settle_wait.py", "--selftest"]),
     # r98：「判据把成败押在机器时刻上」这一族的普查尺。立因是 r96 连吃两条同根 CI 红
     #   （j4_memory 定长 8s 押落库时刻 / data_rights 快照⇄导出跨时刻），当时把两处升到

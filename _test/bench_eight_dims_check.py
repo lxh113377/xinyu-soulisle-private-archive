@@ -116,7 +116,7 @@ def docs_peers_val(path, payload):
             for k in ("api_spec", "guide", "contributing", "docs_site")}
     dist = payload.get("class_dist") or {}
     self_row = next((r for r in rows if str(r.get("repo", "")).startswith("self")), None)
-    blind = len(payload.get("blind_or_na") or [])
+    blind = len(payload.get("na") or [])          # 声明键＝四态形状 C（r122 用错 blind_or_na 打成过未验）
     return ("四类位在册（分母 %s 仓）：API 规范 %s、教程 %s、贡献指南 %s、独立文档区 %s；"
             "形态 %s；失明/未验 %d 仓｜self 同尺=%s（缺项＝独立 quickstart 文件，本仓入门写在 docs/README.md 里）"
             % (payload.get("denominator"), bits.get("api_spec", "NA"), bits.get("guide", "NA"),

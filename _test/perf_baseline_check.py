@@ -56,6 +56,7 @@ MIN_RPS_EMOTION = 50.0
 #    贴着读数设阈值＝给下一轮埋一条会自己踩穿的红（同 r96/r100 的噪声一手在册）。
 MAX_RSS_MB = 1200.0            # ≈观测峰值 333.8MB 的 3.6x ⇒ 抓泄漏/无界缓存，不抓抖动
 MAX_US_CPU_PER_REQ = 12000.0   # ≈观测最坏 3092.7µs 的 3.9x ⇒ 抓每请求计算量的数量级退化
+IDLE_WINDOW_S = 1.0        # r123 空载窗口长度（秒）：与负载窗口按 CPU 速率归一，不要求等长
 CONC = {"threads": 8, "per_thread": 6}
 # r96：单点并发**必须把档位写进读数本身**。立因是 r95 报告自相矛盾——§1 维度 4 印
 # `吞吐 1013.9 rps`，§5 又写「并发维度仍无读数」（依据是 grep k6/locust 全仓 0 命中）。
@@ -153,6 +154,22 @@ def proc_read(pid):
     return {"rss_mb": rss, "rss_peak_mb": hwm if hwm is not None else rss, "cpu_ms": cpu_ms}
 
 
+def resource_net(load_cpu_ms, load_wall, idle_cpu_ms, idle_wall, n_req):
+    """**净**单请求 CPU（µs）＝(负载窗口 CPU − 同速率空载 CPU) ÷ 请求数。
+
+    为什么要这一格：r122 的 `us_cpu_per_req` 把 JVM 的 JIT/GC/H2 后台线程一并算进窗口，
+    五轮 651.0~3092.7µs 跨 4.7 倍 —— 那不是业务耗时，是"这台机器此刻在忙什么"。
+    补一段**同长度的空载窗口**按速率折算后相减，才知道地板该往哪收紧。
+    任一读数缺 ⇒ None（未验，禁止用 0 顶替）；结果为负 ⇒ 照实返回，
+    由 `resource_state` 侧标 noise-dominated（负号本身就是结论：负载 CPU 与空载同速率之差被噪声吃掉）。
+    """
+    vals = (load_cpu_ms, load_wall, idle_cpu_ms, idle_wall, n_req)
+    if any(v is None for v in vals) or load_wall <= 0 or idle_wall <= 0 or n_req <= 0:
+        return None
+    net_ms = load_cpu_ms - idle_cpu_ms * (load_wall / idle_wall)
+    return round(net_ms * 1000.0 / n_req, 1)
+
+
 def timed(fn):
     t0 = time.perf_counter()
     r = fn()
@@ -211,8 +228,17 @@ def measure(base, reps):
     # 吞吐：只测 health（最轻，测的是服务端并发而非上游）
     if not fatal:
         # r122：资源占用率读数 ⇒ 窗口前后各读一次**被测进程自己**的计数器
+        # r123：再补一段**空载窗口**（同法前后各读一次），用于把 JIT/GC/后台线程的那份 CPU 扣掉
         pid, pid_how, pid_note = resolve_pid(base)
         r0 = proc_read(pid)
+        idle_wall = IDLE_WINDOW_S
+        idle_cpu = None
+        if r0 is not None:
+            time.sleep(idle_wall)
+            _ri = proc_read(pid)
+            if _ri is not None:
+                idle_cpu = max(0.0, _ri["cpu_ms"] - r0["cpu_ms"])
+                r0 = _ri                      # 空载窗口之后才是负载窗口的起点
         def hit():
             return timed(lambda: get(base + "/api/health"))[0]
         t0 = time.perf_counter()
@@ -243,7 +269,11 @@ def measure(base, reps):
                                "rss_mb": round(r1["rss_mb"], 1),
                                "rss_peak_mb": round(r1["rss_peak_mb"] or r1["rss_mb"], 1),
                                "cpu_ms_window": round(cpu_ms, 1), "requests": n_req,
-                               "us_cpu_per_req": round(cpu_ms * 1000.0 / n_req, 1)}
+                               "us_cpu_per_req": round(cpu_ms * 1000.0 / n_req, 1),
+                               "idle_cpu_ms": None if idle_cpu is None else round(idle_cpu, 1),
+                               "idle_window_s": idle_wall,
+                               "us_cpu_per_req_net": resource_net(cpu_ms, wall + wall2,
+                                                                  idle_cpu, idle_wall, n_req)}
         else:
             out["resource"] = None
             out["resource_na"] = pid_note or ("进程计数器读不到（pid=%s，通道 %s）" % (pid, pid_how))
@@ -471,6 +501,19 @@ def selftest():
         bad.append("⑦c 单请求 CPU 超上限仍判通过 ⇒ 每请求计算量退化无人管")
     if judge(dict(_ok, resource=None)) or resource_state({"resource": None})[0] != "na":
         bad.append("⑦d 资源取不到却走绿、或没被识别成未验 ⇒「没量到」会被读成达标")
+    # r123 净 CPU 四腿：正常／任一读数缺⇒None／除零⇒None／负值照实带出（噪声主导本身就是结论）
+    # 期望由被测函数自报后再核对算式：(300 − 120×(1.5/1.0))ms ×1000 ÷96 = 1250.0µs
+    # （第一版我把期望写成 1125.0 —— 手算错，被测对象反倒报 1250.0；按算式复核后是**我错**，
+    #   故改期望而不是改实现。这类"期望凭直觉写"的坑在册：变异/桩的期望必须被测对象自报或算式复核。）
+    if resource_net(300.0, 1.5, 120.0, 1.0, 96) != 1250.0:
+        bad.append("⑧净 CPU 算错：%s（算式 (300−120×1.5)×1000÷96 应得 1250.0）"
+                   % resource_net(300.0, 1.5, 120.0, 1.0, 96))
+    if resource_net(300.0, 1.5, None, 1.0, 96) is not None:
+        bad.append("⑧b 空载读数缺却给了数 ⇒ 把「没扣」写成「扣过了」")
+    if resource_net(300.0, 0.0, 120.0, 1.0, 96) is not None or resource_net(300.0, 1.5, 120.0, 1.0, 0) is not None:
+        bad.append("⑧c 窗口长度或请求数为 0 时没拒算 ⇒ 除零会造出天文数字读数")
+    if resource_net(100.0, 1.0, 200.0, 1.0, 96) >= 0:
+        bad.append("⑧d 空载比负载还忙时没把负号带出来 ⇒ 噪声主导被抹平成 0，读起来像「几乎不耗 CPU」")
     if resource_state({"resource": _res})[0] != "ok":
         bad.append("⑦e 有读数时 resource_state 没判 ok ⇒ main 会把量到的资源误报成未验")
 
@@ -541,7 +584,7 @@ def selftest():
         bad.append("⑲变异体失效：16 档中位数读数里 llm_used=None 没被 judge_ramp 点名 ⇒ 中位数把偷换抹平了")
     print("SELFTEST-%s" % ("PASS: 百分位/空样本/恒慢/缺面/口径漂移 + 阶梯 正例/双地板/LLM偷换/NA不冒充绿"
                            " + 中位数 取中/带宽/LLM从严/冷启不掺/空样本/接线双证"
-                           " + 资源 正常/超工作集/超单请求CPU/缺数不判绿/有数不误未验"
+                           " + 资源 正常/超工作集/超单请求CPU/缺数不判绿/有数不误未验 + 净CPU 正常/缺读数/除零/负值不抹平"
                            if not bad else "FAIL: " + "; ".join(bad)))
     return 1 if bad else 0
 
@@ -678,9 +721,11 @@ def main():
                                              a.ramp_reps, a.ramp_warmup,
                                              worst_band if worst_band is not None else "-"))
     rs = m.get("resource") or {}
-    res_note = ("资源 工作集=%sMB 峰值=%sMB 单请求CPU=%sµs（pid %s 由端口反查）"
+    res_note = ("资源 工作集=%sMB 峰值=%sMB 单请求CPU=%sµs（扣空载后净=%sµs，空载 %sms/%ss）"
+                "（pid %s 由端口反查）"
                 % (rs.get("rss_mb", "NA"), rs.get("rss_peak_mb", "NA"),
-                   rs.get("us_cpu_per_req", "NA"), rs.get("pid", "NA"))) if rs else "资源 未验"
+                   rs.get("us_cpu_per_req", "NA"), rs.get("us_cpu_per_req_net", "NA"),
+                   rs.get("idle_cpu_ms", "NA"), rs.get("idle_window_s", "NA"), rs.get("pid", "NA"))) if rs else "资源 未验"
     print("PERF-BASELINE-PASS（%d 个目标在预算内｜实测峰值 p95=%.1fms，最紧余量 %.0fms｜"
           "吞吐 并发%d线程×%d请求：health=%s rps／emotion=%s rps（词典引擎真实路径%s）｜%s｜"
           "口径=本地无外网 + 危机路径不调 LLM；这是自身棘轮不是跨项目对比）"

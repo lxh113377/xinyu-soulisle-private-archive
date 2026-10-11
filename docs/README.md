@@ -10,6 +10,7 @@
 | [`EXTENSIONS.md`](EXTENSIONS.md) | 扩展手册：词表 SSOT、共情策略、LLM 上游切换、记忆 provider、部署目标、第三方集成清单 | 人工维护；接口面变动由 C7 与 `_test/engine_consistency_check.py` 兜住，本目录由 `_test/repo_config_check.py` G19 盯「在不在索引里」 |
 | [`PERF-BASELINE.md`](PERF-BASELINE.md) | 性能基线口径与预算表（p95 / 吞吐 / 四目标预算），把"自证"变成可引用的数 | `_test/perf_baseline_check.py`（同机棘轮，超限即红） |
 | [`quality-gates.md`](quality-gates.md) | 判据体系明细：每条套件的口径 + 复算命令（**条数一律从 `run_all_suites.py` 的 SUITES 现读，本文件不抄数**） | `_test/repo_config_check.py` G16：电池脚本 ⇄ 本文档双向对账（漏登/幽灵登都红） |
+| [`QUICKSTART.md`](QUICKSTART.md) | 三步上手：静态页 / fat jar / 容器，每条路的「起来了」判据、给密钥的三种落点、十分钟自证清单与起不来的排查顺序 | 人工维护；本文的存在性由 `_test/peer_docs_probe.py` 计入本仓文档四类位（教程位），命令真伪随 `docs/quality-gates.md` 与 `_test/repo_config_check.py` G19 一起对账 |
 | [`data-and-privacy.md`](data-and-privacy.md) | 数据与隐私面：本地存储什么、谁能清除、危机转介的边界 | `_test/data_rights_check.py`（真点击清除 + 落库回执） |
 | [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | 第三方授权边界（three=MIT、GSAP=GreenSock 标准许可 **非 MIT**、axe-core=MPL-2.0） | `_test/repo_config_check.py` G6+G7：分母从 `_test/vendor-manifest.json` 现读，逐文件带条款表行 |
 

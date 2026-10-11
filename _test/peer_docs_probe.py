@@ -128,6 +128,45 @@ def self_only():
     return rec
 
 
+def build_payload(rows, blind):
+    """台账本体的**唯一构造点**（main 与契约腿共用）：抄两份就等于给形状坑留第二条路。
+
+    声明位用 `na`（不是 blind_or_na）——`ledger_age_check.declared_na()` 只认顶层键
+    ("blind","na","unverified")，认不出形状 ⇒ 整把龄期尺判 NA-UNKNOWN、rc=2 未验。
+    r122 一手：我把键名写成 blind_or_na，龄期尺整体降档，而自己这侧门面照样印 PASS。
+    """
+    peers_rows = [r for r in rows if not str(r.get("repo", "")).startswith("self")]
+    self_row = next((r for r in rows if str(r.get("repo", "")).startswith("self")), {})
+    dist = {}
+    for r in peers_rows:
+        dist[str(r.get("class"))] = dist.get(str(r.get("class")), 0) + 1
+    bits = {k: sum(1 for r in peers_rows if r.get(k))
+            for k in ("api_spec", "guide", "contributing", "docs_site")}
+    return {"generated_by": "_test/peer_docs_probe.py", "denominator": len(PEERS),
+            "rows": rows, "na": blind, "class_dist": dist,
+            "scope": "class_dist/bit_counts/na 只数 peers 行；self 单列 self_class",
+            "self_class": self_row.get("class"), "bit_counts": bits,
+            "note": "四类位＝API 规范 / 教程 / 贡献指南 / 独立文档区；"
+                    "0/4 只在取数面完整时成立，失明一律单列 unverified 不折算成零",
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+
+
+def shape_contract(payload):
+    """**跨判据契约**：本探针的台账必须能被 `ledger_age_check.declared_na()` 认出形状。
+
+    为什么由生产者来断：龄期尺是常驻判据，它把我这份台账认成 `NA-UNKNOWN` 时，红的是**整把尺**
+    （rc=2 未验），而不是我这一族——r122 一手实测：键名写成 `blind_or_na` 后
+    `declared_na()` 返回 (None,'unknown') ⇒ 17 族的龄期判据整体降档，而我自己的门面照样印 PASS。
+    所以"我的输出符合下游判据的形状"必须在**我这侧**被断住，而不是等下一轮别人发现。
+    取不到 ledger_age_check ⇒ 返回 None，由调用方判**未验**（禁静默放行）。
+    """
+    try:
+        import ledger_age_check as LA
+    except Exception:                                      # noqa: BLE001
+        return None
+    return LA.declared_na(payload)
+
+
 def run_selftest():
     bad = []
     # 正向：四类位齐
@@ -157,7 +196,20 @@ def run_selftest():
     # 反向守卫：全空样本必须 0/4（否则 shape 恒真）
     if shape({"api_spec": 0, "guide": 0, "contributing": 0, "docs_site": 0})[1] != 0:
         bad.append("shape() 恒真：全空样本仍计到位")
-    print("PEER-DOCS-SELFTEST-%s（正向 1 + 反例 4 + 恒真守卫，分母名册 %d 仓）"
+    # 跨判据契约三条：声明键的形状 must 被龄期尺认出（NA-UNKNOWN＝把整把常驻尺打成未验）。
+    # 夹具**走生产函数本身**（build_payload），不是我另抄一份 dict——否则测的是我的构造，不是产物。
+    probe_payload = build_payload([{"repo": "a/b", "class": "3/4"},
+                                   {"repo": "self（心屿 MindIsle 本仓）", "class": "4/4"}], [])
+    got = shape_contract(probe_payload)
+    if got is None:
+        bad.append("契约腿未跑成（ledger_age_check 取不到）⇒ 形状契约未验，不得静默放行")
+    elif got[1] == "unknown":
+        bad.append("台账形状被判 unknown ⇒ 龄期尺会整尺降档未验（r122 一手复现的键名坑）：%s" % (got,))
+    # 变异腿：把键名换回 r122 那个错形状，契约腿**必须**认成 unknown（否则它就是恒绿的）
+    wrong = shape_contract({"denominator": 16, "rows": [], "blind_or_na": []})
+    if wrong[1] != "unknown":
+        bad.append("契约腿失效：错键名 blind_or_na 被判成 %s ⇒ 这条腿抓不到自己要吃的那个坑" % (wrong,))
+    print("PEER-DOCS-SELFTEST-%s（正向 1 + 反例 4 + 恒真守卫 + 跨判据形状契约 3 条，分母名册 %d 仓）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(PEERS)))
     return 1 if bad else 0
 
@@ -201,14 +253,11 @@ def main():
         dist[str(r.get("class"))] = dist.get(str(r.get("class")), 0) + 1
     bits = {k: sum(1 for r in peers_rows if r.get(k))
             for k in ("api_spec", "guide", "contributing", "docs_site")}
-    payload = {"generated_by": "_test/peer_docs_probe.py", "denominator": len(PEERS),
-               "rows": rows, "blind_or_na": blind, "class_dist": dist,
-               "scope": "class_dist/bit_counts 只数 peers 行；self 单列 self_class",
-               "self_class": self_row.get("class"), "bit_counts": bits,
-               "rows": rows, "blind_or_na": blind, "class_dist": dist,
-               "note": "四类位＝API 规范 / 教程 / 贡献指南 / 独立文档区；"
-                       "0/4 只在取数面完整时成立，失明一律单列 unverified 不折算成零",
-               "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    # 声明位用 `na`（不是 blind_or_na）——`ledger_age_check.declared_na()` 只认
+    # ("blind","na","unverified") 三个顶层键，认不出形状 ⇒ 整把龄期尺判 NA-UNKNOWN、rc=2 未验。
+    # r122 我就是用了 blind_or_na 把那条**常驻判据**打成的未验（一手：declared_na() 直查返回 (None,"unknown")），
+    # 所以这里把形状契约写成断言（见 _shape_contract），而不是靠人记得键名。
+    payload = build_payload(rows, blind)
     if a.json:
         Path(a.json).write_bytes((json.dumps(payload, ensure_ascii=False, indent=1) + "\n")
                                  .encode("utf-8").replace(b"\r\n", b"\n"))
