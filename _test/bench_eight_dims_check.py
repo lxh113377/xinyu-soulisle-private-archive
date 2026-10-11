@@ -225,16 +225,7 @@ def build_dims():
         cell4,
     ]})
 
-    mem_p, mem = ledger("peer-memory-*.json")
-    dims.append({"dim": DIM_ORDER[4], "cells": [
-        cell("self 缺位", "插件协议 / 向量长记忆 / i18n（文档化 ≠ 机制化，见 docs/EXTENSIONS.md）",
-             "HEAD 面 git ls-tree + docs/EXTENSIONS.md"),
-        cell("peers vector_memory", "%d/%d" % (dist.get("vector_memory", 0), denom), m_src),
-        cell("peers i18n_locale", "%d/%d" % (dist.get("i18n_locale", 0), denom), m_src),
-        cell("peers 记忆形态在册面", "usable=%s blind=%s denominator=%s" % (
-            (mem or {}).get("usable"), (mem or {}).get("blind"), (mem or {}).get("denominator")) if mem else "NA",
-             stamp(mem_p, mem) if mem_p else "—"),
-    ]})
+    dims.append(_dim_memory(dist, denom, m_src))
 
     mt_p, mt = ledger("peer-maintenance-*.json")
     rel_p, rel = ledger("peer-release-*.json")
@@ -282,13 +273,32 @@ def build_dims():
         cell("peers docs 面", docs_peers_val(dc_p, dc), "本件不重采 ⇒ 引用 NA；补法 python _test/benchmark_metrics.py（docs 字段在 runs[-1].repos[].docs）"),
     ]})
 
-    why = ", ".join("%s(%s)" % (r.get("repo", "?").split("/")[-1], r.get("tier", "-")) for r in peers[:6])
-    dims.append({"dim": DIM_ORDER[7], "cells": [
-        cell("self 定位", "演示级单用户 + 离线可完整演示 + 三路情绪 + 危机转介", "HEAD 面 src/ 与 memory/01-goal.md"),
-        cell("peers 定位抽样", why, m_src + "（repos[].why/tier）"),
-    ]})
+    dims.append(_dim_positioning(peers, m_src))
 
     return dims, notes
+
+
+def _dim_memory(dist, denom, m_src):
+    """第 4 维（记忆）：self 缺位 + peers 三类记忆面在册数（r125 拆自 build_dims，内容不变）。"""
+    mem_p, mem = ledger("peer-memory-*.json")
+    return {"dim": DIM_ORDER[4], "cells": [
+        cell("self 缺位", "插件协议 / 向量长记忆 / i18n（文档化 ≠ 机制化，见 docs/EXTENSIONS.md）",
+             "HEAD 面 git ls-tree + docs/EXTENSIONS.md"),
+        cell("peers vector_memory", "%d/%d" % (dist.get("vector_memory", 0), denom), m_src),
+        cell("peers i18n_locale", "%d/%d" % (dist.get("i18n_locale", 0), denom), m_src),
+        cell("peers 记忆形态在册面", "usable=%s blind=%s denominator=%s" % (
+            (mem or {}).get("usable"), (mem or {}).get("blind"), (mem or {}).get("denominator")) if mem else "NA",
+             stamp(mem_p, mem) if mem_p else "—"),
+    ]}
+
+
+def _dim_positioning(peers, m_src):
+    """第 7 维（定位）：self 定位一句话 + peers 定位抽样（r125 拆自 build_dims，内容不变）。"""
+    why = ", ".join("%s(%s)" % (r.get("repo", "?").split("/")[-1], r.get("tier", "-")) for r in peers[:6])
+    return {"dim": DIM_ORDER[7], "cells": [
+        cell("self 定位", "演示级单用户 + 离线可完整演示 + 三路情绪 + 危机转介", "HEAD 面 src/ 与 memory/01-goal.md"),
+        cell("peers 定位抽样", why, m_src + "（repos[].why/tier）"),
+    ]}
 
 
 class Unverified(Exception):
