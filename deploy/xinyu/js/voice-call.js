@@ -41,6 +41,7 @@ window.VoiceCall = (function () {
   let micOn = true, watch = 0;
   let pending = "", lastSpeech = 0, turnAt = 0, ttf = 0, turnMs = 0;
   let baseLen = 0, lastLen = 0;   // 已收过口的转写条数 / 本会话累计转写条数（防旧句被重新拼进新句）
+  let recAlive = false;           // 识别会话是否还活着：活着就不该再 start()（真机 start 会抛，白折腾一次重启）
   let consumed = 0, speakingBuf = "", tailQueued = false, aiLine = null, lastGum = null;
   let vad = null;               // {stop()} 或 null
   const metric = { user: "", reply: "", mode: "", ttfb: 0 };
@@ -172,6 +173,7 @@ window.VoiceCall = (function () {
     rec.onresult = (e) => {
       let interim = "", said = "";
       const list = e.results || [];
+      if (list.length < lastLen) baseLen = 0;      // 列表变短 = 换了新会话，旧偏移作废
       lastLen = list.length;
       // 真 SpeechRecognition 的 results 是**整个会话的累计列表**（旧句不会消失）⇒ 已收过口的
       // 前 baseLen 条必须跳过，否则下一句的转写会把上一句重新拼进去 = 重复回答（桩若只投一条会藏住这个缺陷）
@@ -193,31 +195,23 @@ window.VoiceCall = (function () {
       if (n) n.textContent = "识别中断（" + (e && e.error ? e.error : "asr-error") + "）—— 接着说就行，或点「说完啦」";
     };
     rec.onend = () => {
-      // 真机常见：continuous 也会自行结束。通话没退就重启，退出态不等 end（voice_check A8 教训）
-      if (state !== "idle" && micOn && rec) startRec(120);
+      // 一次 end = 一个会话结束：转写列表随之作废 ⇒ 偏移归零（真机重启后 results 是空的）。
+      // 只在「正该听」的时候接手重启：半双工念话期间 end 到了不能抢着开麦（那会把自家念白收进去）。
+      // 退出态不等 end（voice_check A8 一手教训）——重启条件写的是状态，不是"等谁先回来"。
+      baseLen = 0; lastLen = 0; recAlive = false;
+      if (state === "listening" && micOn && rec) startRec();
     };
   }
-  function startRec(delay) {
-    if (!rec) return;
-    const go = () => {
-      try { rec.start(); return true; }
-      catch { return false; }
-    };
-    if (go()) { baseLen = 0; lastLen = 0; return; }   // 新会话 = 转写列表清零
-    // start() 抛错（上一路还在收尾）：先 stop 再试一次，仍失败就如实标注，不锁死按钮
-    setTimeout(() => {
-      try { rec.stop(); } catch (e) { /* 已自行结束 */ }
-      if (go()) { baseLen = 0; lastLen = 0; return; }
-      const n = $("#call-note");
-      if (n) n.textContent = "识别器暂时起不来（start-rejected）—— 点「说完啦」可直接收句";
-    }, 240);
-    void delay;
+  function startRec() {
+    if (!rec || recAlive) return;                     // 已在听就别再 start()：真机只会抛，然后被重试路径换掉整条会话
+    try { rec.start(); recAlive = true; baseLen = 0; lastLen = 0; }
+    catch { recAlive = false; }                       // 抛错多半是上一路还在收尾，onend 会接手重启
   }
   function pauseRec() { if (rec) { try { rec.stop(); } catch (e) { /* 已停 */ } } }
   /** 回到「听」：识别器还在就重新起。退出态不等 end（voice_check A8 一手教训） */
   function resume() {
     if (state !== "listening" || !rec || !micOn) return;
-    startRec(0);
+    startRec();
   }
 
   /* ── 音量计（增益项：失败不得影响通话；恒 video:false）────────── */
@@ -344,7 +338,7 @@ window.VoiceCall = (function () {
     if (nb) nb.setAttribute("aria-pressed", "true");
     paint();
     buildRec();
-    startRec(0);
+    startRec();
     startVad();
     watch = setInterval(tick, 100);
     caption("sys", "通话开始 · 说完整一句话，自然停顿我就接；摄像头开不开都不影响。");
@@ -358,6 +352,7 @@ window.VoiceCall = (function () {
       try { rec.stop(); } catch (e) { /* 已停 */ }
       rec = null;
     }
+    recAlive = false;
     if (window.Voice) window.Voice.cancelSpeech();
     stopVad();
     state = "idle";

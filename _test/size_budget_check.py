@@ -146,7 +146,10 @@ BUDGETS = {
     "src/js/voice.js": 11_160,
     # r116 新增两件（语音通话）：编排层 + 它自己的样式表。分文件是为守 size_budget 的逐文件口径，
     #    不是绕预算 —— 两者都计入 TOTAL，且都进 sw.js PRECACHE（断网也要能讲）。
-    "src/js/voice-call.js": 21_330,
+    "src/js/voice-call.js": 22_465,   # r116 首登 21,330（实测 20,312 +5%）→ 收口轮上调 22,465（实测 21,396 +5%）：
+    #    收口时补的两处一手修复 —— ① 真机 results 是会话级累计列表，收口后要按条数跳过旧句（baseLen），
+    #    否则第二句会把第一句重拼进送模型的文本；② 识别会话生命周期 recAlive（活着不重复 start、
+    #    半双工念话期间 end 到了不抢着开麦）。都不是注释膨胀，是行为码。
     "src/css/voice-call.css": 4_690,
     "src/js/chart.js": 3969,
     "src/js/chat-window.js": 5845,

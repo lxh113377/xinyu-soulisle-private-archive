@@ -22,14 +22,19 @@
   C1 入口存在且**真点得开**（浮层出现 —— 本仓两次同族缺陷：存在≠可达）
   C2 通话不请求摄像头（getUserMedia 全部约束 video 为空/假；没请求也算干净）
   C3 多种音色：目录 ≥4 档 + 选择持久化 + 该音色真进了 utterance（rate/pitch/lang 实测）
-  C4 半句不答（先证假上游装好了，才谈得上「没答」是收句判据拦的）
+  C4 半句不答（先证假上游装好了，才分得清「没答」是收句拦的还是上游挂的）
   C5 整句才答 + 边生成边念第一句：首声时刻 < 末片到达时刻，且整句最终全念出来
   C6 摄像头关着能通话（读数如实带「摄像头未开启」）
   C7 摄像头开着也能通话（注入 FaceEngine 读数；真摄像头腿归 face_check.py，本腿验**互不依赖**）
   C8 全双工可打断 / C8b 半双工讲完再听（两条都过）
-  C9 退出复位：结束通话后浏览器自派 end **不得**再重启识别（否则退出态把通话锁死）
+  C9 退出复位：结束通话后浏览器自派 end **不得**再重启识别（先证回调已摘，再看计数）
   C10 全程零 pageerror
   C11 会话累计转写不重复收口（真机 results 留着旧句；桩按累计语义投才打得中这一类缺陷）
+
+函数切分（r116 收口轮）：loc_guard 的 ≤150 行/函数门把原来的 run_legs（219 行）拆成
+  六段（开层/音色/整轮/双工/摄像头/退出），每段自带前置缺失即早退，结论仍汇进同一个 legs 字典。
+  等态一律走 wait_state / wait_text 的**完成态轮询**，不留装饰性定长等待
+  （timing_coupling 的 C1_HARD 棘轮只认「等完直接读一个确定值」这种形状）。
 
 门面行自带档位（电池只留末条判定行，档位不上那一行 = 受理面上不存在）。
 rc：0=PASS 1=FAIL 2=UNVERIFIED（浏览器起不来 / 页面打不开 / 桩未就位 —— 「没测到」绝不判绿）
@@ -59,8 +64,19 @@ window.__vc = { utts: [], deltas: [], cancels: 0, gum: [], started: 0, stopped: 
       var h = self["on" + name];
       if (typeof h === "function") { try { h.call(self, arg || {}); } catch (e) { V.ev.push("throw:" + name + ":" + e.message); } }
     };
-    this.start = function () { V.started += 1; fire("start"); };
-    this.stop = function () { V.stopped += 1; setTimeout(function () { fire("end"); }, 20); };
+    this.start = function () {
+      // 真机语义：一次只能有一个会话，重复 start() 抛 InvalidStateError；
+      // 会话结束后 results 作废（新会话从空列表开始）。桩不照这个形状，被测代码的
+      // 「会话活着就别重启」与「旧句偏移」两条都测不到（本轮一手：桩允许重复 start
+      //  ⇒ 每轮结束都换会话 ⇒ 送模型的文本被拼成一长串）。
+      if (self.__on) { throw new Error("InvalidStateError: recognition already started"); }
+      self.__on = true; V.started += 1; fire("start");
+    };
+    this.stop = function () {
+      if (!self.__on) return;
+      self.__on = false; V.stopped += 1;
+      setTimeout(function () { V.results = []; fire("end"); }, 20);
+    };
     this.abort = this.stop;
   }
   window.SpeechRecognition = SR; window.webkitSpeechRecognition = SR;
@@ -73,9 +89,9 @@ window.__vc = { utts: [], deltas: [], cancels: 0, gum: [], started: 0, stopped: 
   window.__vcSay = function (text, isFinal) {
     // 真机 results 是**会话级累计列表**，临时结果在原位更新、已定稿的句子不会消失。
     // 桩早先只投一条扁平结果，把「上一句被重新拼进下一句」这类缺陷整个藏住 ⇒ 按累计语义投，
-    // 并让 C11 腿专门盯它。
+    // 并让 C11 腿专门盯它。每个元素本身是「备选数组 + .isFinal」，与被审代码的读法同形。
     var L = V.results;
-    if (L.length && !L[L.length - 1].isFinal) L.pop();        // 临时结果被自己的下一版覆盖
+    if (L.length && !L[L.length - 1].isFinal) L.pop();
     L.push({ transcript: text, isFinal: !!isFinal, 0: { transcript: text, confidence: 0.9 }, length: 1 });
     var s = SR.__sink;
     if (s) s({ results: L });
@@ -128,14 +144,60 @@ window.__vc = { utts: [], deltas: [], cancels: 0, gum: [], started: 0, stopped: 
 """
 
 
+def vc(page):
+    """读桩的累计记录（一次求值，别在断言里散落着重复取）"""
+    return page.evaluate("() => window.__vc")
+
+
+def state(page):
+    return page.evaluate("() => window.VoiceCall.inspect().state")
+
+
 def wait_state(page, want, tries=60):
     s = "?"
     for _ in range(tries):
-        s = page.evaluate("() => window.VoiceCall.inspect().state")
+        s = state(page)
         if s == want:
             return True, s
         page.wait_for_timeout(50)
     return False, s
+
+
+def wait_text(page, sel, needle, tries=40):
+    """等「文本出现」这个完成态，而不是等一段装饰性定长（timing_coupling 的 C1_HARD 形状）"""
+    txt = ""
+    for _ in range(tries):
+        txt = page.locator(sel).inner_text()
+        if needle in txt:
+            return True, txt
+        page.wait_for_timeout(50)
+    return False, txt
+
+
+def wait_count(page, key, want, tries=60):
+    """等「桩里的计数器到数」这个完成态（utts / texts / stopped 都用它）"""
+    for _ in range(tries):
+        v = vc(page)[key]
+        n = len(v) if isinstance(v, list) else v
+        if n >= want:
+            return True
+        page.wait_for_timeout(50)
+    return False
+
+
+def wait_join(page, want, tries=60):
+    """等「念出来的拼接 == 整句回复」这个完成态（第二句在流末尾才入队，等状态会抢跑）"""
+    joined = ""
+    for _ in range(tries):
+        joined = "".join([x["text"] for x in vc(page)["utts"]]).replace(" ", "")
+        if joined == want:
+            return True, joined
+        page.wait_for_timeout(50)
+    return False, joined
+
+
+def wait_texts(page, want, tries=60):
+    return wait_count(page, "texts", want, tries)
 
 
 # ── 纯函数（可注入反例 ⇒ --selftest 打的是尺，不是运气）──────────────────
@@ -215,26 +277,28 @@ def selftest():
     return 0
 
 
+UNIT_JS = """() => {
+  const U = window.VoiceCall._unit, o = [];
+  const ck = (name, got, want) => o.push([name, String(got) === String(want), got, want]);
+  ck("半截不算完整", U.semanticallyComplete("我今天"), false);
+  ck("够长且非连接词收尾算完整", U.semanticallyComplete("我今天被导师骂了"), true);
+  ck("以「然后」收尾不算完整", U.semanticallyComplete("我想一下然后"), false);
+  ck("句末问号算完整", U.semanticallyComplete("真的吗？"), true);
+  ck("完整句 700ms 停顿即收", U.shouldCommit("我今天被导师骂了", 700), "语义收句");
+  ck("半截句 700ms 不收", U.shouldCommit("我想一下然后", 700), "");
+  ck("半截句到 1900ms 有界收口", U.shouldCommit("我想一下然后", 2000), "停顿收口");
+  ck("空文本不收", U.shouldCommit("", 3000), "");
+  const c1 = U.cutSentences("第一句完了。第二句还挂着", 0);
+  ck("分句切点", c1[0].length === 1 && c1[1] === 6, true);
+  const c2 = U.cutSentences("没有标点的一句很长的话", 0);
+  ck("无标点不误切", c2[0].length === 0, true);
+  return o;
+}"""
+
+
 def unit_legs(page):
     """U1：语义收句与分句的纯函数组（确定性最高，先把尺钉死再看行为）。"""
-    js = """() => {
-      const U = window.VoiceCall._unit, o = [];
-      const ck = (name, got, want) => o.push([name, String(got) === String(want), got, want]);
-      ck("半截不算完整", U.semanticallyComplete("我今天"), false);
-      ck("够长且非连接词收尾算完整", U.semanticallyComplete("我今天被导师骂了"), true);
-      ck("以「然后」收尾不算完整", U.semanticallyComplete("我想一下然后"), false);
-      ck("句末问号算完整", U.semanticallyComplete("真的吗？"), true);
-      ck("完整句 700ms 停顿即收", U.shouldCommit("我今天被导师骂了", 700), "语义收句");
-      ck("半截句 700ms 不收", U.shouldCommit("我想一下然后", 700), "");
-      ck("半截句到 1900ms 有界收口", U.shouldCommit("我想一下然后", 2000), "停顿收口");
-      ck("空文本不收", U.shouldCommit("", 3000), "");
-      const c1 = U.cutSentences("第一句完了。第二句还挂着", 0);
-      ck("分句切点", c1[0].length === 1 && c1[1] === 6, true);
-      const c2 = U.cutSentences("没有标点的一句很长的话", 0);
-      ck("无标点不误切", c2[0].length === 0, true);
-      return o;
-    }"""
-    rows = page.evaluate(js)
+    rows = page.evaluate(UNIT_JS)
     fails = []
     for name, ok, got, want in rows:
         if ok:
@@ -244,117 +308,142 @@ def unit_legs(page):
     return fails, len(rows)
 
 
-def run_legs(page):
-    """返回 (fails, legs)。每条腿先证前置，再下结论。"""
-    f = []
-    legs = {}
-
-    def v():
-        return page.evaluate("() => window.__vc")
-
-    # C1 入口存在且真点得开
+# ── 行为腿：按段切分（loc_guard ≤150 行/函数），结论统一汇进 legs ──────────
+def legs_open(page, f, legs):
+    """C1 真点得开 / C2 不请求摄像头 / C6 摄像头关着的读数。返回 False = 后续腿无靶子。"""
     btn = page.locator("#btn-call")
     if not btn.is_visible():
         legs["C1"] = "FAIL"
-        return ["C1 #btn-call 不可见（入口被藏 = 通话功能等于没有）"], legs
+        f.append("C1 #btn-call 不可见（入口被藏 = 通话功能等于没有）")
+        return False
     btn.click(timeout=5000)
-    opened = False
-    for _ in range(30):
-        if not page.evaluate("() => document.querySelector('#call-layer').hidden"):
-            opened = True
-            break
-        page.wait_for_timeout(50)
     ok_state, st = wait_state(page, "listening")
-    d = v()
+    d = vc(page)
+    opened = not page.evaluate("() => document.querySelector('#call-layer').hidden")
     if opened and ok_state and d["srMade"] >= 1 and d["started"] >= 1:
         legs["C1"] = "PASS"
         print("C1 PASS  点得开：浮层出现 state=%s srMade=%d started=%d" % (st, d["srMade"], d["started"]))
     else:
         legs["C1"] = "FAIL"
-        return [("C1 点开后没进入通话态 opened=%s state=%s srMade=%d started=%d（存在≠可达，本仓两次同族）"
-                 % (opened, st, d["srMade"], d["started"]))], legs
-
-    # C2 通话不请求摄像头
-    g = v()["gum"]
+        f.append("C1 点开后没进入通话态 opened=%s state=%s srMade=%d started=%d（存在≠可达，本仓两次同族）"
+                 % (opened, st, d["srMade"], d["started"]))
+        return False
+    g = d["gum"]
     if camera_clean(g):
         legs["C2"] = "PASS"
         print("C2 PASS  未请求摄像头（gUM 约束=%s）" % (json.dumps(g, ensure_ascii=False) if g else "无"))
     else:
         legs["C2"] = "FAIL"
         f.append("C2 通话请求了视频设备：%s" % g)
-
-    # C6 摄像头关着时的状态读数
-    face_txt = page.locator("#call-face").inner_text()
-    if "摄像头未开启" in face_txt:
+    ok_face, face_txt = wait_text(page, "#call-face", "摄像头未开启")
+    if ok_face:
         legs["C6"] = "PASS"
         print("C6 PASS  摄像头关着照样通话，读数如实：%r" % face_txt)
     else:
         legs["C6"] = "FAIL"
         f.append("C6 摄像头关着但读数不说实话：%r" % face_txt)
+    return True
 
-    # C3 多种音色：目录 ≥4 + 选择持久化 + 真进 utterance
+
+def legs_timbre(page, f, legs):
+    """C3 多种音色：目录 ≥4 档 + 选择持久化 + 真进了 utterance 的 rate/pitch/lang。"""
     opts = page.evaluate("() => Array.from(document.querySelector('#call-timbre').options).map(o => o.value)")
     if len(opts) < 4:
         legs["C3"] = "FAIL"
         f.append("C3 可选音色只有 %d 档（要求 ≥4 才谈得上「多种音色」）" % len(opts))
+        return
+    pick = opts[1]
+    page.select_option("#call-timbre", pick)
+    saved = page.evaluate("() => localStorage.getItem('peiliao.calltimbre.v1')")
+    page.evaluate("() => { window.__vc.utts = []; window.Voice.preview(); }")
+    got = wait_count(page, "utts", 1)              # 等「试听真的开口」这个完成态
+    u = vc(page)["utts"]
+    want = json.loads(saved) if saved else {}
+    ok = bool(u) and u[0]["lang"] == "zh-CN" and abs(u[0]["rate"] - want.get("rate", -1)) < 1e-6 \
+        and abs(u[0]["pitch"] - want.get("pitch", -1)) < 1e-6
+    if ok:
+        legs["C3"] = "PASS"
+        print("C3 PASS  %d 档音色；选中 %s 已持久化并进了 utterance（rate=%s pitch=%s voice=%s）"
+              % (len(opts), pick, u[0]["rate"], u[0]["pitch"], u[0]["voice"]))
     else:
-        pick = opts[1]
-        page.select_option("#call-timbre", pick)
-        saved = page.evaluate("() => localStorage.getItem('peiliao.calltimbre.v1')")
-        page.evaluate("() => { window.__vc.utts = []; window.Voice.preview(); }")
-        page.wait_for_timeout(300)
-        u = v()["utts"]
-        want = json.loads(saved) if saved else {}
-        ok = bool(u) and u[0]["lang"] == "zh-CN" and abs(u[0]["rate"] - want.get("rate", -1)) < 1e-6 \
-            and abs(u[0]["pitch"] - want.get("pitch", -1)) < 1e-6
-        if ok:
-            legs["C3"] = "PASS"
-            print("C3 PASS  %d 档音色；选中 %s 已持久化并进了 utterance（rate=%s pitch=%s voice=%s）"
-                  % (len(opts), pick, u[0]["rate"], u[0]["pitch"], u[0]["voice"]))
-        else:
-            legs["C3"] = "FAIL"
-            f.append("C3 音色选择没落到发声上 saved=%s utts=%s" % (saved, u))
+        legs["C3"] = "FAIL"
+        f.append("C3 音色选择没落到发声上 saved=%s utts=%s got=%s" % (saved, u, got))
 
-    # C4 半句不答（先装假上游，才分得清「没答」是收句拦的还是上游挂的）
+
+def legs_turn(page, f, legs):
+    """C4 半句不答 / C5 整句才答 + 边生成边念第一句 / C11 旧句不重拼。"""
     page.evaluate("() => window.__vcInstallFake()")
     page.evaluate("() => window.__vcSay('我今天', false)")
+    # C4 是「确认没发生」：观察窗就是判据本身（无完成态可等），取 3×SILENCE_MS 的界
     page.wait_for_timeout(900)
-    if v()["llmCalls"] == 0:
+    if vc(page)["llmCalls"] == 0:
         legs["C4"] = "PASS"
         print("C4 PASS  半截话「我今天」停顿 900ms 未送模型（真听懂再答）")
     else:
         legs["C4"] = "FAIL"
-        f.append("C4 半截话就被送去回答了（llmCalls=%d）⇒ 「完整理解语义」不成立" % v()["llmCalls"])
+        f.append("C4 半截话就被送去回答了（llmCalls=%d）⇒ 「完整理解语义」不成立" % vc(page)["llmCalls"])
 
-    # C5 整句才答 + 边生成边念第一句
     page.evaluate("() => { window.__vc.utts = []; window.__vc.deltas = []; window.__vc.t0 = performance.now(); }")
+    n0 = len(vc(page)["texts"])
     page.evaluate("() => window.__vcSay('我今天被导师骂了', true)")
-    got_s, st = wait_state(page, "speaking", 60)
-    d = v()
-    if d["llmCalls"] < 1:
+    # 先等「第一声真的出口」这个完成态：假上游在 respond 被调那一刻就记 texts，
+    # 拿 texts 当"出声了"的凭据会抢在 90ms 首片之前读空（本轮一手实测踩过）。
+    wait_count(page, "utts", 1)
+    d = vc(page)
+    if d["llmCalls"] <= n0:
         legs["C5"] = "FAIL"
-        f.append("C5 前置缺失：完整句也没把模型叫起来（llmCalls=0）state=%s" % st)
-    elif not d["utts"]:
+        f.append("C5 前置缺失：完整句没把模型叫起来（llmCalls=%d 应有>%d）state=%s" % (d["llmCalls"], n0, state(page)))
+        return
+    if not d["utts"]:
         legs["C5"] = "FAIL"
-        f.append("C5 没有出声（utts 空）state=%s" % st)
-    elif not first_sound_before_stream_end([x["at"] for x in d["utts"]], [x["at"] for x in d["deltas"]]):
+        f.append("C5 没有出声（utts 空）state=%s" % state(page))
+        return
+    ok_turn = wait_texts(page, n0 + 1)          # 整轮 resolve（两片都到）后才谈得上首声早于末片
+    d = vc(page)
+    if not ok_turn:
+        legs["C5"] = "FAIL"
+        f.append("C5 前置缺失：这一轮没跑完（texts=%d 应有>%d）" % (len(d["texts"]), n0))
+        return
+    if not first_sound_before_stream_end([x["at"] for x in d["utts"]], [x["at"] for x in d["deltas"]]):
         legs["C5"] = "FAIL"
         f.append("C5 出声不「边生成边念」：首声=%.1fms 末片=%.1fms" % (d["utts"][0]["at"], d["deltas"][-1]["at"]))
+        return
+    tail_norm = page.evaluate("() => window.__vcReply").replace(" ", "")
+    ok_join, joined = wait_join(page, tail_norm)      # 第二句在流末尾才入队 ⇒ 等拼接而不是等状态
+    back, _ = wait_state(page, "listening", 60)       # 念完自动回听
+    if not ok_join:
+        legs["C5"] = "FAIL"
+        f.append("C5 整句没念全：念出=%r 应有=%r" % (joined, tail_norm))
     else:
-        page.wait_for_timeout(300)
-        d = v()
-        joined = "".join([x["text"] for x in d["utts"]]).replace(" ", "")
-        tail_norm = page.evaluate("() => window.__vcReply").replace(" ", "")
-        if joined != tail_norm:
-            legs["C5"] = "FAIL"
-            f.append("C5 整句没念全：念出=%r 应有=%r" % (joined, tail_norm))
-        else:
-            legs["C5"] = "PASS"
-            got_s2, _ = wait_state(page, "listening", 20)
-            print("C5 PASS  首声 %.1fms < 末片 %.1fms，整句全念出（%d 次出声，念完自动回听=%s）"
-                  % (d["utts"][0]["at"], d["deltas"][-1]["at"], len(d["utts"]), got_s2))
+        legs["C5"] = "PASS"
+        d2 = vc(page)                                  # 出声次数要按念全之后的读数印，别拿旧快照
+        print("C5 PASS  首声 %.1fms < 末片 %.1fms，整句全念出（%d 次出声，念完自动回听=%s）"
+              % (d["utts"][0]["at"], d["deltas"][-1]["at"], len(d2["utts"]), back))
 
-    # C8 全双工可打断（先把出声时长调到 1.5s，确保打断发生在「它还在说」的窗口里）
+    # C11 真机 results 是会话级累计列表 ⇒ 收过口的旧句不得再拼进下一句
+    before = len(d["texts"])
+    page.evaluate("() => window.__vcSay('第一句已经收口了', true)")
+    if not wait_texts(page, before + 1):
+        legs["C11"] = "FAIL"
+        f.append("C11 前置缺失：第一句没起轮（texts 停在 %d）⇒ 本腿无靶子" % before)
+        return
+    page.evaluate("() => window.__vcSay('第二句单独成句', true)")
+    ok2 = wait_texts(page, before + 2)
+    texts = vc(page)["texts"]
+    if not ok2:
+        legs["C11"] = "FAIL"
+        f.append("C11 前置缺失：第二句没起轮（texts=%s）" % texts)
+    elif texts[-1] != "第二句单独成句":
+        legs["C11"] = "FAIL"
+        f.append("C11 旧句被重拼：本轮送模型的是 %r（应只有「第二句单独成句」）" % texts[-1])
+    else:
+        legs["C11"] = "PASS"
+        print("C11 PASS  收过口的旧句不再参与下一句（本轮送模型=%r）" % texts[-1])
+
+
+def legs_duplex(page, f, legs):
+    """C8 全双工可打断 / C8b 半双工讲完再听（两条都要过）。"""
+    # 把出声时长撑到 1.5s，保证「打断」发生在它真的还在说的时候（否则这条腿在打空靶）
     page.evaluate("() => { window.__vc.speakMs = 1500; window.__vc.cancels = 0; window.__vc.utts = []; }")
     page.evaluate("() => window.__vcSay('今天有点累想早点睡', true)")
     got_sp, st = wait_state(page, "speaking", 60)
@@ -363,13 +452,13 @@ def run_legs(page):
         f.append("C8 前置缺失：新一轮没能进入出声态（state=%s），打断腿没靶子" % st)
     else:
         page.evaluate("() => { window.__vc.cancels = 0; }")
-        if v()["cancels"] != 0:
+        if vc(page)["cancels"] != 0:
             legs["C8"] = "FAIL"
             f.append("C8 前置缺失：cancels 清零没生效")
         else:
             page.evaluate("() => window.__vcSay('先别说了我想静静', true)")
             ok_i, st = wait_state(page, "listening", 40)
-            c = v()["cancels"]
+            c = vc(page)["cancels"]
             if c >= 1 and ok_i:
                 legs["C8"] = "PASS"
                 print("C8 PASS  全双工：用户插话即闭嘴（cancels=%d state=%s）" % (c, st))
@@ -377,10 +466,9 @@ def run_legs(page):
                 legs["C8"] = "FAIL"
                 f.append("C8 插话没打断：cancels=%d state=%s" % (c, st))
 
-    # C8b 半双工：切档后它开口即停识别
     page.locator("#btn-call-duplex").click(timeout=5000)
-    word = page.locator("#btn-call-duplex").inner_text()
-    if "讲完再听" not in word:
+    ok_half, word = wait_text(page, "#btn-call-duplex", "讲完再听")
+    if not ok_half:
         legs["C8b"] = "FAIL"
         f.append("C8b 双工切换按钮文案没翻面：%r" % word)
     else:
@@ -390,76 +478,69 @@ def run_legs(page):
         if not got_h:
             legs["C8b"] = "FAIL"
             f.append("C8b 前置缺失：半双工下没进入出声态（state=%s）" % st)
+        elif wait_count(page, "stopped", 1):
+            legs["C8b"] = "PASS"
+            print("C8b PASS  半双工：它开口即停识别（stopped=%d）" % vc(page)["stopped"])
         else:
-            page.wait_for_timeout(150)
-            s = v()["stopped"]
-            if s >= 1:
-                legs["C8b"] = "PASS"
-                print("C8b PASS  半双工：它开口即停识别（stopped=%d）" % s)
-            else:
-                legs["C8b"] = "FAIL"
-                f.append("C8b 半双工没停识别（stopped=0）⇒ 会把自家念白当用户插话")
+            legs["C8b"] = "FAIL"
+            f.append("C8b 半双工没停识别（stopped=0）⇒ 会把自家念白当用户插话")
     page.evaluate("() => { window.__vc.speakMs = 40; }")
     page.locator("#btn-call-duplex").click(timeout=5000)
 
-    # C7 摄像头开着也能通话（注入 FaceEngine 读数）
+
+def legs_camera(page, f, legs):
+    """C7 摄像头开着也能通话（注入 FaceEngine 读数；真摄像头腿归 face_check.py）。"""
     page.evaluate("() => { window.FaceEngine = window.FaceEngine || {}; window.FaceEngine.last = function () { return {emotion: 'sad', intensity: 0.6}; }; window.VoiceCall._repaint(); }")
-    page.wait_for_timeout(150)
-    face_txt = page.locator("#call-face").inner_text()
-    page.evaluate("() => { window.__vc.llmCalls = 0; window.__vcSay('现在摄像头开着也能聊', true); }")
-    page.wait_for_timeout(1300)
-    if "表情随聊已开启" not in face_txt:
+    ok_face, face_txt = wait_text(page, "#call-face", "表情随聊已开启")
+    n0 = len(vc(page)["texts"])
+    page.evaluate("() => window.__vcSay('现在摄像头开着也能聊', true)")
+    ok_turn = wait_texts(page, n0 + 1)
+    if not ok_face:
         legs["C7"] = "FAIL"
         f.append("C7 摄像头开着但通话层读数没反映：%r" % face_txt)
-    elif v()["llmCalls"] < 1:
+    elif not ok_turn:
         legs["C7"] = "FAIL"
-        f.append("C7 摄像头开着时通话链路断了（llmCalls=0）")
+        f.append("C7 摄像头开着时通话链路断了（送模型 0 轮）")
     else:
         legs["C7"] = "PASS"
-        print("C7 PASS  摄像头开着照旧通话（读数=%r llmCalls=%d）" % (face_txt, v()["llmCalls"]))
+        print("C7 PASS  摄像头开着照旧通话（读数=%r 送模型=%r）" % (face_txt, vc(page)["texts"][-1]))
 
-    # C11 会话累计转写不得把上一句重新拼进下一句（真机 results 会一直留着旧句）
-    n_text_before = len(v()["texts"])
-    page.evaluate("() => window.__vcSay('第一句已经收口了', true)")
-    page.wait_for_timeout(1400)
-    page.evaluate("() => window.__vcSay('第二句单独成句', true)")
-    page.wait_for_timeout(1400)
-    texts = v()["texts"]
-    if len(texts) < n_text_before + 2:
-        legs["C11"] = "FAIL"
-        f.append("C11 前置缺失：两句只起了 %d 轮（应有 2 轮）⇒ 收口没跑起来，本腿无靶子"
-                 % (len(texts) - n_text_before))
-    elif texts[-1] != "第二句单独成句":
-        legs["C11"] = "FAIL"
-        f.append("C11 旧句被重拼：本轮送模型的是 %r（应只有「第二句单独成句」）" % texts[-1])
-    else:
-        legs["C11"] = "PASS"
-        print("C11 PASS  收过口的旧句不再参与下一句（本轮送模型=%r）" % texts[-1])
 
-    # C9 退出复位
+def legs_exit(page, f, legs):
+    """C9 退出复位：浮层收起 + 回调已摘 + 自派 end 不再重启识别。"""
     page.locator("#btn-call-end").click(timeout=5000)
-    page.wait_for_timeout(250)
-    before = v()["started"]
+    ok_idle, st = wait_state(page, "idle", 40)
+    before = vc(page)["started"]
     hidden = page.evaluate("() => document.querySelector('#call-layer').hidden")
-    st = page.evaluate("() => window.VoiceCall.inspect().state")
     # 先证「回调真被摘掉」，再看 start 计数有没有涨（否则 sink 已为 null，计数不涨是白断）
-    sink_after_exit = page.evaluate("() => String(window.SpeechRecognition.__sink)")
-    if "function" in sink_after_exit:
-        legs["C9"] = "FAIL"
-        f.append("C9 退出后 onresult 回调还在（sink=%s）⇒ 判红不给绿，防白断" % sink_after_exit[:60])
-        return f, legs
+    sink = page.evaluate("() => String(window.SpeechRecognition.__sink)")
     page.evaluate("() => { var s = window.SpeechRecognition.__sink; if (s) s({ results: [] }); }")
     page.wait_for_timeout(400)
-    after = v()["started"]
-    if not hidden or st != "idle":
+    after = vc(page)["started"]
+    if not hidden or not ok_idle:
         legs["C9"] = "FAIL"
         f.append("C9 结束通话没收回：hidden=%s state=%s" % (hidden, st))
+    elif "function" in sink:
+        legs["C9"] = "FAIL"
+        f.append("C9 退出后 onresult 回调还在（sink=%s）⇒ 前置不成立，计数断言是白断" % sink[:60])
     elif after > before:
         legs["C9"] = "FAIL"
         f.append("C9 退出后识别又被重启（started %d→%d）⇒ 没摘回调，会空转到刷新" % (before, after))
     else:
         legs["C9"] = "PASS"
         print("C9 PASS  退出复位：浮层收起 state=idle 且 end 事件不再重启识别（started 保持 %d）" % after)
+
+
+def run_legs(page):
+    """六段行为腿依次跑；C1 失败即整体早退（后面每条腿都依赖通话层已打开）。"""
+    f, legs = [], {}
+    if not legs_open(page, f, legs):
+        return f, legs
+    legs_timbre(page, f, legs)
+    legs_turn(page, f, legs)
+    legs_duplex(page, f, legs)
+    legs_camera(page, f, legs)
+    legs_exit(page, f, legs)
     return f, legs
 
 
