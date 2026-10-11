@@ -34,6 +34,10 @@ window.VoiceCall = (function () {
   const END_RE = /[。！？!?…]+$/;
   const TAIL_RE = /(然后|还有|而且|以及|或者|因为|但是|所以|就是|那个|可以|需要|应该|比较|特别|非常|一点|一些|的话|可是|不过|要是|如果|跟|和|与|、|，|,)$/;
   const SENT_SPLIT = /[。！？!?…；;]/;
+  // 采集侧显式声明处理链（不再吃浏览器默认）：Web Speech 的内部采集 JS 管不到，能管的是
+  // 这一路音量计流 + 下面的能量门 —— 后者才是「背景噪声不许把话头一直吊着」的那道闸。
+  const AUDIO_CST = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  const NOISE_FLOOR = 0.012;     // 能量门下限：低于此不刷新 lastSpeech（取不到读数时不拦）
 
   let deps = null, rec = null, SR = null;
   let state = "idle";           // idle | listening | thinking | speaking
@@ -43,6 +47,7 @@ window.VoiceCall = (function () {
   let baseLen = 0, lastLen = 0;   // 已收过口的转写条数 / 本会话累计转写条数（防旧句被重新拼进新句）
   let recAlive = false;           // 识别会话是否还活着：活着就不该再 start()（真机 start 会抛，白折腾一次重启）
   let consumed = 0, speakingBuf = "", tailQueued = false, aiLine = null, lastGum = null;
+  let lvl = null;               // 音量计实时能量读数；null = 取不到（判据桩/无权限），取不到就不拦
   let vad = null;               // {stop()} 或 null
   const metric = { user: "", reply: "", mode: "", ttfb: 0 };
 
@@ -65,6 +70,8 @@ window.VoiceCall = (function () {
     if (silenceMs >= SILENCE_MS && semanticallyComplete(t)) return "语义收句";
     return "";
   }
+  /** 能量门：噪声不该被当成「还在说话」。读数取不到（无权限/桩）一律放行，宁降级不误伤。 */
+  function gateOpen(l) { return l == null || l >= NOISE_FLOOR; }
 
   /* ── 分句（首声延迟的关键：一句收住就送进朗读队列）──────────────── */
   /** 从累计文本里切出「新增且已收住」的句子。返回 [句子数组, 新的消费位置] */
@@ -184,6 +191,7 @@ window.VoiceCall = (function () {
       }
       const got = (said + interim).trim();
       if (!micOn) { pending = ""; return; }              // 静音键：不采集也不收句
+      if (!gateOpen(lvl)) return;                        // 能量门：这一帧没人在说话，噪声不配当话头
       pending = got;
       lastSpeech = performance.now();
       // 全双工打断：用户真的插话（且不是我们自己念的字）→ 立刻闭嘴转回听
@@ -218,7 +226,7 @@ window.VoiceCall = (function () {
   function startVad() {
     const md = navigator.mediaDevices;
     if (!md || !md.getUserMedia || !(window.AudioContext || window.webkitAudioContext)) return;
-    lastGum = { audio: true, video: false };
+    lastGum = { audio: AUDIO_CST, video: false };
     md.getUserMedia(lastGum)
       .then((stream) => {
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -236,14 +244,15 @@ window.VoiceCall = (function () {
           an.getByteTimeDomainData(buf);
           let sum = 0;
           for (let i = 0; i < buf.length; i++) { const d = (buf[i] - 128) / 128; sum += d * d; }
-          if (meter) meter.style.setProperty("--lvl", String(Math.min(1, Math.sqrt(sum / buf.length) * 3.2)));
+          lvl = Math.sqrt(sum / buf.length);
+          if (meter) meter.style.setProperty("--lvl", String(Math.min(1, lvl * 3.2)));
           self.timer = requestAnimationFrame(loop);
         };
         loop();
       })
       .catch(() => { const m = $("#call-level"); if (m) m.classList.add("is-na"); });
   }
-  function stopVad() { if (vad) { try { vad.stop(); } catch (e) { /* 已释放 */ } vad = null; } }
+  function stopVad() { lvl = null; if (vad) { try { vad.stop(); } catch (e) { /* 已释放 */ } vad = null; } }
 
   /* ── 一轮问答 ───────────────────────────────────────────────────── */
   function bargeIn() {
@@ -255,12 +264,11 @@ window.VoiceCall = (function () {
     paint();
   }
   function queueSpeech(s) {
-    speakingBuf += s;
-    if (window.Voice) {
-      window.Voice.enqueue(s, () => {
-        if (!ttf && turnAt) { ttf = Math.round(performance.now() - turnAt); metric.ttfb = ttf; paint(); }
-      });
-    }
+    speakingBuf += s;                 // 回声过滤按字面比对，发不出声也得记下我说过什么
+    const heard = !!window.Voice && window.Voice.enqueue(s, () => {
+      if (!ttf && turnAt) { ttf = Math.round(performance.now() - turnAt); metric.ttfb = ttf; paint(); }
+    });
+    if (!heard) { paint(); return; }  // 发不出声就别把状态翻成「在说」，否则永远等不到回听（判据 C13）
     if (state === "thinking") state = "speaking";
     if (state === "speaking" && duplex === "half") pauseRec();
     paint();
@@ -326,6 +334,7 @@ window.VoiceCall = (function () {
   /* ── 开 / 收 ────────────────────────────────────────────────────── */
   function startCall() {
     if (state !== "idle" || !asrReady() || !$("#call-layer")) return;
+    if (window.Voice) window.Voice.probeLocal();   // 开了本机引擎就在开口前探一次；默认关 ⇒ 零请求
     SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     state = "listening";
     pending = ""; ttf = 0; turnMs = 0; consumed = 0; speakingBuf = ""; aiLine = null; lastSpeech = 0;
@@ -421,6 +430,6 @@ window.VoiceCall = (function () {
         complete: semanticallyComplete(pending || metric.user), metrics: metric,
         gum: lastGum, videoAsked: !!(lastGum && lastGum.video), lines: $("#call-captions") ? $("#call-captions").children.length : 0 };
     },
-    _unit: { semanticallyComplete, shouldCommit, cutSentences, isEcho }
+    _unit: { semanticallyComplete, shouldCommit, cutSentences, isEcho, gateOpen }
   };
 })();

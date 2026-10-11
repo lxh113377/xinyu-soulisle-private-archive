@@ -55,7 +55,7 @@ window.Voice = (function () {
   const voiceListeners = [];
   function buildCatalog() {
     const vs = rawVoices();
-    const out = [];
+    const out = ltOn() ? ltCatalog() : [];      // 本机引擎在位时排最前，浏览器音色随后作兜底
     const base = vs.length ? vs : [null];
     base.forEach((v, i) => {
       TONES.forEach((t) => {
@@ -84,13 +84,15 @@ window.Voice = (function () {
   function timbre() {
     const c = catalog.length ? catalog : buildCatalog();
     if (chosen) { const hit = c.filter((t) => t.id === chosen.id); if (hit.length) return hit[0]; }
+    const local = c.filter((t) => t.local)[0];
     const neural = c.filter((t) => /独立音色/.test(t.label))[0];
-    return neural || c[0];
+    return local || neural || c[0];
   }
   function setTimbre(id) {
     const hit = (catalog.length ? catalog : buildCatalog()).filter((t) => t.id === id)[0];
     if (!hit) return false;
     chosen = hit;
+    if (hit.local) setLtSid(hit.sid);
     try { localStorage.setItem(TIMBRE_KEY, JSON.stringify(hit)); } catch { /* 内存态 */ }
     return true;
   }
@@ -110,28 +112,116 @@ window.Voice = (function () {
     try { return window.speechSynthesis.getVoices() || []; } catch { return []; }
   }
 
+  /* ── 本机开源神经引擎（r118 决策 #11：sherpa-onnx sidecar，零密钥零付费）──────────
+   * 三层开关口径与 emotion-remote / J4 记忆完全一致，不得混为一谈：
+   *   1) 代码层：`cfg.localTts === true` 才探测 —— 默认关，公网面一次网络请求都不发
+   *      （否则 ERR_CONNECTION_REFUSED 会打破 public_check 的 CONSOLE_ERRORS:0）；
+   *   2) 本地演示层：src/js/demo-config.js 置 localTts: true（sidecar 起在 127.0.0.1:8320）；
+   *   3) 公网部署层：deploy/xinyu/js/demo-config.js 刻意不含。
+   * 探测失败/引擎不在 → 全链路按改动前的浏览器路径走，零回归。 */
+  const LT_BASE = "http://127.0.0.1:8320";
+  const LT_SID_KEY = "peiliao.localtts.sid.v1";
+  const LT_SHOW = 8;                 // 目录里放前 8 个说话人（模型实测 174 人，全列会把下拉撑爆）
+  let lt = { probed: false, up: false, busy: false, speakers: 0, err: "" };
+  let ltAudio = null, ltSeq = 0;
+  let ltSid = 0;
+  try { ltSid = Math.max(0, parseInt(localStorage.getItem(LT_SID_KEY) || "0", 10) || 0); } catch { ltSid = 0; }
+  function cfgLocalTts() {
+    try { return JSON.parse(localStorage.getItem("peiliao.cfg.v1") || "{}").localTts === true; } catch { return false; }
+  }
+  const ltOn = () => lt.up;
+  function ltCatalog() {
+    const out = [];
+    for (let i = 0; i < Math.min(LT_SHOW, lt.speakers); i++) {
+      out.push({ id: "lt/" + i, label: "本机神经引擎 · 说话人 " + (i < 10 ? "0" : "") + i,
+        local: true, sid: i, rate: 1, pitch: 1, kind: "本机开源引擎" });
+    }
+    return out;
+  }
+  function probe() {
+    if (lt.busy || lt.up || !cfgLocalTts()) return;      // 每次都按当前 cfg 重判：demo-config 在 init 之后才写开关
+    lt.busy = true; lt.probed = true;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => { try { ctl.abort(); } catch { /* 已了结 */ } }, 1500);
+    fetch(LT_BASE + "/health", { signal: ctl.signal })
+      .then((r) => r.json())
+      .then((j) => {
+        clearTimeout(timer); lt.busy = false;
+        lt.up = !!(j && j.loaded && j.numSpeakers > 0);
+        lt.speakers = (j && j.numSpeakers) || 0; lt.err = (j && j.error) || "";
+        if (ltSid >= lt.speakers) ltSid = 0;
+        buildCatalog(); emitVoices();
+      })
+      .catch((e) => { clearTimeout(timer); lt.busy = false; lt.up = false; lt.err = String((e && e.name) || e).slice(0, 60); });
+  }
+  /** 一句话 → WAV → 播完 resolve。发不出声也必须 resolve，否则队列会挂死（同 C13 那一类）。
+   *  onPlay 在**真的要开口那一刻**回调（不是请求发出时）——首声延迟要量的是这个。 */
+  function ltSpeak(text, sid, onPlay) {
+    const seq = ++ltSeq;
+    return fetch(LT_BASE + "/tts", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: text, sid: sid, speed: 1 })
+    }).then((r) => { if (!r.ok) throw new Error("tts-" + r.status); return r.blob(); })
+      .then((b) => new Promise((done) => {
+        if (seq !== ltSeq) { done(); return; }             // 已被更新的一句话顶掉
+        const el = new Audio(URL.createObjectURL(b));
+        ltAudio = el;
+        let settled = false, watch = 0;
+        const settle = () => {
+          if (settled) return;
+          settled = true; clearTimeout(watch);
+          if (ltAudio === el) ltAudio = null;
+          try { URL.revokeObjectURL(el.src); } catch { /* 已释放 */ }
+          done();
+        };
+        el.onended = el.onerror = settle;
+        watch = setTimeout(settle, 30000);   // 播放事件丢了也不许把朗读队列挂死
+        if (onPlay) { try { onPlay(); } catch { /* 回调是观测项 */ } }
+        el.play().catch(() => settle());
+      }));
+  }
+  function ltStop() { ltSeq++; if (ltAudio) { try { ltAudio.pause(); } catch { /* 已停 */ } ltAudio = null; } }
+  function setLtSid(sid) {
+    ltSid = Math.max(0, Math.min(Number(sid) || 0, Math.max(0, lt.speakers - 1)));
+    try { localStorage.setItem(LT_SID_KEY, String(ltSid)); } catch { /* 内存态 */ }
+    return ltSid;
+  }
+
   /* ── 朗读队列（分句出声）────────────────────────────────────────── */
   let queue = [], talking = false;
   const clean = (t) => String(t == null ? "" : t).replace(/\s+/g, " ").slice(0, 400);
+  const canSpeak = () => ltOn() || hasTTS();
   function pump() {
-    if (talking || !hasTTS()) return;
+    if (talking || !canSpeak()) return;
     const item = queue.shift();
     if (!item) return;
     talking = true;
+    const t = timbre();
+    if (t.local) {                                  // 本机神经引擎：一句话一个 WAV，播完再排下一句
+      ltSpeak(clean(item.text), t.sid, item.onStart).then(() => { talking = false; pump(); },
+        () => { talking = false; if (ltOn()) lt.err = "net"; pump(); });
+      return;
+    }
     let u;
     try {
       u = new window.SpeechSynthesisUtterance(clean(item.text));
-      applyTimbre(u, timbre());
+      applyTimbre(u, t);
       if (item.onStart) u.onstart = () => { try { item.onStart(); } catch { /* 回调是观测项 */ } };
       u.onend = u.onerror = () => { talking = false; pump(); };
       window.speechSynthesis.speak(u);
     } catch { talking = false; queue = []; }        // 约束 2：朗读失败不许把队列挂死
   }
-  /** 送一句进队列；onStart 在该句真正开口时回调（通话层用它记「首声延迟」） */
-  function enqueue(text, onStart) { queue.push({ text: text, onStart: onStart }); pump(); }
+  /** 送一句进队列；onStart 在该句真正开口时回调（通话层用它记「首声延迟」）。
+   *  返回 false = 这引擎根本发不出声（调用方据此别把状态翻成「在说」，见 C13）。 */
+  function enqueue(text, onStart) {
+    if (!canSpeak()) return false;      // 引擎缺失即拒收：队列里留项 = queueBusy 恒真 = 通话卡死
+    queue.push({ text: text, onStart: onStart }); pump();
+    return true;
+  }
   function cancelSpeech() {
     queue = [];
     talking = false;
+    ltStop();
     if (hasTTS()) { try { window.speechSynthesis.cancel(); } catch { /* 忽略 */ } }
   }
   const queueBusy = () => talking || queue.length > 0;
@@ -218,6 +308,7 @@ window.Voice = (function () {
       speakInit();
       voiceInit();
       buildCatalog();
+      probe();                       // cfg.localTts 不为 true 时零请求（公网面/默认态行为一字不变）
       if (hasTTS()) {
         // 部分浏览器 getVoices() 首帧为空，音色表稍后异步到位 ⇒ 到位后重建目录，
         // 用户没手动选过就跟着升级到更好的音色（选过的一律尊重用户选择）
@@ -235,6 +326,8 @@ window.Voice = (function () {
     /** 供通话层与设置面使用 */
     timbreCatalog: buildCatalog,
     timbre, setTimbre, preview, enqueue, cancelSpeech, queueBusy, onVoices,
-    ttsReady: hasTTS
+    ttsReady: hasTTS, probeLocal: probe,
+    /** 供判据与设置面读取本机引擎状态；不驱动业务路径 */
+    localStatus: () => ({ probed: lt.probed, up: lt.up, speakers: lt.speakers, err: lt.err, sid: ltSid })
   };
 })();

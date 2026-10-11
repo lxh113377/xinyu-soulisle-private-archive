@@ -30,9 +30,14 @@
   C9 退出复位：结束通话后浏览器自派 end **不得**再重启识别（先证回调已摘，再看计数）
   C10 全程零 pageerror
   C11 会话累计转写不重复收口（真机 results 留着旧句；桩按累计语义投才打得中这一类缺陷）
+  C12 采集链显式声明降噪/回声抑制/自动增益 + 能量门纯函数（噪声不许把话头吊着不收口）
+  C13 合成引擎**根本不在**时整轮仍跑完并回到听态（字幕是唯一出口；有码无判据的兜底腿，07 卷139 登记）
+  C14 长轮次稳定性：连打 8 轮不重建识别器、不重复 start、字幕封顶、轮轮都回听
+      ⚠️ 本腿是**桩化**的结构稳定性，不等于真机连说 30 分钟；本机无真麦克风，后者只能人测。
+  C15 本机神经语音引擎：默认态零探测（公网红线）+ 开关开时目录/路由/通话中切说话人三件齐
 
-函数切分（r116 收口轮）：loc_guard 的 ≤150 行/函数门把原来的 run_legs（219 行）拆成
-  六段（开层/音色/整轮/双工/摄像头/退出），每段自带前置缺失即早退，结论仍汇进同一个 legs 字典。
+函数切分（r116 收口轮 / r118 补四段）：loc_guard 的 ≤150 行/函数门把原来的 run_legs（219 行）拆成
+  十段（开层/音色/整轮/双工/摄像头/采集链/无TTS/长轮次/退出/本机引擎），每段自带前置缺失即早退，结论仍汇进同一个 legs 字典。
   等态一律走 wait_state / wait_text 的**完成态轮询**，不留装饰性定长等待
   （timing_coupling 的 C1_HARD 棘轮只认「等完直接读一个确定值」这种形状）。
 
@@ -50,7 +55,8 @@ URL = next((a for a in sys.argv[1:] if not a.startswith("--")), "http://127.0.0.
 
 STUB = r"""
 window.__vc = { utts: [], deltas: [], cancels: 0, gum: [], started: 0, stopped: 0,
-                 srMade: 0, ev: [], llmCalls: 0, results: [], t0: 0, speakMs: 40, texts: [] };
+                 srMade: 0, ev: [], llmCalls: 0, results: [], t0: 0, speakMs: 40, texts: [],
+                 ttsReqs: [], audioMade: 0, audioPlayed: 0, audioPaused: 0 };
 (function () {
   var V = window.__vc;
   var now = function () { return performance.now(); };
@@ -110,6 +116,55 @@ window.__vc = { utts: [], deltas: [], cancels: 0, gum: [], started: 0, stopped: 
     };
     P.cancel = function () { V.cancels += 1; };
   }
+  /* ── TTS「引擎根本不在」态（C13 用）：patch speak 只是把声音吃掉，hasTTS() 依然为真 ⇒
+        那条「队列里的句子永不消费」的缺陷照样打不中。这里把构造器摘成 undefined，
+        让被测对象的 hasTTS() 自己判 false —— 前置断言读的就是它。 ── */
+  var Utt = window.SpeechSynthesisUtterance;
+  window.__vcKillTTS = function () {
+    try {
+      Object.defineProperty(window, "SpeechSynthesisUtterance", { value: undefined, configurable: true });
+    } catch (e) { return "define-fail:" + e.message; }
+    return "killed";
+  };
+  window.__vcRestoreTTS = function () {
+    try {
+      Object.defineProperty(window, "SpeechSynthesisUtterance", { value: Utt, configurable: true, writable: true });
+    } catch (e) { return "restore-fail:" + e.message; }
+    return "restored";
+  };
+  /* ── 本机神经引擎 sidecar 桩（C15 用）：/health 与 /tts 由桩应答，其余 fetch 原样透传。
+        探测本身由被测对象按 cfg.localTts 决定 —— 默认态一次都不发，这正是公网面的红线。
+        Audio 桩按真机语义投：play() 起定时器后派发 onended，否则被测对象的
+        「播完才排下一句」这条永远等不到，等于拿假桩测自己。 */
+  var RF = window.fetch ? window.fetch.bind(window) : null;
+  window.fetch = function (u, opt) {
+    var s = String(u);
+    if (s.indexOf("/health") >= 0) { V.probeHits = (V.probeHits || 0) + 1; }
+    if (s.indexOf("/health") < 0 && s.indexOf("/tts") < 0) {
+      return RF ? RF(u, opt) : Promise.reject(new Error("no-fetch"));
+    }
+    if (s.indexOf("/health") >= 0) {
+      V.healthHits = (V.healthHits || 0) + 1;
+      return Promise.resolve({ ok: true, status: 200, json: function () {
+        return Promise.resolve({ status: "UP", loaded: true, numSpeakers: 174,
+                                 sampleRate: 22050, engine: "stub", error: "" }); } });
+    }
+    var b = {}; try { b = JSON.parse((opt && opt.body) || "{}"); } catch (e) {}
+    V.ttsReqs.push({ text: b.text, sid: b.sid });
+    return Promise.resolve({ ok: true, status: 200, blob: function () {
+      return Promise.resolve(new Blob([new Uint8Array([82, 73, 70, 70])], { type: "audio/wav" })); } });
+  };
+  window.Audio = function (src) {
+    var el = { src: src, onended: null, onerror: null, _t: 0,
+      play: function () {
+        V.audioPlayed += 1;
+        el._t = setTimeout(function () { if (el.onended) { try { el.onended(); } catch (e) {} } }, V.speakMs);
+        return Promise.resolve();
+      },
+      pause: function () { clearTimeout(el._t); V.audioPaused += 1; } };
+    V.audioMade += 1;
+    return el;
+  };
   /* ── getUserMedia：记录约束后拒绝（音频腿取不到时通话必须照常用）── */
   if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     navigator.mediaDevices.getUserMedia = function (c) {
@@ -174,6 +229,18 @@ def wait_text(page, sel, needle, tries=40):
     return False, txt
 
 
+def wait_js(page, expr, tries=60):
+    """等「页面表达式为真」这个完成态（本机引擎的探测是异步 fetch，定长等待会飘）"""
+    for _ in range(tries):
+        try:
+            if page.evaluate(expr):
+                return True
+        except Exception:  # noqa: BLE001
+            return False
+        page.wait_for_timeout(50)
+    return False
+
+
 def wait_count(page, key, want, tries=60):
     """等「桩里的计数器到数」这个完成态（utts / texts / stopped 都用它）"""
     for _ in range(tries):
@@ -216,6 +283,20 @@ def first_sound_before_stream_end(utt_ts, delta_ts):
     return min(utt_ts) < max(delta_ts)
 
 
+AUDIO_FLAGS = ("echoCancellation", "noiseSuppression", "autoGainControl")
+
+
+def audio_chain_ok(gum_list):
+    """采集链的降噪/回声抑制必须**写进约束**，不是靠浏览器默认。
+    取最近一次请求（通话里只开一次，真重启也应以最新态为准）；audio 写成布尔 = 没声明 = 判红。"""
+    if not gum_list:
+        return False
+    audio = (gum_list[-1] or {}).get("audio")
+    if not isinstance(audio, dict):
+        return False
+    return all(audio.get(k) is True for k in AUDIO_FLAGS)
+
+
 def verdict(fails, legs, unit):
     """门面行：档位必须落在这一行本身，否则被电池折掉 = 没有读数。上限 110 字符。"""
     p = sum(1 for v in legs.values() if v == "PASS")
@@ -225,7 +306,7 @@ def verdict(fails, legs, unit):
 
 
 def selftest():
-    """尺自己的反例：三条纯函数各配正例/反例，并做一次「摘掉守卫必须翻绿」的变异。"""
+    """尺自己的反例：四条纯函数各配正例/反例，并做一次「摘掉守卫必须翻绿」的变异。"""
     bad = []
     cases_cam = [([], True, "没请求过音频也算干净"),
                  ([{"audio": True, "video": False}], True, "显式 video:false 干净"),
@@ -243,6 +324,25 @@ def selftest():
         bad.append("变异体没让反例翻绿 ⇒ camera_clean 这条腿在打不存在的靶子")
     if keep([{"video": True}]):
         bad.append("还原后同一反例没回判红 ⇒ 动的是期望值不是尺")
+
+    cases_audio = [([], False, "一次都没请求 = 没声明，不许读成通过"),
+                   ([{"audio": True, "video": False}], False, "audio 写成布尔 = 吃浏览器默认 = 判红"),
+                   ([{"audio": {"noiseSuppression": True}}], False, "只声明一面旗不算声明"),
+                   ([{"audio": {"echoCancellation": True, "noiseSuppression": True,
+                                "autoGainControl": True}}], True, "三面旗齐 = 采集链真被声明"),
+                   ([{"audio": {"echoCancellation": 1, "noiseSuppression": True,
+                                "autoGainControl": True}}], False, "1 不是 true，按未声明判红")]
+    for g, want, why in cases_audio:
+        if audio_chain_ok(g) != want:
+            bad.append("audio_chain_ok %s（期望 %s）" % (why, want))
+    keep3 = globals()["audio_chain_ok"]
+    globals()["audio_chain_ok"] = lambda g: True                     # 变异：把尺整个关掉
+    vac_a = [audio_chain_ok(g) for g, w, _ in cases_audio if not w]
+    globals()["audio_chain_ok"] = keep3
+    if not vac_a or not all(vac_a):
+        bad.append("变异体没让 audio_chain_ok 的反例翻绿 ⇒ 这条腿在打不存在的靶子")
+    if keep3([{"audio": True}]) or keep3([]):
+        bad.append("还原后「布尔 audio」或「一次没请求」仍算通过 ⇒ 动的是期望值不是尺")
 
     cases_fs = [([], [1.0], False, "没出声不得判通过"),
                 ([1.0], [], False, "没有流式末片不得判通过"),
@@ -272,8 +372,9 @@ def selftest():
     if bad:
         print("VOICECALL-SELFTEST-FAIL: " + " ; ".join(bad))
         return 1
-    print("VOICECALL-SELFTEST-PASS: %d 用例（camera_clean %d 条含变异翻绿+还原回红 / 首声时机 %d 条含空断言变异 / 门面行 3 条）"
-          % (len(cases_cam) + len(cases_fs) + 6, len(cases_cam), len(cases_fs)))
+    print("VOICECALL-SELFTEST-PASS: %d 用例（camera_clean %d 条含变异翻绿+还原回红 / audio_chain_ok %d 条含变异翻绿+还原回红 / 首声时机 %d 条含空断言变异 / 门面行 3 条）"
+          % (len(cases_cam) + len(cases_audio) + len(cases_fs) + 6, len(cases_cam),
+             len(cases_audio), len(cases_fs)))
     return 0
 
 
@@ -506,6 +607,117 @@ def legs_camera(page, f, legs):
         print("C7 PASS  摄像头开着照旧通话（读数=%r 送模型=%r）" % (face_txt, vc(page)["texts"][-1]))
 
 
+GATE_JS = """() => {
+  const U = window.VoiceCall._unit, o = [];
+  const ck = (name, got, want) => o.push([name, String(got) === String(want), got, want]);
+  ck("取不到能量读数就放行（无权限/桩）", U.gateOpen(null), true);
+  ck("低于门限不续命", U.gateOpen(0.005), false);
+  ck("高于门限放行", U.gateOpen(0.05), true);
+  ck("0 是纯静音，同样不许当话头", U.gateOpen(0), false);
+  return o;
+}"""
+
+
+def legs_noise(page, f, legs):
+    """C12 采集链显式声明降噪 + 能量门纯函数（噪声不许把话头一直吊着）。"""
+    d = vc(page)
+    if not audio_chain_ok(d["gum"]):
+        legs["C12"] = "FAIL"
+        f.append("C12 采集约束没显式声明 echoCancellation/noiseSuppression/autoGainControl（最近一次=%s）"
+                 "⇒ 「有降噪」只是浏览器默认，不能算实现" %
+                 json.dumps(d["gum"][-1] if d["gum"] else {}, ensure_ascii=False))
+        return
+    rows = page.evaluate(GATE_JS)
+    bad = [r for r in rows if not r[1]]
+    if bad:
+        legs["C12"] = "FAIL"
+        f.append("C12 能量门判据不符: %s" % bad)
+        return
+    legs["C12"] = "PASS"
+    print("C12 PASS  采集链三面旗齐 + 能量门 %d 例（无读数不拦 / 低能量不续命）；"
+          "Web Speech 内部采集 JS 管不到，此项只声明到音量计这一路" % len(rows))
+
+
+def last_ai_line(page):
+    return page.evaluate(
+        "() => { const l = document.querySelectorAll('#call-captions .call-line.ai');"
+        " return l.length ? (l[l.length-1].querySelector('.call-line-text') || {}).textContent || '' : ''; }")
+
+
+def legs_no_tts(page, f, legs):
+    """C13 合成引擎根本不在时，通话必须跑完整轮并回听（字幕是唯一出口）。"""
+    if page.evaluate("() => window.__vcKillTTS()") != "killed":
+        legs["C13"] = "FAIL"
+        f.append("C13 前置不成立：TTS 摘不掉，本腿无靶子（不是通过）")
+        return
+    if page.evaluate("() => window.Voice.ttsReady()"):
+        legs["C13"] = "FAIL"
+        f.append("C13 前置不成立：摘掉构造器后 ttsReady 仍为真 ⇒ 被测对象的能力探测没在跑")
+        return
+    n0 = len(vc(page)["texts"])
+    page.evaluate("() => { window.__vc.utts = []; }")
+    page.evaluate("() => window.__vcSay('这把椅子好像有点晃', true)")
+    ok_turn = wait_texts(page, n0 + 1)
+    back, st = wait_state(page, "listening", 40)
+    ai_txt = last_ai_line(page)
+    heard = len(vc(page)["utts"])
+    page.evaluate("() => window.__vcRestoreTTS()")
+    if not ok_turn:
+        legs["C13"] = "FAIL"
+        f.append("C13 没有合成引擎时整轮没跑完（送模型停在 %d）" % len(vc(page)["texts"]))
+    elif heard:
+        legs["C13"] = "FAIL"
+        f.append("C13 引擎已摘却仍有 %d 次出声 ⇒ 桩没生效，本腿白跑" % heard)
+    elif not back:
+        legs["C13"] = "FAIL"
+        f.append("C13 无 TTS 时卡在 %s 不回听 ⇒ 队列留了永不消费的项，通话就此哑掉" % st)
+    elif page.evaluate("() => window.__vcReply") not in ai_txt:
+        legs["C13"] = "FAIL"
+        f.append("C13 无 TTS 且字幕没兜住回复：%r" % ai_txt[:60])
+    else:
+        legs["C13"] = "PASS"
+        print("C13 PASS  无合成引擎：整轮跑完、0 次出声、字幕兜住、%s 回听态" % st)
+
+
+def legs_marathon(page, f, legs):
+    """C14 长轮次稳定性：连打 8 轮不许漏定时器 / 重建识别器 / 字幕爆量 / 轮次退化。"""
+    n0 = len(vc(page)["texts"])
+    made0, start0 = vc(page)["srMade"], vc(page)["started"]
+    stuck = ""
+    for i in range(8):
+        before = len(vc(page)["texts"])
+        page.evaluate("(t) => window.__vcSay('第' + t + '轮我想再确认一件事', true)", i + 1)
+        if not wait_texts(page, before + 1):
+            stuck = "第 %d 轮没起轮（texts 停在 %d）" % (i + 1, len(vc(page)["texts"]))
+            break
+        ok_back, st = wait_state(page, "listening", 40)
+        if not ok_back:
+            stuck = "第 %d 轮没回到听态（state=%s）" % (i + 1, st)
+            break
+    d = vc(page)
+    lines = page.evaluate("() => window.VoiceCall.inspect().lines")
+    done = len(d["texts"]) - n0
+    if stuck:
+        legs["C14"] = "FAIL"
+        f.append("C14 长轮次中途退化：%s" % stuck)
+    elif done < 8:
+        legs["C14"] = "FAIL"
+        f.append("C14 8 轮只跑完 %d 轮" % done)
+    elif d["srMade"] != made0:
+        legs["C14"] = "FAIL"
+        f.append("C14 识别器被重建（srMade %d→%d）⇒ 每轮换会话，长时间必累积泄漏" % (made0, d["srMade"]))
+    elif d["started"] > start0:
+        legs["C14"] = "FAIL"
+        f.append("C14 全双工下识别被重复 start（%d→%d）⇒ 30 分钟会空转到页面崩溃" % (start0, d["started"]))
+    elif lines > 12:
+        legs["C14"] = "FAIL"
+        f.append("C14 字幕没封顶（%d 行 > 12）⇒ DOM 无限涨" % lines)
+    else:
+        legs["C14"] = "PASS"
+        print("C14 PASS  连打 8 轮全跑完；srMade=%d started=%d 字幕=%d 行封顶（真机 30 分钟归人测，本机无真麦）"
+              % (d["srMade"], d["started"], lines))
+
+
 def legs_exit(page, f, legs):
     """C9 退出复位：浮层收起 + 回调已摘 + 自派 end 不再重启识别。"""
     page.locator("#btn-call-end").click(timeout=5000)
@@ -531,8 +743,89 @@ def legs_exit(page, f, legs):
         print("C9 PASS  退出复位：浮层收起 state=idle 且 end 事件不再重启识别（started 保持 %d）" % after)
 
 
-def run_legs(page):
-    """六段行为腿依次跑；C1 失败即整体早退（后面每条腿都依赖通话层已打开）。"""
+def legs_local(page, browser, url, f, legs):
+    """C15 本机神经引擎：默认态零探测（公网红线）+ 开关开时目录/路由/通话中切说话人三件都成立。"""
+    hits = vc(page).get("probeHits") or 0
+    probed = page.evaluate("() => window.Voice.localStatus().probed")
+    if hits or probed:
+        legs["C15"] = "FAIL"
+        f.append("C15 默认态（未置 cfg.localTts）就去探了本机引擎：probeHits=%d probed=%s"
+                 "⇒ 公网面会吃一条 ERR_CONNECTION_REFUSED，CONSOLE_ERRORS:0 判据会被打破" % (hits, probed))
+        return
+    ctx = browser.new_context(permissions=["microphone"])
+    ctx.add_init_script(STUB)
+    p2 = ctx.new_page()
+    e2 = []
+    p2.on("pageerror", lambda e: e2.append(str(e)))
+    try:
+        p2.goto(url, wait_until="load", timeout=30000)
+    except Exception as e:  # noqa: BLE001
+        ctx.close()
+        legs["C15"] = "FAIL"
+        f.append("C15 本机引擎页打不开（%s）—— 没测到不判绿" % str(e)[:70])
+        return
+    # 开关走真实门（cfg.localTts），且必须在 demo-config 落完它自己那份 cfg 之后合着写 ——
+    # 覆盖式写会把 remote/emotionRemote 抹掉，那就不是在测「本机引擎在位」而是在测一个不存在的配置态。
+    p2.evaluate("() => { const k='peiliao.cfg.v1'; const c=JSON.parse(localStorage.getItem(k)||'{}');"
+                " c.localTts = true; localStorage.setItem(k, JSON.stringify(c)); }")
+    p2.locator("#btn-call").click(timeout=5000)          # 开通话才探（默认态零请求那条在上半段已钉）
+    up = wait_js(p2, "() => window.Voice.localStatus().up === true")
+    st = p2.evaluate("() => window.Voice.localStatus()") if up else {}
+    ids = p2.evaluate("() => Array.from(document.querySelector('#call-timbre').options).map(o => o.value)")
+    ltids = [i for i in ids if str(i).startswith("lt/")]
+    if not up or not ltids:
+        ctx.close()
+        legs["C15"] = "FAIL"
+        f.append("C15 引擎在位却没进目录：up=%s status=%s 本机档位数=%d" % (up, st, len(ltids)))
+        return
+    p2.evaluate("() => window.__vcInstallFake()")
+    wait_state(p2, "listening")
+    n0 = len(vc(p2)["texts"])
+    p2.evaluate("() => { window.__vc.utts = []; window.__vc.ttsReqs = []; window.__vc.audioPlayed = 0; }")
+    p2.evaluate("() => window.__vcSay('我今天被导师骂了', true)")
+    ok_turn = wait_texts(p2, n0 + 1)
+    back, state_txt = wait_state(p2, "listening", 60)
+    d = vc(p2)
+    first_sid = d["ttsReqs"][0]["sid"] if ok_turn and d["ttsReqs"] else None
+    p2.select_option("#call-timbre", "lt/5")
+    heard0 = d["audioPlayed"]
+    p2.evaluate("() => window.__vcSay('换个声音再说一次', true)")
+    ok_swap = wait_texts(p2, n0 + 2)
+    d2 = vc(p2)
+    last_sid = d2["ttsReqs"][-1]["sid"] if ok_swap and d2["ttsReqs"] else None
+    ctx.close()
+    texts = [r["text"] for r in d2["ttsReqs"]]
+    if not ok_turn:
+        legs["C15"] = "FAIL"
+        f.append("C15 前置缺失：本机态整轮没跑完（texts=%d 应有>%d）" % (len(d["texts"]), n0))
+    elif not d["ttsReqs"]:
+        legs["C15"] = "FAIL"
+        f.append("C15 一次都没找本机引擎要音频（ttsReqs 空）⇒ 引擎在位却没被用上，等于白接")
+    elif d["utts"]:
+        legs["C15"] = "FAIL"
+        f.append("C15 选了本机引擎却仍走了浏览器合成（utts=%d）⇒ 路由没切过来" % len(d["utts"]))
+    elif not d["audioPlayed"]:
+        legs["C15"] = "FAIL"
+        f.append("C15 拿到音频却没播（audioPlayed=0）⇒ 存在性≠可达性")
+    elif last_sid == first_sid:
+        legs["C15"] = "FAIL"
+        f.append("C15 通话中切说话人没生效：切前 sid=%s 切后 sid=%s（应不同）" % (first_sid, last_sid))
+    elif not back or not ok_swap:
+        legs["C15"] = "FAIL"
+        f.append("C15 本机态没回到听态或第二轮没起轮：back=%s state=%s ok_swap=%s" % (back, state_txt, ok_swap))
+    elif e2:
+        legs["C15"] = "FAIL"
+        f.append("C15 本机态页面有未捕获异常 %d 条: %s" % (len(e2), e2[:2]))
+    else:
+        legs["C15"] = "PASS"
+        print("C15 PASS  默认态 0 探测；本机态 %d 档进目录、%d 次找 sidecar 要音频、0 次浏览器合成、"
+              "通话中切说话人 %s→%s 生效（播%d 次，真机音质归人测）"
+              % (len(ltids), len(d2["ttsReqs"]), first_sid, last_sid, d2["audioPlayed"] - heard0))
+        print("        送 sidecar 的文本：%s" % " | ".join(texts[:4])[:100])
+
+
+def run_legs(page, browser, url):
+    """十段行为腿依次跑；C1 失败即整体早退（后面每条腿都依赖通话层已打开）。"""
     f, legs = [], {}
     if not legs_open(page, f, legs):
         return f, legs
@@ -540,7 +833,11 @@ def run_legs(page):
     legs_turn(page, f, legs)
     legs_duplex(page, f, legs)
     legs_camera(page, f, legs)
+    legs_noise(page, f, legs)
+    legs_no_tts(page, f, legs)
+    legs_marathon(page, f, legs)
     legs_exit(page, f, legs)
+    legs_local(page, browser, url, f, legs)
     return f, legs
 
 
@@ -575,7 +872,7 @@ def main():
                 return 2
             uf, unit_n = unit_legs(page)
             fails += uf
-            lf, legs = run_legs(page)
+            lf, legs = run_legs(page, browser, URL)
             fails += lf
             if errs:
                 fails.append("C10 未捕获异常逃逸到页面 %d 条: %s" % (len(errs), errs[:2]))
