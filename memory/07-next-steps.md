@@ -11,6 +11,8 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 ## P0 — 必须做
 - [ ] 🔴 **每轮第一要务：表情识别 · 语意理解**（用户 2026-10-11 立规）—— 每轮必跑
       `python _test/core_capability_baseline_check.py`（棘轮只降不升）；目标/指标/轨迹 = `memory/10-core-capabilities.md`
+- [ ] 🟠 **[推荐:R116-01/02｜用户操作]** 语音通话已落地但**只在本地**：main 与 origin 分叉 18/52 ⇒ push 待老大选；
+      公网未发布 ⇒ `offline_shell` R9a / `live_sync` / `live_sync_alt` 三条必红。全文 `07-next-steps.part139.md`
 - [ ] WF-r97-v1.8.1发布链 推 main+tag v1.8.1+CI 回执+Release（Pages 面未发布，CI 电池不豁免 live 面）（由 flow 登记；状态: blocked）
 - [ ] **J3/J4 变现** [推荐:R35-02]：① ② ③ 三件均已实测就绪 ⇒ **唯一阻塞 = 老大给目标机器**（IP/登录/安全组）。`part17`
 - [ ] 🟠 [推荐:R83-02] **共享环境隔离待老大**：陪聊 / iCAN 门店 / 医 同居一个 CloudBase env，
