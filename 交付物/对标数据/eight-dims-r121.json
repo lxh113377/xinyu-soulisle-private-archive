@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/bench_eight_dims_check.py",
  "round": "r121",
- "written_at": "2026-10-11T20:26:40Z",
+ "written_at": "2026-10-11T20:27:40Z",
  "dims": [
   {
    "dim": "功能模块覆盖",
@@ -58,7 +58,7 @@
     },
     {
      "label": "self Java 用例",
-     "value": "12 件 / 101 例｜门 LINE/BRANCH ≥ {\"LINE\": 0.9, \"BRANCH\": 0.9}",
+     "value": "13 件 / 104 例｜门 LINE/BRANCH ≥ {\"LINE\": 0.9, \"BRANCH\": 0.9}",
      "source": "git ls-tree HEAD + server/pom.xml"
     },
     {
@@ -113,7 +113,7 @@
    "cells": [
     {
      "label": "self 30 天提交",
-     "value": "425 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
+     "value": "426 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
      "source": "本轮 git rev-list --count --since=30.days HEAD 实测"
     },
     {
