@@ -11,6 +11,11 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 ## P0 — 必须做
 - [ ] 🔴 **每轮第一要务：表情识别 · 语意理解**（用户 2026-10-11 立规）—— 每轮必跑
       `python _test/core_capability_baseline_check.py`（棘轮只降不升）；目标/指标/轨迹 = `memory/10-core-capabilities.md`
+- [ ] 🔴 **表情识别准确率攻坚（face-diag，2026-10-12 立）**：诊断+方案全文 = `memory/11-face-accuracy.md`
+      （主壳+四卷）。实测根因：真人 0.2~0.45 低强度段表情系统性沉底 calm（轻微笑 .22/轻怒 browDown .20 实测 MISS），
+      标定史全是表演级强度（Duchenne 4 张/peak 17 合成）。老大定口径：**有把握帧 top-1 ≥95% + 不确定帧 ≤30%；
+      端到端 ≤500ms 且单帧 ≤100ms；路线=规则派**。执行次序：S4 真照片 AU 批跑尺（T+7，先尺后改）
+      → S1 动态分母（T+3）→ S2 弱信号档（T+5）→ S3 anger 复标（T+10）→ M1 权重复标（T+28）。排期假设待老大确认。
 - [ ] 🟠 **[推荐:R116-01/02｜用户操作]** 语音通话已落地但**只在本地**：main 与 origin 分叉 18/52 ⇒ push 待老大选；
       公网未发布 ⇒ `offline_shell` R9a / `live_sync` / `live_sync_alt` 三条必红。全文 `07-next-steps.part139.md`
 - [ ] WF-r97-v1.8.1发布链 推 main+tag v1.8.1+CI 回执+Release（Pages 面未发布，CI 电池不豁免 live 面）（由 flow 登记；状态: blocked）
