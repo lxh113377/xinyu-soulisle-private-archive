@@ -385,60 +385,46 @@ def selftest():
             finally:
                 globals()["ROOT"] = save
 
-    # 反例 1：把 disgust 的口鼻证据抽掉（模拟 r102 的旧权重：disgust 判不出来）
-    m = real_rules.replace("noseSneerLeft: 1.0, noseSneerRight: 1.0,\n      mouthUpperUpLeft: 0.8, mouthUpperUpRight: 0.8,\n      mouthLowerDownLeft: 0.5, mouthLowerDownRight: 0.5,\n      mouthShrugUpper: 0.3,",
-                           "mouthShrugUpper: 0.3,")
-    if m == real_rules:
-        bad.append("selftest 反例1 构造失败：disgust 权重串没匹配上（规则文件已改？先更新本测试）")
-    else:
-        red, msg = probe_with(m, "反例1 disgust 证据被抽掉")
+    def rule_case(tag, *pairs):
+        """反例通用体：按 (旧, 新) 对依次替换规则片段，探针必须红。
+        返回 True=F11 抓到；构造失败（片段没匹配上）记入 bad 并返回 False。
+        收口行 F11-SELFTEST-PASS/FAIL 与逐条 print 的格式保持原样。"""
+        m = real_rules
+        for old, new in pairs:
+            m = m.replace(old, new)
+        if m == real_rules:
+            bad.append(tag + " 构造失败：替换片段没匹配上（规则文件已改？先更新本测试）")
+            return False
+        red, msg = probe_with(m, tag)
         print("  " + msg)
         if not red:
             bad.append(msg)
+        return True
+
+    # 反例 1：把 disgust 的口鼻证据抽掉（模拟 r102 的旧权重：disgust 判不出来）
+    rule_case("反例1 disgust 证据被抽掉",
+              ("noseSneerLeft: 1.0, noseSneerRight: 1.0,\n      mouthUpperUpLeft: 0.8, mouthUpperUpRight: 0.8,\n"
+               "      mouthLowerDownLeft: 0.5, mouthLowerDownRight: 0.5,\n      mouthShrugUpper: 0.3,",
+               "mouthShrugUpper: 0.3,"))
 
     # 反例 2：把 disgust 与 surprise 从声明的类别里去掉（模拟 r102 的旧版：
     #   这两类根本不在词表里，于是 disgust 判成 anger、surprise 判成 fear）
-    m2 = real_rules.replace(
-        '"surprise", "disgust", "contempt", "calm"', '"calm"')
-    if m2 == real_rules:
-        bad.append("selftest 反例2 构造失败：emotions 串没匹配上")
-    else:
-        red, msg = probe_with(m2, "反例2 删掉 surprise/disgust/contempt 三类（模拟旧版）")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例2 删掉 surprise/disgust/contempt 三类（模拟旧版）",
+              ('"surprise", "disgust", "contempt", "calm"', '"calm"'))
 
     # 反例 2b：把 fear 与 surprise 的分水岭拆掉（browDown 一正一负那一对）——
     #   模拟 r102 修的第二个真实缺陷：fear 永远被 surprise 抢走。
-    m2b = real_rules.replace("      browDownLeft: 0.4, browDownRight: 0.4,\n      jawOpen: 0.25,", "      jawOpen: 0.25,")
-    m2b = m2b.replace("      browDownLeft: -0.6, browDownRight: -0.6,\n      mouthPressLeft: -0.4, mouthPressRight: -0.4", "      mouthPressLeft: -0.4, mouthPressRight: -0.4")
-    if m2b == real_rules:
-        bad.append("selftest 反例2b 构造失败：browDown 分水岭串没匹配上")
-    else:
-        red, msg = probe_with(m2b, "反例2b 拆掉 fear/surprise 的 browDown 分水岭")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例2b 拆掉 fear/surprise 的 browDown 分水岭",
+              ("      browDownLeft: 0.4, browDownRight: 0.4,\n      jawOpen: 0.25,", "      jawOpen: 0.25,"),
+              ("      browDownLeft: -0.6, browDownRight: -0.6,\n      mouthPressLeft: -0.4, mouthPressRight: -0.4",
+               "      mouthPressLeft: -0.4, mouthPressRight: -0.4"))
 
     # 反例 3：peak 调到极小（模拟旧版饱和：所有非平静分都顶满 1.0）
-    m3 = real_rules.replace("peak: 0.60,", "peak: 0.05,")
-    if m3 == real_rules:
-        bad.append("selftest 反例3 构造失败：peak 串没匹配上")
-    else:
-        red, msg = probe_with(m3, "反例3 peak 调到 0.05（制造饱和）")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例3 peak 调到 0.05（制造饱和）", ("peak: 0.60,", "peak: 0.05,"))
 
     # 反例 4：confidence 阈值压到 0（恒 confident ⇒ 该字段退化成装饰）
-    m4 = real_rules.replace("confidence: { on: 0.15, lowLabel:", "confidence: { on: -1, lowLabel:")
-    if m4 == real_rules:
-        bad.append("selftest 反例4 构造失败：confidence 串没匹配上")
-    else:
-        red, msg = probe_with(m4, "反例4 confidence 阈值压到 -1（恒 confident）")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例4 confidence 阈值压到 -1（恒 confident）",
+              ("confidence: { on: 0.15, lowLabel:", "confidence: { on: -1, lowLabel:"))
 
     # 反例 5：把非对称门去掉（轻蔑会被 joy 抢走）。
     #   这条门在 **face-engine.js** 里（判据只存阈值），所以改的是引擎不是 rules。
@@ -474,92 +460,42 @@ def selftest():
     # 反例 6：把 anger 的 browDown 权重压回 1.0（=回到 r102 的量级），
     #   真愤怒的分数会掉到与「专注轻皱」拉不开 —— ②b 必须在此时报红。
     #   这条模拟的是"某天有人为了压误报把权重调回去"，是最可能发生的回退。
-    m6 = real_rules.replace("browDownLeft: 1.4, browDownRight: 1.4,",
-                            "browDownLeft: 1.0, browDownRight: 1.0,")
-    if m6 == real_rules:
-        bad.append("selftest 反例6 构造失败：anger 的 browDown 权重串没匹配上")
-    else:
-        ran += 1
-        red, msg = probe_with(m6, "反例6 anger 的 browDown 压回 1.0（真怒与专注拉不开）")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例6 anger 的 browDown 压回 1.0（真怒与专注拉不开）",
+              ("browDownLeft: 1.4, browDownRight: 1.4,", "browDownLeft: 1.0, browDownRight: 1.0,"))
 
     # 反例 7：把 sadness 的 browInnerUp 从 1.2 降回 0.7（= r102 的权重）。
     #   ⚠️ 这条原本写的是「拆掉 jawOpen 反向证据」，跑出来 **F11 没抓到** ——
     #   查证发现 jawOpen:-1.9 在两组真悲伤上**完全不影响分数**（删掉/归零后与有它时一字不差），
     #   它只管「悲伤+惊讶混合」的边界，不管主判。真正的 load-bearing 项是 browInnerUp。
     #   ⇒ 反例改成测真正起作用的那一个。教训：反例没被抓到时，先查它是不是测了个摆设。
-    m7 = real_rules.replace("      browInnerUp: 1.2,", "      browInnerUp: 0.7,")
-    if m7 == real_rules:
-        bad.append("selftest 反例7 构造失败：sadness 的 jawOpen 行没匹配上")
-    else:
-        ran += 1
-        red, msg = probe_with(m7, "反例7 sadness 的 browInnerUp 降回 0.7（回到 r102 漏判态）")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例7 sadness 的 browInnerUp 降回 0.7（回到 r102 漏判态）",
+              ("      browInnerUp: 1.2,", "      browInnerUp: 0.7,"))
 
     # 反例 8：把 sadness 加回 need:2（r102 旧状态）。多区要求会让只有 brow 证据的真悲伤
     #   被打折一半 ⇒ 同样漏判。这条盯的是「多区要求被加回来」。
-    m8 = real_rules.replace("need: { fear: 2 },", "need: { fear: 2, sadness: 2 },")
-    if m8 == real_rules:
-        bad.append("selftest 反例8 构造失败：need 串没匹配上")
-    else:
-        ran += 1
-        red, msg = probe_with(m8, "反例8 把 sadness 加回 need:2（回退到漏判态）")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例8 把 sadness 加回 need:2（回退到漏判态）",
+              ("need: { fear: 2 },", "need: { fear: 2, sadness: 2 },"))
 
     # 反例 9：browInnerUp 压回 r102 的 0.7 ⇒ 真悲伤 sad 分跌破 0.55（②c 必须红）。
     #   【覆盖②c：真悲伤分数低端保护】
-    m9 = real_rules.replace("      browInnerUp: 1.2,", "      browInnerUp: 0.7,")
-    if m9 == real_rules:
-        bad.append("selftest 反例9 构造失败：browInnerUp 串没匹配上")
-    else:
-        ran += 1
-        red, msg = probe_with(m9, "反例9 browInnerUp 压回 0.7（真悲伤跌破 0.55）")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例9 browInnerUp 压回 0.7（真悲伤跌破 0.55）",
+              ("      browInnerUp: 1.2,", "      browInnerUp: 0.7,"))
 
     # 反例 10：browInnerUp 抬到 3.0 ⇒ 轻担忧 innerUp .40 也被判成 sadness（②e 必须红）。
     #   这是「乙」益价最真实的放大方向：有人为了"不漏真悲"一味抬高主证据。
-    m10 = real_rules.replace("      browInnerUp: 1.2,", "      browInnerUp: 3.0,")
-    if m10 == real_rules:
-        bad.append("selftest 反例10 构造失败")
-    else:
-        ran += 1
-        red, msg = probe_with(m10, "反例10 browInnerUp 抬到 3.0（轻担忧误报低落）")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例10 browInnerUp 抬到 3.0（轻担忧误报低落）",
+              ("      browInnerUp: 1.2,", "      browInnerUp: 3.0,"))
 
     # 反例 11：jawOpen 负权从 -1.9 调小到 -0.3 ⇒ 边担忧边说话开始误报 sadness（②e 必须红）。
     #   这条盯的是 jawOpen 在代价面上的作用 —— 上轮误判它是摆设，代价面实测才翻案。
-    m11 = real_rules.replace("      jawOpen: -1.9,", "      jawOpen: -0.3,")
-    if m11 == real_rules:
-        bad.append("selftest 反例11 构造失败")
-    else:
-        ran += 1
-        red, msg = probe_with(m11, "反例11 jawOpen 负权调小到 -0.3（边担忧边说话误报低落）")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例11 jawOpen 负权调小到 -0.3（边担忧边说话误报低落）",
+              ("      jawOpen: -1.9,", "      jawOpen: -0.3,"))
 
     # 反例 12：mouthFrown 从 0.4 抬回 1.0（r102 旧权重）⇒ 合成悲伤全对，
     #   但真悲伤的 sad 分可能被稀释。盯的是「辅证被当成主证」。
-    m12 = real_rules.replace("      mouthFrownLeft: 0.4, mouthFrownRight: 0.4,",
-                              "      mouthFrownLeft: 1.0, mouthFrownRight: 1.0,")
-    if m12 == real_rules:
-        bad.append("selftest 反例12 构造失败")
-    else:
-        ran += 1
-        red, msg = probe_with(m12, "反例12 mouthFrown 抬回 1.0（r102 旧权重回归）")
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
+    rule_case("反例12 mouthFrown 抬回 1.0（r102 旧权重回归）",
+              ("      mouthFrownLeft: 0.4, mouthFrownRight: 0.4,",
+               "      mouthFrownLeft: 1.0, mouthFrownRight: 1.0,"))
 
     if bad:
         print("F11-SELFTEST-FAIL 实跑 %d 条反例，%d 条没抓到" % (ran, len(bad)))

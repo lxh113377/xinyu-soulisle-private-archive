@@ -318,6 +318,330 @@ def leg_f10(browser, base, notes, bad):
     ctx.close()
 
 
+def _set_cam_setting(page, allow):
+    """r109：总闸的家搬到设置面板（#set-face-cam）——开面板、切换、关面板。
+    用 DOM click() 而非直接赋值 checked，保证 change 事件真触发（applyEnabled 才会跑）。"""
+    page.click("#btn-settings")
+    page.wait_for_timeout(300)
+    page.evaluate("(v) => { const c = document.getElementById('set-face-cam');"
+                  " if (c.checked !== v) c.click(); }", allow)
+    page.wait_for_timeout(400)
+    page.keyboard.press("Escape")          # 关设置面板（dialog 原生行为）
+    page.wait_for_timeout(300)
+
+
+def _leg_f4_f5(browser, base, notes, bad, cam, rows):
+    """F4 真实摄像头路径（假设备）+ 关闭后必须真停 + 摄像头总闸开关；F5 真实照片实跑。
+    F4/F5 共用同一 context/page（F5 在 F4 的页面里切到 harness），故同腿拆出。
+    返回 (labels, hs)：labels 供 F12 复用；hs=None 表夹具缺失、F5 未跑。"""
+    labels, hs = {}, None
+    ctx = browser.new_context(permissions=["camera"], viewport={"width": 1280, "height": 900})
+    page = ctx.new_page()
+    errs = []
+    page.on("pageerror", lambda e: errs.append(str(e)))
+    page.goto(base + "/index.html", wait_until="load")   # 部署布局：根即 deploy/xinyu
+    try:
+        page.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'",
+                               timeout=90000)
+    except Exception as e:  # noqa: BLE001
+        bad.append("F4 页面迟迟不给表情能力状态（%s）" % type(e).__name__)
+    st = page.evaluate("window.__XINYU_FACE_UI__")
+    notes.append("face_ui=%s/%s" % ((st or {}).get("state"), (st or {}).get("reason") or "-"))
+    if (st or {}).get("state") != "ready":
+        bad.append("F4 表情能力未就绪：state=%s reason=%s ⇒ 真机上按钮会消失"
+                   % ((st or {}).get("state"), (st or {}).get("reason")))
+    else:
+        page.click("#btn-face")
+        try:
+            page.wait_for_function("!document.getElementById('face-hud').hidden", timeout=40000)
+        except Exception:  # noqa: BLE001
+            bad.append("F4 点了实时表情感知，小窗没出现")
+        # 等**状态**而不是等固定秒数：模型首帧要过 wasm 初始化，慢机器上 2.5s 不够
+        try:
+            page.wait_for_function(
+                "document.getElementById('btn-face').getAttribute('aria-pressed') === 'true'", timeout=30000)
+        except Exception:  # noqa: BLE001
+            pass
+        diag = page.evaluate("""({
+            pressed: document.getElementById('btn-face').getAttribute('aria-pressed'),
+            err: window.FaceEngine.lastError(), note: (document.getElementById('face-note')||{}).textContent || ''
+        })""")
+        pressed = diag["pressed"]
+        if pressed != "true":
+            bad.append("F4 开启后 aria-pressed=%r ≠ true（引擎原因=%s）" % (pressed, diag["err"]))
+        else:
+            # 真脸流：必须真的出读数，且星雾底色被驱动起来（可视化那一半）
+            if cam:
+                try:
+                    page.wait_for_function(
+                        "window.FaceEngine.sampleCount() > 0 && !!window.FaceEngine.last()", timeout=30000)
+                except Exception:  # noqa: BLE001
+                    bad.append("F4 假摄像头喂的是真人脸，却一帧读数都没出来（samples=%s）"
+                               % page.evaluate("window.FaceEngine.sampleCount()"))
+                else:
+                    got = page.evaluate("""({v: window.FaceEngine.last(),
+                        tag: document.getElementById('face-hud-emo').textContent,
+                        badge: document.getElementById('face-hud-smile').textContent,
+                        mist: window.ThreeScene.mistInfo().on})""")
+                    v = got.get("v") or {}
+                    notes.append("F4 实时读数：%s/%s 强度=%.2f 徽章=%r 星雾底色=%s"
+                                 % (v.get("emotion"), (v.get("smile") or {}).get("kind"),
+                                    v.get("intensity", 0), got.get("badge"), got.get("mist")))
+                    if v.get("emotion") != "joy":
+                        bad.append("F4 真笑照片喂进实时链路，主情绪=%r ≠ joy ⇒ 映射链有问题" % v.get("emotion"))
+                    if not got.get("mist"):
+                        bad.append("F4 读数已出但星雾底色没被驱动 ⇒ 可视化那一半没接上")
+                    # 留一张取证截图（_shots 已 ignore，不进仓库）
+                    try:
+                        shot = ROOT / "_test" / "_shots" / "face_hud_live.png"
+                        shot.parent.mkdir(parents=True, exist_ok=True)
+                        page.locator("#face-hud").screenshot(path=str(shot))
+                        notes.append("截图=%s" % shot.name)
+                    except Exception:  # noqa: BLE001
+                        pass
+        page.wait_for_timeout(1500)
+        page.click("#btn-face-close")
+        page.wait_for_timeout(600)
+        st2 = page.evaluate("""({
+            running: window.FaceEngine.isRunning(),
+            pressed: document.getElementById('btn-face').getAttribute('aria-pressed'),
+            hudHidden: document.getElementById('face-hud').hidden,
+            liveStreams: Array.from(document.querySelectorAll('video')).filter(v => !!v.srcObject).length,
+            mist: window.ThreeScene.mistInfo ? window.ThreeScene.mistInfo().on : null
+        })""")
+        if st2["running"]:
+            bad.append("F4 关闭后 FaceEngine 仍在跑 ⇒ 摄像头没真停")
+        if st2["liveStreams"] != 0:
+            bad.append("F4 关闭后仍有 %d 个 video 挂着流 ⇒ 指示灯不灭（隐私红线）" % st2["liveStreams"])
+        if st2["pressed"] != "false" or not st2["hudHidden"]:
+            bad.append("F4 关闭后状态未复位：pressed=%s hudHidden=%s" % (st2["pressed"], st2["hudHidden"]))
+        if st2["mist"]:
+            bad.append("F4 关闭后星雾底色没收回 ⇒ 表情色留在了星云上")
+        # 摄像头总闸（r87b）：关 = 入口全隐 + 状态 unavailable + 选择被记住；
+        # 再开 = 入口恢复（能否真用仍由能力探测说了算）。开关按钮必须永远可点。
+        _set_cam_setting(page, False)
+        off = page.evaluate("""({allowed: document.getElementById('set-face-cam').checked,
+            faceHidden: document.getElementById('btn-face').hidden,
+            scanHidden: document.getElementById('btn-face-scan').hidden,
+            ui: window.__XINYU_FACE_UI__, running: window.FaceEngine.isRunning(),
+            live: Array.from(document.querySelectorAll('video')).filter(v => !!v.srcObject).length,
+            stored: localStorage.getItem('peiliao.face.cam.v1')})""")
+        if off["allowed"] or off["stored"] != "off":
+            bad.append("F4 摄像头开关关闭未生效：aria-pressed=%s stored=%r" % (off["pressed"], off["stored"]))
+        if not (off["faceHidden"] and off["scanHidden"]) or (off["ui"] or {}).get("reason") != "cam-disabled":
+            bad.append("F4 关总闸后摄像头入口没消失/原因没写明：%s" % json.dumps(off, ensure_ascii=False))
+        if off["running"] or off["live"]:
+            bad.append("F4 关总闸后摄像头还在跑（running=%s live=%s）⇒ 开关是假的" % (off["running"], off["live"]))
+        _set_cam_setting(page, True)
+        on = page.evaluate("""({allowed: document.getElementById('set-face-cam').checked,
+            faceHidden: document.getElementById('btn-face').hidden,
+            ui: window.__XINYU_FACE_UI__})""")
+        if (not on["allowed"]) or on["faceHidden"] or (on["ui"] or {}).get("state") != "ready":
+            bad.append("F4 重开总闸后入口没恢复：%s" % json.dumps(on, ensure_ascii=False))
+    if errs:
+        bad.append("F4 页面运行时异常 %d 条：%s" % (len(errs), " | ".join(errs[:2])[:180]))
+
+    # ── F5：真实照片实跑 ──
+    if not FIX_DIR.is_dir() or not list(FIX_DIR.glob("*.jpg")):
+        notes.append("F5 UNVERIFIED：夹具目录为空（_test/face-fixtures）")
+    else:
+        lp = FIX_DIR / "labels.json"
+        if lp.is_file():
+            labels = {x["file"]: x for x in json.loads(lp.read_text("utf-8"))}
+        h = page.goto(base + "/_test/face-harness.html", wait_until="load")
+        try:
+            page.wait_for_function("window.__HARNESS__ && (window.__HARNESS__.ready || window.__HARNESS__.err)",
+                                   timeout=90000)
+        except Exception:  # noqa: BLE001
+            bad.append("F5 宿主机迟迟不就绪")
+        hs = page.evaluate("window.__HARNESS__")
+        if not (hs or {}).get("ready"):
+            bad.append("F5 推理器起不来：%s" % ((hs or {}).get("err") or "unknown"))
+        else:
+            for img in sorted(FIX_DIR.glob("*.jpg")):
+                r = page.evaluate("u => window.__HARNESS__.detect(u)", "/_test/face-fixtures/" + img.name)
+                v = r.get("view") or {}
+                sm = v.get("smile") or {}
+                rows.append({
+                    "file": img.name,
+                    "label": (labels.get(img.name) or {}).get("label", "unknown"),
+                    "faces": r.get("faces", 0),
+                    "mouth": round(sm.get("mouth", 0), 3),
+                    "ratio": round(sm.get("ratio", 0), 3),
+                    "emotion": v.get("emotion"),
+                    "intensity": round(v.get("intensity", 0), 3),
+                    "smile_kind": sm.get("kind"),
+                })
+    ctx.close()
+    return labels, hs
+
+
+def _leg_f12(browser, base, bad, rows12, labels, hs):
+    """F12：真实照片**逐类准确率**（r102 补）——每张照片的标注类 vs 实得主情绪，按类汇总。
+    F5 只验「微笑组 vs 中性组口部分离」，从不问"判对没有"；F12 问的就是这个。
+    hs=宿主机状态（F5 产物）；未 ready 或夹具缺失时整腿跳过。"""
+    if not (hs or {}).get("ready"):
+        return
+    ctx12 = browser.new_context(viewport={"width": 1280, "height": 900})
+    pg12 = ctx12.new_page()
+    pg12.goto(base + "/_test/face-harness.html", wait_until="load")
+    try:
+        pg12.wait_for_function(
+            "window.__HARNESS__ && window.__HARNESS__.ready === true", timeout=90000)
+    except Exception:  # noqa: BLE001
+        bad.append("F12 宿主机迟迟不就绪")
+    else:
+        for img in sorted(FIX_DIR.glob("*.jpg")):
+            lab = (labels.get(img.name) or {}).get("label", "unknown")
+            if lab in ("smiling", "neutral"):
+                continue          # 那两类由 F5 验，不在 F12 重复计数
+            r = pg12.evaluate("u => window.__HARNESS__.detect(u)",
+                              "/_test/face-fixtures/" + img.name)
+            v = r.get("view") or {}
+            rows12.append({
+                "file": img.name, "label": lab, "faces": r.get("faces", 0),
+                "got": v.get("emotion"),
+                "intensity": round(v.get("intensity", 0), 3),
+                "margin": round(v.get("confidence", 0), 3),
+            })
+    ctx12.close()
+
+
+def _leg_f7(browser, base, notes, bad):
+    """F7：**授权必须排在模型加载之前**（r87c；老大实测"点了不弹授权窗"的根因）。
+    判据用"把 getUserMedia 拖慢 800ms + 记录调用时刻 + 记录首个 mediapipe 资源请求时刻"
+    来复算顺序，而不是读注释。顺序错了（先下 13MB 再要权限）会在这里红。"""
+    ctx7 = browser.new_context(permissions=["camera"], viewport={"width": 1280, "height": 900})
+    ctx7.add_init_script("""
+        window.__ORDER__ = [];
+        const md = navigator.mediaDevices, g = md.getUserMedia.bind(md);
+        md.getUserMedia = async (...a) => {
+            window.__ORDER__.push(['gum-called', performance.now()]);
+            await new Promise(r => setTimeout(r, 800));   // 模拟"弹窗等用户点"的耗时
+            return g(...a);
+        };
+        const f = window.fetch;
+        window.fetch = (...a) => {
+            const u = String(a[0]);
+            if (u.indexOf('mediapipe') >= 0) window.__ORDER__.push(['fetch', performance.now()]);
+            return f(...a);
+        };
+    """)
+    p7 = ctx7.new_page()
+    errs7 = []
+    p7.on("pageerror", lambda e: errs7.append(str(e)))
+    p7.goto(base + "/index.html", wait_until="load")
+    p7.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'", timeout=60000)
+    p7.click("#btn-face")
+    seen = []
+    for _ in range(80):                      # 最多 12s：把阶段顺序采样下来
+        st7 = p7.evaluate("({p: window.FaceEngine.stats().phase, run: window.FaceEngine.isRunning()})")
+        if st7["p"] and (not seen or seen[-1] != st7["p"]):
+            seen.append(st7["p"])
+        if st7["run"] or st7["p"] == "idle":
+            break
+        p7.wait_for_timeout(150)
+    order = p7.evaluate("window.__ORDER__")
+    gum_t = next((t for k, t in order if k == "gum-called"), None)
+    mp_t = next((t for k, t in order if k == "fetch"), None)
+    notes.append("F7 阶段顺序=%s｜gum@%s mediapipe_fetch@%s"
+                 % ("→".join(seen) or "-", "-" if gum_t is None else round(gum_t),
+                    "未走 fetch" if mp_t is None else round(mp_t)))
+    if gum_t is None:
+        bad.append("F7 开启时没有调用 getUserMedia ⇒ 授权根本没被请求")
+    elif mp_t is not None and mp_t < gum_t:
+        bad.append("F7 模型资源先于摄像头授权被请求（fetch@%.0f < gum@%.0f）"
+                   " ⇒ 用户会先等十几秒才看到授权弹窗" % (mp_t, gum_t))
+    if seen[:1] and seen[0] not in ("permission", "model", "warmup", "running"):
+        bad.append("F7 首次采样到的阶段=%r 不是预期阶段" % seen[0])
+    if errs7:
+        bad.append("F7 顺序腿页面异常 %d 条：%s" % (len(errs7), " | ".join(errs7[:2])[:160]))
+    ctx7.close()
+
+
+def _leg_f8(browser, base, notes, bad):
+    """F8 病①：一个摄像头设备都没有（enumerateDevices 空）⇒ 入口消失 + 说"检查驱动"。
+    设备层/权限层的两种真实病，界面必须分开报（r87d）。"""
+    ctx8 = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx8.add_init_script("navigator.mediaDevices.enumerateDevices = async () => [];")
+    p8 = ctx8.new_page()
+    p8.goto(base + "/index.html", wait_until="load")
+    try:
+        p8.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'", timeout=30000)
+    except Exception:  # noqa: BLE001
+        pass
+    p8.wait_for_timeout(600)
+    st8 = p8.evaluate("""({ui: window.__XINYU_FACE_UI__,
+        faceHidden: document.getElementById('btn-face').hidden,
+        scanHidden: document.getElementById('btn-face-scan').hidden,
+        status: (document.getElementById('face-status')||{}).textContent || ''})""")
+    if (st8["ui"] or {}).get("reason") != "no-video-device":
+        bad.append("F8 无摄像头设备时 reason=%r ≠ no-video-device（会把设备问题糊成权限问题）"
+                   % (st8["ui"] or {}).get("reason"))
+    if not (st8["faceHidden"] and st8["scanHidden"]):
+        bad.append("F8 无设备时摄像头入口没隐藏")
+    if "设备" not in st8["status"]:
+        bad.append("F8 无设备时状态行没点明设备问题：%r" % st8["status"][:60])
+    else:
+        notes.append("F8 无设备面：入口已隐藏 + 状态行=%r" % st8["status"][:40])
+    ctx8.close()
+
+
+def _leg_f9(browser, base, notes, bad):
+    """F9 病②：浏览器记住了"阻止"（不再弹窗，getUserMedia 直接 NotAllowedError）
+    ⇒ 必须给出"锁形图标 → 摄像头 → 允许"的可行路径，而不是一句"暂不可用"。"""
+    ctx9 = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx9.add_init_script("""
+        navigator.mediaDevices.getUserMedia = async () => {
+            const e = new Error('Permission denied'); e.name = 'NotAllowedError'; throw e;
+        };
+    """)
+    p9 = ctx9.new_page()
+    p9.goto(base + "/index.html", wait_until="load")
+    try:
+        p9.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'", timeout=30000)
+    except Exception:  # noqa: BLE001
+        pass
+    p9.wait_for_timeout(400)
+    p9.click("#btn-face")
+    p9.wait_for_timeout(1200)
+    st9 = p9.evaluate("(document.getElementById('face-status')||{}).textContent || ''")
+    if "锁形图标" not in st9:
+        bad.append("F9 被阻止时状态行没给可行路径（应含「锁形图标」指引）：%r" % st9[:80])
+    else:
+        notes.append("F9 被阻止面：状态行=%r" % st9[:56])
+    ctx9.close()
+
+
+def _leg_f6(browser, base, bad):
+    """F6：无 mediaDevices ⇒ 入口必须消失，不是点了报错。"""
+    ctx2 = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx2.add_init_script("Object.defineProperty(navigator,'mediaDevices',{get:()=>undefined,configurable:true});")
+    p2 = ctx2.new_page()
+    errs2 = []
+    p2.on("pageerror", lambda e: errs2.append(str(e)))
+    p2.goto(base + "/index.html", wait_until="load")
+    try:
+        p2.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'", timeout=60000)
+    except Exception:  # noqa: BLE001
+        pass
+    st3 = p2.evaluate("""({ui: window.__XINYU_FACE_UI__,
+        btnHidden: document.getElementById('btn-face').hidden,
+        scanHidden: document.getElementById('btn-face-scan').hidden,
+        note: (document.getElementById('face-note')||{}).textContent || ''})""")
+    ui = st3.get("ui") or {}
+    if ui.get("state") != "unavailable":
+        bad.append("F6 无摄像头时 state=%r ≠ unavailable ⇒ 会把不可用伪装成可用" % ui.get("state"))
+    if not (st3.get("btnHidden") and st3.get("scanHidden")):
+        bad.append("F6 无摄像头时入口按钮没隐藏（btn=%s scan=%s）⇒ 用户点了只会有报错"
+                   % (st3.get("btnHidden"), st3.get("scanHidden")))
+    if not st3.get("note"):
+        bad.append("F6 无摄像头时没有一句人话说明原因（静默降级=伪装）")
+    if errs2:
+        bad.append("F6 降级路径仍抛 %d 条异常：%s" % (len(errs2), " | ".join(errs2[:2])[:160]))
+    ctx2.close()
+
+
 def browser_legs():
     """返回 (rows_F5, bad, notes)。bad 为空即绿。"""
     from playwright.sync_api import sync_playwright
@@ -338,328 +662,22 @@ def browser_legs():
             browser, face = launch(pw, args=args, label="face_check")
             notes.append("engine=%s" % face.split(" 原因=")[0])
             try:
-                # ── F4：真实摄像头路径（假设备）+ 关闭后必须真停 ──
-                ctx = browser.new_context(permissions=["camera"], viewport={"width": 1280, "height": 900})
-                page = ctx.new_page()
-                errs = []
-                page.on("pageerror", lambda e: errs.append(str(e)))
-                page.goto(base + "/index.html", wait_until="load")   # 部署布局：根即 deploy/xinyu
-                try:
-                    page.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'",
-                                           timeout=90000)
-                except Exception as e:  # noqa: BLE001
-                    bad.append("F4 页面迟迟不给表情能力状态（%s）" % type(e).__name__)
-                st = page.evaluate("window.__XINYU_FACE_UI__")
-                notes.append("face_ui=%s/%s" % ((st or {}).get("state"), (st or {}).get("reason") or "-"))
-                if (st or {}).get("state") != "ready":
-                    bad.append("F4 表情能力未就绪：state=%s reason=%s ⇒ 真机上按钮会消失"
-                               % ((st or {}).get("state"), (st or {}).get("reason")))
-                else:
-                    page.click("#btn-face")
-                    try:
-                        page.wait_for_function("!document.getElementById('face-hud').hidden", timeout=40000)
-                    except Exception:  # noqa: BLE001
-                        bad.append("F4 点了实时表情感知，小窗没出现")
-                    # 等**状态**而不是等固定秒数：模型首帧要过 wasm 初始化，慢机器上 2.5s 不够
-                    try:
-                        page.wait_for_function(
-                            "document.getElementById('btn-face').getAttribute('aria-pressed') === 'true'", timeout=30000)
-                    except Exception:  # noqa: BLE001
-                        pass
-                    diag = page.evaluate("""({
-                        pressed: document.getElementById('btn-face').getAttribute('aria-pressed'),
-                        err: window.FaceEngine.lastError(), note: (document.getElementById('face-note')||{}).textContent || ''
-                    })""")
-                    pressed = diag["pressed"]
-                    if pressed != "true":
-                        bad.append("F4 开启后 aria-pressed=%r ≠ true（引擎原因=%s）" % (pressed, diag["err"]))
-                    else:
-                        # 真脸流：必须真的出读数，且星雾底色被驱动起来（可视化那一半）
-                        if cam:
-                            try:
-                                page.wait_for_function(
-                                    "window.FaceEngine.sampleCount() > 0 && !!window.FaceEngine.last()", timeout=30000)
-                            except Exception:  # noqa: BLE001
-                                bad.append("F4 假摄像头喂的是真人脸，却一帧读数都没出来（samples=%s）"
-                                           % page.evaluate("window.FaceEngine.sampleCount()"))
-                            else:
-                                got = page.evaluate("""({v: window.FaceEngine.last(),
-                                    tag: document.getElementById('face-hud-emo').textContent,
-                                    badge: document.getElementById('face-hud-smile').textContent,
-                                    mist: window.ThreeScene.mistInfo().on})""")
-                                v = got.get("v") or {}
-                                notes.append("F4 实时读数：%s/%s 强度=%.2f 徽章=%r 星雾底色=%s"
-                                             % (v.get("emotion"), (v.get("smile") or {}).get("kind"),
-                                                v.get("intensity", 0), got.get("badge"), got.get("mist")))
-                                if v.get("emotion") != "joy":
-                                    bad.append("F4 真笑照片喂进实时链路，主情绪=%r ≠ joy ⇒ 映射链有问题" % v.get("emotion"))
-                                if not got.get("mist"):
-                                    bad.append("F4 读数已出但星雾底色没被驱动 ⇒ 可视化那一半没接上")
-                                # 留一张取证截图（_shots 已 ignore，不进仓库）
-                                try:
-                                    shot = ROOT / "_test" / "_shots" / "face_hud_live.png"
-                                    shot.parent.mkdir(parents=True, exist_ok=True)
-                                    page.locator("#face-hud").screenshot(path=str(shot))
-                                    notes.append("截图=%s" % shot.name)
-                                except Exception:  # noqa: BLE001
-                                    pass
-                    page.wait_for_timeout(1500)
-                    page.click("#btn-face-close")
-                    page.wait_for_timeout(600)
-                    st2 = page.evaluate("""({
-                        running: window.FaceEngine.isRunning(),
-                        pressed: document.getElementById('btn-face').getAttribute('aria-pressed'),
-                        hudHidden: document.getElementById('face-hud').hidden,
-                        liveStreams: Array.from(document.querySelectorAll('video')).filter(v => !!v.srcObject).length,
-                        mist: window.ThreeScene.mistInfo ? window.ThreeScene.mistInfo().on : null
-                    })""")
-                    if st2["running"]:
-                        bad.append("F4 关闭后 FaceEngine 仍在跑 ⇒ 摄像头没真停")
-                    if st2["liveStreams"] != 0:
-                        bad.append("F4 关闭后仍有 %d 个 video 挂着流 ⇒ 指示灯不灭（隐私红线）" % st2["liveStreams"])
-                    if st2["pressed"] != "false" or not st2["hudHidden"]:
-                        bad.append("F4 关闭后状态未复位：pressed=%s hudHidden=%s" % (st2["pressed"], st2["hudHidden"]))
-                    if st2["mist"]:
-                        bad.append("F4 关闭后星雾底色没收回 ⇒ 表情色留在了星云上")
-                    # 摄像头总闸（r87b）：关 = 入口全隐 + 状态 unavailable + 选择被记住；
-                    # 再开 = 入口恢复（能否真用仍由能力探测说了算）。开关按钮必须永远可点。
-                    def set_cam(allow):
-                        """r109：总闸的家搬到设置面板（#set-face-cam）——开面板、切换、关面板。
-                        用 DOM click() 而非直接赋值 checked，保证 change 事件真触发（applyEnabled 才会跑）。"""
-                        page.click("#btn-settings")
-                        page.wait_for_timeout(300)
-                        page.evaluate("(v) => { const c = document.getElementById('set-face-cam');"
-                                      " if (c.checked !== v) c.click(); }", allow)
-                        page.wait_for_timeout(400)
-                        page.keyboard.press("Escape")          # 关设置面板（dialog 原生行为）
-                        page.wait_for_timeout(300)
-                    set_cam(False)
-                    off = page.evaluate("""({allowed: document.getElementById('set-face-cam').checked,
-                        faceHidden: document.getElementById('btn-face').hidden,
-                        scanHidden: document.getElementById('btn-face-scan').hidden,
-                        ui: window.__XINYU_FACE_UI__, running: window.FaceEngine.isRunning(),
-                        live: Array.from(document.querySelectorAll('video')).filter(v => !!v.srcObject).length,
-                        stored: localStorage.getItem('peiliao.face.cam.v1')})""")
-                    if off["allowed"] or off["stored"] != "off":
-                        bad.append("F4 摄像头开关关闭未生效：aria-pressed=%s stored=%r" % (off["pressed"], off["stored"]))
-                    if not (off["faceHidden"] and off["scanHidden"]) or (off["ui"] or {}).get("reason") != "cam-disabled":
-                        bad.append("F4 关总闸后摄像头入口没消失/原因没写明：%s" % json.dumps(off, ensure_ascii=False))
-                    if off["running"] or off["live"]:
-                        bad.append("F4 关总闸后摄像头还在跑（running=%s live=%s）⇒ 开关是假的" % (off["running"], off["live"]))
-                    set_cam(True)
-                    on = page.evaluate("""({allowed: document.getElementById('set-face-cam').checked,
-                        faceHidden: document.getElementById('btn-face').hidden,
-                        ui: window.__XINYU_FACE_UI__})""")
-                    if (not on["allowed"]) or on["faceHidden"] or (on["ui"] or {}).get("state") != "ready":
-                        bad.append("F4 重开总闸后入口没恢复：%s" % json.dumps(on, ensure_ascii=False))
-                if errs:
-                    bad.append("F4 页面运行时异常 %d 条：%s" % (len(errs), " | ".join(errs[:2])[:180]))
+                labels, hs = _leg_f4_f5(browser, base, notes, bad, cam, rows)
 
-                # ── F5：真实照片实跑 ──
-                if not FIX_DIR.is_dir() or not list(FIX_DIR.glob("*.jpg")):
-                    notes.append("F5 UNVERIFIED：夹具目录为空（_test/face-fixtures）")
-                else:
-                    labels = {}
-                    lp = FIX_DIR / "labels.json"
-                    if lp.is_file():
-                        labels = {x["file"]: x for x in json.loads(lp.read_text("utf-8"))}
-                    h = page.goto(base + "/_test/face-harness.html", wait_until="load")
-                    try:
-                        page.wait_for_function("window.__HARNESS__ && (window.__HARNESS__.ready || window.__HARNESS__.err)",
-                                               timeout=90000)
-                    except Exception:  # noqa: BLE001
-                        bad.append("F5 宿主机迟迟不就绪")
-                    hs = page.evaluate("window.__HARNESS__")
-                    if not (hs or {}).get("ready"):
-                        bad.append("F5 推理器起不来：%s" % ((hs or {}).get("err") or "unknown"))
-                    else:
-                        for img in sorted(FIX_DIR.glob("*.jpg")):
-                            r = page.evaluate("u => window.__HARNESS__.detect(u)", "/_test/face-fixtures/" + img.name)
-                            v = r.get("view") or {}
-                            sm = v.get("smile") or {}
-                            rows.append({
-                                "file": img.name,
-                                "label": (labels.get(img.name) or {}).get("label", "unknown"),
-                                "faces": r.get("faces", 0),
-                                "mouth": round(sm.get("mouth", 0), 3),
-                                "ratio": round(sm.get("ratio", 0), 3),
-                                "emotion": v.get("emotion"),
-                                "intensity": round(v.get("intensity", 0), 3),
-                                "smile_kind": sm.get("kind"),
-                            })
-                ctx.close()
+                _leg_f12(browser, base, bad, rows12, labels, hs)
 
-                # ── F12：真实照片**逐类准确率**（r102 补）──────────────────────────
-                # F5 只验「微笑组 vs 中性组口部分离」，从不问"判对没有"。F12 问的就是这个：
-                # 每张照片的标注类 vs 实得主情绪，按类汇总成准确率。
-                #
-                # ⚠️ anger 曾经是 0/2，**为什么不是判据坏了**（r103 一手实测，别再查一遍）：
-                #   真 MediaPipe 读出的真愤怒照，AU 分布是 **browDown 0.64/0.59 而其余全 0**
-                #   （无鼻翼、无抿唇、无张口）。而 r102 的 need:{anger:2} 要求「眉区之外再来一区」
-                #   才认 —— 那条规则当初是为压「专注时轻皱被判愤怒」设的，代价是**真愤怒也判不出来**。
-                #   这不是阈值没调好：真愤怒(browDown 0.64) 与 专注轻皱(browDown 0.40)
-                #   在 blendshape 空间里**结构完全相同**，只有幅度差 ⇒ 任何阈值都在
-                #   「漏掉真愤怒」与「误报专注」之间二选一，**没有第三个正解**。
-                #   ⇒ r103 老大拍板走「保真怒」（anger 不再要求多区 + browDown 权重 1.0→1.4、
-                #     压低鼻翼/抿唇的母数），F12 实测 anger 0/2 → **2/2**；
-                #     代价是专注轻皱会判 anger（已在 F11 的 ②b 与单测里钉住强度序）。
-                #     ⚠️ 若哪天这里又红成 0/2，先查 `need` 里是不是又把 anger 加回去了。
-                if (hs or {}).get("ready"):
-                    ctx12 = browser.new_context(viewport={"width": 1280, "height": 900})
-                    pg12 = ctx12.new_page()
-                    pg12.goto(base + "/_test/face-harness.html", wait_until="load")
-                    try:
-                        pg12.wait_for_function(
-                            "window.__HARNESS__ && window.__HARNESS__.ready === true", timeout=90000)
-                    except Exception:  # noqa: BLE001
-                        bad.append("F12 宿主机迟迟不就绪")
-                    else:
-                        for img in sorted(FIX_DIR.glob("*.jpg")):
-                            lab = (labels.get(img.name) or {}).get("label", "unknown")
-                            if lab in ("smiling", "neutral"):
-                                continue          # 那两类由 F5 验，不在 F12 重复计数
-                            r = pg12.evaluate("u => window.__HARNESS__.detect(u)",
-                                              "/_test/face-fixtures/" + img.name)
-                            v = r.get("view") or {}
-                            rows12.append({
-                                "file": img.name, "label": lab, "faces": r.get("faces", 0),
-                                "got": v.get("emotion"),
-                                "intensity": round(v.get("intensity", 0), 3),
-                                "margin": round(v.get("confidence", 0), 3),
-                            })
-                    ctx12.close()
-
-                # ── F7：**授权必须排在模型加载之前**（r87c；老大实测"点了不弹授权窗"的根因）──
-                # 判据用"把 getUserMedia 拖慢 800ms + 记录调用时刻 + 记录首个 mediapipe 资源请求时刻"
-                # 来复算顺序，而不是读注释。顺序错了（先下 13MB 再要权限）会在这里红。
-                ctx7 = browser.new_context(permissions=["camera"], viewport={"width": 1280, "height": 900})
-                ctx7.add_init_script("""
-                    window.__ORDER__ = [];
-                    const md = navigator.mediaDevices, g = md.getUserMedia.bind(md);
-                    md.getUserMedia = async (...a) => {
-                        window.__ORDER__.push(['gum-called', performance.now()]);
-                        await new Promise(r => setTimeout(r, 800));   // 模拟"弹窗等用户点"的耗时
-                        return g(...a);
-                    };
-                    const f = window.fetch;
-                    window.fetch = (...a) => {
-                        const u = String(a[0]);
-                        if (u.indexOf('mediapipe') >= 0) window.__ORDER__.push(['fetch', performance.now()]);
-                        return f(...a);
-                    };
-                """)
-                p7 = ctx7.new_page()
-                errs7 = []
-                p7.on("pageerror", lambda e: errs7.append(str(e)))
-                p7.goto(base + "/index.html", wait_until="load")
-                p7.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'", timeout=60000)
-                p7.click("#btn-face")
-                seen = []
-                for _ in range(80):                      # 最多 12s：把阶段顺序采样下来
-                    st7 = p7.evaluate("({p: window.FaceEngine.stats().phase, run: window.FaceEngine.isRunning()})")
-                    if st7["p"] and (not seen or seen[-1] != st7["p"]):
-                        seen.append(st7["p"])
-                    if st7["run"] or st7["p"] == "idle":
-                        break
-                    p7.wait_for_timeout(150)
-                order = p7.evaluate("window.__ORDER__")
-                gum_t = next((t for k, t in order if k == "gum-called"), None)
-                mp_t = next((t for k, t in order if k == "fetch"), None)
-                notes.append("F7 阶段顺序=%s｜gum@%s mediapipe_fetch@%s"
-                             % ("→".join(seen) or "-", "-" if gum_t is None else round(gum_t),
-                                "未走 fetch" if mp_t is None else round(mp_t)))
-                if gum_t is None:
-                    bad.append("F7 开启时没有调用 getUserMedia ⇒ 授权根本没被请求")
-                elif mp_t is not None and mp_t < gum_t:
-                    bad.append("F7 模型资源先于摄像头授权被请求（fetch@%.0f < gum@%.0f）"
-                               " ⇒ 用户会先等十几秒才看到授权弹窗" % (mp_t, gum_t))
-                if seen[:1] and seen[0] not in ("permission", "model", "warmup", "running"):
-                    bad.append("F7 首次采样到的阶段=%r 不是预期阶段" % seen[0])
-                if errs7:
-                    bad.append("F7 顺序腿页面异常 %d 条：%s" % (len(errs7), " | ".join(errs7[:2])[:160]))
-                ctx7.close()
+                _leg_f7(browser, base, notes, bad)
 
                 # ── F10：侧边控制面板的开关（实现见 leg_f10，可被 --leg F10 单独调起）──
                 # r113：删掉残留的 ctx10.close() —— leg_f10 自建自关 context，此处 ctx10 从未定义，
                 # 执行到必 NameError 崩掉整条浏览器腿（本轮静态确证后作为跑通验证链的前提移除）。
                 leg_f10(browser, base, notes, bad)
 
-                # ── F8：设备层/权限层的两种真实病，界面必须分开报（r87d）──
-                # 病①：一个摄像头设备都没有（enumerateDevices 空）⇒ 入口消失 + 说"检查驱动"
-                ctx8 = browser.new_context(viewport={"width": 1280, "height": 900})
-                ctx8.add_init_script("navigator.mediaDevices.enumerateDevices = async () => [];")
-                p8 = ctx8.new_page()
-                p8.goto(base + "/index.html", wait_until="load")
-                try:
-                    p8.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'", timeout=30000)
-                except Exception:  # noqa: BLE001
-                    pass
-                p8.wait_for_timeout(600)
-                st8 = p8.evaluate("""({ui: window.__XINYU_FACE_UI__,
-                    faceHidden: document.getElementById('btn-face').hidden,
-                    scanHidden: document.getElementById('btn-face-scan').hidden,
-                    status: (document.getElementById('face-status')||{}).textContent || ''})""")
-                if (st8["ui"] or {}).get("reason") != "no-video-device":
-                    bad.append("F8 无摄像头设备时 reason=%r ≠ no-video-device（会把设备问题糊成权限问题）"
-                               % (st8["ui"] or {}).get("reason"))
-                if not (st8["faceHidden"] and st8["scanHidden"]):
-                    bad.append("F8 无设备时摄像头入口没隐藏")
-                if "设备" not in st8["status"]:
-                    bad.append("F8 无设备时状态行没点明设备问题：%r" % st8["status"][:60])
-                else:
-                    notes.append("F8 无设备面：入口已隐藏 + 状态行=%r" % st8["status"][:40])
-                ctx8.close()
+                _leg_f8(browser, base, notes, bad)
 
-                # 病②：浏览器记住了"阻止"（不再弹窗，getUserMedia 直接 NotAllowedError）
-                # ⇒ 必须给出"锁形图标 → 摄像头 → 允许"的可行路径，而不是一句"暂不可用"
-                ctx9 = browser.new_context(viewport={"width": 1280, "height": 900})
-                ctx9.add_init_script("""
-                    navigator.mediaDevices.getUserMedia = async () => {
-                        const e = new Error('Permission denied'); e.name = 'NotAllowedError'; throw e;
-                    };
-                """)
-                p9 = ctx9.new_page()
-                p9.goto(base + "/index.html", wait_until="load")
-                try:
-                    p9.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'", timeout=30000)
-                except Exception:  # noqa: BLE001
-                    pass
-                p9.wait_for_timeout(400)
-                p9.click("#btn-face")
-                p9.wait_for_timeout(1200)
-                st9 = p9.evaluate("(document.getElementById('face-status')||{}).textContent || ''")
-                if "锁形图标" not in st9:
-                    bad.append("F9 被阻止时状态行没给可行路径（应含「锁形图标」指引）：%r" % st9[:80])
-                else:
-                    notes.append("F9 被阻止面：状态行=%r" % st9[:56])
-                ctx9.close()
+                _leg_f9(browser, base, notes, bad)
 
-                # ── F6：无 mediaDevices ⇒ 入口必须消失，不是点了报错 ──
-                ctx2 = browser.new_context(viewport={"width": 1280, "height": 900})
-                ctx2.add_init_script("Object.defineProperty(navigator,'mediaDevices',{get:()=>undefined,configurable:true});")
-                p2 = ctx2.new_page()
-                errs2 = []
-                p2.on("pageerror", lambda e: errs2.append(str(e)))
-                p2.goto(base + "/index.html", wait_until="load")
-                try:
-                    p2.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'", timeout=60000)
-                except Exception:  # noqa: BLE001
-                    pass
-                st3 = p2.evaluate("""({ui: window.__XINYU_FACE_UI__,
-                    btnHidden: document.getElementById('btn-face').hidden,
-                    scanHidden: document.getElementById('btn-face-scan').hidden,
-                    note: (document.getElementById('face-note')||{}).textContent || ''})""")
-                ui = st3.get("ui") or {}
-                if ui.get("state") != "unavailable":
-                    bad.append("F6 无摄像头时 state=%r ≠ unavailable ⇒ 会把不可用伪装成可用" % ui.get("state"))
-                if not (st3.get("btnHidden") and st3.get("scanHidden")):
-                    bad.append("F6 无摄像头时入口按钮没隐藏（btn=%s scan=%s）⇒ 用户点了只会有报错"
-                               % (st3.get("btnHidden"), st3.get("scanHidden")))
-                if not st3.get("note"):
-                    bad.append("F6 无摄像头时没有一句人话说明原因（静默降级=伪装）")
-                if errs2:
-                    bad.append("F6 降级路径仍抛 %d 条异常：%s" % (len(errs2), " | ".join(errs2[:2])[:160]))
-                ctx2.close()
+                _leg_f6(browser, base, bad)
             finally:
                 browser.close()
     finally:

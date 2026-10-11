@@ -318,6 +318,18 @@ def selftest() -> int:
     return 0
 
 
+def _finish(fails, legs, slegs) -> int:
+    """收尾出口：verdict 行恒印，失败明细随后；门面行与退出码同源（r100 口径）。"""
+    print()
+    line = voice_verdict(fails, legs, slegs)
+    print(line)
+    if fails:
+        for f in fails:
+            print("  -", f)
+        return 1
+    return 0
+
+
 async def main() -> int:
     fails = []
     legs, slegs = {}, {}
@@ -458,15 +470,7 @@ async def main() -> int:
 
         await browser.close()
 
-    print()
-    line = voice_verdict(fails, legs, slegs)
-    if fails:
-        print(line)
-        for f in fails:
-            print("  -", f)
-        return 1
-    print(line)
-    return 0
+    return _finish(fails, legs, slegs)
 
 
 if __name__ == "__main__":

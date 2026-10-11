@@ -571,6 +571,54 @@ function initFaceHud(deps) {
   return { setPill, setSwitch, showStage, paintHud };
 }
 
+/* r117（pushgate-locfix）：initFace 两个自成一块的绑定从 IIFE 里外提（函数声明同层提升，无 TDZ）。
+   gl/paint/faceChipHtml/$ 与本函数同在外层 IIFE 作用域，直接可见；initFace 的局部量走 deps。 */
+function bindFaceScan(deps) {
+  const { FE, probe, note, scanBtn, setStatus, paint } = deps;
+  // A. 第二幕：扫描一次
+  scanBtn.addEventListener("click", async () => {
+    const v = $("#face-video");
+    v.hidden = false;
+    note.textContent = "正在准备表情模型（首次约 13MB，之后走缓存）…";
+    scanBtn.disabled = true;
+    setStatus("正在请求摄像头授权并加载模型…");
+    const r = await FE.probeOnce({ video: v });
+    scanBtn.disabled = false;
+    v.hidden = true;
+    if (!r.ok) { note.textContent = FE.reasonText(r.reason || "no-face"); setStatus(FE.reasonText(r.reason || "no-face")); return; }
+    const box = document.createElement("div");
+    box.className = "face-row";
+    box.innerHTML = faceChipHtml(r.view);
+    probe.insertBefore(box, note);
+    paint(box);
+    // 只染星雾底色（不点亮新星）：一次扫描不该在星图上留下"记忆"
+    if (gl) window.ThreeScene.setMistTint(r.view.color, r.view.intensity);
+    setTimeout(() => { if (window.ThreeScene) window.ThreeScene.setMistTint(null); }, 4000);
+    note.textContent = "扫描完成 —— 画面没有保存，摄像头已关闭。";
+    setStatus("扫描完成，摄像头已关闭");
+  });
+}
+
+function faceDiagnoseReport(deps) {
+  const { FE, setStatus, unavailable } = deps;
+  /* 开局自检（r87d）：把"卡在哪一层"提前显示在状态行。 */
+  return FE.diagnose().then((d) => {
+    window.__XINYU_FACE_DIAG__ = d;
+    if (d.devices === 0) {                  // 一个摄像头设备都没有：先别让用户点，直接说清
+      unavailable("no-video-device");
+      setStatus(FE.reasonText("no-video-device"));
+      return;
+    }
+    if (d.permission === "denied") {
+      setStatus("浏览器已阻止摄像头：点地址栏左侧锁形图标 → 摄像头 → 允许，再点开启（被记住的阻止不会再弹窗）");
+    } else if (d.permission === "granted") {
+      setStatus("摄像头权限：已授权 · 检测到 " + d.devices + " 个摄像头设备");
+    } else if (d.devices > 0) {
+      setStatus("检测到 " + d.devices + " 个摄像头设备，首次使用需在弹窗里点「允许」");
+    }
+  }).catch(() => { /* 自检失败不影响主链路 */ });
+}
+
 (function initFace() {
     const FE = window.FaceEngine;
     const probe = $("#face-probe"), scanBtn = $("#btn-face-scan"), dockBtn = $("#btn-face");
@@ -626,22 +674,7 @@ function initFaceHud(deps) {
       if (!cap.ok) { unavailable(cap.reason); setStatus(FE.reasonText(cap.reason)); return; }
       ready();
       setStatus("");
-      /* 开局自检（r87d）：把"卡在哪一层"提前显示在状态行。 */
-      FE.diagnose().then((d) => {
-        window.__XINYU_FACE_DIAG__ = d;
-        if (d.devices === 0) {                  // 一个摄像头设备都没有：先别让用户点，直接说清
-          unavailable("no-video-device");
-          setStatus(FE.reasonText("no-video-device"));
-          return;
-        }
-        if (d.permission === "denied") {
-          setStatus("浏览器已阻止摄像头：点地址栏左侧锁形图标 → 摄像头 → 允许，再点开启（被记住的阻止不会再弹窗）");
-        } else if (d.permission === "granted") {
-          setStatus("摄像头权限：已授权 · 检测到 " + d.devices + " 个摄像头设备");
-        } else if (d.devices > 0) {
-          setStatus("检测到 " + d.devices + " 个摄像头设备，首次使用需在弹窗里点「允许」");
-        }
-      }).catch(() => { /* 自检失败不影响主链路 */ });
+      faceDiagnoseReport({ FE, setStatus, unavailable });
       note.textContent = "画面只在你本机的内存里过一遍 —— 不拍照、不上传、不留存。";
     }
     if (camToggle) camToggle.addEventListener("change", () => { FE.setEnabled(camToggle.checked); applyEnabled(); });
@@ -656,28 +689,8 @@ function initFaceHud(deps) {
        ready() 用的 setSwitch/setPill/showStage 是 initFaceHud 返回的 const，写在前面踩 TDZ；
        initFace 在顶层同步执行 ⇒ 一抛则 boot/开场/对话接线全不执行，表现是**整页打不开**。 */
 
-    // A. 第二幕：扫描一次
-    scanBtn.addEventListener("click", async () => {
-      const v = $("#face-video");
-      v.hidden = false;
-      note.textContent = "正在准备表情模型（首次约 13MB，之后走缓存）…";
-      scanBtn.disabled = true;
-      setStatus("正在请求摄像头授权并加载模型…");
-      const r = await FE.probeOnce({ video: v });
-      scanBtn.disabled = false;
-      v.hidden = true;
-      if (!r.ok) { note.textContent = FE.reasonText(r.reason || "no-face"); setStatus(FE.reasonText(r.reason || "no-face")); return; }
-      const box = document.createElement("div");
-      box.className = "face-row";
-      box.innerHTML = faceChipHtml(r.view);
-      probe.insertBefore(box, note);
-      paint(box);
-      // 只染星雾底色（不点亮新星）：一次扫描不该在星图上留下"记忆"
-      if (gl) window.ThreeScene.setMistTint(r.view.color, r.view.intensity);
-      setTimeout(() => { if (window.ThreeScene) window.ThreeScene.setMistTint(null); }, 4000);
-      note.textContent = "扫描完成 —— 画面没有保存，摄像头已关闭。";
-      setStatus("扫描完成，摄像头已关闭");
-    });
+    // A. 第二幕：扫描一次（绑定外提 bindFaceScan，见 initFace 上方）
+    bindFaceScan({ FE, probe, note, scanBtn, setStatus, paint });
 
     // B. 第三幕：实时表情感知（开 = 真开摄像头；关 = 真停轨道）
     const { setPill, setSwitch, showStage, paintHud } = initFaceHud({

@@ -6,6 +6,8 @@
 
 ```powershell
 python _test/run_all_suites.py           # ★ 全量电池（套件条数以 `--list` 实算为准，本文件不抄数；逐条直取 rc，聚合不掩盖单项失败） ⇒ 更正注 r100：新增 **BLIND-RED 档**（`blind_reds()` 纯函数 + `blind_selftest()`）——rc=1 却**一行判据结论都没有** = 仪器自己崩了，不是产品红。此前这类与真红在收口面同形（r99 三处 Playwright 超时的现场），判红名单照收但没人知道该查的是判据而不是产品代码。红照判、rc 判定一字未动，只是单列点名；桩双向含「FAIL 行即结论不得再记盲红」「rc=2/rc=3 不抢档」。
+python _test/blindred_guard_check.py            # r112 BLIND-RED 常驻棘轮：AST 清点 SUITES 在册脚本里「不在 try 保护内的 assert / wait_for_*」裸抛栈点（rc≠0 却零结论行 = 仪器自己崩），超基线判红并点名到 文件:行；基线只降不升（首扫 23 → 现 21）。（r117 登记补录：判据入电池后本清单漏登，G16 抓到后补行）
+python _test/blindred_guard_check.py --selftest # r112 判据自身桩：变异腿注入裸 assert 必须被抓到、原样脚本不误报；名册取不到 rc=2 不当绿（套件 blindred_guard_selftest）
 python _test/fault_injection_check.py    # r51 故障注入：上游 500/非JSON/断连/黑洞挂起/恢复 五类，看界面说不说真话（徽章同帧翻面 + hit_count 全非零证注入真打到通道）
 python _test/fault_injection_check.py --selftest  # r51 判据自身桩：12 例（含「注入 0 命中记 INVALID 不记 PASS」+ r52「归因缺失总预算内也判红」）
 python _test/peer_fault_probe.py --selftest       # r51 故障可见性对标探针桩：6 例（边界=不得写成报错体验对比结论）
