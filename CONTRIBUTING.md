@@ -85,7 +85,7 @@ java -jar server/target/soulisle-server.jar --server.port=8123
 
 # 2. 改动后本地验证（CI 会复跑同样判据）
 python _test/deploy_sync_check.py       # src ↔ deploy 同步守卫
-node _test/emotion_eval.js              # 情绪评测（73 条，输出 JSON）
+node _test/emotion_eval.js              # 情绪评测（条数以该脚本自印为准；旧注写 73 条是 2026-09-23 前的快照，HEAD 面现为 85 条——G8 两面判据盯着这类声称）
 mvn -f server/pom.xml -B package        # Java 构建
 
 # 3. 涉及前端运行时行为时，追加：
@@ -99,6 +99,36 @@ python _test/ux_guards_check.py         # TTS / 对话窗口化 / 响应式与�
 
 CI 与本地同口径：`.github/workflows/ci.yml` 三个 job 分别跑「同步+评测+策略表+密钥扫描」「Java 构建+词表一致性红线」「浏览器回归」。
 需要真实密钥的判据（`stream_contract` 的 B 组、`public_check`）**不进 CI**——CI 只跑零密钥可复现的部分，避免把密钥带进托管环境。
+
+## 如何跑电池（推送前必做，别只挑几条跑）
+
+```bash
+python _test/run_all_suites.py --exclude-llm     # 全量回归（豁免 3 条需真实密钥的套件）
+python _test/run_all_suites.py --list            # 套件名册（唯一真相源 = SUITES 列表，不手抄条数）
+python _test/run_all_suites.py --only deploy     # 只跑名字含 deploy 的套件（调试用，**不算**推送前验证）
+```
+
+四类结论，含义不同，**别把它们读成两档**：
+
+| 结论 | 含义 | 该做什么 |
+|---|---|---|
+| `*-PASS`（rc=0） | 判据跑完且干净 | 可以收工 |
+| `*-FAIL`（rc=1） | 判据跑完且判红 | 修产品，不是放宽判据 |
+| `*-UNVERIFIED`（rc=2） | 取数面不可读／输入为空／环境缺件 | **不是通过**；把缺的那一面补出来再判 |
+| `CRASH`／`SUITE-TIMEOUT` | 判据进程自己崩了或没跑完 | 与"产品红""环境未验"三档分列，红因必须自己点名 |
+
+配套纪律（每条都在本仓有常驻判据兜着，不是口头约定）：
+
+- **判据必须自带反例腿**：新增或改动判据时同轮加 `--selftest`，且**先看它红一次**（把守卫摘掉必须翻红），
+  否则等于写了一条永远绿的装饰。跑法：`python _test/<某判据>.py --selftest`。
+- **数字别手抄**：套件数由 `repo_config_check` 的 G4 与 README 断言等值对账；评测集条数由 **G8**
+  在**工作树面与受理面（`git show HEAD:`）各判一次**——只在本机对上一句、CI 检出的那份不对，G8 会点名是哪一面。
+- **整跑不可重入，也不可与单跑并行**：并发第二条一律 `BATTERY-UNVERIFIED(并发)`（不给绿也不造假红）。
+  共享工作树里常有并行会话，起服务前先量端口归属：`Get-NetTCPConnection -LocalPort 8123 -State Listen`。
+- **提交一律 pathspec 限定**：`git add <本次路径…> && git commit -m "…" -- <本次路径…>`，
+  提交后 `git show --name-only HEAD` 核对只含本次文件；`git add -A` 在多人同树是事故源。
+- **行尾**：本仓按 LF 落盘，改完跑 `python _test/eol_parity_check.py`——Windows 下编辑器写出 CRLF
+  会让"逐字节／SHA256／字节预算"类主张在别人 clone 上不可复算（r119 一手实测：一次编辑落 168 个 CR）。
 
 ## 提交规范
 

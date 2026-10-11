@@ -581,8 +581,14 @@ def eval_section(text):
     return rest
 
 
-def eval_scope(seg, files, counts):
+def eval_scope(seg, files, counts, read=None, face="工作树"):
     """G8 纯函数：评测集红线必须真落地。
+
+    r120 两面口径（一手起因：并行提交把 06 的声称条数改成**磁盘/工作树**的实数，
+    而承担该数据的那次提交没落进 main ⇒ `repo_config` 在本机绿、CI 检出后判红。
+    同一事实被两个面各说一遍时，只量一面的判据等于**给"本机绿"发通行证**）：
+    `read(rel)` 决定"实际条数"从哪一面取，`face` 只负责把面名写进红因，
+    让读红的人一眼知道是"我的树不对"还是"受理面不对"。
 
     ⚠️ 两处口径修正（本轮实测踩到后写死，别再用错分母）：
     ① 占位符判据**锚定 init 模板原句**（"清单：（如 "），不能泛指"段里出现（如 "就算占位符"
@@ -602,18 +608,22 @@ def eval_scope(seg, files, counts):
     for f, declared in (counts or {}).items():
         if f not in files:
             continue                      # 配置声明件只要求"存在"，不按样本条数核
-        p = ROOT / "_test" / f
-        if not p.exists():
-            bad.append(f"06 登记的 {f} 磁盘上不存在（文档写了≠磁盘有，R240）")
+        try:
+            raw = (read or (lambda rel: (ROOT / "_test" / rel).read_text("utf-8")))(f)
+        except (OSError, RuntimeError) as e:
+            bad.append(f"[{face}] {f} 取不到正文（{type(e).__name__}）⇒ 记未验，禁止折算成绿")
+            continue
+        if raw is None:
+            bad.append(f"[{face}] {f} 该面没有这个文件（文档写了≠该面有，R240）")
             continue
         try:
-            d = json.loads(p.read_text("utf-8"))
+            d = json.loads(raw)
         except Exception as e:
-            bad.append(f"{f} 不可解析：{e}")
+            bad.append(f"[{face}] {f} 不可解析：{e}")
             continue
         items = d if isinstance(d, list) else (d.get("items") or d.get("cases") or d.get("data") or [])
         if declared != len(items):
-            bad.append(f"{f} 实际 {len(items)} 条，06 声称 {declared} 条")
+            bad.append(f"[{face}] {f} 实际 {len(items)} 条，06 声称 {declared} 条")
     return bad
 
 
@@ -951,6 +961,32 @@ def peer_count_audit(readme_text, truth):
         elif int(c) != int(truth):
             bad.append(f"README 声称 {c} 仓，台账权威值 {truth}（差 {int(c)-int(truth):+d}）")
     return bad
+
+
+def _stub_scope_cases():
+    """G8 两面的自测样本（r120）：正例两面齐、受理面单独红（本机绿的伪装形）、取不到记未验。"""
+    seg_ok = "评测集隔离\n- 清单：a-dataset.json 共 2 条"
+    seg_lie = "评测集隔离\n- 清单：a-dataset.json 共 9 条"
+    two = '{"items":[1,2]}'
+    out = []
+    if eval_scope(seg_ok, ["a-dataset.json"], eval_counts(seg_ok), read=lambda r: two):
+        out.append("两面齐的正例被判红")
+    if not eval_scope(seg_lie, ["a-dataset.json"], eval_counts(seg_lie), read=lambda r: two):
+        out.append("声称不符未判红（尺恒绿）")
+    # 受理面单独红：同一句声称在工作树对、在 HEAD 不对 ⇒ 必须点名是哪一个面
+    wt = eval_scope(seg_ok, ["a-dataset.json"], eval_counts(seg_ok), read=lambda r: two, face="工作树")
+    hd = eval_scope(seg_ok, ["a-dataset.json"], eval_counts(seg_ok),
+                    read=lambda r: '{"items":[1,2,3,4,5,6,7,8,9]}', face="受理面 HEAD")
+    if wt or not hd or "[受理面 HEAD]" not in hd[0]:
+        out.append("两面未分离：本机绿会替受理面作证，或红因点不出是哪一面")
+    if not eval_scope(seg_ok, ["a-dataset.json"], eval_counts(seg_ok),
+                      read=lambda r: None, face="受理面 HEAD"):
+        out.append("该面缺文件被当成通过（零输入不得记绿）")
+    if not eval_scope(seg_ok, ["a-dataset.json"], eval_counts(seg_ok),
+                      read=lambda r: (_ for _ in ()).throw(RuntimeError("git show 失败")),
+                      face="受理面 HEAD"):
+        out.append("取数失败被当成通过（读不动≠结论为否）")
+    return out
 
 
 def head_blob(rel):
@@ -1616,6 +1652,7 @@ def selftest():
     故首个失败点、断言条数与退出码都不变（`--selftest` 的 n_mut 是验真点）。
     """
     bad = []
+    bad += _stub_scope_cases()      # r120：G8 两面分离的自测腿（无消费者的判据等于没写）
     n_all, ex0 = _st_mut_a(bad)
     _st_mut_b(bad)
     return _st_mut_c(bad, n_all, ex0)
@@ -1757,11 +1794,31 @@ def _cfg_body(a):
         check("G6+G7 第三方授权边界已声明且逐文件登记（GSAP 非 MIT 不可含糊）", not lbad,
               " ; ".join(lbad) + "｜分母=%d(名册现读)" % len(vfiles))
 
+    # G8 两面：声称侧一律读**该面自己的** 06（工作树读工作树、受理面读 HEAD 的 06），
+    # 数据侧同理 —— 否则就是拿我的树去替 CI 作证（r120 一手：CI 检出面 85 条 vs 声称 105 条，本机全绿）。
     ct = (ROOT / "memory" / "06-constraints.md").read_text("utf-8") if (ROOT / "memory" / "06-constraints.md").exists() else ""
     seg, dfiles = eval_section(ct), eval_data_files()
-    ebad = eval_scope(seg, dfiles, eval_counts(seg))
-    check("G8 评测集来源已登记且声称条数==实际条数（R196 红线机器化）", not ebad, " ; ".join(ebad)
-          + f" | 裁决用数据 {dfiles} | 登记表抽到条数 {eval_counts(seg)}")
+    ebad = eval_scope(seg, dfiles, eval_counts(seg), face="工作树")
+    faces = "工作树面=%s" % ("绿" if not ebad else "红")
+    try:
+        cth = head_blob("memory/06-constraints.md")
+        segh = eval_section(cth)
+        data_h = {}
+        for p in sorted((ROOT / "_test").glob("*.json")):
+            try:
+                data_h[p.name] = head_blob("_test/" + p.name)
+            except RuntimeError:
+                data_h[p.name] = None            # 该面没有此文件 = 事实，不是"取不到"
+        ebad_h = eval_scope(segh, dfiles, eval_counts(segh),
+                            read=lambda rel: data_h.get(rel), face="受理面 HEAD")
+        ebad += ebad_h
+        faces += "，受理面 HEAD=%s" % ("绿" if not ebad_h else "红")
+    except RuntimeError as e:
+        ebad.append("受理面取不到（%s）⇒ 本维在 CI 侧未验，不得据工作树绿就判整条绿" % str(e)[:60])
+        faces += "，受理面 HEAD=未验"
+    check("G8 评测集来源已登记且声称条数==实际条数（R196 红线机器化；**工作树与受理面各判一次**）", not ebad,
+          " ; ".join(ebad) + " | 裁决用数据 %s | 登记表抽到条数 %s | 两面=%s"
+          % (dfiles, eval_counts(seg), faces))
 
     reqp = ROOT / "_test" / "requirements.txt"
     g11bad, n_runs, n_inst = ci_deps_audit(
