@@ -25,6 +25,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -183,6 +184,47 @@ def run_probe():
         return json.loads(p.stdout.strip().splitlines()[-1]), []
     except Exception as e:  # noqa: BLE001
         return None, ["F11 探针输出解析失败：%s" % e]
+
+
+def _probe_with(patch_text, tag):
+    """把改坏的 rules 临时落到一个副本工程里，跑同一探针，看 F11 是否红。
+    返回 (red, msg)：red=True=判据抓到了。（r117 自 selftest 嵌套升模块级：
+    嵌套体行数计入 selftest 使其超 loc-guard 函数长门。）"""
+    with tempfile.TemporaryDirectory() as td:
+        for sub in ("src/data", "src/js"):
+            os.makedirs(os.path.join(td, sub), exist_ok=True)
+        for rel in ("src/data/emotion-lexicon.js", "src/js/emotion-engine.js",
+                    "src/js/face-engine.js"):
+            shutil.copy(os.path.join(ROOT, rel), os.path.join(td, rel))
+        with open(os.path.join(td, "src/data/face-smile-rules.js"), "w", encoding="utf-8") as fh:
+            fh.write(patch_text)
+        save = ROOT
+        try:
+            globals()["ROOT"] = td
+            data, errs = run_probe()
+            if data is None:
+                return False, tag + " 探针没跑起来：" + "; ".join(errs)
+            got = f11_bad(data)
+            return bool(got), tag + (" ⇒ F11 抓到了" if got else " ⇒ **F11 没抓到，判据无牙**")
+        finally:
+            globals()["ROOT"] = save
+
+
+def _rule_case(real_rules, bad, tag, *pairs):
+    """反例通用体：按 (旧, 新) 对依次替换规则片段，探针必须红。
+    返回 1=探针实跑（selftest 据此累加 ran）/ 0=构造失败未跑（缺口记入 bad）；
+    抓没抓到的结论在本函数内 print 并记 bad，收口行 F11-SELFTEST-PASS/FAIL 格式保持原样。"""
+    m = real_rules
+    for old, new in pairs:
+        m = m.replace(old, new)
+    if m == real_rules:
+        bad.append(tag + " 构造失败：替换片段没匹配上（规则文件已改？先更新本测试）")
+        return 0
+    red, msg = _probe_with(m, tag)
+    print("  " + msg)
+    if not red:
+        bad.append(msg)
+    return 1
 
 
 def _f11_margin(cases, bad):
@@ -362,76 +404,37 @@ def selftest():
     每条反例都对应 r102 真实修过的一个缺陷，不是凭空造的。
 
     ⚠️ 回执条数**由实际执行数统计**，不写死数字：首版跑了 6 条却印「5 条」——
-    报数与实跑脱节，正是本仓在册的「计数靠手写就会漂」那类错，故改成自动数。"""
+    报数与实跑脱节，正是本仓在册的「计数靠手写就会漂」那类错，故改成自动数。
+    （r117 计数账：probe_with 原嵌套自计数、反例6-12 又显式 ran+=1 双计，报数虚高；
+    助手升模块级后改为 _rule_case 返回实跑数、此处累加，一处计数一处累加。）"""
     import copy
-    import tempfile
     bad = []
     ran = 0
     real_rules = open(os.path.join(ROOT, "src/data/face-smile-rules.js"), encoding="utf-8").read()
-    ran = 0
-
-    def probe_with(patch_text, tag):
-        """把改坏的 rules 临时落到一个副本工程里，跑同一探针，看 F11 是否红。"""
-        nonlocal ran
-        ran += 1
-        with tempfile.TemporaryDirectory() as td:
-            for sub in ("src/data", "src/js"):
-                os.makedirs(os.path.join(td, sub), exist_ok=True)
-            for rel in ("src/data/emotion-lexicon.js", "src/js/emotion-engine.js",
-                        "src/js/face-engine.js"):
-                shutil.copy(os.path.join(ROOT, rel), os.path.join(td, rel))
-            with open(os.path.join(td, "src/data/face-smile-rules.js"), "w", encoding="utf-8") as fh:
-                fh.write(patch_text)
-            save = ROOT
-            try:
-                globals()["ROOT"] = td
-                data, errs = run_probe()
-                if data is None:
-                    return False, tag + " 探针没跑起来：" + "; ".join(errs)
-                got = f11_bad(data)
-                return bool(got), tag + (" ⇒ F11 抓到了" if got else " ⇒ **F11 没抓到，判据无牙**")
-            finally:
-                globals()["ROOT"] = save
-
-    def rule_case(tag, *pairs):
-        """反例通用体：按 (旧, 新) 对依次替换规则片段，探针必须红。
-        返回 True=F11 抓到；构造失败（片段没匹配上）记入 bad 并返回 False。
-        收口行 F11-SELFTEST-PASS/FAIL 与逐条 print 的格式保持原样。"""
-        m = real_rules
-        for old, new in pairs:
-            m = m.replace(old, new)
-        if m == real_rules:
-            bad.append(tag + " 构造失败：替换片段没匹配上（规则文件已改？先更新本测试）")
-            return False
-        red, msg = probe_with(m, tag)
-        print("  " + msg)
-        if not red:
-            bad.append(msg)
-        return True
 
     # 反例 1：把 disgust 的口鼻证据抽掉（模拟 r102 的旧权重：disgust 判不出来）
-    rule_case("反例1 disgust 证据被抽掉",
+    ran += _rule_case(real_rules, bad, "反例1 disgust 证据被抽掉",
               ("noseSneerLeft: 1.0, noseSneerRight: 1.0,\n      mouthUpperUpLeft: 0.8, mouthUpperUpRight: 0.8,\n"
                "      mouthLowerDownLeft: 0.5, mouthLowerDownRight: 0.5,\n      mouthShrugUpper: 0.3,",
                "mouthShrugUpper: 0.3,"))
 
     # 反例 2：把 disgust 与 surprise 从声明的类别里去掉（模拟 r102 的旧版：
     #   这两类根本不在词表里，于是 disgust 判成 anger、surprise 判成 fear）
-    rule_case("反例2 删掉 surprise/disgust/contempt 三类（模拟旧版）",
+    ran += _rule_case(real_rules, bad, "反例2 删掉 surprise/disgust/contempt 三类（模拟旧版）",
               ('"surprise", "disgust", "contempt", "calm"', '"calm"'))
 
     # 反例 2b：把 fear 与 surprise 的分水岭拆掉（browDown 一正一负那一对）——
     #   模拟 r102 修的第二个真实缺陷：fear 永远被 surprise 抢走。
-    rule_case("反例2b 拆掉 fear/surprise 的 browDown 分水岭",
+    ran += _rule_case(real_rules, bad, "反例2b 拆掉 fear/surprise 的 browDown 分水岭",
               ("      browDownLeft: 0.4, browDownRight: 0.4,\n      jawOpen: 0.25,", "      jawOpen: 0.25,"),
               ("      browDownLeft: -0.6, browDownRight: -0.6,\n      mouthPressLeft: -0.4, mouthPressRight: -0.4",
                "      mouthPressLeft: -0.4, mouthPressRight: -0.4"))
 
     # 反例 3：peak 调到极小（模拟旧版饱和：所有非平静分都顶满 1.0）
-    rule_case("反例3 peak 调到 0.05（制造饱和）", ("peak: 0.60,", "peak: 0.05,"))
+    ran += _rule_case(real_rules, bad, "反例3 peak 调到 0.05（制造饱和）", ("peak: 0.60,", "peak: 0.05,"))
 
     # 反例 4：confidence 阈值压到 0（恒 confident ⇒ 该字段退化成装饰）
-    rule_case("反例4 confidence 阈值压到 -1（恒 confident）",
+    ran += _rule_case(real_rules, bad, "反例4 confidence 阈值压到 -1（恒 confident）",
               ("confidence: { on: 0.15, lowLabel:", "confidence: { on: -1, lowLabel:"))
 
     # 反例 5：把非对称门去掉（轻蔑会被 joy 抢走）。
@@ -468,7 +471,7 @@ def selftest():
     # 反例 6：把 anger 的 browDown 权重压回 1.0（=回到 r102 的量级），
     #   真愤怒的分数会掉到与「专注轻皱」拉不开 —— ②b 必须在此时报红。
     #   这条模拟的是"某天有人为了压误报把权重调回去"，是最可能发生的回退。
-    rule_case("反例6 anger 的 browDown 压回 1.0（真怒与专注拉不开）",
+    ran += _rule_case(real_rules, bad, "反例6 anger 的 browDown 压回 1.0（真怒与专注拉不开）",
               ("browDownLeft: 1.4, browDownRight: 1.4,", "browDownLeft: 1.0, browDownRight: 1.0,"))
 
     # 反例 7：把 sadness 的 browInnerUp 从 1.2 降回 0.7（= r102 的权重）。
@@ -476,32 +479,32 @@ def selftest():
     #   查证发现 jawOpen:-1.9 在两组真悲伤上**完全不影响分数**（删掉/归零后与有它时一字不差），
     #   它只管「悲伤+惊讶混合」的边界，不管主判。真正的 load-bearing 项是 browInnerUp。
     #   ⇒ 反例改成测真正起作用的那一个。教训：反例没被抓到时，先查它是不是测了个摆设。
-    rule_case("反例7 sadness 的 browInnerUp 降回 0.7（回到 r102 漏判态）",
+    ran += _rule_case(real_rules, bad, "反例7 sadness 的 browInnerUp 降回 0.7（回到 r102 漏判态）",
               ("      browInnerUp: 1.2,", "      browInnerUp: 0.7,"))
 
     # 反例 8：把 sadness 加回 need:2（r102 旧状态）。多区要求会让只有 brow 证据的真悲伤
     #   被打折一半 ⇒ 同样漏判。这条盯的是「多区要求被加回来」。
-    rule_case("反例8 把 sadness 加回 need:2（回退到漏判态）",
+    ran += _rule_case(real_rules, bad, "反例8 把 sadness 加回 need:2（回退到漏判态）",
               ("need: { fear: 2 },", "need: { fear: 2, sadness: 2 },"))
 
     # 反例 9：browInnerUp 压回 r102 的 0.7 ⇒ 真悲伤 sad 分跌破 0.55（②c 必须红）。
     #   【覆盖②c：真悲伤分数低端保护】
-    rule_case("反例9 browInnerUp 压回 0.7（真悲伤跌破 0.55）",
+    ran += _rule_case(real_rules, bad, "反例9 browInnerUp 压回 0.7（真悲伤跌破 0.55）",
               ("      browInnerUp: 1.2,", "      browInnerUp: 0.7,"))
 
     # 反例 10：browInnerUp 抬到 3.0 ⇒ 轻担忧 innerUp .40 也被判成 sadness（②e 必须红）。
     #   这是「乙」益价最真实的放大方向：有人为了"不漏真悲"一味抬高主证据。
-    rule_case("反例10 browInnerUp 抬到 3.0（轻担忧误报低落）",
+    ran += _rule_case(real_rules, bad, "反例10 browInnerUp 抬到 3.0（轻担忧误报低落）",
               ("      browInnerUp: 1.2,", "      browInnerUp: 3.0,"))
 
     # 反例 11：jawOpen 负权从 -1.9 调小到 -0.3 ⇒ 边担忧边说话开始误报 sadness（②e 必须红）。
     #   这条盯的是 jawOpen 在代价面上的作用 —— 上轮误判它是摆设，代价面实测才翻案。
-    rule_case("反例11 jawOpen 负权调小到 -0.3（边担忧边说话误报低落）",
+    ran += _rule_case(real_rules, bad, "反例11 jawOpen 负权调小到 -0.3（边担忧边说话误报低落）",
               ("      jawOpen: -1.9,", "      jawOpen: -0.3,"))
 
     # 反例 12：mouthFrown 从 0.4 抬回 1.0（r102 旧权重）⇒ 合成悲伤全对，
     #   但真悲伤的 sad 分可能被稀释。盯的是「辅证被当成主证」。
-    rule_case("反例12 mouthFrown 抬回 1.0（r102 旧权重回归）",
+    ran += _rule_case(real_rules, bad, "反例12 mouthFrown 抬回 1.0（r102 旧权重回归）",
               ("      mouthFrownLeft: 0.4, mouthFrownRight: 0.4,",
                "      mouthFrownLeft: 1.0, mouthFrownRight: 1.0,"))
 
