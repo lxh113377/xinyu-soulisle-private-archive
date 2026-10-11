@@ -4,6 +4,10 @@
 > 归档类型：增量（✅ 已实现的项移入归档）
 
 ## ✅ 已实现
+## ✅ 已实现（r116 语音腿，2026-10-11 · 语音通话 + 多种机器人音色）
+
+> 全文迁 `05…part19.md`（R161 壳 ≤4096B 硬顶，逐字搬卷未改写）：语音通话层 + 音色目录 + 分句出声 + 摄像头解耦，判据 `_test/voice_call_check.py` C腿=10/10。
+
 ## ✅ 已实现（v2 / J3-J4 变现，2026-09-22）
 
 - [ ] ⏳ 仅剩：fat jar 部署到国内可达机器（摆脱 CloudBase 首访中间页）
@@ -38,4 +42,5 @@
 - **卷16** `05-feature-status.part16.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷17** `05-feature-status.part17.md` — 05-feature-status 分卷（R199 自动拆卷）
 - **卷18** `05-feature-status.part18.md` — 05-feature-status 分卷（R199 自动拆卷）
+- **卷19** `05-feature-status.part19.md` — r116 语音腿全文（人工搬卷，壳撞 R161 4096B 硬顶；逐字未改）
 

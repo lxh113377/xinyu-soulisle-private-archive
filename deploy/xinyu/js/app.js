@@ -339,12 +339,11 @@
   const CW = window.ChatWindow;
   CW.init("#chat-log", { history: () => window.ChatAgent.getHistory() });
 
-  $("#chat-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = $("#chat-input");
-    const text = input.value.trim();
-    if (!text) return;
-    input.value = "";
+  /* r116：「一句话走完整共情链路」抽成 sendTurn，文字模式（提交表单）与通话模式共用一条路。
+     extraDelta 是给通话层做「边生成边念第一句」的按句出队用的；文字模式传 null ⇒ 行为与抽取前一致。
+     为什么抽而不是复制：通话若另起一条链路，情绪双路/记忆注入/危机短路/星雾点亮就要维护两份，
+     那正是本仓「两份真相」红线刚消掉过的形态（见 03 决策 #1 的 J6 更正注）。 */
+  async function sendTurn(text, extraDelta) {
     CW.push("user", text);
     const thinking = CW.push("ai", "心屿正在感受你的话…", "");
     thinking.classList.add("thinking");
@@ -352,6 +351,7 @@
      * 上游/代理不支持流式时 onDelta 永不触发，收尾按整包一次性渲染（与旧行为一致）。 */
     let bubble = null;
     const onDelta = (full) => {
+      if (extraDelta) { try { extraDelta(full); } catch { /* 通话层是观测+出声侧，不得把主链路带崩（voice.js 约束2 同族） */ } }
       if (bubble) { CW.update(bubble, full); return; }
       window.__seenStreamingBubble = true;   // 供 _test/stream_contract.py 断言「确实出现过逐字气泡」
       thinking.remove();
@@ -375,7 +375,8 @@
       const aiMsg = CW.push("ai", r.reply,
         `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${memLabel}${dropLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}${faceLabel}`);
       aiMsg.dataset.emotion = r.emotion;
-      window.Voice.speak(r.reply);   // 朗读开关打开时同步播出（失败静默，绝不影响主链路）
+      // 朗读开关打开时同步播出；通话中改由通话层按句出声，这里不重复念（失败静默，绝不影响主链路）
+      if (!(window.VoiceCall && window.VoiceCall.isCalling())) window.Voice.speak(r.reply);
       // 记住这条情绪 → 点亮一簇星（一个瞬间 = 1~8 颗，强度越高越多）
       // 复用 respond 里已算好的词典结果，避免同文本二次 scan；旧版本无 lexAll 时回落重扫
       const lexAll = r.lexAll || window.EmotionEngine.scan(text).all;
@@ -391,11 +392,26 @@
         appliedSecondary: applied, path: r.path ? "双路情绪 · " + r.path : "词典快判",
         face: r.face || null, divergence: r.divergence || "" });
       window.Chart.render();
+      return r;
     } catch (err) {
       thinking.remove();
       CW.push("ai", "刚才我走神了一下（网络不稳定）。你可以再发一次，或点右上角「模型设置」检查连接。", "友好错误态");
+      return null;
     }
+  }
+
+  $("#chat-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = $("#chat-input");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    sendTurn(text, null);
   });
+
+  /* r116：语音通话层接线。只把 sendTurn 注进去（通话层不认识 ChatAgent / EmotionEngine），
+     出声与耗时读数由通话层自己经 window.Voice 的能力层做。判据 _test/voice_call_check.py。 */
+  window.VoiceCall.init({ send: sendTurn });
 
   /* 6.1) 面部表情识别（r87）：不可用即隐藏入口（禁伪装）；画面只在内存里过一遍，零上传零落盘。 */
   /* ── r116（老大纠正参照物：要的是**微信视频通话**，不是 r115 那个侧边栏）──────

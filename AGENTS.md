@@ -139,7 +139,7 @@
 ## 模块说明
 
 ### 权威源（改这里）
-- `src/` — **唯一权威源码**。`index.html`（五幕叙事 + 底部对话坞 + 星雾 canvas）+ `css/` + `js/`（`app.js` 编排 / `three-scene.js` 星雾与情绪点亮 / `chat-agent.js` 对话与记忆 / `emotion-engine.js` 词典情绪引擎 / `scroll-story.js` 滚动叙事 / `demo-config.js` 本地演示配置，**含 Key 已 ignore**）+ `vendor/`（three / gsap / ScrollTrigger 本地 vendor）+ `functions/api/chat.js`（Pages Function 源）
+- `src/` — **唯一权威源码**。`index.html`（五幕叙事 + 底部对话坞 + 星雾 canvas + r116 通话浮层 `#call-layer`）+ `css/`（`style.css` 全站 + `voice-call.css` 通话层专属）+ `js/`（`app.js` 编排 / `three-scene.js` 星雾与情绪点亮 / `chat-agent.js` 对话与记忆 / `emotion-engine.js` 词典情绪引擎 / `voice.js` 声音能力层（音色目录 + 分句朗读队列 + 一次性语音输入）/ `voice-call.js` 语音通话编排（语义收句 + 双工 + 打断）/ `scroll-story.js` 滚动叙事 / `demo-config.js` 本地演示配置，**含 Key 已 ignore**）+ `vendor/`（three / gsap / ScrollTrigger 本地 vendor）+ `functions/api/chat.js`（Pages Function 源）
 
 ### 交付与部署
 - `deploy/` — **部署产物**，改完 `src/` 必须同步此处并做 SHA256 双向比对（MISSING / DIFF / EXTRA 三类归零）

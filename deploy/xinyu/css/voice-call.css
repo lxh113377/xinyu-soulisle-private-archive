@@ -1,0 +1,61 @@
+/* 心屿 · 语音通话层样式（r116 新增）
+ *
+ * 为什么单开一份 CSS：`src/css/style.css` 的字节预算余量只够小改，通话层是一块新界面；
+ * 分文件既守住了「一个能力一个模块」的分工，也让体积预算按文件各归各（size_budget_check 逐文件判）。
+ * 令牌一律复用 style.css 的 :root（--ink / --ink-2 / --line / --accent / --r-* / --sp-* / --dur-* / --sh-*），
+ * 禁自造颜色 —— 浅深两套主题都要成立。
+ * 尺寸写 CSSOM 的只有音量计的 --lvl（0..1），markup 层不出现 style= （inline_style_check）。
+ */
+.call-layer[hidden]{display:none}
+.call-layer{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;
+  padding:16px;background:rgba(4,6,14,.72);backdrop-filter:blur(6px)}
+.call-card{width:min(560px,100%);max-height:min(86vh,720px);display:flex;flex-direction:column;gap:10px;
+  background:linear-gradient(165deg,rgba(24,32,62,.96),rgba(10,14,32,.96));border:1px solid var(--line);
+  border-radius:var(--r-lg);box-shadow:var(--sh-3),var(--hi);padding:16px 18px;color:var(--ink)}
+.call-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.call-title{font-weight:700;font-size:16px;letter-spacing:.02em}
+.call-pill{font-size:12.5px;padding:5px 12px;border-radius:var(--r-pill);border:1px solid var(--line);color:var(--ink-2)}
+.call-pill.s-listening{color:var(--accent2);border-color:rgba(57,208,196,.45)}
+.call-pill.s-thinking{color:var(--warn);border-color:rgba(240,179,84,.45)}
+.call-pill.s-speaking{color:var(--accent);border-color:rgba(124,108,255,.5)}
+.call-live{font-size:15px;line-height:1.7;color:var(--ink);min-height:26px;padding:8px 12px;
+  background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:var(--r-sm)}
+/* 音量计：宽度由 CSSOM 写的 --lvl 决定；取不到音频腿时 .is-na 收成一条静默轨（不影响通话） */
+.call-level{position:relative;height:6px;border-radius:var(--r-pill);background:rgba(255,255,255,.07);overflow:hidden}
+.call-level::after{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(var(--lvl,0) * 100%);
+  min-width:4px;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width var(--dur-1) linear}
+.call-level.is-na::after{opacity:.25}
+.call-captions{flex:1 1 auto;min-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;
+  padding:6px 2px;overscroll-behavior:contain}
+.call-line{font-size:14.5px;line-height:1.65;padding:8px 12px;border-radius:var(--r-md);border:1px solid var(--line)}
+.call-line.you{align-self:flex-end;background:rgba(124,108,255,.14)}
+.call-line.ai{align-self:flex-start;background:var(--bubble-ai)}
+.call-line.sys{align-self:center;color:var(--ink-2);font-size:12.5px;background:none;border:none;text-align:center}
+.call-line-meta{display:block;margin-top:4px;font-size:11.5px;color:var(--muted)}
+.call-opts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.call-opts label{font-size:12.5px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.call-opts select{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);
+  border-radius:var(--r-sm);padding:8px 10px;font-family:var(--font);font-size:13px;max-width:230px}
+.call-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.call-acts .ghost-btn{min-height:44px}
+.call-acts .call-end{color:#ff8f8f;border-color:rgba(255,122,122,.5)}
+.call-note{font-size:12px;color:var(--warn);min-height:16px}
+.call-face{font-size:12px;color:var(--ink-2)}
+.call-metrics{font-size:12px;color:var(--accent2)}
+.btn-call.on{color:var(--accent);border-color:var(--accent)}
+/* 通话层是整屏浮层（z 70）；摄像头悬浮小窗是另一条独立能力（r116 并行轮做的微信式 PIP）。
+   摄像头开着时进通话，小窗必须浮在通话层**上面** —— 「无论是否开启摄像头均可通话」的正向半边：
+   两条能力互不遮挡、互不依赖。`:has()` 现代内核均支持，取不到时只是小窗留在下层，不影响通话可用。 */
+body:has(.call-layer.on) .face-pip{z-index:80}
+.btn-call.is-off,.call-acts .ghost-btn.is-off{opacity:.55}
+
+@media(max-width:480px){
+  .call-layer{padding:0}
+  .call-card{width:100%;max-height:92vh;border-radius:var(--r-lg) var(--r-lg) 0 0;padding:14px}
+  .call-opts select{max-width:100%;flex:1 1 auto}
+  /* 触屏 44px 触控基线：音色/试听/双工三个小控件在手机上也要按得动（桌面维持 tiny 密度） */
+  .call-opts select,.call-opts .ghost-btn{min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){
+  .call-level::after{transition:none}
+}

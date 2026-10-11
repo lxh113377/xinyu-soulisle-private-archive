@@ -282,6 +282,10 @@ SUITES = [
     ("voice", [sys.executable, "_test/voice_check.py", BASE]),
     # r35：voice 的"CI 无麦克风 ⇒ SKIP"降级必须是纯函数且带边界反例，否则降级会吞掉真缺陷
     ("voice_selftest", [sys.executable, "_test/voice_check.py", "--selftest"]),
+    # r116：语音通话层（收句/音色/双工/不靠摄像头/退出复位）。桩打在被审对象的两个边界
+    # （SpeechRecognition 与 ChatAgent.respond），被测的是编排层本身 ⇒ 不进 LLM_SUITES，CI 可跑。
+    ("voice_call", [sys.executable, "_test/voice_call_check.py", BASE]),
+    ("voice_call_selftest", [sys.executable, "_test/voice_call_check.py", "--selftest"]),
     ("browser_check", [sys.executable, "_test/browser_check.py"]),
     ("pixel_dual", [sys.executable, "_test/pixel_dual_check.py"]),
     ("lightshow", [sys.executable, "_test/lightshow_check.py"]),
