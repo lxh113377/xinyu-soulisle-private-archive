@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/bench_eight_dims_check.py",
  "round": "r123",
- "written_at": "2026-10-11T22:10:33Z",
+ "written_at": "2026-10-11T22:20:13Z",
  "dims": [
   {
    "dim": "功能模块覆盖",
@@ -113,7 +113,7 @@
    "cells": [
     {
      "label": "self 30 天提交",
-     "value": "431 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
+     "value": "432 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
      "source": "本轮 git rev-list --count --since=30.days HEAD 实测"
     },
     {
@@ -143,12 +143,12 @@
    "cells": [
     {
      "label": "self 文档件数 / openapi⇄端点",
-     "value": "14 件｜openapi 11 paths ⇄ Java 11 映射（差 0）｜同尺四类位=3/4（HEAD 面取数，与 peers 同一条 classify_docs）",
+     "value": "15 件｜openapi 11 paths ⇄ Java 11 映射（差 0）｜同尺四类位=4/4（HEAD 面取数，与 peers 同一条 classify_docs）",
      "source": "HEAD 面 git ls-tree + docs/openapi.yaml + 控制器注记；四类位＝_test/peer_docs_probe.py self_only()"
     },
     {
      "label": "peers docs 面",
-     "value": "四类位在册（分母 16 仓）：API 规范 1、教程 9、贡献指南 10、独立文档区 10；形态 0/4=5 1/4=1 2/4=2 3/4=7 4/4=1；失明/未验 0 仓｜self 同尺=3/4（缺项＝独立 quickstart 文件，本仓入门写在 docs/README.md 里）",
+     "value": "四类位在册（分母 16 仓）：API 规范 1、教程 9、贡献指南 10、独立文档区 10；形态 0/4=5 1/4=1 2/4=2 3/4=7 4/4=1；失明/未验 0 仓｜self 同尺=4/4（四位齐，r123 起由 docs/QUICKSTART.md 撑出，非改尺所得）",
      "source": "本件不重采 ⇒ 引用 NA；补法 python _test/benchmark_metrics.py（docs 字段在 runs[-1].repos[].docs）"
     }
    ]

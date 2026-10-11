@@ -117,12 +117,18 @@ def docs_peers_val(path, payload):
     dist = payload.get("class_dist") or {}
     self_row = next((r for r in rows if str(r.get("repo", "")).startswith("self")), None)
     blind = len(payload.get("na") or [])          # 声明键＝四态形状 C（r122 用错 blind_or_na 打成过未验）
+    # self 的缺项**从 self 行现算**，不写死句子：写死的那句在 QUICKSTART 落地后就成了
+    # 一张说着旧话的表（r123 一手：同一格硬编码过"缺项＝quickstart"，文件建好后它没跟着变）。
+    missing = [nm for key, nm in (("api_spec", "API 规范"), ("guide", "独立教程文件"),
+                                  ("contributing", "贡献指南"), ("docs_site", "独立文档区"))
+               if not (self_row or {}).get(key)]
+    self_note = ("self 同尺=%s（缺项：%s）" % ((self_row or {}).get("class", "NA"), "、".join(missing))
+                 if missing else "self 同尺=4/4（四位齐，r123 起由 docs/QUICKSTART.md 撑出，非改尺所得）")
     return ("四类位在册（分母 %s 仓）：API 规范 %s、教程 %s、贡献指南 %s、独立文档区 %s；"
-            "形态 %s；失明/未验 %d 仓｜self 同尺=%s（缺项＝独立 quickstart 文件，本仓入门写在 docs/README.md 里）"
+            "形态 %s；失明/未验 %d 仓｜%s"
             % (payload.get("denominator"), bits.get("api_spec", "NA"), bits.get("guide", "NA"),
                bits.get("contributing", "NA"), bits.get("docs_site", "NA"),
-               " ".join("%s=%d" % kv for kv in sorted(dist.items())), blind,
-               (self_row or {}).get("class", "NA")))
+               " ".join("%s=%d" % kv for kv in sorted(dist.items())), blind, self_note))
 
 
 def cell(label, value, source):

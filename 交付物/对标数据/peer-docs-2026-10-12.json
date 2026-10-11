@@ -180,13 +180,13 @@
   },
   {
    "api_spec": 1,
-   "guide": 0,
+   "guide": 1,
    "contributing": 1,
    "docs_site": 1,
-   "readme_bytes": 21864,
-   "docs_md_files": 7,
+   "readme_bytes": 22134,
+   "docs_md_files": 8,
    "repo": "self（心屿 MindIsle 本仓）",
-   "class": "3/4",
+   "class": "4/4",
    "face": "HEAD 面 git ls-tree -r HEAD（与 peers 同面）"
   }
  ],
@@ -199,7 +199,7 @@
   "0/4": 5
  },
  "scope": "class_dist/bit_counts/na 只数 peers 行；self 单列 self_class",
- "self_class": "3/4",
+ "self_class": "4/4",
  "bit_counts": {
   "api_spec": 1,
   "guide": 9,
@@ -207,5 +207,5 @@
   "docs_site": 10
  },
  "note": "四类位＝API 规范 / 教程 / 贡献指南 / 独立文档区；0/4 只在取数面完整时成立，失明一律单列 unverified 不折算成零",
- "ts": "2026-10-11T22:10:10Z"
+ "ts": "2026-10-11T22:17:24Z"
 }
