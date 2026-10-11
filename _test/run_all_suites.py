@@ -391,6 +391,12 @@ SUITES = [
     # （只读本地台账 + git HEAD 面，零网络；缺源判 rc=2 不塌缩成 0）。
     ("bench_rollup", [sys.executable, "_test/bench_rollup.py"]),
     ("bench_rollup_selftest", [sys.executable, "_test/bench_rollup.py", "--selftest"]),
+    # r119：八维总览表**派生化**（对标改造二）。立因：`bench_rollup.py` 只算 2 维，其余 6 维每轮手抄进
+    #   报告，而本仓被"文档数字与实值脱节"咬过（AC-OBS-09 的 94.4%/3-3 旧值在注入面活了好几轮）。
+    #   本件把 8 维一次算全并**硬断言每格有出处**（缺源即红），产物eight-dims-rNNN.json 带时点；
+    #   CI 浅克隆下提交率/tag 两格降档为 NA-DECLARED 并写明补法（不印一个失真读数进台账被下轮横比）。
+    ("bench_eight_dims", [sys.executable, "_test/bench_eight_dims_check.py", "--round", "battery", "--no-write", "--quiet"]),
+    ("bench_eight_dims_selftest", [sys.executable, "_test/bench_eight_dims_check.py", "--selftest"]),
     # r96：对标台账的**龄期**尺。立因是一手实测——r95 报告 §1 维度 1/5 写着「16 仓同址尺」，
     #   而底层 peer 台账按文件名日期有 12/15 族已 8–9 天没重采（契约自己声明 refresh_days=7）。
     #   此前没有任何一把尺盯台账的龄，所以「现测」二字没人能对账。静态零网络，进契约 blocking。

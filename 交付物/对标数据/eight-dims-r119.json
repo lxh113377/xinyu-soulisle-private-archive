@@ -1,0 +1,177 @@
+{
+ "generated_by": "_test/bench_eight_dims_check.py",
+ "round": "r119",
+ "written_at": "2026-10-11T17:55:43Z",
+ "dims": [
+  {
+   "dim": "功能模块覆盖",
+   "cells": [
+    {
+     "label": "self 计数位",
+     "value": "6 项：api_spec/container/deps_autoupdate/emotion_backend_wired/pwa_manifest/pwa_offline",
+     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+    },
+    {
+     "label": "self 测量盲区（不是缺功能）",
+     "value": "e2e_browser、streaming",
+     "source": "benchmark-metrics.json@2026-10-10 01:12 UT（self_row.caps_blind；口径见 benchmark_metrics.cap_channel_class docstring）"
+    },
+    {
+     "label": "peers 单格最高",
+     "value": "vector_memory=7/16",
+     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+    },
+    {
+     "label": "peers 危机语料覆盖",
+     "value": "池内多数仓无标注危机集；self 有 6 条冻结样本",
+     "source": "peer-capability-safety 台账 peer-capability-safety-2026-10-08.json"
+    }
+   ]
+  },
+  {
+   "dim": "技术架构设计",
+   "cells": [
+    {
+     "label": "self 零构建",
+     "value": "zero_build=True｜套件 152｜Java 测试件 12",
+     "source": "benchmark-rollup-r95.json"
+    },
+    {
+     "label": "词表单源",
+     "value": "src/data/emotion-lexicon.js（JS/Java 各加载同一文件）",
+     "source": "HEAD 面 git show + memory/AGENTS.md 词表一致性红线"
+    },
+    {
+     "label": "peers 生态",
+     "value": "deps_autoupdate=2/16（有包清单才可挂）",
+     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+    }
+   ]
+  },
+  {
+   "dim": "实现方式（质量门）",
+   "cells": [
+    {
+     "label": "self 电池套件数",
+     "value": "154（HEAD 面）",
+     "source": "git show HEAD:_test/run_all_suites.py 的 SUITES 计数"
+    },
+    {
+     "label": "self Java 用例",
+     "value": "12 件 / 101 例｜门 LINE/BRANCH ≥ {\"LINE\": 0.9, \"BRANCH\": 0.9}",
+     "source": "git ls-tree HEAD + server/pom.xml"
+    },
+    {
+     "label": "peers 有测试结构 / CI unit 步",
+     "value": "7/16 ＋ 5/16（coverage_gate 与 mutation_gate 均 0/16）",
+     "source": "peer-quality-tooling-2026-10-08.json"
+    }
+   ]
+  },
+  {
+   "dim": "性能表现",
+   "cells": [
+    {
+     "label": "self 首屏预算",
+     "value": "{\"files\": 28, \"total_bytes\": 1114883}",
+     "source": "benchmark-rollup-r95.json"
+    },
+    {
+     "label": "peers bench 在册数",
+     "value": "NA-DECLARED：台账未取到 peers 的 bench_script 在册数 ⇒ 不做无据横比；补法 python _test/benchmark_metrics.py --doc-perf",
+     "source": "peer-repro 台账 peer-repro-2026-10-08.json@2026-10-07T20:40:20"
+    }
+   ]
+  },
+  {
+   "dim": "可扩展性",
+   "cells": [
+    {
+     "label": "self 缺位",
+     "value": "插件协议 / 向量长记忆 / i18n（文档化 ≠ 机制化，见 docs/EXTENSIONS.md）",
+     "source": "HEAD 面 git ls-tree + docs/EXTENSIONS.md"
+    },
+    {
+     "label": "peers vector_memory",
+     "value": "7/16",
+     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+    },
+    {
+     "label": "peers i18n_locale",
+     "value": "3/16",
+     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+    },
+    {
+     "label": "peers 记忆形态在册面",
+     "value": "usable=12 blind=5 denominator=17",
+     "source": "peer-memory-2026-10-10.json"
+    }
+   ]
+  },
+  {
+   "dim": "维护状态",
+   "cells": [
+    {
+     "label": "self 30 天提交",
+     "value": "421 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
+     "source": "本轮 git rev-list --count --since=30.days HEAD 实测"
+    },
+    {
+     "label": "self tag 数",
+     "value": "12（一致性由 repo_config G12 独家判，本件不重复设尺）",
+     "source": "本轮 git tag 实测 + G12"
+    },
+    {
+     "label": "peers 提交率 top",
+     "value": "lobehub=29.73/日、letta-code=12.53/日、ryza-ai-revive=1.97/日",
+     "source": "peer-maintenance-2026-10-08.json@2026-10-07T20:31:41"
+    },
+    {
+     "label": "peers release / semver tag",
+     "value": "11/16 ＋ 11/16",
+     "source": "peer-release-2026-10-08.json@2026-10-07T20:39:15"
+    },
+    {
+     "label": "peers issue 响应可比性",
+     "value": "NA-DECLARED：17 条里含 self 在内多条为 NA（零 issue 或样本<3）⇒ 该维不作差距项；补法 python _test/peer_issue_response_probe.py --json …（错峰单跑）",
+     "source": "peer-issue-response-2026-10-08.json@2026-10-07T20:27:33"
+    }
+   ]
+  },
+  {
+   "dim": "文档完善程度",
+   "cells": [
+    {
+     "label": "self 文档件数 / openapi⇄端点",
+     "value": "14 件｜openapi 11 paths ⇄ Java 11 映射（差 0）",
+     "source": "HEAD 面 git ls-tree + docs/openapi.yaml + 控制器注记"
+    },
+    {
+     "label": "peers docs 面",
+     "value": "本件不重采 ⇒ 引用 NA；补法 python _test/benchmark_metrics.py（docs 字段在 runs[-1].repos[].docs）",
+     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+    }
+   ]
+  },
+  {
+   "dim": "适用场景",
+   "cells": [
+    {
+     "label": "self 定位",
+     "value": "演示级单用户 + 离线可完整演示 + 三路情绪 + 危机转介",
+     "source": "HEAD 面 src/ 与 memory/01-goal.md"
+    },
+    {
+     "label": "peers 定位抽样",
+     "value": "lobehub(A), SillyTavern(A), Open-LLM-VTuber(B), my-neuro(B), letta-code(D), MASCOT(C)",
+     "source": "benchmark-metrics.json@2026-10-10 01:12 UT（repos[].why/tier）"
+    }
+   ]
+  }
+ ],
+ "na_cells": [
+  "性能表现/peers bench 在册数",
+  "维护状态/peers issue 响应可比性"
+ ],
+ "cells": 25
+}

@@ -119,7 +119,16 @@ def main():
                 t0 = pg.evaluate("() => window.__XINYU_SCROLL_T__")
                 pg.mouse.move(640, 400)          # 视口中央（全屏坞上、chat-log 日志区——日志为空时不吃滚轮）
                 pg.mouse.wheel(0, 900)
-                pg.wait_for_timeout(300)
+                # r119 改造三：把「定长 300ms 押虚拟映射生效」换成**等被等对象本身的完成态**
+                # （t 由 GSAP 逐帧写，机器慢时 300ms 不够 → D10 假红；机器快时白等 → 整跑噪声）。
+                # 等不到不抛错：仍由下面的 ck 用现读值判红，证据里带 t0->t1，绝不静默放过。
+                try:
+                    pg.wait_for_function(
+                        "(t0) => window.__XINYU_SCROLL_T__ != null"
+                        " && window.__XINYU_SCROLL_T__ > t0",
+                        arg=t0, timeout=3000, polling="raf")
+                except Exception:                      # noqa: BLE001
+                    pass
                 t1 = pg.evaluate("() => window.__XINYU_SCROLL_T__")
                 ck("D10 全屏态滚轮推动星雾进度（虚拟映射，页面滚动是锁死的）",
                    t1 is not None and t0 is not None and t1 > t0, "%s -> %s" % (t0, t1))

@@ -771,6 +771,45 @@
   解封只差一个 Cloudflare API Token（或一次交互式 `wrangler login`），随后按序 publish → 复跑 → 先推 tag 再推分支 → 取 CI 回执 → 建 Release。
 - 台账：`memory/07-next-steps.part121.md`（逐条读数 + 新状态「备用线比 `origin/main` 新」+ 下轮入口三条）。
 
+### r119 — GitHub 八维对标 + 四项工程改造（对标报告：`交付物/对标分析报告-2026-10-12-r119.md`）
+
+**双核心能力（每轮第一要务）**：本轮**零增量、零回退**。HEAD 面复算语意 **85 条 / 100% / 危机 6-6**、
+表情单测 **26/26**（`core_capability_baseline_check` PASS）；工作树读数 105 条 / 99% 判红，
+经 `git archive HEAD` 复算**归因到并行会话在途的 +20 条评测集**，本轮按 R263 不改他人数据、不动棘轮基线。
+
+**受理面可信度（本轮四项改造，全部对标实测差距驱动）**：
+
+- **改造一 · 公网出口件离线单元判据**：`src/functions/api/chat.js` 此前在 CI 里**零执行**
+  （`LLM_SUITES` 豁免 `j2_chat_contract`/`stream_contract`/`online_check` 三条，G10 实测「实跑 149 + 豁免 3」）。
+  新增 `_test/js/pages-function-chat.unit.test.mjs` **17 用例**（契约五形态 + 先查 key 的判定顺序 +
+  默认值/env 别名/URL 拼接 + 流式三分支 + CORS 白名单 + OPTIONS + 密钥零外泄），
+  走 `js_unit` 的文件枚举面自动进电池与 CI ⇒ `JS-UNIT-PASS 50 用例（文件 3 个）`（改前 33）。
+  一手修正：原先断言「SSE 直通 = 同一个 body 对象引用」，实测 `new Response(body)` 会包装成**新的**
+  ReadableStream ⇒ 主张不成立，改判成「仍是流 + 分块逐字抵达」这类可观测事实。
+- **改造二 · 八维总览表派生化**：`bench_rollup.py` 只算 2 维、其余 6 维 60+ 份报告每份手抄
+  （本仓 AC-OBS-09 的旧值 94.4%/3-3/36 条就是这么活过好几轮的）。新增 `_test/bench_eight_dims_check.py`
+  一次算全 8 维并**硬断言每格有出处**（缺源/缺维/零格即红），产物 `交付物/对标数据/eight-dims-r119.json|.md`；
+  CI 浅克隆下提交率与 tag 两格**逐格降档 NA-DECLARED 并写明补法**（不产出失真读数被下轮横比）。
+  接线：SUITES +2 ⇒ **152→154**，README 计数与 `docs/quality-gates.md` 同步，`suite_resource_census 154/154`。
+- **改造三 · 时刻耦合台账自洽**：`dock_auto_check.py` D10 的 `wait_for_timeout(300)` 换成等
+  `__XINYU_SCROLL_T__` 翻面的完成态等待（等不到不抛，仍由 ck 用现读值判红并带 t0→t1 证据），
+  评审账 sites 1→2 并保留 r104 原文加更正注 ⇒ C1_HARD **21 → 20**（基线不动），`DOCK-AUTO-PASS 15/15`；
+  余 2 条红因点名他人件（`quote_eval` 未登记、`face_check` 锚点陈旧）⇒ 移交归属轮，不代改。
+- **改造四 · 消灭我自己造的第二把尺**：改造二首版把套件数/Java 用例/jacoco/HEAD 清单又算一遍，
+  与既有算家 `bench_rollup` 构成「同一事实两把尺」⇒ 改判为 `import bench_rollup` 归口，
+  **取不到就整尺 rc=2，禁止回落自算**（回落等于把去重偷偷改回重复）。
+
+**并行边界与两条一手坑**（写在这里是为了下一轮对得上账）：
+
+- 入场 `HEAD=77e7163`，收口 `HEAD=bb7ce5d`：期间并行落 5 个提交，其中 `a25042a` 把 **loc_guard 6 超限拆到 1**
+  并补录 G4/G16 ⇒ 本轮原列的「G4/G16 账面对齐」与「loc_guard 拆薄」被做掉，第三/四项改造据实改判，
+  不重复劳动、也不虚报成自己做的。
+- **本仓用编辑工具改 `.py` 会写出 CRLF**（`dock_auto_check.py` 落 168 个 CR），被 `eol_parity_check` 当场判红
+  ——「逐字节/SHA256/字节预算类主张在他人 clone 上不可复算」。正解=按 `read_bytes()` 去 `\r\n` 整体回写并复跑该判据。
+- `8123` 全程由并行会话持有（pid 34412，webRoot=工作树 src）⇒ 本轮**未跑整跑电池、未重建 fat jar**，
+  浏览器腿走 spare `http.server 8141`；因此「整跑全绿」这句话本轮没有读数支撑，不写。
+
+
 ## [1.8.1] - 2026-10-06 — 语音输入退出态真缺陷修复（r94/r95/r96 三轮挂账项落地）
 
 > **切版动因**：本版含一处 **`src/` 行为码修复**，而它正是 `v1.8.0` 发布后挂账的那一项（报告 §3 #9 /

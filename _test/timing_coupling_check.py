@@ -551,11 +551,15 @@ REVIEW = {
     #    可 wait_for_function 断言 classList 翻面（该先例已落地，见 r104 ③）。
     #    不塞 shaped-only：等的是"另一个同步变更后的副作用"，不是被断言项自身。──
     "dock_auto_check.py::pg.wait_for_timeout(400)": {
-        "verdict": "debt-open", "sites": 1,
+        "verdict": "debt-open", "sites": 2,
         "why": "D7 三态循环里进入 C1_HARD 的那一跳（常规→全屏）后读 open/full ⇒ 同步 "
                "class 变更，可等 classList 翻面（先例：browser_check:75）。"
                "⚠️ sites 记 1 不记 3：该件有多处 400ms，但 C1_HARD 只认「等待后被决策消费」"
-               "的那处，账必须与现读逐键等值（r104 一手：记 3 当场被对账腿抓到 sites 不符）"},
+               "的那处，账必须与现读逐键等值（r104 一手：记 3 当场被对账腿抓到 sites 不符）。"
+               "更正注 r119：**现读 2 条** ⇒ 账随现读改 1→2。动因是本轮把 D10 那条 "
+               "`wait_for_timeout(300)` 换成等 `__XINYU_SCROLL_T__` 翻面（完成态等待），"
+               "同件里「等待→取数→被 ck 消费」的形状因此剩 D7 跳与 D11 跳两处；"
+               "这不是放宽对账 —— 对账腿本来就要求逐键等值，账不跟着动它就自己会红"},
     "dock_auto_check.py::pg.wait_for_timeout(900)": {
         "verdict": "debt-open", "sites": 1,
         "why": "点 #btn-lightshow 后读 body.showtime ⇒ 同步 class 变更可等"},
