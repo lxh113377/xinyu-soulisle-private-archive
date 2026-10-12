@@ -165,6 +165,10 @@ SUITES = [
     # 取数面取不到 ⇒ rc=2 UNVERIFIED 不判绿）。这三件事此前只有人工核对轮用眼过，机器面为零。
     ("psych_kb_integrity", [sys.executable, "_test/psych_kb_integrity_check.py"]),
     ("psych_kb_integrity_selftest", [sys.executable, "_test/psych_kb_integrity_check.py", "--selftest"]),
+    # r129：知识库注入链路（求解释轮有依据 / 纯倾诉轮不注入 / 危机轮零请求 / 注入编号必须是真条目）。
+    # quote 侧 r117 已有常驻件，KB 侧的探针是 r113 的一次性单腿件 —— 此后三轮扩库没再跑过它。
+    ("kb_wiring", [sys.executable, "_test/kb_wiring_check.py"]),
+    ("kb_wiring_selftest", [sys.executable, "_test/kb_wiring_check.py", "--selftest"]),
     ("emotion_wiring", [sys.executable, "_test/emotion_wiring_check.py"]),
     ("emotion_wiring_selftest", [sys.executable, "_test/emotion_wiring_check.py", "--selftest"]),
     ("vendor_freshness", [sys.executable, "_test/vendor_freshness_check.py"]),

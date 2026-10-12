@@ -1,0 +1,245 @@
+# -*- coding: utf-8 -*-
+"""kb_wiring_check.py — 心理学知识库注入链路判据（r129 常驻）
+
+补齐的是目标里「响应生成环节」那一半的机器面：库建得再好，**注入链断了没人知道**。
+r113 当时的 kb 探针是单腿一次性件（见 quote_wiring_check.py 头部自述），此后三轮扩库
+（第 3/4/5 轮）都没再跑过它 ⇒ 「条目卡⇄数据件⇄提示词」这条链的后半段一直是零读数。
+
+判什么（任一 FAIL 即判红；环境取不到 ⇒ rc=2 UNVERIFIED，不得读成通过）：
+  K1 求解释轮有依据：用户问「为什么/什么原理」时，system 里必须出现知识条目块且 ≥1 条 [PSY-…·级]
+  K2 注入的编号必须真存在且级别一致（**反臆造钉子**：模型拿到的编号若在数据件里查不到，
+     就是注入面在编造引用；同理级别不符会让〔依据:编号·级〕标错可信度）
+  K3 纯倾诉轮不注入（防「共情回复变心理课」，persona 禁说教的机制面）
+  K4 危机轮零注入且不发 API 请求（危机由词典短路，表情/知识都不许介入）
+  K5 system 总长 ≤1600 字符（继承 context_budget X3；知识块与记忆/概要/引语共享这块余量）
+  K6 反臆造指令文案在位：知识块头部必须含「不要编造文献或数据」「弱化表述」「争议双方」三处约束词
+     —— 这三句是「减少无依据臆造」在提示词层的钉子，被删或被改写即红
+  K7 数据件面（零浏览器）：产品件里不得出现 E 级；每条必须有 title/summary/rel，
+     content ≤320（构建器截断口径）
+
+用法：python _test/kb_wiring_check.py [--base http://127.0.0.1:8123] [--selftest]
+退出码：0=全过 1=判红 2=环境未验证（服务/浏览器/数据件不可达）
+"""
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "_test"))
+
+KB_MARK = "可依据的心理学知识条目"
+ANTI_FAB_KW = ("不要编造文献或数据", "弱化表述", "争议双方")
+SYSTEM_BUDGET = 1600
+CONTENT_MAX = 320
+CRISIS_TEXT = "我不想活了，真的好累"
+CURIOUS_TEXT = "我为什么会反复想同一件难过的事，心理学上有什么原理？"
+PLAIN_TEXT = "嗯嗯"
+KB_RE = re.compile(r"window\.__XINYU_PSYCH_KB__\s*=\s*(\{.*\});", re.S)
+ID_RE = re.compile(r"\[(PSY-[A-Z]+-\d{3})·([A-E])\]")
+REPLY_BODY = '{"choices":[{"message":{"content":"我在，慢慢说。"}}],"usage":{}}'
+
+
+def load_entries():
+    p = ROOT / "src" / "data" / "psych-kb.js"
+    if not p.exists():
+        return None
+    m = KB_RE.search(p.read_text(encoding="utf-8"))
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1)).get("entries") or []
+    except Exception:
+        return None
+
+
+def extract_ids(system):
+    return ID_RE.findall(system or "")
+
+
+def parse_systems(captured):
+    out = []
+    for body in captured or []:
+        try:
+            msgs = json.loads(body).get("messages") or []
+        except Exception:
+            continue
+        out.append(" ".join(m.get("content", "") for m in msgs if m.get("role") == "system"))
+    return out
+
+
+def ghost_ids(ids, entries):
+    """注入块里出现、但数据件里没有或级别不符的编号 —— 注入面在造引用。"""
+    by_id = {e["id"]: e for e in entries}
+    return ["%s·%s" % (i, lv) for i, lv in ids if i not in by_id or by_id[i]["level"] != lv]
+
+
+def check_data_face(entries):
+    bad = []
+    for e in entries:
+        lv = e.get("level")
+        if lv not in ("A", "B", "C", "D"):
+            bad.append("%s 级别 %r 不合法（E 级禁入产品件）" % (e.get("id", "?"), lv))
+        for k in ("title", "summary"):
+            if not e.get(k):
+                bad.append("%s 缺 %s" % (e.get("id", "?"), k))
+        if len(e.get("content") or "") > CONTENT_MAX:
+            bad.append("%s 内容 %d 字超截断上限 %d" % (e.get("id", "?"), len(e["content"]), CONTENT_MAX))
+    return bad
+
+
+def selftest():
+    """判据非恒真的取证：正例过 + 四类反例必须红（含幽灵编号与约束词被删两条反臆造腿）。"""
+    entries = [{"id": "PSY-AX-002", "level": "B", "title": "担忧 vs 反刍", "summary": "s", "content": "c"},
+               {"id": "PSY-ER-002", "level": "A", "title": "重评 vs 抑制", "summary": "s", "content": "c"}]
+    head = (KB_MARK + "（回答可自然融入，不说教；句末可标〔依据:编号·级〕；"
+            "条目未覆盖的专业内容不要编造文献或数据，用弱化表述；D级内容须呈现争议双方）：")
+    good = head + "\n[PSY-AX-002·B]担忧 vs 反刍：s"
+    ghost = head + "\n[PSY-ZX-999·B]不存在的条目：s"
+    wrong_level = head + "\n[PSY-AX-002·A]级别被改：s"
+    no_keywords = KB_MARK + "（随便说说）：\n[PSY-ER-002·A]重评：s"
+    fails = []
+    if KB_MARK not in good:
+        fails.append("正例①块标记被误判")
+    if ghost_ids(extract_ids(good), entries):
+        fails.append("正例②合法编号被判幽灵")
+    if not ghost_ids(extract_ids(ghost), entries):
+        fails.append("反例①（幽灵编号）未被判红")
+    if not ghost_ids(extract_ids(wrong_level), entries):
+        fails.append("反例②（级别不符）未被判红")
+    if all(k in no_keywords for k in ANTI_FAB_KW):
+        fails.append("反例③（约束词被删）未被判红")
+    if not check_data_face([{"id": "PSY-X-001", "level": "E", "title": "t", "summary": "s", "content": "c"}]):
+        fails.append("反例④（E 级混入产品件）未被判红")
+    if check_data_face(entries):
+        fails.append("正例③（合规数据面）被误判")
+    if fails:
+        print("KB-WIRING-SELFTEST-FAIL: " + "；".join(fails))
+        return 1
+    print("KB-WIRING-SELFTEST-PASS: 3 正例过 / 4 反例红（含幽灵编号与约束词被删两条反臆造腿）")
+    return 0
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--base", default="http://127.0.0.1:8123")
+    ap.add_argument("--selftest", action="store_true")
+    args = ap.parse_args()
+    if args.selftest:
+        return selftest()
+
+    entries = load_entries()
+    if not entries:
+        print("KB-WIRING-UNVERIFIED: 数据件缺失或不可解析（src/data/psych-kb.js）⇒ 先跑构建器")
+        return 2
+    bad, notes = [], []
+    face = check_data_face(entries)
+    if face:
+        bad += ["K7 " + f for f in face[:8]]
+    else:
+        notes.append("K7 数据件面 %d 条全部 A-D 级、无超长内容" % len(entries))
+
+    try:
+        from playwright.sync_api import sync_playwright
+        from browser_engine import launch as be_launch
+    except Exception as e:
+        print("KB-WIRING-UNVERIFIED: 浏览器环境不可达: %s" % e)
+        return 2
+
+    try:
+        with sync_playwright() as p:
+            b, engine = be_launch(p, label="kb-wiring")
+            pg = b.new_page(viewport={"width": 1200, "height": 860})
+            pg.add_init_script(
+                "try{localStorage.setItem('peiliao.cfg.v1',JSON.stringify("
+                "{proxy:'%s/api/chat',stream:false}))}catch(e){}" % args.base)
+            try:
+                pg.goto(args.base + "/index.html", wait_until="load", timeout=45000)
+            except Exception as e:
+                print("KB-WIRING-UNVERIFIED: 页面打不开 %s（服务没起？）: %s" % (args.base, type(e).__name__))
+                b.close()
+                return 2
+            pg.wait_for_timeout(1200)
+            pg.evaluate("localStorage.removeItem('peiliao.history.v1');"
+                        "localStorage.removeItem('peiliao.emotions.v1'); 1")
+            cap = {"list": [], "err": []}
+            pg.on("pageerror", lambda e: cap["err"].append(str(e)[:80]))
+
+            def handler(route):
+                cap["list"].append(route.request.post_data)
+                route.fulfill(status=200, content_type="application/json", body=REPLY_BODY)
+
+            pg.route("**/api/chat*", handler)
+
+            def send(text, want=1, wait_ms=800):
+                cap["list"] = []
+                pg.fill("#chat-input", text)
+                pg.press("#chat-input", "Enter")
+                for _ in range(60):
+                    if len(cap["list"]) >= want:
+                        break
+                    pg.wait_for_timeout(150)
+                pg.wait_for_timeout(wait_ms)
+                return list(cap["list"])
+
+            # K1/K2/K6：求解释轮
+            sys_k = parse_systems(send(CURIOUS_TEXT, want=2))
+            reply = [s for s in sys_k if KB_MARK in s]
+            if not reply:
+                bad.append("K1 求解释轮（含「为什么/原理」）system 里没有知识条目块（注入链断或触发判据失效）")
+            else:
+                blk = reply[-1]
+                ids = extract_ids(blk)
+                if not ids:
+                    bad.append("K1 有块但零条 [PSY-…] 编号")
+                notes.append("K1 求解释轮注入 %d 条：%s" % (len(ids), "、".join(i for i, _ in ids)))
+                gh = ghost_ids(ids, entries)
+                if gh:
+                    bad.append("K2 注入面给出数据件里查不到的编号 %s（模型据此标注即为编造引用）" % gh)
+                missing_kw = [k for k in ANTI_FAB_KW if k not in blk]
+                if missing_kw:
+                    bad.append("K6 反臆造约束词缺失 %s（提示词层的「不许编造文献/数据」钉子被拔掉）" % missing_kw)
+            over = [len(s) for s in sys_k if len(s) > SYSTEM_BUDGET]
+            if over:
+                bad.append("K5 system 超 %d 字符：%s" % (SYSTEM_BUDGET, over))
+
+            # K3：纯倾诉轮不注入
+            sys_p = parse_systems(send(PLAIN_TEXT, want=2))
+            if any(KB_MARK in s for s in sys_p):
+                bad.append("K3 纯倾诉轮注入了知识块（共情回复会说教化）")
+            else:
+                notes.append("K3 纯倾诉轮零注入")
+
+            # K4：危机轮短路
+            sys_c = parse_systems(send(CRISIS_TEXT, want=1))
+            if sys_c:
+                bad.append("K4 危机轮发出了 %d 发 API 请求（词典危机短路应不调模型）" % len(sys_c))
+            crisis_ui = pg.evaluate("document.body.innerText") or ""
+            if not re.search(r"热线|希望 24|心理援助|400-161-9995|12356", crisis_ui):
+                bad.append("K4 危机轮界面没有求助热线文案")
+            else:
+                notes.append("K4 危机轮零请求 + 热线在位")
+
+            if cap["err"]:
+                bad.append("页面报错 %s" % cap["err"][:3])
+            b.close()
+    except Exception as e:
+        print("KB-WIRING-UNVERIFIED: 浏览器腿未跑通: %s: %s" % (type(e).__name__, str(e)[:120]))
+        return 2
+
+    for n in notes:
+        print("  · " + n)
+    if bad:
+        for s in bad:
+            print("  🔴 " + s)
+        print("KB-WIRING-FAIL: %d 项判红（引擎=%s，数据件 %d 条）" % (len(bad), engine, len(entries)))
+        return 1
+    print("KB-WIRING-PASS: K1-K7 全过（数据件 %d 条｜引擎=%s｜求解释轮有依据/倾诉轮不注入/危机轮零请求）"
+          % (len(entries), engine))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
