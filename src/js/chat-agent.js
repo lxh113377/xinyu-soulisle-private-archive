@@ -150,17 +150,21 @@ window.ChatAgent = (function () {
    * 或用户在**求解释**（问号/为什么/原理…）且条目自动关联了当前情绪 —— 纯倾诉轮不注入，
    * 免得共情回复变成心理课（persona 规则禁说教）。
    * 体量硬约束：context_budget_check X3 把 system 段钉在 1600 字符 ⇒ 只用剩余量，
-   * 挤不下就本轮不注入，绝不挤占记忆/概要段（那两段是判据钉死的既有能力）。 */
+   * 挤不下就本轮不注入，绝不挤占记忆/概要段（那两段是判据钉死的既有能力）。
+   * r132：返回 {block, used} 而非裸串——used 是**本轮真正进了 block 的条目**，
+   * 供回复面核对模型标的〔依据:编号〕（见 verifyCitations）。知识面干净（E 级构建期排除）
+   * 不等于输出面干净：模型仍可能凭空标一个 PSY-XX-999·A，这一层就是堵它的。 */
+  const EMPTY_KB = { block: "", used: [] };
   function kbBlockFor(emo, userText, budget) {
     const KB = window.__XINYU_PSYCH_KB__;
-    if (!KB || !KB.entries || !KB.entries.length || budget < 220) return "";
+    if (!KB || !KB.entries || !KB.entries.length || budget < 220) return EMPTY_KB;
     const hay = String(userText || "");
     const grams = new Set();
     for (let i = 0; i < hay.length - 1; i++) {
       const g = hay.slice(i, i + 2);
       if (/[\u4e00-\u9fa5A-Za-z]/.test(g[0]) && /[\u4e00-\u9fa5A-Za-z]/.test(g[1])) grams.add(g);
     }
-    if (!grams.size) return "";
+    if (!grams.size) return EMPTY_KB;
     const curious = /[?？]|为什么|怎么|如何|原理|科学|是不是|心理学/.test(hay);
     const scored = [];
     for (const e of KB.entries) {
@@ -172,14 +176,41 @@ window.ChatAgent = (function () {
     }
     scored.sort((a, b) => b.s - a.s);
     const head = "可依据的心理学知识条目（回答可自然融入，不说教；句末可标〔依据:编号·级〕；条目未覆盖的专业内容不要编造文献或数据，用弱化表述；D级内容须呈现争议双方）：";
-    let block = "", used = head.length, n = 0;
+    let block = "", usedLen = head.length, n = 0;
+    const used = [];
     for (const p of scored) {
       if (n >= 3) break;
       const item = "\n[" + p.e.id + "·" + p.e.level + "]" + p.e.title + "：" + p.e.summary + p.e.content;
-      if (used + item.length > budget) break;
-      block += item; used += item.length; n++;
+      if (usedLen + item.length > budget) break;
+      block += item; usedLen += item.length; n++;
+      used.push({ id: p.e.id, level: p.e.level });
     }
-    return n ? head + block : "";
+    return n ? { block: head + block, used: used } : EMPTY_KB;
+  }
+
+  /* r132 引用核对面：把模型句末标的〔依据:编号·级〕与**本轮真实注入**的 used 集合比对。
+   * 三种结局，一律**只改标记、不删原文**：
+   *   命中且级一致 → 原样保留；命中但级不符 → 按库里真实级更正并写明「模型标X，已更正」（挡 E 冒充 A）；
+   *   未命中 → 〔依据:<原编号>·未查证〕（编号原样保留，不擅自改写模型写的东西）。
+   * used 为空（未注入/离线/降级）时任何标记都算未命中——那条回复根本没见过知识库。 */
+  const CITE_RE = /〔依据[:：]\s*([^〕·]+?)\s*(?:·\s*([A-Ea-e])\s*)?〕/g;
+  function verifyCitations(reply, used) {
+    const src = String(reply == null ? "" : reply);
+    const map = {};
+    (used || []).forEach(function (u) { if (u && u.id) map[String(u.id).toUpperCase()] = String(u.level || "?"); });
+    let checked = 0, matched = 0;
+    const out = src.replace(CITE_RE, function (whole, id, lv) {
+      checked++;
+      const key = String(id || "").trim().toUpperCase();
+      const real = map[key];
+      if (!real) return "〔依据:" + key + "·未查证〕";
+      matched++;
+      const shown = String(lv || "").toUpperCase();
+      return shown && shown !== real
+        ? "〔依据:" + key + "·" + real + "（模型标" + shown + "，已更正）〕"
+        : "〔依据:" + key + "·" + real + "〕";
+    });
+    return { text: out, checked: checked, matched: matched, unmatched: checked - matched };
   }
 
   /* 表达语料库注入（r117，老大定的「每轮都给候选」）：
@@ -225,7 +256,7 @@ window.ChatAgent = (function () {
     return (n || Q.rulesOnly === true) ? head + block : "";
   }
 
-  const SYSTEM = (emo, userText) => {
+  const SYSTEM = (emo, userText) => {   /* r132：返回 {text, kbUsed}，供回复面核对面取用本轮真实注入集 */
     const s = strategyOf(emo);
     // 长期记忆注入（r52）：MemoryStore 原本**只写不读**，"跨设备记住你"只成立在展示层。
     // 只注入聚合摘要，不注入原话。
@@ -237,7 +268,8 @@ window.ChatAgent = (function () {
     const remain = 1600 - base.length - 40;
     const quoteBudget = Math.min(280, Math.max(180, Math.floor(remain * 0.45)));
     const qb = remain >= 180 ? quoteBlockFor(emo, userText, quoteBudget) : "";
-    return base + qb + kbBlockFor(emo, userText, remain - (qb ? qb.length : 0));
+    const kb = kbBlockFor(emo, userText, remain - (qb ? qb.length : 0));
+    return { text: base + qb + kb.block, kbUsed: kb.used };
   };
 
   /**
@@ -272,14 +304,26 @@ window.ChatAgent = (function () {
   }
 
   async function onlineReply(text, emo, onDelta) {
-    const messages = [{ role: "system", content: SYSTEM(emo, text) }];
+    const sys = SYSTEM(emo, text);
+    const messages = [{ role: "system", content: sys.text }];
     for (const h of history.slice(-HISTORY_MAX)) messages.push(h);
     messages.push({ role: "user", content: text });
     const s = strategyOf(emo);
-    return llmFetch(messages,
+    const raw = await llmFetch(messages,
       s.temperature ?? STR.defaultTemperature ?? 0.85,
       s.maxTokens ?? STR.defaultMaxTokens ?? 220,
       onDelta);
+    /* r133 接线：r132 建了 verifyCitations 但没接调用点（输出面等于无核对，模型可凭空标编号）。
+     * 这里在**非流式**时改写最终回复；流式下逐字已吐给用户，改写会造成"屏幕上文字与
+     * 内存里文字不一致"，故流式走原文 + 只回计数（口径差异写进返回值的 citeApplied 字段）。 */
+    const v = verifyCitations(raw, sys.kbUsed);
+    const streamed = !!onDelta;
+    return {
+      reply: streamed ? raw : v.text,
+      kbUsed: sys.kbUsed,
+      citeChecked: v.checked, citeMatched: v.matched, citeUnmatched: v.unmatched,
+      citeApplied: !streamed
+    };
   }
 
   const EMOTIONS = Object.keys(STR.strategy);
@@ -348,13 +392,18 @@ window.ChatAgent = (function () {
       return { reply: CRISIS_REPLY, emotion: "crisis", mode: "guard", path, latency: 0, lexAll: lex.all, emoSrc,
                face, divergence };
     }
-    let reply, mode, streamed = false;
+    let reply, mode, streamed = false, kbUsed = [];
+    let citeChecked = 0, citeMatched = 0, citeUnmatched = 0, citeApplied = false;
     // 记录"本轮发给模型前已存在的记忆条数"：record 在之后才写，所以这里取到的是**此前**的条数
     const memBefore = (window.MemoryStore && window.MemoryStore.count) ? window.MemoryStore.count() : 0;
     const dropBefore = droppedCount();   // 同理：概要替代掉的条数要在 remember 之前取
     if (isOnline()) {
       try {
-        reply = await onlineReply(text, emo, onDelta);
+        const o = await onlineReply(text, emo, onDelta);
+        reply = o.reply;
+        kbUsed = o.kbUsed || [];
+        citeChecked = o.citeChecked || 0; citeMatched = o.citeMatched || 0;
+        citeUnmatched = o.citeUnmatched || 0; citeApplied = !!o.citeApplied;
         mode = "model";
         llmBad = false;
         streamed = !!onDelta;
@@ -368,7 +417,17 @@ window.ChatAgent = (function () {
     // memory/dropped 只在**真的带着它们发给了模型**时才非零：降级/离线模板没走 LLM，标了就是说谎
     return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all, streamed,
              emoSrc, face, divergence, memory: mode === "model" ? memBefore : 0,
-             dropped: mode === "model" ? dropBefore : 0 };
+             dropped: mode === "model" ? dropBefore : 0,
+             /* r132：只有真走 LLM 的那一轮才谈得上「依据」——降级/离线模板没注入知识库，
+              * 此时标依据就是说谎（与 memory/dropped 同口径）。 */
+             kbUsed: mode === "model" ? kbUsed : [],
+             /* r133 引用消费遥测：模型这一轮实际标了几处依据、其中几处对得上注入集。
+              * 「候选给了但一条都没被消费」是语料库有效性问题的唯一可测信号 —— 没有它，
+              * 引用检出率 0% 只会被当成「模型化用其意」来解释，无从证伪。降级/离线恒为 0。*/
+             citeChecked: mode === "model" ? citeChecked : 0,
+             citeMatched: mode === "model" ? citeMatched : 0,
+             citeUnmatched: mode === "model" ? citeUnmatched : 0,
+             citeApplied: mode === "model" ? citeApplied : false };
   }
 
   /* 对外仍叫 respond：包一层 turn()，每轮起止就成了可等的读数（r100） */
@@ -396,5 +455,6 @@ window.ChatAgent = (function () {
   }
 
   return { respond, classifyEmotion, isOnline, setCfg, getCfg, getHistory, droppedCount, strategyInfo,
+           verifyCitations,   // r132：回复面核对面（_test/kb_citation_check.py 取它做判定）
            llmBad: () => llmBad };   // r51：徽章要能反映"配了在线但刚降级过"，否则会说谎
 })();

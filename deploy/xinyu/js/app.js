@@ -361,6 +361,15 @@
     try {
       const r = await window.ChatAgent.respond(text, onDelta);
       if (bubble) bubble.remove(); else thinking.remove();
+      /* r132 引用核对面：模型句末标的〔依据:编号·级〕必须与本轮真实注入的条目集合比对，
+       * 未命中的一律标「未查证」——知识库 E 级已在构建期排除，但模型仍可能凭空编号。
+       * 只改标记不删原文；verifyCitations 未挂载（旧缓存）时静默回落原样，不拖垮主链路。 */
+      const cite = (typeof window.ChatAgent.verifyCitations === "function")
+        ? window.ChatAgent.verifyCitations(r.reply, r.kbUsed)
+        : { text: r.reply, checked: 0, matched: 0, unmatched: 0 };
+      const citeLabel = cite.checked
+        ? (cite.unmatched ? " · 依据 " + cite.matched + "/" + cite.checked + "，未查证 " + cite.unmatched : " · 依据 " + cite.matched + "/" + cite.checked + " 已核对")
+        : "";
       const modeLabel = { model: "在线大模型生成", fallback: "大模型暂不可用 · 离线共情模板", offline: "离线共情模板", guard: "安全转介策略" }[r.mode];
       refreshBadge();   // r51：降级发生过就必须让徽章同帧翻面（判据 fault_injection_check F3）
       // 情绪识别来源必须如实标注：后端 /api/emotion 与本地词典是两套实现，界面不得含糊
@@ -372,11 +381,11 @@
       // r87：表情是**并列第三路**——只标注，不覆盖文本/LLM 的裁决（保住文本链路准确率不回退）
       const faceLabel = r.divergence === "disagree" ? " · 表情与文字不一致（可能是强颜欢笑）"
         : r.divergence === "agree" ? " · 表情与文字一致" : "";
-      const aiMsg = CW.push("ai", r.reply,
-        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${memLabel}${dropLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}${faceLabel}`);
+      const aiMsg = CW.push("ai", cite.text,
+        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${memLabel}${dropLabel}${citeLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}${faceLabel}`);
       aiMsg.dataset.emotion = r.emotion;
       // 朗读开关打开时同步播出；通话中改由通话层按句出声，这里不重复念（失败静默，绝不影响主链路）
-      if (!(window.VoiceCall && window.VoiceCall.isCalling())) window.Voice.speak(r.reply);
+      if (!(window.VoiceCall && window.VoiceCall.isCalling())) window.Voice.speak(cite.text);
       // 记住这条情绪 → 点亮一簇星（一个瞬间 = 1~8 颗，强度越高越多）
       // 复用 respond 里已算好的词典结果，避免同文本二次 scan；旧版本无 lexAll 时回落重扫
       const lexAll = r.lexAll || window.EmotionEngine.scan(text).all;

@@ -169,6 +169,11 @@ SUITES = [
     # quote 侧 r117 已有常驻件，KB 侧的探针是 r113 的一次性单腿件 —— 此后三轮扩库没再跑过它。
     ("kb_wiring", [sys.executable, "_test/kb_wiring_check.py"]),
     ("kb_wiring_selftest", [sys.executable, "_test/kb_wiring_check.py", "--selftest"]),
+    # r132：kb_wiring 的**回复面**另一半（注入面管「模型拿到什么」，本件管「模型标了什么」）：
+    # 〔依据:编号·级〕必须与本轮真实注入集比对 —— 幽灵编号判未查证、级冒充按库里真实级更正、
+    # 只改标记不删正文、降级轮不谎称依据。此前目标里「减少无依据臆造输出」零机器面。
+    ("kb_citation", [sys.executable, "_test/kb_citation_check.py"]),
+    ("kb_citation_selftest", [sys.executable, "_test/kb_citation_check.py", "--selftest"]),
     ("emotion_wiring", [sys.executable, "_test/emotion_wiring_check.py"]),
     ("emotion_wiring_selftest", [sys.executable, "_test/emotion_wiring_check.py", "--selftest"]),
     ("vendor_freshness", [sys.executable, "_test/vendor_freshness_check.py"]),
