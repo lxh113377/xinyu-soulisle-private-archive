@@ -2,8 +2,8 @@
   "meta": {
     "name": "心屿情绪引擎评测集 v2",
     "date": "2026-09-23",
-    "note": "标注=预期主导情绪。v1=36 条 → v2=71 条（每类均衡补样 + 2 条「口头禅式极端词」对抗样本 + 3 条危机）→ v3=73 条（+2 条 NEG/DEG 覆盖修复的防回归样本）→ v4=79 条（r112：+4 条「远距离否定」样本「没什么好/可 + 情绪词」，其否定词距情绪词 4 字、旧 3 字窗口抓不到；+2 条「防扩窗误伤」对抗样本，钉住「否定词不得越过逗号去否定后面的情绪词」）。含否定/程度/混合/危机对抗样本。",
-    "samples": 85
+    "note": "标注=预期主导情绪。v1=36 条 → v2=71 条（每类均衡补样 + 2 条「口头禅式极端词」对抗样本 + 3 条危机）→ v3=73 条（+2 条 NEG/DEG 覆盖修复的防回归样本）→ v4=79 条（r112：+4 条「远距离否定」样本「没什么好/可 + 情绪词」，其否定词距情绪词 4 字、旧 3 字窗口抓不到；+2 条「防扩窗误伤」对抗样本，钉住「否定词不得越过逗号去否定后面的情绪词」）→ v5=105 条（r117：+15 条「口语隐喻/惯用喻体」样本，原件（`_temp/r117_weak_probe.js` A 组）实测 20 条里 17 条词典层零命中判成 calm，是**覆盖缺口**；+5 条「反讽/反问」样本，标 `expectIr` —— 其 `expect` 是**字面读法**（词典层该读出的），词典层判不出真意属原理性限制，故另立 `irony_recall` 指标衡量它是否**自证不确定**，而不是让它猜。含否定/程度/混合/危机对抗样本。",
+    "samples": 105
   },
   "items": [
     { "text": "今天面试通过了，超开心", "expect": "joy" },
@@ -102,6 +102,28 @@
     { "text": "备考的时候非常焦虑，不过想到考完就轻松了，还是挺开心的", "expect": "joy" },
     { "text": "被批评了很难过，可是我知道他是为我好，现在平静多了", "expect": "calm" },
     { "text": "本来非常生气，可是听说他家里出事了，又觉得挺难过的", "expect": "sadness" },
-    { "text": "嘴上说着太开心了，可心里其实特别难过", "expect": "sadness" }
+    { "text": "嘴上说着太开心了，可心里其实特别难过", "expect": "sadness" },
+
+    { "text": "感觉自己快撑不住了", "expect": "fear" },
+    { "text": "我整个人都垮了", "expect": "sadness" },
+    { "text": "太扎心了", "expect": "sadness" },
+    { "text": "整个人都不好了", "expect": "sadness" },
+    { "text": "眼泪止不住地流", "expect": "sadness" },
+    { "text": "感觉被掏空了", "expect": "sadness" },
+    { "text": "心里七上八下", "expect": "fear" },
+    { "text": "如坐针毡", "expect": "fear" },
+    { "text": "心里没底", "expect": "fear" },
+    { "text": "脑子一片空白", "expect": "fear" },
+    { "text": "两眼一黑", "expect": "fear" },
+    { "text": "我心态爆炸", "expect": "anger" },
+    { "text": "气得牙痒痒", "expect": "anger" },
+    { "text": "稳了这次", "expect": "joy" },
+    { "text": "心里美滋滋", "expect": "joy" },
+
+    { "text": "我可太开心了", "expect": "joy", "expectIr": true },
+    { "text": "太好了，又加班", "expect": "joy", "expectIr": true },
+    { "text": "开心？呵", "expect": "joy", "expectIr": true },
+    { "text": "我真够开心的", "expect": "joy", "expectIr": true },
+    { "text": "这事可真让我开心", "expect": "joy", "expectIr": true }
   ]
 }
