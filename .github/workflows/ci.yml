@@ -47,6 +47,12 @@ jobs:
         run: |
           python _test/psych_kb_build.py --check
           python _test/psych_kb_build.py --selftest
+      # r129：引用关联（悬空/孤岛）、证据溯源（非 E 级必须有来源子行）、索引对账 三件事此前只靠人工核对轮，
+      # 机器面为零 ⇒ 「无来源卡混进产品件」「索引与卡级别/归属漂移」都只能在人眼轮次里被抓到。
+      - name: 心理学知识库 引用关联⇄取证⇄索引 三面守卫（含 --selftest 防恒真）
+        run: |
+          python _test/psych_kb_integrity_check.py
+          python _test/psych_kb_integrity_check.py --selftest
       - name: 对标源数据台账自证（漂移判据非恒真；联网采集属人工轮次动作，不在 CI 里跑）
         run: python _test/benchmark_metrics.py --selftest
       - name: 情绪评测集门禁（accuracy ≥ 95% 且危机全召回）

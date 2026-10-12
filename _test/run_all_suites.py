@@ -315,6 +315,8 @@ SUITES = [
     #   本尺是**棘轮**：复算双能力基线并拒收任何回退；目标/指标/轨迹 = memory/10-core-capabilities.md。
     ("core_capability_baseline", [sys.executable, "_test/core_capability_baseline_check.py"]),
     ("core_capability_selftest", [sys.executable, "_test/core_capability_baseline_check.py", "--selftest"]),
+    ("face_lowintensity", [sys.executable, "_test/face_lowintensity_check.py"]),
+    ("face_lowintensity_selftest", [sys.executable, "_test/face_lowintensity_check.py", "--selftest"]),
     # r58 质量工程面：JS 侧从"0 个单元测试"变成有常驻执行位（node --test + 跨 realm 归一）
     ("js_unit", [sys.executable, "_test/js_unit_check.py"]),
     ("js_unit_selftest", [sys.executable, "_test/js_unit_check.py", "--selftest"]),
