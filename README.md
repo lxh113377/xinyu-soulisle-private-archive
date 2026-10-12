@@ -198,7 +198,7 @@ CloudBase 注意事项（实测得来）：
 
 > **现状（与机器逐条对账，别手抄）**：GitHub Actions 四条门禁（`.github/workflows/ci.yml` 的 job 数；
 > 另有独立的性能基线工作流 `.github/workflows/perf-baseline.yml`，周常复跑）｜
-> ★ 全量电池（183 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
+> ★ 全量电池（185 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
 > （更正注 r111：旧值写 146；本轮按用户立规新增双核心能力基线棘轮 `core_capability_baseline` 与其 `--selftest` 两套件 ⇒ 146→148。旧值按本仓惯例保留于此，不删。）
 > （更正注 r116：语音通话层落地，新增 `voice_call` 与其 `--selftest` 两套件 ⇒ 148→150。判据 `_test/voice_call_check.py`，见 `docs/quality-gates.md` 同条目。）
 > （更正注 r117：BLIND-RED 常驻棘轮入电池，新增 `blindred_guard` 与其 `--selftest` 两套件 ⇒ 150→152（`run_all_suites.py` 实测 152）。判据 `_test/blindred_guard_check.py`，见 `docs/quality-gates.md` 同条目。）

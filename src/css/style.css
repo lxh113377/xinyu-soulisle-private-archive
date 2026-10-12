@@ -1,4 +1,9 @@
 /* 心屿 MindIsle — 设计令牌：雾蓝夜色 + 情绪色相 */
+
+/* r129 唯一断点标尺（_test/breakpoint_scale_check.py B1 强制；新增档须同步该判据 BASELINE）
+   写在注释里：裸 at-rule 非合法 CSS 会触发解析告警，而 @media 不支持 var()。 */
+/* @breakpoint-scale 1024px 900px 768px 640px 480px */
+
 :root{
   --bg:#070b18; --ink:#e8ecf8; --muted:#8a93b2;
   --accent:#7c6cff; --accent2:#39d0c4;

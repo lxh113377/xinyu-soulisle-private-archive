@@ -10,6 +10,8 @@ python _test/blindred_guard_check.py            # r112 BLIND-RED 常驻棘轮：
 python _test/blindred_guard_check.py --selftest # r112 判据自身桩：变异腿注入裸 assert 必须被抓到、原样脚本不误报；名册取不到 rc=2 不当绿（套件 blindred_guard_selftest）
 python _test/server_hardening_check.py         # r128 服务端硬化常驻棘轮：H1 限流闸（429 + Retry-After + 令牌桶）/ H2 请求体上限（默认值非零）/ H3 结构化访问日志在位且**不记载荷与密钥**（扫代码、剔注释）/ H4 BM25 长期记忆检索「控制器 + openapi + 人读手册」三处齐备。**存在动因**：JUnit 会被后人整体删或改宽松，仓库面没有第二把尺 ⇒「改了没尺」重演（r127 §8 S5/S8/S9/S10/S11 同族）
 python _test/server_hardening_check.py --selftest # r128 变异腿：H1/H2/H3/H4 各注入一处变异必须把对应断言**单独**打翻，还原后原样零红；变异空操作（替换未命中）与还原不完整一律判红（第一版三条腿是空操作 + MANUAL 未还原，属自曝其短，判据本身先返工）
+python _test/breakpoint_scale_check.py        # r129 FE-1 断点标尺棘轮（F-R-1）：B1 style.css 头部必须声明唯一标尺 / B2 所有 `@media` 宽度取值须 ∈ 标尺 / B3 每个值定义处数不超基线。**为什么不搬代码而做尺**：两处 768 服务不相交选择器，合并会改层叠顺序 ⇒ 为整洁冒回归风险（改判据不修数据面）
+python _test/breakpoint_scale_check.py --selftest # r129 变异腿：抹掉标尺声明、在 voice-call.css 私造 850px 断点，两类变异必须各自打翻；还原后原样零红。⚠️ 本判据第一版踩了**状态泄漏**（模块级 results 累加器不重置 ⇒ 还原后复跑读到历次累积结果）+ **变异锚点只认四个字**（该串在正文说明里也出现，replace 打到说明处、真声明纹丝不动）
 python _test/fault_injection_check.py    # r51 故障注入：上游 500/非JSON/断连/黑洞挂起/恢复 五类，看界面说不说真话（徽章同帧翻面 + hit_count 全非零证注入真打到通道）
 python _test/fault_injection_check.py --selftest  # r51 判据自身桩：12 例（含「注入 0 命中记 INVALID 不记 PASS」+ r52「归因缺失总预算内也判红」）
 python _test/peer_fault_probe.py --selftest       # r51 故障可见性对标探针桩：6 例（边界=不得写成报错体验对比结论）
