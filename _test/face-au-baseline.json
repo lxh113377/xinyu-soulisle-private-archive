@@ -1,0 +1,35 @@
+{
+ "n": 12,
+ "hit": 10,
+ "hit_lean": 2,
+ "soft_ok": 0,
+ "uncertain": 0,
+ "wrong_confident": 0,
+ "by_label": {
+  "anger": {
+   "n": 2,
+   "hit": 2,
+   "wrong": 0
+  },
+  "calm": {
+   "n": 4,
+   "hit": 4,
+   "wrong": 0
+  },
+  "joy": {
+   "n": 4,
+   "hit": 4,
+   "wrong": 0
+  },
+  "surprise": {
+   "n": 2,
+   "hit": 2,
+   "wrong": 0
+  }
+ },
+ "top1": 1.0,
+ "confident_n": 10,
+ "acc_on_confident": 1.0,
+ "wrong": [],
+ "stored_mismatch": []
+}
