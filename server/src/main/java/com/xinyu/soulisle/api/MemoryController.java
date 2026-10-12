@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xinyu.soulisle.entity.ChatMessage;
 import com.xinyu.soulisle.entity.EmotionRecord;
+import com.xinyu.soulisle.service.MemorySearchService;
 import com.xinyu.soulisle.service.MemoryService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -110,6 +111,50 @@ public class MemoryController {
         body.put("emotions", memory.countEmotions(sessionId));
         body.put("messages", memory.countMessages(sessionId));
         return json(200, write(body));
+    }
+
+    /**
+     * 长期记忆检索（r128 新增）：用 BM25 在历史消息里找「说过类似话的那几条」。
+     *
+     * <p>{@code sessionId} 可选 —— 给了就在该会话内检索，不给就在全库最近若干条里检索
+     * （单用户演示形态下这两者差别不大，但语义上区分开，判据能分别验）。
+     *
+     * <p>候选池上限 {@code SEARCH_POOL}：BM25 是 O(候选数 × 词元数)，池子放大到几万条
+     * 会让单次请求变慢，而「问最近发生过什么」这个场景本来就不该翻到很老。
+     */
+    @GetMapping("/api/memory/search")
+    public ResponseEntity<byte[]> search(@RequestParam(name = "q", required = false) String q,
+                                         @RequestParam(required = false) String sessionId,
+                                         @RequestParam(defaultValue = "10") int limit) {
+        List<ChatMessage> pool = (sessionId == null || sessionId.isBlank())
+                ? memory.recentMessages(SEARCH_POOL)
+                : memory.messages(sessionId, SEARCH_POOL);
+        List<MemorySearchService.Hit> hits = MemorySearchService.search(pool, q, normLimit(limit));
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (MemorySearchService.Hit hit : hits) {
+            ChatMessage m = hit.message();
+            Map<String, Object> x = new LinkedHashMap<>();
+            x.put("id", m.getId());
+            x.put("sessionId", m.getSessionId());
+            x.put("role", m.getRole());
+            x.put("content", m.getContent());
+            x.put("createdAt", m.getCreatedAt() == null ? null : m.getCreatedAt().toString());
+            x.put("score", Math.round(hit.score() * 10000.0) / 10000.0);
+            out.add(x);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("query", q == null ? "" : q);
+        body.put("pool", pool.size());
+        body.put("count", out.size());
+        body.put("results", out);
+        return json(200, write(body));
+    }
+
+    private static final int SEARCH_POOL = 1000;
+
+    private int normLimit(int limit) {
+        return limit <= 0 ? 10 : Math.min(limit, 50);
     }
 
     private JsonNode parse(String raw) {

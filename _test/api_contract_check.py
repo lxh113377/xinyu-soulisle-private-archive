@@ -136,7 +136,8 @@ def live_probes(spec, ann=None):
              ("/api/emotion", "post"), ("/api/chat", "post"),
              ("/api/memory/emotion", "post"), ("/api/memory/message", "post"),
              ("/api/memory/stats", "get"), ("/api/memory/emotions", "get"),
-             ("/api/memory/messages", "get"), ("/api/memory/{sessionId}", "delete")]
+             ("/api/memory/messages", "get"), ("/api/memory/search", "get"),
+             ("/api/memory/{sessionId}", "delete")]
     ann = ann if ann is not None else annotated_ops(spec)
     skipped = {k: v[1] for k, v in ann.items() if isinstance(v, tuple)}
     live = {(norm(p), v.upper()): op.get("x-live-check") or {}
@@ -245,7 +246,13 @@ def selftest():
             bad.append("篡改⑥（yaml 新增接口而手册没写）未被 C7 抓到 ⇒ 手册腿恒真")
         if not manual_legs(sp, md + "\n`GET /api/ghostly-side-door`\n"):
             bad.append("篡改⑦（手册凭空多写一条接口）未被 C7 抓到 ⇒ 手册腿恒真")
-        if not manual_legs(sp, md.replace("11 路径", "99 路径", 1)):
+        # 篡改⑧要把计数写歪。⚠️ 这里**不能硬编码**旧计数串（第一版写死 "11 路径"，
+        # 手册真值改成 12 之后替换变空操作 ⇒ 合成样本等于原样 ⇒ 腿被误判成恒真）。
+        # 正解：从手册里正则读回它自己声明的数，再换成一个对不上的值。
+        _claimed = re.findall(r"(\d+)\s*(?:条)?路径", md)
+        if not _claimed:
+            bad.append("C7 自检读不到手册声明的路径计数 ⇒ 计数腿无法证伪")
+        elif manual_legs(sp, md.replace(_claimed[0] + " 路径", "999 路径", 1)) == []:
             bad.append("篡改⑧（手册把路径计数写歪）未被 C7 抓到 ⇒ 计数腿恒真")
     print("SELFTEST-PASS: 删文档/加幽灵/偷调用/缺键/抹标注/手册三面漂移 八类样本均被抓到、原样零问题"
           if not bad else "SELFTEST-FAIL: " + "; ".join(bad))

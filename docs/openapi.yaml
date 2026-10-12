@@ -249,6 +249,27 @@ paths:
               schema:
                 type: object
                 required: [sessionId, emotions, messages]
+  /api/memory/search:
+    get:
+      tags: [memory]
+      summary: 长期记忆检索（r128 新增，BM25 打分，零新依赖）
+      description: >-
+        在历史消息里检索「说过类似话的那几条」。`sessionId` 可选：给了就在该会话内检索，
+        不给就在全库最近 1000 条里检索。中文按二元组（bigram）切分，ASCII 按小写单词切分，
+        因此不需要词典与分词库。`score` 只在本次候选集内可比，不是跨查询的绝对相关度。
+      parameters:
+        - { in: query, name: q, required: false, schema: { type: string }, description: 检索词；空白时返回空结果 }
+        - { in: query, name: sessionId, required: false, schema: { type: string } }
+        - { in: query, name: limit, required: false, schema: { type: integer, default: 10, maximum: 50 } }
+      x-live-check: { method: get, query: { q: "hello" }, status: [200], required_keys: [query, pool, count, results] }
+      responses:
+        "200":
+          description: 命中列表（按 BM25 分值递减）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [query, pool, count, results]
   /api/memory/{sessionId}:
     delete:
       tags: [memory]

@@ -1,6 +1,6 @@
 # 心屿 MindIsle API 手册（人类可读版）
 
-> 机器契约唯一真相源 = `docs/openapi.yaml`（11 路径，`_test/api_contract_check.py` 强制：文档不缺/不虚/前端不偷调/运行态一致/零豁免探测，
+> 机器契约唯一真相源 = `docs/openapi.yaml`（12 路径，`_test/api_contract_check.py` 强制：文档不缺/不虚/前端不偷调/运行态一致/零豁免探测，
 > 并自 r89 起**把本手册也钉进对账**（C7：yaml 每条路径必须在本文件出现、本文件不得虚报接口、上方路径计数必须等于实值）——
 > 手册此前"没有任何读者"，yaml 一改它就静默过期）。
 > 基地址：本地 `http://127.0.0.1:8123`；公网 Pages 只有 `/api/chat`（其余接口不在此形态暴露）。
@@ -33,6 +33,7 @@
 | `POST /api/memory/message` | `{sessionId,role:user\|assistant,content}` → `{ok,count}` |
 | `GET /api/memory/messages?sessionId=&limit=40` | 数组元素必含 role,content |
 | `GET /api/memory/stats?sessionId=` | `{sessionId,emotions,messages}`（AC-OBS-10 判据口） |
+| `GET /api/memory/search?q=&sessionId=&limit=10` | `{query,pool,count,results[]}`（r128：BM25 长期记忆检索；sessionId 可省＝全库检索，score 只在本次候选集内可比） |
 | `DELETE /api/memory/{sessionId}` | `{ok,removed}`（对应界面"清除我的数据"） |
 
 ## 5. 鉴权与错误码总表

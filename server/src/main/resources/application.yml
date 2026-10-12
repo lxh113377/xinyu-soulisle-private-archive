@@ -34,6 +34,20 @@ xinyu:
   # 可选鉴权：留空 = 完全放行（演示默认）；非空则 /api/**（除 /api/health）需带 X-Xinyu-Token
   api-token: ${XINYU_API_TOKEN:}
   web-root: ${XINYU_WEB_ROOT:./src/}
+  # r128 成本面/内存面防护闸（ApiGuardFilter）：/api/chat 每调一次真花一次上游的钱，
+  # 而此前全仓零限流（实测 rateLimit|429|quota|Retry-Forward 在 server/src/main/java 下 0 命中）。
+  # 默认值刻意给得宽松（60/min，桶容量 20）：宁可在极端滥用下多花一点，也不能打断
+  # 既有 180 条回归电池里的自调用。per-minute 配成 0 = 关闭限流（只留体上限）。
+  guard:
+    enabled: ${XINYU_GUARD_ENABLED:true}
+    rate-limit-per-minute: ${XINYU_GUARD_RATE_LIMIT_PER_MIN:60}
+    burst: ${XINYU_GUARD_BURST:20}
+    # 请求体上限 256 KiB：正常对话（messages 数组 + system 提示）远低于此，
+    # 超限直接 413 且不进 LLM。配成 0 = 不限体。
+    max-body-bytes: ${XINYU_GUARD_MAX_BODY_BYTES:262144}
+  # r128 结构化访问日志（AccessLogFilter）：只记元数据，绝不记请求体/响应体/密钥。
+  access-log:
+    enabled: ${XINYU_ACCESS_LOG_ENABLED:true}
   # 情绪词表单一真相源（前端与服务端共用同一份文件）：
   #   ${XINYU_LEXICON} 直接指向文件；未设则用 ${XINYU_WEB_ROOT}/data/emotion-lexicon.js
   #   —— 即 src/data/emotion-lexicon.js（fat jar）或 /app/web/data/...（Docker）。

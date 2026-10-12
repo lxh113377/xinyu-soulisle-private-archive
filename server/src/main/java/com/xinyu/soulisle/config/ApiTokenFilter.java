@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -23,6 +24,7 @@ import java.nio.charset.StandardCharsets;
  * 前端同源托管时不带该头，因此开启鉴权适用于「只暴露给受信客户端」的部署形态。
  */
 @Component
+@Order(10)
 public class ApiTokenFilter extends OncePerRequestFilter {
 
     /** 健康检查永远放行：负载均衡/容器探针不应因鉴权而失败 */

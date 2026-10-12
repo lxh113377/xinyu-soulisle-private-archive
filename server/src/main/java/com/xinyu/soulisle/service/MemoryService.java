@@ -73,6 +73,14 @@ public class MemoryService {
         return out;
     }
 
+    /** 全库最近若干条（不限会话）—— r128 长期记忆检索的候选池；刻意不加 sessionId 条件 */
+    public List<ChatMessage> recentMessages(int limit) {
+        return messageMapper.selectList(
+                Wrappers.<ChatMessage>lambdaQuery()
+                        .orderByDesc(ChatMessage::getId)
+                        .last("LIMIT " + normLimit(limit)));
+    }
+
     /** 一键清除（对应前端「清除我的数据」） */
     public int clear(String sessionId) {
         int a = emotionMapper.delete(Wrappers.<EmotionRecord>lambdaQuery().eq(EmotionRecord::getSessionId, sessionId));

@@ -451,6 +451,9 @@ SUITES = [
     #   取数=AST（区分 try 内外），分母=SUITES 在册脚本现读；基线只降不升（首扫 23 → 现 21）。
     ("blindred_guard", [sys.executable, "_test/blindred_guard_check.py"]),
     ("blindred_guard_selftest", [sys.executable, "_test/blindred_guard_check.py", "--selftest"]),
+    # r128: server hardening ratchet (cost limit / body cap / access log / BM25 search)
+    ("server_hardening", [sys.executable, "_test/server_hardening_check.py"]),
+    ("server_hardening_selftest", [sys.executable, "_test/server_hardening_check.py", "--selftest"]),
     # r119 接线补录：表达语料库注入链路判据（r117 建，G16 四面对账抓到孤儿后接线；
     #   电池自管服务面自动起 8123，Q1-Q7 页面腿在电池内实跑）。
     ("quote_wiring", [sys.executable, "_test/quote_wiring_check.py"]),
