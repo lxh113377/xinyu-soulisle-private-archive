@@ -20,6 +20,14 @@
       读数：`coverage_gate 0/16（未验0）` → **`1/15（未验1）例：NJX-njx/opensoul`**（对手真有覆盖率门：
       根级 `vitest.config.ts` thresholds lines70/branches55 ＋ ci.yml 内 iOS 43% 内联门）。
       ⚠️ 同族第三次「手抄文字与数据脱节」（前两处＝「r126 首采」标签、「本格改前抄台账的 152」注释）。
+- [ ] 🟠 **[推荐:R127-09｜agent 自动｜待干净窗口]** **打断语义落差（对齐 Open-LLM-VTuber，本轮原文精读所得）**：
+      对方 `AgentInterface.handle_interrupt(heard_response)` 把**被打断前已听到的半句**回传 agent；我方
+      `voice-call.js::bargeIn()` 里 `speakingBuf=""` 直接丢弃 ⇒ 模型无感知、答不出"你刚才说到哪"。
+      最小修法 / 三条验收 / 复现路径全文 = `交付物/开源学习-Open-LLM-VTuber-打断语义-2026-10-12-r127.md` §二。
+      前提（本轮实测）：`src/js/voice-call.js` 与 `src/js/chat-agent.js` **均在 M（他人在途）** ⇒ 不在在途件上动手，待干净窗口。
+- [ ] 🟡 **[推荐:R127-10｜agent 自动]** **第 5 维吃到的形态**：若开向量长记忆，第一步**不是"加服务"**，而是把
+      `MemoryService` 抽成 `MemoryProvider` 接口（默认实现＝现有 H2 两表）⇒ 侧车可 drop-in、决策成本下降。
+      已并入卷152 A 案「最小可逆试验」前置；代价≈1 轮、零行为变化。
 - [ ] 🟠 **[推荐:R127-02｜agent 自动]** **face-diag S1「低强度动态分母」现在可开工**：F12 尺已在位，
       改动前水位 = 笃定错报 8/45、有把握帧命中 78.4%（目标 ≥95%）。验收＝改后 F12 的 8 必须降且 N2 只升不降。
       前提：`python _test/face_lowintensity_check.py`（复算水位）；src/js/face-engine.js 动前必查并发脏度
