@@ -23,6 +23,11 @@
       **同日第二条腿（S9，精读 Open-LLM-VTuber 衍生）**：`benchmark_metrics.py::vector_memory` 只认
       `vector/embedding/独立 rag`，认不出 mem0/letta 这类产品名后端 ⇒ 全池 **7/16 → 9/16**（差距比已发布更大）。
       修法＝产品名按**词元边界**纳入（有意不收 `chroma`：`chroma.min.js` 是配色库），配 3 真阳 + 3 假阳反例腿。
+- [x] 🟡 **[推荐:R127-11｜agent 自动｜本轮已落]** **能力面复核（验证性负结论，零改动）**：16 仓真树 × 10 组写法变体
+      （`Dockerfile.*`/`compose.{yml,yaml}`/`devcontainer`/`dependabot.yaml`/`renovate.json5`/`serviceWorker` 驼峰/
+      `site.webmanifest`/`puppeteer·selenium`/`stream.ts`/mutation 工具名族）⇒ i18n 扩面**零漏检**、mutation 变体**零命中**；
+      两处疑似判为**不构成假阴**（文档站资产 / 全树无 sse 锚）⇒ **不改规则**（不拿模糊词换假阳）。
+      方法论：与 S8/S9 同源——「对手都没有 X」必须拿真树证伪过一次；负结论要**声明取数面**才配写进报告。
 - [ ] 🟠 **[推荐:R127-09｜agent 自动｜待干净窗口]** **打断语义落差（对齐 Open-LLM-VTuber，本轮原文精读所得）**：
       对方 `AgentInterface.handle_interrupt(heard_response)` 把**被打断前已听到的半句**回传 agent；我方
       `voice-call.js::bargeIn()` 里 `speakingBuf=""` 直接丢弃 ⇒ 模型无感知、答不出"你刚才说到哪"。
