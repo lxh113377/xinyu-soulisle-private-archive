@@ -9,11 +9,13 @@
 J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.9 环境实证（含 JAVA_HOME=JDK8 的坑）全文 `part17`。
 
 ## P0 — 必须做
-- [ ] 🔴 **心理学知识库 r129 收尾六件（第 6 轮入口）**：篇章 18 失恋与被拒（RJ）待入库 → README 升 v1.4
-      与构建器 `KB_VERSION/BUILT_TAG` **同批**改 → KB 新内容上线（本轮故意没部署：语音轮在
-      `app.js`/`chat-agent.js`/`voice-call.js` 有未入库改动）→ src 侧「回复里的〔依据:编号·级〕必须与实际注入
-      编号集合比对，未命中标未查证」→ `wit_quotes_build.py` 同族接线 → 选题队列改由
-      `python _test/psych_kb_integrity_check.py --backlog` 给（现读 116 卡 / 未闭合 332 项）。全文 `part151`
+- [ ] 🔴 **心理学知识库第 6 轮入口**：✅ 已收——篇章 18 失恋与被拒入库 + README 升 v1.4（四域码/篇章 17-20）
+      与构建器 `KB_VERSION/BUILT_TAG` 同批对齐（r129，122 条 E=0）。**未收三件**：① KB 新内容上线
+      （deploy 已同步、公网未部署；本轮故意不做——语音轮在 `app.js`/`chat-agent.js`/`voice-call.js` 有未入库改动，
+      上线窗口 = 那三面收口后）；② src 侧「回复里的〔依据:编号·级〕必须与实际注入编号集合比对，未命中标未查证」
+      （证据溯源的用户可见面，落点在 chat-agent.js，前提同上）；③ `wit_quotes_build.py` 同族接线（无 selftest、不在电池，
+      做法照抄 `4b274d5`）。**选题队列改由机器给**：`python _test/psych_kb_integrity_check.py --backlog`
+      （现读 122 卡 / 未闭合 300+ 项）。全文 `part151`
 - [ ] 🔴 **每轮第一要务：表情识别 · 语意理解**（用户 2026-10-11 立规）—— 每轮必跑
       `python _test/core_capability_baseline_check.py`（棘轮只降不升）；目标/指标/轨迹 = `memory/10-core-capabilities.md`
 - [ ] 🔴 **表情识别准确率攻坚（face-diag，2026-10-12 立）**：诊断+方案全文 = `memory/11-face-accuracy.md`
