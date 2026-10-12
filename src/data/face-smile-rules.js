@@ -103,7 +103,14 @@ window.__XINYU_FACE_RULES__ = {
       jawForward: 0.3,
       jawOpen: 0.15,
       mouthUpperUpLeft: -0.5, mouthUpperUpRight: -0.5,
-      mouthSmileLeft: -0.6, mouthSmileRight: -0.6
+      mouthSmileLeft: -0.6, mouthSmileRight: -0.6,
+      /* r165（S3 anger 复标）：眉内侧上抬 = 焦虑/专注/担忧的第二 AU，与愤怒互斥。
+       * 同步实测（`_temp/s3_probe.mjs`，2026-10-13）：
+       *   加负权后「专注（browDown .3 + browInnerUp .3）」的 anger 原始分 .308 → .253，
+       *   落入 calm 区间（配合 weak.offByEmo.anger 定线 ⇒ 显示"看不出来"）；
+       *   而真愤怒（.631）/纯压眉专注（.410）/说话皱眉（.330）**零变化**
+       *   （无 browInnerUp 激活时负权不参与分子）。 */
+      browInnerUp: -0.5
     },
     fear: {
       eyeWideLeft: 1.0, eyeWideRight: 1.0,
@@ -220,7 +227,14 @@ window.__XINYU_FACE_RULES__ = {
   weak: {
     on: 0.10, off: 0.26,
     onByEmo: { surprise: 0.13 },
-    offByEmo: { joy: 0.15, sadness: 0.22, surprise: 0.20 }
+    /* offByEmo.anger=0.23（r165，S3 窄缝标定）：
+     *   上界 = 「专注（browDown .3 + browInnerUp .3）」负权后的 anger 原始分 .253
+     *          （≥ 此线则不再翻 anger ⇒ 专注场景显示"看不出来"）；
+     *   下界 = 「轻紧锁眉 browDown .20」原始分 .205（< 此线仍翻"轻微 anger（读数仅供参考）"）。
+     *   取两点中点 .229 → 上圆整 .23（比"区间中点 .25"对专注余量更足：.253−.23=.023）。
+     * 实测（`_temp/s3_probe.mjs`）：专注 @0.3/@0.4/@0.45 三档退出笃定/非笃定误报区，
+     * 真愤怒与纯压眉专注零变化。 */
+    offByEmo: { joy: 0.15, sadness: 0.22, surprise: 0.20, anger: 0.23 }
   },
 
   /* ── 质量门（r113「表情识别更抗造」）：画面本身靠不住时，读数只能当参考 ──────────

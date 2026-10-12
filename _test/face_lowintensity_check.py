@@ -50,6 +50,10 @@ SHAPES = [
     ("joy", {"mouthSmileLeft": .8, "mouthSmileRight": .8, "cheekSquintLeft": .6,
              "cheekSquintRight": .6, "eyeSquintLeft": .5, "eyeSquintRight": .5}),
     ("anger", {"browDownLeft": .65, "browDownRight": .65}),
+    # r165（S3）：专注带眉内侧上抬——与愤怒的判别面（anger 的 browInnerUp 负权 + weak 定线）。
+    # 期望 calm：@0.12/.22 落 uncertain（弱专注仍在边界，未标置信报非期望=可接受档），
+    # @0.3+ 落 soft_ok（诚实退回"看不出来"）。实测见 _temp/s3_probe.mjs（2026-10-13）。
+    ("focus_inner", {"browDownLeft": .3, "browDownRight": .3, "browInnerUp": .3}),
     ("sadness", {"mouthFrownLeft": .8, "mouthFrownRight": .8, "browInnerUp": .6}),
     ("fear", {"browInnerUp": .8, "eyeWideLeft": .6, "eyeWideRight": .6,
               "mouthStretchLeft": .5, "mouthStretchRight": .5}),
@@ -61,7 +65,7 @@ SHAPES = [
 # calm 期望的负样本（低强度段同样不许笃定报错）
 NEGATIVES = [("neutral", {}), ("speaking", {"jawOpen": .5, "mouthFunnel": .3}),
              ("lips_pressed", {"mouthPressLeft": .4, "mouthPressRight": .4})]
-EXPECT = {"joy": "joy", "anger": "anger", "sadness": "sadness", "fear": "fear",
+EXPECT = {"joy": "joy", "anger": "anger", "focus_inner": "calm", "sadness": "sadness", "fear": "fear",
           "surprise": "surprise", "disgust": "disgust",
           "neutral": "calm", "speaking": "calm", "lips_pressed": "calm"}
 TARGET_CONF_ACC = 0.95
@@ -278,8 +282,13 @@ def main():
     cur = tally(data)
     bad, notes = ratchet(cur, base)
     if a.update:
-        if bad and not a.force and base:
-            print("F12-UPDATE-REFUSED 存在回退项，棘轮不允许写低：%s" % "; ".join(bad[:2]))
+        # r165：格数变更**不阻止**重建 —— 判据「格数变了 ⇒ 红」的本意是"夹具改动须同步
+        # 重建基线、不许沿用旧水位"，而重建通道就是本处；旧条件把重建自己也拦死
+        # （45→50 加 focus_inner 形态实测：UPDATE-REFUSED「格数变了」⇒ 无正规出路）。
+        # 但现在只豁免格数项：若同时存在笃定错报增多等真回退，仍拒（须 --force 说明理由）。
+        blocking = [x for x in bad if "格数变了" not in x]
+        if blocking and not a.force and base:
+            print("F12-UPDATE-REFUSED 存在回退项，棘轮不允许写低：%s" % "; ".join(blocking[:2]))
             return 1
         payload = dict(cur)
         payload["updated"] = __import__("datetime").date.today().isoformat()

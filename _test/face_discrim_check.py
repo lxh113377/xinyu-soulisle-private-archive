@@ -79,6 +79,11 @@ CASES = [
     ("blinking", {"eyeBlinkLeft": .9, "eyeBlinkRight": .9}, "calm"),
     ("looking_down", {"eyeLookDownLeft": .8, "eyeLookDownRight": .8}, "calm"),
     ("lips_pressed", {"mouthPressLeft": .4, "mouthPressRight": .4}, "calm"),
+    # r165（S3）：专注带眉内侧上抬 —— 与「纯压眉」的 concentrating 是两个形态：
+    #   纯压眉（无 IU）仍按 r103 拍板走 anger（保真怒）；**带 IU 的专注/焦虑**由 anger 的
+    #   browInnerUp 负权 + weak.offByEmo.anger 定线推开 ⇒ 期望 calm（"看不出来"）。
+    #   实测（_temp/s3_probe.mjs）：read 输出 calm-（ang .253 ≥ off .23 不翻）。
+    ("focus_inner", {"browDownLeft": .3, "browDownRight": .3, "browInnerUp": .3}, "calm"),
     # 专注/说话：已知会误报 anger，但强度必须**低于真愤怒**，否则"专注"读数与"真发怒"读数
     # 无法区分，代价就从"闪一下红"升级成"骗人"。
     ("concentrating", {"browDownLeft": .4, "browDownRight": .4}, "anger"),
@@ -107,7 +112,7 @@ SWEEP = [.25, .40, .55, .70, .85, 1.00]
 #   - joy_weak：它的标签是 calm，同上。
 POSITIVE = [c for c in CASES if c[0] not in (
     "concentrating", "speaking_frown", "speaking", "blinking", "looking_down",
-    "lips_pressed", "joy_weak",
+    "lips_pressed", "focus_inner", "joy_weak",
     # r103 代价面样本：worry_* 是「乙」取舍的**代价**，不是任何一类的正样本 ——
     # 用它们扫「某类分数随强度递增」是扫错了对象（它们量的类是随输入反向变的）。
     # 它们在 ②c/②d/②e 里各自有专门断言，不参与这项统计。
@@ -512,8 +517,14 @@ def selftest():
     #   被翻成 joy ⇒ F11 负样本假阳性必须红。盯「有人为了轻微笑更灵敏把 joy 的 off 调宽」——
     #   joy_weak .167 与轻微笑 .137 只差 .03，是整条 weak 机制最窄的一条缝。
     ran += _rule_case(real_rules, bad, "反例13 weak joy.off 抬到 0.20（joy_weak 被翻成 joy）",
-              ("offByEmo: { joy: 0.15, sadness: 0.22, surprise: 0.20 }",
-               "offByEmo: { joy: 0.20, sadness: 0.22, surprise: 0.20 }"))
+              ("offByEmo: { joy: 0.15, sadness: 0.22, surprise: 0.20, anger: 0.23 }",
+               "offByEmo: { joy: 0.20, sadness: 0.22, surprise: 0.20, anger: 0.23 }"))
+
+    # 反例 15（r165）：S3 的 anger 负权被删（browInnerUp -0.5 → 0.0）⇒ focus_inner
+    #   （专注带眉内抬）重新被判 anger（ang .308、calm 残余归零）⇒ F11 必须红。
+    #   盯「后人"顺手"把负权拿掉」——它的保护对象是专注/焦虑场景不再被读成愤怒。
+    ran += _rule_case(real_rules, bad, "反例15 anger 负权被删（专注带眉内抬重新判 anger）",
+              ("browInnerUp: -0.5", "browInnerUp: 0.0"))
 
     # 反例 14（r161）：weak.onByEmo.surprise 从 0.13 降到 0.09 ⇒ speaking 的 surprise .12
     #   进入窄区被翻成 surprise ⇒ F11 必须红。盯「全局 on 被顺手调到 surprise 上」——
