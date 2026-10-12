@@ -202,7 +202,24 @@
      期间用户点了「关闭」⇒ 不能因为 await 返回晚就把摄像头又开回来。
      每次 start 领一个号，await 回来先对号，号不对说明已被 stop ⇒ 立刻释放并退出。 */
   let session = 0;
-  const state = { ema: null, view: null, at: 0, err: null, tracks: 0, phase: "idle" };
+  const state = { ema: null, view: null, at: 0, err: null, tracks: 0, phase: "idle", ts: 0 };
+
+  /* 延迟埋点（轮132·口径 memory/11-face-accuracy.part4 §五） */
+  const LAT_N = 120;
+  const latB = { inferMs: [], computeMs: [], e2eMs: [] };
+  let latIdx = 0, latN = 0;
+  function latPush(k, v) {
+    latB[k][latIdx] = v;
+    if (latN < LAT_N) latN++;
+    latIdx = (latIdx + 1) % LAT_N;
+  }
+  function latPct(k) {
+    if (!latN) return null;
+    const s = latB[k].slice(0, latN).sort((a, b) => a - b);
+    /* 取位按本通道自身长度：latN 三通道共用，越位会返 undefined ⇒ JSON 吞键假绿（轮132） */
+    return s.length ? s[Math.min(s.length - 1, Math.floor(0.95 * s.length))] : null;
+  }
+  function latClear() { latIdx = 0; latN = 0; for (const k in latB) latB[k].length = 0; }
 
   /** 能力探测：只回答"这台设备/这个环境能不能用"，不启动摄像头 */
   function capability() {
@@ -281,12 +298,14 @@
     if (!running || !landmarker || !videoEl) return false;
     if (videoEl.readyState < 2) return false;                  // 帧还没到
     if (document.visibilityState === "hidden") return false;   // 页面不可见即停推理
-    const ts = Math.max(lastTs + 1, Math.round(performance.now()));
+    const t0 = performance.now();
+    const ts = Math.max(lastTs + 1, Math.round(t0));
     lastTs = ts;                                               // detectForVideo 要求时间戳单调递增
     const res = landmarker.detectForVideo(videoEl, ts);
+    const tInfer = performance.now();
     const cats = res && res.faceBlendshapes && res.faceBlendshapes[0]
       && res.faceBlendshapes[0].categories;
-    if (!cats) return false;                                   // 这一帧没检出脸：不算失败，继续下一帧
+    if (!cats) return false;                                   // 这一帧没检出脸：不算失败，不记样本
     const bs = {};
     for (const c of cats) bs[c.categoryName] = c.score;
     state.view = read(smooth(bs));
@@ -303,6 +322,11 @@
       yaw: yawRatio(res.faceLandmarks && res.faceLandmarks[0]),
       mouthFlatSamples: mouthFlatRun
     }));
+    /* compute 判≤100ms；infer=推理 */
+    const tView = performance.now();
+    latPush("inferMs", tInfer - t0);
+    latPush("computeMs", tView - tInfer);
+    state.ts = t0;
     state.at = Date.now();
     samples++;
     return true;
@@ -365,7 +389,7 @@
       if (!running) return;
       timer = setTimeout(tick, period);
       try {
-        if (frame() && o.onRead) o.onRead(state.view);
+        if (frame() && o.onRead) { o.onRead(state.view); latPush("e2eMs", performance.now() - state.ts); }
       } catch (e) {
         /* 单帧异常不炸链路：记一次继续跑（WebGL 上下文丢失等瞬时错误属于这一类）。
            但必须**留痕**：公网排障时"一直没读数"最常见的根因就藏在这里，静默吞掉等于没线索。 */
@@ -388,7 +412,7 @@
     if (landmarker && window.__XINYU_FACE_VISION__ && window.__XINYU_FACE_VISION__.closeLandmarker) {
       window.__XINYU_FACE_VISION__.closeLandmarker(landmarker);
     }
-    landmarker = null; videoEl = null; state.ema = null;
+    landmarker = null; videoEl = null; state.ema = null; latClear();
   }
 
   /** 第二幕用：开一次摄像头，采够样本就停（单帧噪声大，EMA 收敛后的读数才对得起"我识别到了"）。 */
@@ -468,6 +492,9 @@
     lastError: () => state.err,
     sampleCount: () => samples,
     stats: () => ({ running: running, samples: samples, err: state.err, phase: state.phase,
-      frameErr: state.frameErr || null, frameErrN: state.frameErrN || 0 })
+      frameErr: state.frameErr || null, frameErrN: state.frameErrN || 0,
+      lat: { n: latN, window: LAT_N,
+        inferMs: latPct("inferMs"), computeMs: latPct("computeMs"),
+        e2eMs: latPct("e2eMs") } })
   };
 })();
