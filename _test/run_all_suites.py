@@ -161,6 +161,11 @@ SUITES = [
     # 本轮不代处置（该面有并行会话在途），登记于 memory/07-next-steps。
     ("psych_kb_build", [sys.executable, "_test/psych_kb_build.py", "--check"]),
     ("psych_kb_build_selftest", [sys.executable, "_test/psych_kb_build.py", "--selftest"]),
+    # r133：上条注释「wit_quotes_build.py 同样无 --selftest、不在电池」已过期——
+    #   实测该件 2026-10-12 已有 --selftest（15 腿全过），缺的只是**接线**。
+    #   语料库与知识库同族：构建器不跑，源卡与注入数据件的漂移就会像 psych_kb 那次活 3 轮零告警。
+    ("wit_quotes_build", [sys.executable, "_test/wit_quotes_build.py", "--check"]),
+    ("wit_quotes_build_selftest", [sys.executable, "_test/wit_quotes_build.py", "--selftest"]),
     # r129：引用关联 ⇄ 取证 ⇄ 索引 三面一致性（悬空/自指/孤岛/缺来源/索引漂移各自判红，
     # 取数面取不到 ⇒ rc=2 UNVERIFIED 不判绿）。这三件事此前只有人工核对轮用眼过，机器面为零。
     ("psych_kb_integrity", [sys.executable, "_test/psych_kb_integrity_check.py"]),
@@ -330,6 +335,12 @@ SUITES = [
     ("core_capability_selftest", [sys.executable, "_test/core_capability_baseline_check.py", "--selftest"]),
     ("face_lowintensity", [sys.executable, "_test/face_lowintensity_check.py"]),
     ("face_lowintensity_selftest", [sys.executable, "_test/face_lowintensity_check.py", "--selftest"]),
+    # r132 S4：真照片 AU 回放尺（纯 node，零浏览器零摄像头）。与 face_lowintensity 互补不重叠——
+    #   那把量合成向量的低强度段，这把量**真实照片**的高强度段已覆盖四类。导出腿 face_au_export.py
+    #   **不入电池**（需 Chrome + 数十秒），语料 `_test/face-au/` 入库供复算腿零依赖复跑。
+    ("face_au_replay", [sys.executable, "_test/face_au_replay_check.py"]),
+    ("face_au_replay_selftest", [sys.executable, "_test/face_au_replay_check.py", "--selftest"]),
+    ("face_au_export_check", [sys.executable, "_test/face_au_export.py", "--check"]),
     # r58 质量工程面：JS 侧从"0 个单元测试"变成有常驻执行位（node --test + 跨 realm 归一）
     ("js_unit", [sys.executable, "_test/js_unit_check.py"]),
     ("js_unit_selftest", [sys.executable, "_test/js_unit_check.py", "--selftest"]),
@@ -456,13 +467,18 @@ SUITES = [
     #   取数=AST（区分 try 内外），分母=SUITES 在册脚本现读；基线只降不升（首扫 23 → 现 21）。
     ("blindred_guard", [sys.executable, "_test/blindred_guard_check.py"]),
     ("blindred_guard_selftest", [sys.executable, "_test/blindred_guard_check.py", "--selftest"]),
-    # r128: server hardening ratchet (cost limit / body cap / access log / BM25 search)
+    # r128：成本面/内存面/记忆面四道新能力的常驻棘轮。登记进电池是为了防"孤儿判据"
+    # （G16 反向对账：脚本存在但电池不跑、或电池在跑但台账没登，都会红）。
     ("server_hardening", [sys.executable, "_test/server_hardening_check.py"]),
     ("server_hardening_selftest", [sys.executable, "_test/server_hardening_check.py", "--selftest"]),
     # r119 接线补录：表达语料库注入链路判据（r117 建，G16 四面对账抓到孤儿后接线；
     #   电池自管服务面自动起 8123，Q1-Q7 页面腿在电池内实跑）。
     ("quote_wiring", [sys.executable, "_test/quote_wiring_check.py"]),
     ("quote_wiring_selftest", [sys.executable, "_test/quote_wiring_check.py", "--selftest"]),
+    # r133：verifyCitations 的**接线腿** + 引用消费面（静态面，不占浏览器）。
+    #   verifyCitations 的三结局由 kb_citation_check C1-C7 覆盖，本件**不复验**（禁造第二把尺）。
+    ("quote_r133", [sys.executable, "_test/quote_wiring_r133_check.py"]),
+    ("quote_r133_selftest", [sys.executable, "_test/quote_wiring_r133_check.py", "--selftest"]),
     # r121：peers 性能在册探针的**离线桩**入电池（网络面承 r37 口径不入整跑：
     #   runner 无 GH 配额保证，且八维表第 4 维的 peers 格此前**从来没有分母**，
     #   每轮写「未取到在册数 ⇒ 不做无据横比」就被一代代抄下去。本件把那一格变成可实测。
