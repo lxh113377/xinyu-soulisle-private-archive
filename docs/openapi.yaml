@@ -364,6 +364,16 @@ components:
         webRoot: { type: string, description: 绝对路径，自证"直读 src/ 权威源"是否成立 }
         indexFound: { type: boolean }
         vendorFound: { type: boolean }
+        build:
+          type: string
+          description: >-
+            **产物身份**（r131 新增）：`jar:<文件名>:<摘要前12>:<字节数>` 或
+            `classes:<目录名>:<mtime>`（`spring-boot:run` 直跑 classes 时），取不到为 `unknown`。
+            为什么要有这一格：`service/stage/java/webRoot` 在**新旧产物上逐字相同**，
+            于是「8123 上跑的其实是他人旧产物（甚至 93,975 B 的瘦 jar 冒充 20MB fat jar）」
+            这件事从指纹上完全看不出来，只能靠某个端点超时/404 去猜。
+            摘要只取产物前 64 KiB 且只算一次（健康端点会被性能判据高频打，重算会把自己变成被测噪声）。
+          example: "jar:soulisle-server.jar:9f2c1a7b3e44:20971520"
     ChatRequest:
       type: object
       required: [messages]

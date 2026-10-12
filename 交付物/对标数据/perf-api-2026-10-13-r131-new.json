@@ -1,0 +1,61 @@
+{
+  "generated_by": "_test/perf_api_check.py",
+  "collected_at": "2026-10-13T01:05:13+0800",
+  "base_url": "http://127.0.0.1:8130",
+  "instance_tag": "r131-classes-8130",
+  "fingerprint": {
+    "service": "xinyu-soulisle",
+    "stage": "J5",
+    "java": "17.0.20.1",
+    "webRoot": "C:\\Users\\37533\\Desktop\\workspace\\项目\\陪聊\\src",
+    "indexFound": true,
+    "vendorFound": true,
+    "build": "classes:classes:1791767315194"
+  },
+  "rounds": 15,
+  "endpoints": {
+    "health": {
+      "n": 15,
+      "ok": 15,
+      "fail": 0,
+      "mean_ms": 15.27,
+      "p50_ms": 16.09,
+      "p95_ms": 28.03,
+      "max_ms": 29.01,
+      "rate_limited": 0
+    },
+    "emotion": {
+      "n": 15,
+      "ok": 15,
+      "fail": 0,
+      "mean_ms": 11.11,
+      "p50_ms": 14.91,
+      "p95_ms": 16.36,
+      "max_ms": 22.13,
+      "rate_limited": 0
+    }
+  },
+  "concurrency": {
+    "n": 32,
+    "ok": 32,
+    "fail": 0,
+    "mean_ms": 4.73,
+    "p50_ms": 4.12,
+    "p95_ms": 5.08,
+    "max_ms": 14.39,
+    "rate_limited": 0,
+    "level": 8,
+    "elapsed_ms": 33.35,
+    "rps": 959.65
+  },
+  "thresholds": {
+    "health": {
+      "p95_ms": 50
+    },
+    "emotion": {
+      "p95_ms": 50
+    }
+  },
+  "comparable": false,
+  "comparable_reason": "peers 基准在册 0/16（peer_perf_probe 三通道，2026-10-12 现采）"
+}

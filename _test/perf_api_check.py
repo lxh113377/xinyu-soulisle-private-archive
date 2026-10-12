@@ -44,6 +44,10 @@ OUT_DIR = ROOT / "交付物" / "对标数据"
 #   health p95=16.18ms ｜ emotion p95=15.99ms ｜ 并发 8×32 全成功
 # 登记为 ×3（≈50ms）而非 ×1.5：本机与 CI 负载不同，1.5 倍会把正常抖动读成红。
 # ⚠️ 换产物（指纹变化）后必须重新 --calibrate 并更新这里，否则是拿旧曲线判新产物。
+# 限流污染自愈的等待秒数：ApiGuardFilter 的桶容量 burst=20、补充速率 60/分钟（≈1 token/s）
+# ⇒ 22s 足以回满。写死成常量而不是"随便睡一会儿"：睡多久必须能说清推导，否则就是玄学。
+SETTLE_SECONDS = 22
+
 THRESHOLDS = {
     "health": {"p95_ms": 50},
     "emotion": {"p95_ms": 50},
@@ -148,7 +152,10 @@ def fingerprint(base, timeout):
         return None
     if not isinstance(payload, dict):
         return None
-    return {k: payload.get(k) for k in ("service", "stage", "java", "webRoot", "indexFound", "vendorFound")}
+    # `build` 是 r131 加的产物身份（jar:<名>:<摘要12>:<字节数> / classes:<目录>:<mtime>）。
+    # 没有它，新旧产物在 service/stage/java/webRoot 上**逐字相同** ⇒ 换产物后曲线会被误当连续。
+    return {k: payload.get(k) for k in ("service", "stage", "java", "webRoot",
+                                        "indexFound", "vendorFound", "build")}
 
 
 def judge(endpoints, thresholds):
@@ -189,7 +196,10 @@ class _StubHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        self._reply({"status": "UP", "service": "stub", "stage": "SELFTEST", "java": "stub"})
+        # r131：桩也回传 build。真实服务端自 r131 起带这一格（产物身份），
+        # 桩不带的话，指纹腿在 selftest 里测的是「少一格也能过」——那正是要防的退化解。
+        self._reply({"status": "UP", "service": "stub", "stage": "SELFTEST", "java": "stub",
+                     "build": "jar:stub.jar:abcdef123456:1024"})
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length") or 0)
@@ -236,6 +246,9 @@ def selftest():
     try:
         fp = fingerprint(base, 5)
         check("fingerprint readable", isinstance(fp, dict) and fp.get("service") == "stub", str(fp))
+        # r131：产物身份必须进指纹 —— 没有它，换产物后曲线会被误当同一条
+        check("fingerprint carries build identity", (fp or {}).get("build") == "jar:stub.jar:abcdef123456:1024",
+              str(fp))
         ends = run_serial(base, 3, 5)
         check("both probes ok", ends["health"]["ok"] == 3 and ends["emotion"]["ok"] == 3, str(ends))
         conc = run_concurrent(base, 4, 8, 5)
@@ -279,7 +292,14 @@ def main(argv=None):
     parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument("--json", default=None, help="台账落盘路径（默认 交付物/对标数据/perf-api-<date>.json）")
     parser.add_argument("--calibrate", action="store_true", help="只出数字不判红（登记阈值用）")
+    parser.add_argument("--tag", default="", help="人工标注这轮读数来自哪个实例（如 old-jar-8123 / r130-new）。"
+                                                 "服务端回传的 build 只回答『跑的是哪份产物』，"
+                                                 "回答不了『这份产物是不是我本轮想测的那份』——"
+                                                 "r130 实测：8123 上跑的是他人旧产物，指纹却与新实例逐字相同。")
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument("--no-settle", action="store_true",
+                        help="关闭「检出限流污染后等桶回满再重跑一次」的自愈（默认开）。"
+                             "关掉可用于复现『上一个判据吃掉令牌桶 ⇒ 基准被 429 打残』这一现象。")
     args = parser.parse_args(argv)
 
     if args.selftest:
@@ -297,12 +317,26 @@ def main(argv=None):
         return 2
 
     endpoints = run_serial(args.base, args.rounds, args.timeout)
+
+    # r131：**判据之间共享服务端状态**。先跑 `api_contract_check`（15 条接口连打）会吃掉
+    # ApiGuardFilter 的令牌桶，紧跟着跑基准就会看到 429=9 的假象（实测踩到）——
+    # 那不是"服务慢"，是上一个判据的余温。等桶回满再重跑一次，比把 429 归因给被测服务诚实。
+    # 桶容量 burst=20、补充 60/分钟（≈1/s）⇒ 22s 足够回满；`--no-settle` 可关（用于复现该现象）。
+    if not args.no_settle:
+        starved = {n: s for n, s in endpoints.items() if s["ok"] < max(1, int(s["n"] * 0.6))}
+        if starved:
+            print("  · 检出限流污染（%s），等待 %ds 让令牌桶回满后重跑一次（--no-settle 可关）"
+                  % (", ".join("%s 429=%d" % (n, s.get("rate_limited", 0)) for n, s in starved.items()),
+                     SETTLE_SECONDS))
+            time.sleep(SETTLE_SECONDS)
+            endpoints = run_serial(args.base, args.rounds, args.timeout)
     conc = run_concurrent(args.base, args.concurrency, args.concurrent_requests, args.timeout)
 
     payload = {
         "generated_by": "_test/perf_api_check.py",
         "collected_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "base_url": args.base,
+        "instance_tag": args.tag or None,
         "fingerprint": fp,
         "rounds": args.rounds,
         "endpoints": endpoints,

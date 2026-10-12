@@ -8,7 +8,10 @@
 ## 1. 健康自证 `GET /api/health` → 200
 
 `curl http://127.0.0.1:8123/api/health`
-回 `{status,indexFound,vendorFound,webRoot,stage,java}`；`indexFound/vendorFound` 双 true 才算静态源命中。
+回 `{status,indexFound,vendorFound,webRoot,stage,java,build}`；`indexFound/vendorFound` 双 true 才算静态源命中。
+`build` 是 **r131 加的产物身份**（`jar:<名>:<摘要12>:<字节数>` 或 `classes:<目录>:<mtime>`）——
+`service/stage/java/webRoot` 在新旧产物上逐字相同，**只有它能回答「这个实例跑的到底是哪份产物」**
+（r128、r130 两次栽在「以为测的是新代码，实际打的是他人旧 jar」）。
 
 ## 2. 对话代理 `POST /api/chat`
 
