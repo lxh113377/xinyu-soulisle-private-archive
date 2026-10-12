@@ -11,8 +11,9 @@
      孤岛条目在注入时永远不会被顺藤摸到，等于白写。
   ② 证据溯源：每张非 E 级卡必须有 `- 来源：` 且至少一条来源子行（README §2 定级纪律第 2 条 + §7 红线
      「查不到来源只能 E 级」）。此前这条**只在人工核对轮里靠人眼过**，机器面为零 ⇒ 无来源卡能一路混进产品件。
-  ③ 索引对账：`索引.md` 的「条目索引表」⇄ 卡集合双向差集为 0（缺行/多行=红），且索引行的「可信度」列
-     与卡内 可信度 一致、索引行的「篇章」列与卡实际所在文件一致。
+  ③ 索引对账：`索引.md` 的「条目索引表」⇄ 卡集合双向差集为 0（缺行/多行=红），索引行的「可信度」列
+     与卡内 可信度 一致、「篇章」列与卡实际所在文件一致、「一句话」列与卡内 `- 一句话：` **逐字一致**
+     （r129 实测 110 行可全部逐字相等 ⇒ 由提示升为硬判据：人读索引会照抄这句，索引与卡不同文就是两处真相）。
      立此条的一手代价：第 4 轮 24 条（r123 落盘）在索引里挂了 3 轮无人登记，直到 r127 手工补登 ——
      「人工补登」这件事本身就是这个缺口存在过的证据。
 提示面（不判红，只报读数）：D 级卡的「两方并陈」关键词命中率。语义级判断机器做不靠谱，
@@ -93,6 +94,29 @@ def load_cards(kb_dir=KB_DIR):
     return cards, problems
 
 
+def index_cells(line):
+    """索引表行的**唯一取数口**（实测表头 索引.md:29 = 编号|标题|可信度|篇章|一句话）。
+
+    load_index 与「一句话漂移」比对共用这一个函数：r129 同一次里我把列序读错两回
+    （第一回把标题当级别 ⇒ 196 条假红；第二回把篇章当一句话 ⇒ 110 条全不一致的假读数），
+    根因是同一张表写了两套解析。同表只许一套列序。
+    行尾竖线在既有文件里不统一（r123 前的行带、第 4/5 轮追加的行不带），故按 split 段数取下标，
+    段数不足 6（编号/标题/级别/篇章/一句话 + 首空段）即视为非条目行。
+    """
+    if not line.startswith("|"):
+        return None
+    parts = [p.strip() for p in line.split("|")]
+    if len(parts) < 6:
+        return None
+    if not ID_ONLY_RE.match(parts[1]):
+        return None
+    return {"id": parts[1], "title": parts[2], "level": parts[3],
+            "chapter": parts[4], "summary": parts[5]}
+
+
+ID_ONLY_RE = re.compile(r"^PSY-[A-Z]+-\d{3}$")
+
+
 def load_index(index_path=INDEX):
     """只取「## 二、条目索引表」小节内的表行 ⇒ 规划槽位表（未成卡的编号）不进分母。"""
     if not index_path.is_file():
@@ -108,9 +132,9 @@ def load_index(index_path=INDEX):
             break
         if not in_sec:
             continue
-        m = INDEX_ROW_RE.match(line)
-        if m:
-            rows[m.group(1)] = {"level": m.group(3).strip(), "chapter": m.group(4).strip()}
+        c = index_cells(line)
+        if c:
+            rows[c["id"]] = {"level": c["level"], "chapter": c["chapter"], "summary": c["summary"]}
     if not rows:
         raise FaceMissing("索引「条目索引表」里一条编号都没抽到 ⇒ 表格形状变了，不得据此判绿")
     return rows
@@ -119,25 +143,13 @@ def load_index(index_path=INDEX):
 SUMMARY_RE = re.compile(r"^-\s*一句话：(.*)$")
 
 
-def index_wording_drift(cards, index_path=INDEX):
-    """提示面：索引「一句话」列与卡内 `- 一句话：` 不一致的条目（r129 首查抓到 PSY-AP-002 索引写 255 条、卡写 247 条）。
-    先报数不判红：人工登记时索引侧常被缩写，直接判红会把合法缩写也打成红（门禁形状必须容得下真话）；
-    读数用于判断「能不能升成硬判据」。"""
-    want = {}
-    in_sec = False
-    for raw in index_path.read_text("utf-8", errors="replace").splitlines():
-        line = raw.rstrip()
-        if INDEX_SEC_RE.match(line):
-            in_sec = True
-            continue
-        if in_sec and H2_RE.match(line):
-            break
-        if not in_sec:
-            continue
-        m = INDEX_ROW_RE.match(line)
-        if m:
-            rest = line.split("|")
-            want[m.group(1)] = rest[4].strip() if len(rest) > 4 else ""
+def index_wording_drift(cards, rows):
+    """索引「一句话」列与卡内 `- 一句话：` 不一致的条目 ⇒ run() 把它升成硬判据（r129）。
+
+    r129 首查抓到 PSY-AP-002 索引写 CASME II 255 条而卡写 247 条 —— 这种数字漂移正是人读索引时会抄走的，
+    所以它值得被看见；但先不判红：人工登记时索引侧常被缩写，直接判红会把合法缩写也打成红
+    （门禁形状必须容得下真话）。读数用于判断「能不能升成硬判据」。
+    """
     drift = []
     for cid, c in cards.items():
         card_sum = ""
@@ -146,7 +158,8 @@ def index_wording_drift(cards, index_path=INDEX):
             if s:
                 card_sum = s.group(1).strip()
                 break
-        if cid in want and want[cid] and want[cid] != card_sum:
+        want = (rows.get(cid) or {}).get("summary") or ""
+        if want and card_sum and want != card_sum:
             drift.append(cid)
     return sorted(drift)
 
@@ -243,7 +256,12 @@ def run(kb_dir=KB_DIR, index_path=INDEX):
     prov = check_provenance(cards)
     idx = check_index(cards, rows)
     d_total, d_hit = debate_hint(cards)
-    wording = index_wording_drift(cards, index_path)
+    wording = index_wording_drift(cards, rows)
+    problems = rel + prov + idx
+    if wording:
+        problems.append("索引「一句话」与卡内原文不一致 %d 条：%s（人读索引会照抄这句 ⇒ 必须与卡逐字同文；"
+                        "r129 实测 110 行可全部逐字一致，故升为硬判据）"
+                        % (len(wording), "、".join(wording[:8]) + ("…" if len(wording) > 8 else "")))
     stats = {
         "cards": len(cards), "index_rows": len(rows),
         "edges": sum(len(v) for v in outbound.values()),
@@ -251,7 +269,7 @@ def run(kb_dir=KB_DIR, index_path=INDEX):
         "d_total": d_total, "d_hit": d_hit, "historical": len(historical),
         "wording": len(wording), "wording_ids": wording,
     }
-    return rel + prov + idx, stats
+    return problems, stats
 
 
 def main():
@@ -266,7 +284,7 @@ def main():
         for p in problems[:40]:
             print("  · " + p)
         print("PSYCH-KB-INTEGRITY-REPORT: 卡 %d｜索引行 %d｜关联边 %d｜有进出 %d/%d｜D 级 %d（关键词命中 %d）"
-              "｜更正行历史提及已消失编号 %d 处（不判红）｜索引一句话与卡不一致 %d 条（不判红）：%s｜问题 %d 条"
+              "｜更正行历史提及已消失编号 %d 处（不判红）｜索引一句话与卡不一致 %d 条（判红项）：%s｜问题 %d 条"
               % (stats["cards"], stats["index_rows"], stats["edges"], stats["linked"], stats["cards"],
                  stats["d_total"], stats["d_hit"], stats["historical"], stats["wording"],
                  "、".join(stats["wording_ids"][:10]) + ("…" if stats["wording"] > 10 else ""),
@@ -338,7 +356,7 @@ def raises_facemissing(fn):
 
 
 def selftest():
-    """判据非恒真的取证：夹具正例 1 + 必红 11 + 取数面失效 2 + 历史留痕不得判红 1 + 真面正例 1。
+    """判据非恒真的取证（17 腿）：夹具正例 2 + 该红的 11 + 历史留痕不得判红 1 + 取数面失效 2 + 真面正例 1。
 
     夹具全落系统临时目录；脚本内不做磁盘直删（本仓禁用 rm/rmtree 类形态，OS 回收临时目录）。
     第 12 腿是 r129 首跑我自己踩的两处判据缺陷的回归位：列序读反（196 条假红）与
@@ -430,6 +448,17 @@ def selftest():
         probs, stats = run()
         return (not probs), ("真面现存 %d 条问题：%s" % (len(probs), probs[:3]))
 
+    def wording_clean_match():
+        d, idx = fixture_pair()
+        drift = index_wording_drift(load_cards(d)[0], load_index(idx))
+        return (not drift), ("索引一句话与卡逐字一致却被判漂移：%s" % drift)
+
+    def wording_drift_caught():
+        t = BASE_INDEX.replace("| 甲的一句话 |", "| 甲的一句话改过 |")
+        d, idx = fixture_pair(index_text=t)
+        probs, stats = run(d, idx)
+        return has("索引「一句话」与卡内原文不一致", probs)
+
     leg("夹具正例·干净库零问题", clean_fixture)
     leg("悬空引用必红", dangling)
     leg("自指必红", selfref)
@@ -442,6 +471,8 @@ def selftest():
     leg("索引篇章漂移必红", index_chapter_mismatch)
     leg("索引列序漂移必红（取数面自证）", index_column_swap)
     leg("更正行历史编号不判红（r129 自身缺陷回归）", correction_line_is_history)
+    leg("索引一句话逐字一致⇒零漂移（列序自证）", wording_clean_match)
+    leg("索引一句话被改一个字⇒必抓到", wording_drift_caught)
     leg("空目录⇒UNVERIFIED 不判绿", empty_kb)
     leg("只有规范与索引⇒UNVERIFIED 不判绿", spec_only_kb)
     leg("真面零问题（正例）", real_face_clean)
