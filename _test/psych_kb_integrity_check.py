@@ -26,6 +26,7 @@ import re
 import sys
 import tempfile
 from pathlib import Path
+from urllib.parse import unquote
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[1]
@@ -313,9 +314,250 @@ def print_backlog():
     return 0
 
 
+# URL 只由 ASCII 可视字符（U+0021–U+007E）构成；全角标点与中文一律是正文尾巴。
+# 旧尺写成 `https?://[^\s，。；）)\]」』、>"']+`：黑名单里有全角**右**括号却没有全角**左**括号
+# ⇒ `…54.4.438（Crossref 题录实取）` 被吞成 URL（r131 首跑实测 308「唯一 URL」实为畸形串注水，
+# 独立通道 grep 只数到 145），且同一黑名单排除 ASCII `)` ⇒ 真 DOI `10.1016/S0005-7967(97)00070-3` 被截断后 404。
+URL_RE = re.compile(r"https?://[!-~]+")
+URL_TAIL = "`\"'<>,.;:!?)]}"
+
+
+def norm_url(raw):
+    """把粘连正文的 URL 收成纯地址：剥尾部标点；右括号只有在「配平不成立」时才剥。
+
+    Elsevier 老 DOI 自带 `(` `)`，整条必须保留 ⇒ 判据是"该右括号有没有对应的左括号"，不是"末尾是不是括号"。
+    """
+    u = raw
+    while u:
+        last = u[-1]
+        if last not in URL_TAIL:
+            break
+        if last in ")]}":
+            opener = {")": "(", "]": "[", "}": "{"}[last]
+            if u.count(opener) >= u.count(last):
+                break
+        u = u[:-1]
+    return u
+
+
+BARE_DOI_RE = re.compile(r"(?<![\d./w])(10\.\d{4,5}(?:[/.]|%2F)[^ \t，、；。（）\u4e00-\u9fff]+)")
+
+
+def collect_urls(kb_dir=KB_DIR):
+    """收集条目卡里出现的全部 http(s) 地址（**去重、只在非更正行**），并带上同一行的裸 DOI。
+
+    更正行的 URL 是"这条链接曾经 404、已移除"的历史留痕（README §7 要求撤下死链时要留痕），
+    把历史死链当活引用去探活 = 拿留痕反复报红。取数面按数据流划：只探"当前仍在承载来源"的那些行。
+
+    值形如 `{"files": {篇章名}, "doi": 行内裸 DOI 或 None}`：来源子行常写成
+    「…（DOI 10.1016/j.chbah.2024.100067）；https://出版社落地页」，URL 自身不带 DOI
+    ⇒ 二通道只认 URL 内 DOI 时，这类项会被判"未核"。同行裸 DOI 是该来源的题外补充，可用。
+    """
+    files = sorted(p for p in kb_dir.glob("*.md") if p.name not in SPEC_FILES)
+    found = {}
+    for path in files:
+        for raw in path.read_text("utf-8", errors="replace").splitlines():
+            if CORRECTION_RE.match(raw):
+                continue
+            bare = BARE_DOI_RE.search(raw)
+            line_doi = norm_url(unquote(bare.group(1))) if bare else None
+            for m in URL_RE.findall(raw):
+                u = norm_url(m)
+                if len(u) > len("https://x"):
+                    e = found.setdefault(u, {"files": set(), "doi": None})
+                    e["files"].add(path.name)
+                    if e["doi"] is None and line_doi and line_doi not in u:
+                        e["doi"] = line_doi
+    return found
+
+
+# DOI 里允许 ASCII 括号（Elsevier 老 DOI `10.1016/S0005-7967(97)00070-3` 合法带括号），
+# 只排除空白与 CJK/全角标点；尾巴再走 norm_url 的"配平才剥"规则。
+# 与 URL_RE 同族缺陷的第二处由 selftest「DOI 取数三形态」腿当场抓到（19/20 起红 ⇒ 腿非恒真）。
+# 承载形态三类（r131 首跑 --links 实测漏第三类，pnas/sagepub 的 403 因此没走到二通道）：
+#   doi.org/<doi> · api.crossref.org/works/<doi> · 出版商落地页 journals.pnas.org/doi/<doi>（含 /10.x/ 中段）
+#   以及 psycnet 的 ?doi=<百分号编码>
+DOI_RE = re.compile(
+    r"(?:doi\.org/|/works/|/doi/|doi=)(10\.\d{4,5}(?:[/.]|%2F)[^ \t，、；。（）&\u4e00-\u9fff]+)")
+
+
+def doi_of(url):
+    """从 URL 里取 DOI（用于 403/404 时的二通道存在性核验）；取不到返回 None。"""
+    from urllib.parse import unquote
+    m = DOI_RE.search(url)
+    return norm_url(unquote(m.group(1))) if m else None
+
+
+def doi_of_url(u, ent):
+    """该来源的 DOI：优先 URL 自带的，其次同一来源子行写明的裸 DOI。
+
+    mdpi/sage 这类出版社落地页 URL 里没有 DOI 串（`mdpi.com/2079-9292/12/22/4714`），
+    同行题录却写着 `DOI 10.3390/electronics12224714` ⇒ 只用 URL 内 DOI 会把这类项永久留在"未核"。
+    """
+    return doi_of(u) or (ent or {}).get("doi")
+
+
+def second_channel_exists(doi, timeout):
+    """二通道证 DOI 为真：Crossref 与 OpenAlex 任一 2xx/3xx 即成立。
+
+    只回答"这个 DOI 存不存在"，不回答"期刊页面能不能直连打开"——后者被 WAF 拦是反爬，不是死链。
+    两通道都连不通 ⇒ None（无法判定），既不记成功也不记死链。
+    """
+    import urllib.request
+    import urllib.error
+    import json
+    for api in ("https://api.crossref.org/works/" + doi,
+                "https://api.openalex.org/works/doi:" + doi):
+        try:
+            req = urllib.request.Request(api, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                if 200 <= r.status < 400 and "crossref.org" in api:
+                    json.loads(r.read().decode("utf-8", errors="replace"))
+                if 200 <= r.status < 400:
+                    return True
+        except Exception:
+            continue
+    return None
+
+
+def probe_one(url, timeout):
+    """单个 URL 的探活结果：('ok'|'throttled'|'denied'|'notfound'|'netfail'|'http', HTTP 码或 None)。
+
+    429 与 403 分家：429 是"对面嫌你快"（本机并发即成因），既不能判死链、也不能判已核实。
+    """
+    import urllib.request
+    import urllib.error
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return ("ok", r.status)
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            return ("throttled", e.code)
+        if e.code == 403:
+            return ("denied", e.code)
+        if e.code in (404, 410):
+            return ("notfound", e.code)
+        return ("http", e.code)
+    except Exception:
+        return ("netfail", None)
+
+
+def probe_links(timeout=12, workers=8):
+    """--links：探活来源 URL（README §7 红线「来源 URL 必须真实可访问」的机器面）。
+
+    联网动作 ⇒ 只作人工轮次工具，不进电池/CI；无网络/全部超时 ⇒ rc=2 UNVERIFIED。
+    判读口径（r131 首跑后重定）：GET 而非 HEAD；403/404 且带 DOI 的项先走二通道证存在性，
+    证到 ⇒ 记「反爬（DOI 为真）」不算死链；证不到或无 DOI ⇒ 才进待处置清单。
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    urls = collect_urls()
+    if not urls:
+        print("PSYCH-KB-LINKS-UNVERIFIED: 未从条目卡里解析出任何 URL（取数面失效？）")
+        return 2
+    if any(ord(c) > 126 for u in urls for c in u):
+        print("PSYCH-KB-LINKS-SELFDEFECT: 抽取面吐出含非 ASCII 的 URL ⇒ 尺自身失效，本次读数作废")
+        return 1
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        raw = dict(zip(sorted(urls), pool.map(lambda u: probe_one(u, timeout), sorted(urls))))
+
+    # 429 是限流读数，而并发本身就是限流源（r131 首跑 16 并发把 NCBI/Crossref 打成 32 条 429）
+    # ⇒ 这类读数不可归因，串行慢速复探一次并以复探为准；仍 429 的按"对面限流"而非"死链"处置。
+    import time
+    throttled = [u for u in sorted(urls) if raw[u][1] == 429]
+    healed = 0
+    if throttled:
+        time.sleep(3.0)
+        for u in throttled:
+            time.sleep(1.2)
+            kind, code = probe_one(u, timeout)
+            raw[u] = (kind, code)
+            if code != 429:
+                healed += 1
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        # 二通道也走同一个池：非 OK 项可达数十条，串行会在本机拖到分钟级（r131 首跑即因此超时）
+        need = [u for u in sorted(urls)
+                if raw[u][0] != "ok" and doi_of_url(u, urls[u])
+                and raw[u][0] in ("denied", "netfail", "notfound", "throttled")]
+        second = dict(zip(need,
+                          pool.map(lambda u: second_channel_exists(doi_of_url(u, urls[u]), timeout), need)))
+
+    ok = rescued = dead_404 = hard = netfail = denied_unk = throttled_unk = 0
+    todo = []   # 🔴 判死（404/410/其它 HTTP）⇒ rc=1
+    warn = []   # ⚠️/⏳ 取不到读数（限流/反爬无佐证/本机网络不可达）⇒ rc=2，既不判绿也不判死
+    for u in sorted(urls):
+        kind, code = raw[u]
+        first = sorted(urls[u]["files"])[0]
+        if kind == "ok":
+            ok += 1
+            continue
+        doi = doi_of_url(u, urls[u])
+        # 二通道只回答"这条引用是不是真实文献"，不回答"这个链接打得开吗"：
+        # 403/429/连不通 = 反爬或本机网络，DOI 为真即可放行；404/410 是链接本身坏了，
+        # 即便 DOI 为真也只是"URL 形态问题"，仍须逐条人工改链接 ⇒ 404 不走 rescue。
+        if kind in ("denied", "netfail", "throttled") and second.get(u):
+            rescued += 1
+            continue
+        if kind == "throttled":
+            # 慢速复探后仍 429 ⇒ 对面嫌快，不是死链，也不是"已核实"：单列 UNVERIFIED 态
+            throttled_unk += 1
+            warn.append("⏳ %s  HTTP-429（串行复探后仍限流）（首次见：%s）" % (u, first))
+        elif kind == "notfound":
+            dead_404 += 1
+            note = ("DOI 二通道为真 ⇒ 链接形态问题" if doi and second.get(u)
+                    else ("DOI 二通道未证 ⇒ 需复核引用本身" if doi else "非 DOI 链接"))
+            todo.append("🔴 %s  HTTP-%s｜%s（首次见：%s）" % (u, code, note, first))
+        elif kind == "denied":
+            denied_unk += 1
+            warn.append("⚠️ %s  HTTP-403｜无 DOI 或 DOI 未证 ⇒ 未核（不是死链判定）（首次见：%s）" % (u, first))
+        elif kind == "netfail":
+            netfail += 1
+            warn.append("🌐 %s  连接失败（超时/DNS/TLS）——本机链路状态，不作死链判定（首次见：%s）" % (u, first))
+        else:
+            hard += 1
+            todo.append("🔴 %s  HTTP-%s（首次见：%s）" % (u, code, first))
+    counted = ok + rescued + throttled_unk + denied_unk + netfail + dead_404 + hard
+    print("KB-LINKS: 唯一 URL %d｜直连 OK %d｜DOI 二通道佐证 %d｜判死 %d（404/410 %d／其它 HTTP %d）"
+          "｜未核 %d（429 限流 %d／403 无佐证 %d／本机网络不可达 %d）｜慢探复跑 %d 条转好 %d 条"
+          % (len(urls), ok, rescued, dead_404 + hard, dead_404, hard,
+             throttled_unk + denied_unk + netfail, throttled_unk, denied_unk, netfail,
+             len(throttled), healed))
+    for line in todo:
+        print("  " + line)
+    for line in warn:
+        print("  " + line)
+    if counted != len(urls):
+        print("PSYCH-KB-LINKS-UNVERIFIED: 分桶漏 %d 条（计入 %d ≠ 总数 %d）⇒ 尺自身有未覆盖态，本次读数作废"
+              % (len(urls) - counted, counted, len(urls)))
+        return 2
+    # 列面 ⇄ 计数面必须一一对应（r131 实测踩过：残留的旧汇总把 todo 印了两遍，
+    # 2 条判死在报告里显示成 4 行 ⇒ 只校分桶不校列面，读数仍会骗人）
+    if len(todo) != dead_404 + hard or len(warn) != throttled_unk + denied_unk + netfail:
+        print("PSYCH-KB-LINKS-UNVERIFIED: 列面与计数面不符（判死列 %d≠%d／未核列 %d≠%d）⇒ 本次读数作废"
+              % (len(todo), dead_404 + hard, len(warn), throttled_unk + denied_unk + netfail))
+        return 2
+    if todo:
+        print("PSYCH-KB-LINKS-FAIL: 判死 %d 项 ⇒ 按 README §7 逐条人工复核（撤链接须在卡内 `- 更正：` 留痕）"
+              % len(todo))
+        return 1
+    if warn:
+        print("PSYCH-KB-LINKS-UNVERIFIED: 无判死项，但 %d 项本轮取不到可核读数"
+              "（限流/反爬无佐证/本机网络）⇒ 红线既未破也未证，隔日单线程复探（禁读成绿）" % len(warn))
+        return 2
+    print("PSYCH-KB-LINKS-PASS: 直连 OK %d ＋ DOI 二通道佐证 %d ＝ 全部 %d 个 URL 有读数"
+          % (ok, rescued, len(urls)))
+    return 0
+
+
 def main():
     problems = []
     stats = {}
+    if "--links" in sys.argv:
+        try:
+            return probe_links()
+        except FaceMissing as e:
+            print("PSYCH-KB-LINKS-UNVERIFIED: 取数面缺失/解析失效 %s" % e)
+            return 2
     if "--backlog" in sys.argv:
         try:
             return print_backlog()
@@ -403,11 +645,13 @@ def raises_facemissing(fn):
 
 
 def selftest():
-    """判据非恒真的取证（17 腿）：夹具正例 2 + 该红的 11 + 历史留痕不得判红 1 + 取数面失效 2 + 真面正例 1。
+    """判据非恒真的取证（21 腿）：抽取/取数面 4 ＋ 夹具正例 1 ＋ 该红的 10 ＋ 历史留痕不得判红 1
+    ＋ 列序自证 2 ＋ 取数面失效 2 ＋ 真面正例 1（实跑数由收尾行自报，不靠这句自证）。
 
     夹具全落系统临时目录；脚本内不做磁盘直删（本仓禁用 rm/rmtree 类形态，OS 回收临时目录）。
     第 12 腿是 r129 首跑我自己踩的两处判据缺陷的回归位：列序读反（196 条假红）与
     把 `- 更正：` 行的历史编号当成活引用（7 条假红）—— 修完各留一条腿，防止改回去。
+    前 3 腿是 r131 首跑 `--links` 踩到的同一族缺陷（正则把中文尾巴吞进 URL、把带括号真 DOI 截断）的回归位。
     """
     results = []
 
@@ -506,6 +750,86 @@ def selftest():
         probs, stats = run(d, idx)
         return has("索引「一句话」与卡内原文不一致", probs)
 
+    def url_shape():
+        """抽取腿（r131 首跑实测的自造缺陷的回归位）：中文尾巴不得进 URL，含括号真 DOI 须整条留。"""
+        cases = [
+            ("实取（Europe PMC）；https://eutils.ncbi.nlm.nih.gov/x?id=1 后续正文",
+             "https://eutils.ncbi.nlm.nih.gov/x?id=1"),
+            ("见 https://api.crossref.org/works/10.1016/s0005-7967(97)00070-3（题录实取）",
+             "https://api.crossref.org/works/10.1016/s0005-7967(97)00070-3"),
+            ("链 [text](https://example.org/a/b) 尾", "https://example.org/a/b"),
+            ("https://en.wikipedia.org/wiki/Foo_(bar) 中立页", "https://en.wikipedia.org/wiki/Foo_(bar)"),
+        ]
+        bad = []
+        for line, want in cases:
+            got = [norm_url(m) for m in URL_RE.findall(line)]
+            if want not in got:
+                bad.append("漏抽/截断 %r ⇒ got=%r" % (want, got))
+            bad += ["非 ASCII 漏进 URL %r（源行：%s）" % (g, line[:24])
+                    for g in got if any(ord(c) > 126 for c in g)]
+        return (not bad), "；".join(bad)
+
+    def doi_shape():
+        """DOI 取数腿：五种承载形态都要取出 DOI，非 DOI 链接必须返回 None（不得猜）。
+
+        前两种是 r129 设计时的形态；`/doi/<doi>` 与 `?doi=<编码>` 是 r131 首跑 --links 实测到的
+        漏面（pnas/sagepub 的 403、psycnet 的 403 因此没走到二通道，被误报成"待人工"）。
+        """
+        want = "10.1016/s0005-7967(97)00070-3"
+        got = [doi_of(u) for u in
+               ("https://doi.org/%s" % want,
+                "https://api.crossref.org/works/" + want,
+                "https://journals.pnas.org/doi/10.1073/pnas.1200155109",
+                "https://psycnet.apa.org/doiLanding?doi=10.1037%2Ft27734-000",
+                "https://www.sciencedirect.com/science/article/abs/pii/S0005796797000703")]
+        bad = []
+        if got[0] != want:
+            bad.append("doi.org 形态回 %r" % got[0])
+        if got[1] != want:
+            bad.append("crossref works 形态回 %r" % got[1])
+        if got[2] != "10.1073/pnas.1200155109":
+            bad.append("出版商 /doi/ 形态回 %r" % got[2])
+        if got[3] != "10.1037/t27734-000":
+            bad.append("百分号编码 ?doi= 形态回 %r" % got[3])
+        if got[4] is not None:
+            bad.append("非 DOI 链接被猜成 %r" % got[4])
+        return (not bad), "；".join(bad)
+
+    def url_face_skips_correction():
+        """取数面腿：`- 更正：` 行里的死链留痕不得被当活引用去探活，而正常来源行的链接必须在面上。"""
+        t = (BASE_CARD_A.replace("- 关联：", "  - [甲二] 佐证 https://example.org/live\n- 关联：")
+             + "\n- 更正：2026-10-12 撤下死链 https://example.org/dead\n")
+        d, _idx = fixture_pair(cards_text=t + "\n" + BASE_CARD_B)
+        found = collect_urls(d)
+        ok = ("https://example.org/dead" not in found and "https://example.org/live" in found)
+        return ok, ("探活面=%s（须含 live、不含 dead）" % sorted(found))
+
+    leg("URL 抽取形态（中文尾巴/带括号 DOI）", url_shape)
+    leg("DOI 取数五形态 + 非 DOI 返 None", doi_shape)
+    def line_doi_attached():
+        """同行裸 DOI 腿（r131 二通道取数面）：出版社落地页 URL 不带 DOI，题录行里写着 ⇒ 必须接上。
+
+        反例两路：URL 自带 DOI 时不得被同行另一个 DOI 顶掉；行内无 DOI 时必须还是 None（不得猜）。
+        """
+        t = (BASE_CARD_A.replace("- 关联：",
+                                 "  - [甲丙] Electronics 12(22):4714. DOI 10.3390/electronics12224714；"
+                                 "https://www.mdpi.com/2079-9292/12/22/4714\n- 关联：")
+             + "\n" + BASE_CARD_B)
+        d, _idx = fixture_pair(cards_text=t)
+        found = collect_urls(d)
+        u = "https://www.mdpi.com/2079-9292/12/22/4714"
+        bad = []
+        if doi_of_url(u, found.get(u)) != "10.3390/electronics12224714":
+            bad.append("同行裸 DOI 未接上：%r" % (found.get(u) or {}).get("doi"))
+        u2 = "https://doi.org/10.5555/zz001"
+        if doi_of(u2) != "10.5555/zz001":
+            bad.append("URL 自带 DOI 形态回退：%r" % doi_of(u2))
+        if doi_of("https://example.org/no-doi-here") is not None:
+            bad.append("无 DOI 链接被猜出 DOI")
+        return (not bad), "；".join(bad)
+
+    leg("同行裸 DOI 接二通道", line_doi_attached)
+    leg("更正行死链不进探活面", url_face_skips_correction)
     leg("夹具正例·干净库零问题", clean_fixture)
     leg("悬空引用必红", dangling)
     leg("自指必红", selfref)
