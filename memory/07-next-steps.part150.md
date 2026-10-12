@@ -28,6 +28,10 @@
       `site.webmanifest`/`puppeteer·selenium`/`stream.ts`/mutation 工具名族）⇒ i18n 扩面**零漏检**、mutation 变体**零命中**；
       两处疑似判为**不构成假阴**（文档站资产 / 全树无 sse 锚）⇒ **不改规则**（不拿模糊词换假阳）。
       方法论：与 S8/S9 同源——「对手都没有 X」必须拿真树证伪过一次；负结论要**声明取数面**才配写进报告。
+- [ ] 🟡 **[推荐:R127-12｜agent 自动]** **记忆探针的 retrieval 轴漏检**：`peer-memory-2026-10-12.json` 里
+      Open-LLM-VTuber 的 `retrieval: []`（空），而它同目录有 `mem0_llm.py`/`letta_agent.py` ⇒ 该轴与 `vector_memory`
+      同病（只认通用词）。**高层读数未受影响**（该仓经 memory/assembly 轴已计入 usable），故低优先；
+      修法＝复用 S9 同一份产品名词元表（不另立第二把尺）+ 重采该族。
 - [ ] 🟠 **[推荐:R127-09｜agent 自动｜待干净窗口]** **打断语义落差（对齐 Open-LLM-VTuber，本轮原文精读所得）**：
       对方 `AgentInterface.handle_interrupt(heard_response)` 把**被打断前已听到的半句**回传 agent；我方
       `voice-call.js::bargeIn()` 里 `speakingBuf=""` 直接丢弃 ⇒ 模型无感知、答不出"你刚才说到哪"。
