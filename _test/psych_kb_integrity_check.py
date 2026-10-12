@@ -272,9 +272,53 @@ def run(kb_dir=KB_DIR, index_path=INDEX):
     return problems, stats
 
 
+def backlog(cards):
+    """待验证点台账（report-only，不判红）：库规 README §6 第①步说「优先补 E 级缺口」，
+    而本库自 r123 起 E=0 ⇒ 该优先级规则失去输入。待验证点就是它失去输入之后的接替者：
+    每张卡把「本轮没核到什么」写在卡内，这个函数把它变成可排序的队列，
+    让下一轮的选题不再靠翻卡片碰运气。"""
+    OPEN_RE = re.compile(r"^-\s*待验证点：(.*)$")
+    rows = []
+    for cid in sorted(cards):
+        val = ""
+        for ln in cards[cid]["lines"]:
+            m = OPEN_RE.match(ln)
+            if m:
+                val = m.group(1).strip()
+                break
+        if not val or val in ("无", "无。"):
+            continue
+        items = [s for s in re.split(r"[；;。]|(?<=.)(?=[①②③④⑤⑥⑦])", val) if len(s.strip()) > 4]
+        if items:
+            rows.append((cid, cards[cid]["file"], len(items)))
+    return rows
+
+
+def print_backlog():
+    cards, _p = load_cards()
+    rows = backlog(cards)
+    by_file = {}
+    for cid, fname, n in rows:
+        by_file[fname] = by_file.get(fname, 0) + n
+    print("KB-BACKLOG: 卡 %d 张｜有待验证点 %d 张｜未闭合条目合计 %d 项"
+          % (len(cards), len(rows), sum(n for _c, _f, n in rows)))
+    for fname, n in sorted(by_file.items(), key=lambda kv: -kv[1]):
+        print("  %-38s %d 项" % (fname, n))
+    print("  —— 逐卡（未闭合项数降序，取前 12）")
+    for cid, fname, n in sorted(rows, key=lambda r: (-r[2], r[0]))[:12]:
+        print("  %-14s %d 项  %s" % (cid, n, fname))
+    return 0
+
+
 def main():
     problems = []
     stats = {}
+    if "--backlog" in sys.argv:
+        try:
+            return print_backlog()
+        except FaceMissing as e:
+            print("PSYCH-KB-BACKLOG-UNVERIFIED: 取数面缺失/解析失效 %s" % e)
+            return 2
     try:
         problems, stats = run()
     except FaceMissing as e:
