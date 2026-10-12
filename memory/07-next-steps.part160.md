@@ -63,6 +63,22 @@ fat jar 上正式读数：health p95 **16.86ms**、emotion p95 **24.52ms**、并
 **提交**：`5595278`（build 身份 + 基准自愈）、`f49afa0`（契约报产物身份）、r131 收口一笔。
 **JUnit 171 → 172 例**；契约 19/19；教程判据 4/4；性能 selftest 19/19；核心能力 PASS。
 
+## 五、本轮新发现的两条（不在上表内，登记待办）
+
+1. **部署同步当前红 1 项，归属并行会话**：`deploy_sync_check` → `DIFF css/voice-call.css`。
+   实测取证：`src/css/voice-call.css` 是 **M（在途）**，工作树 sha `6e8b063a…`，而
+   `deploy/xinyu/css/voice-call.css` 与 **HEAD 版相同**（`9a449d64…`）⇒
+   是并行会话改了 src 尚未同步 deploy，**不是本轮改动**（本轮未碰任何 css）。
+   ⇒ **演示/提交前必须先绿**（用户 2026-09-23 铁律），届时需对方补齐同步；不要代为同步
+   （半成品传播到公网比不同步更糟）。
+2. **成本闸只覆盖了一半暴露面（新 P1）**：r130 的 S2 按日闸在 **Java 服务端**；而公网 v1 线
+   （`pages.dev` → `deploy/functions/api/chat.js`）是**无状态 Pages Function**，既没有令牌桶
+   （`ApiGuardFilter` 在 Java 侧）也没有按日累计（要 KV/D1 才能做）。公网面当前只有
+   「密钥不落前端」这一层。选项：① Cloudflare KV 计数（要建 namespace + 改 wrangler.toml，
+   属对外发布动作，需老大点头）；② 接受平台层限制并写进 `data-and-privacy.md` 的边界声明；
+   ③ 公网 /api/chat 加**无状态**的次数上限（按 CF 提供的 `cf-connecting-ip` + 单实例内存，
+   重启即失效，只能挡瞬时打爆）。**本轮只登记不动手**。
+
 ## 三、一手教训（本轮真踩，全文见报告 §8）
 
 1. **单测全绿 ≠ 能启动**：`MemoryPortService` 漏 `@Service`、`QuotaFilter` 双构造器漏 `@Autowired` ⇒
