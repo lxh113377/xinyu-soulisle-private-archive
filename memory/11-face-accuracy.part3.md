@@ -96,9 +96,13 @@ offByEmo.surprise=0.20（上界 worry_speak_B1 .243，下界 fear@0.22 格的 su
 - **遗留 1 格**：fear@0.12 笃定错报——fear 的 need:2 多区惩罚把 fear 自分压到 surprise 之下
   ⇒ 该格 wt=surprise .09 < on 不翻。fear 的 need 与低强度段结构冲突，归 S3/M1 复标。
 - 未修仪器（登记）：browser_check UNVERIFIED（开场 done 态 15s 超时，scroll-story 路径，
-  与 face 零关联，同族 R105-02/159）；core_capability 的 N2 UNVERIFIED = 该脚本调 node --test
-  的姿势问题（直接跑 `node --test _test/js/face-engine.unit.test.mjs` 有汇总行 31/31）——修法
-  记入方案文档 A0，下轮仪器修。
+  与 face 零关联，同族 R105-02/159）。
+- **A0 仪器已修（r162，commit 778b70b）**：core_capability N2 UNVERIFIED 根因 = node 22/24 在
+  非 TTY 子进程捕获下默认输出 TAP reporter（`# tests 31`），而 parse_node_test 旧正则只认
+  spec 的 `ℹ tests 31` ⇒ rc=0 全过却解析不到汇总行。修法 = 正则双格式兼容
+  `^(?:ℹ|#)\s+tests\s+(\d+)`（re.M 行首锚定，防 TAP 失败 YAML 块缩进注释误匹配）+
+  parse_selftest 4 腿反例。验收：CORE-CAP-BASELINE-PASS（N2 31/31 fail=0）+
+  PARSE-SELFTEST 4/4 + SELFTEST 12/12。N2 从"下轮修"转为常驻可验尺。
 
 ## 回滚锚（通用）
 
