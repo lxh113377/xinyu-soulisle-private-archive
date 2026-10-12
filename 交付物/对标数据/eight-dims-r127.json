@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/bench_eight_dims_check.py",
  "round": "r127",
- "written_at": "2026-10-12T00:25:32Z",
+ "written_at": "2026-10-12T01:05:26Z",
  "dims": [
   {
    "dim": "功能模块覆盖",
@@ -22,9 +22,9 @@
      "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
     },
     {
-     "label": "peers 第二通道（r73 尺，r126 首采）",
+     "label": "peers 第二通道（r73 尺，样本 2 份·最新件内 runs=1）",
      "value": "peers 16/16 仓有读数（未验 0）｜streaming：none=13 token_stream=2 media_stream=1｜e2e_browser：none=14 test_e2e=1 browser_tool_feature=1 ‖ self 同尺：streaming=token_stream e2e=test_e2e（self 只喂 README blob ⇒ 命中即为真，未命中≠没有）",
-     "source": "cap-channel 台账 cap-channel-2026-10-12.json"
+     "source": "cap-channel 台账 cap-channel-2026-10-12b.json"
     },
     {
      "label": "peers 危机语料覆盖",
@@ -58,7 +58,7 @@
    "cells": [
     {
      "label": "self 电池套件数",
-     "value": "162（工作树面）",
+     "value": "168（工作树面）",
      "source": "_test/run_all_suites.py --list 自报（r121 更正：旧标「HEAD 面」与实现不符——归口的 bench_rollup.suites_total() 跑的是工作树脚本，不是 git show HEAD）"
     },
     {
@@ -78,7 +78,7 @@
    "cells": [
     {
      "label": "self 首屏预算",
-     "value": "{\"files\": 29, \"total_bytes\": 1198402}",
+     "value": "{\"files\": 29, \"total_bytes\": 1223457}",
      "source": "benchmark-rollup-r95.json"
     },
     {
@@ -118,7 +118,7 @@
    "cells": [
     {
      "label": "self 30 天提交",
-     "value": "440 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
+     "value": "447 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
      "source": "本轮 git rev-list --count --since=30.days HEAD 实测"
     },
     {

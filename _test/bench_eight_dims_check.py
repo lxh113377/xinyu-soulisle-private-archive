@@ -77,6 +77,13 @@ def ledger(pat):
         return Path(p), {"__unreadable__": type(e).__name__}
 
 
+def ledger_family_n(pat):
+    """某族台账现有几份（与 ledger() 同一套排除规则；标签写「首采」是手抄文字，
+    第二次采样后就成假话 ⇒ 份数一律从名册现读）。取不到族面返回 0，由调用方如实标未验。"""
+    return len([p for p in glob.glob(str(DATA / pat))
+                if "_partial" + os.sep not in p and "_superseded" + os.sep not in p])
+
+
 def stamp(path, payload):
     """来源标签＝文件名 + 件内时点（缺件内时点就用文件名日期，两者都没有 ⇒ 由调用方判缺源）。"""
     ts = None
@@ -201,13 +208,16 @@ def build_dims():
         for c in (r.get("caps") or []):
             dist[c] = dist.get(c, 0) + 1
     top_peer = sorted(dist.items(), key=lambda kv: -kv[1])
-    cc_p, cc = ledger("cap-channel-*.json")     # r126：第二通道首采（16 仓 × description+homepage+README）
+    cc_p, cc = ledger("cap-channel-*.json")     # 第二通道（16 仓 × description+homepage+README 正文）
+    cc_n = ledger_family_n("cap-channel-*.json")
+    cc_runs = len((cc or {}).get("runs") or []) if isinstance(cc, dict) else 0
     dims.append({"dim": DIM_ORDER[0], "cells": [
         cell("self 计数位", "%d 项：%s" % (len(caps), "/".join(caps) or "—"), m_src),
         cell("self 测量盲区（不是缺功能）", "、".join(blind) or "无",
              "%s（self_row.caps_blind；口径见 benchmark_metrics.cap_channel_class docstring）" % m_src),
         cell("peers 单格最高", "%s=%d/%d" % (top_peer[0][0], top_peer[0][1], denom) if top_peer else "NA(池空)", m_src),
-        cell("peers 第二通道（r73 尺，r126 首采）", cap_channel_val(cc_p, cc),
+        cell("peers 第二通道（r73 尺，样本 %d 份·最新件内 runs=%d）" % (cc_n, cc_runs),
+             cap_channel_val(cc_p, cc),
              "cap-channel 台账 " + sref("cap-channel-*.json")),
         cell("peers 危机语料覆盖", "池内多数仓无标注危机集；self 有 6 条冻结样本",
              "peer-capability-safety 台账 " + sref("peer-capability-safety-*.json")),
