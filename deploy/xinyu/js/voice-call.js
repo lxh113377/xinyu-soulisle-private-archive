@@ -30,6 +30,7 @@ window.VoiceCall = (function () {
   const FORCE_MS = 1900;       // 收句上限：到点必收，否则用户等不到回应
   const MIN_COMPLETE = 6;      // 无标点时，至少这么多字才谈得上「一句完整的话」
   const HARD_BREAK = 30;       // 单句超这么多字仍无句号 → 逗号处先出声（首声延迟优先）
+  const STALL_MS = 12000;      // 上游 12s 不吐字就兜底回听（否则 thinking 哑死，S2/S3 钉住）
   const DUPLEX_KEY = "peiliao.callduplex.v1";
   const END_RE = /[。！？!?…]+$/;
   const TAIL_RE = /(然后|还有|而且|以及|或者|因为|但是|所以|就是|那个|可以|需要|应该|比较|特别|非常|一点|一些|的话|可是|不过|要是|如果|跟|和|与|、|，|,)$/;
@@ -47,6 +48,8 @@ window.VoiceCall = (function () {
   let baseLen = 0, lastLen = 0;   // 已收过口的转写条数 / 本会话累计转写条数（防旧句被重新拼进新句）
   let recAlive = false;           // 识别会话是否还活着：活着就不该再 start()（真机 start 会抛，白折腾一次重启）
   let consumed = 0, speakingBuf = "", tailQueued = false, aiLine = null, lastGum = null;
+  let stallT = 0;             // 上游挂起兜底计时器（0=未在等）
+  const clearStall = () => { if (stallT) { clearTimeout(stallT); stallT = 0; } };
   let lvl = null;               // 音量计实时能量读数；null = 取不到（判据桩/无权限），取不到就不拦
   let vad = null;               // {stop()} 或 null
   const metric = { user: "", reply: "", mode: "", ttfb: 0 };
@@ -95,14 +98,17 @@ window.VoiceCall = (function () {
     return [out, i];
   }
 
-  /* ── 回声过滤（全双工时别把自己念的字当成用户插话）──────────────── */
+  /* ── 回声过滤（全双工时别把自己念的字当插话）──────────────────── */
   const norm = (s) => String(s || "").replace(/[\s，。、！？!?…；;,.]/g, "");
   function isEcho(t) {
     const a = norm(t);
     if (a.length < 2) return false;
     const b = norm(speakingBuf);
-    return !!b && (b.indexOf(a) >= 0 || a.indexOf(b.slice(0, 6)) >= 0);
-  }
+    if (!b) return false;
+    if (b.indexOf(a) >= 0 || a.indexOf(b) >= 0) return true;   // 整句互含 = 念白被转写回来
+    // 前缀重叠须扣掉念白没剩内容才算回声；否则同头插话会被误判打不断
+    const rest = a.replace(b, "").replace(a.slice(0, 6), "");
+    return b.indexOf(a.slice(0, 6)) >= 0 && rest.length < 2;  }
 
   /* ── 字幕 ───────────────────────────────────────────────────────── */
   function clearBox(box) { while (box && box.firstChild) box.removeChild(box.firstChild); }
@@ -194,8 +200,8 @@ window.VoiceCall = (function () {
       if (!gateOpen(lvl)) return;                        // 能量门：这一帧没人在说话，噪声不配当话头
       pending = got;
       lastSpeech = performance.now();
-      // 全双工打断：用户真的插话（且不是我们自己念的字）→ 立刻闭嘴转回听
-      if (state === "speaking" && duplex === "full" && got.length >= 2 && !isEcho(got)) bargeIn();
+      // 含 thinking：思考中插话也要能接管（旧码只认 speaking）
+      if (state !== "listening" && duplex === "full" && got.length >= 2 && !isEcho(got)) bargeIn();
       paint();
     };
     rec.onerror = (e) => {
@@ -256,11 +262,22 @@ window.VoiceCall = (function () {
 
   /* ── 一轮问答 ───────────────────────────────────────────────────── */
   function bargeIn() {
+    clearStall();                       // 思考期被打断：兜底计时器一并清
     if (window.Voice) window.Voice.cancelSpeech();
     speakingBuf = "";
     state = "listening";
     turnAt = 0;
     aiLine = null;
+    paint();
+  }
+  /** 上游挂起兜底：到点清场回听。 */
+  function stallOut() {
+    if (state !== "thinking") return;
+    stallT = 0;
+    caption("sys", "这句我想得有点久（网络不太稳），再说一次试试。");    state = "listening";
+    turnAt = 0;
+    aiLine = null;
+    resume();
     paint();
   }
   function queueSpeech(s) {
@@ -285,14 +302,17 @@ window.VoiceCall = (function () {
     state = "thinking";
     turnAt = performance.now();
     consumed = 0; tailQueued = false; speakingBuf = ""; aiLine = null;
+    stallT = setTimeout(stallOut, STALL_MS);
     paint();
     const onDelta = (full) => {
+      clearStall();
       const cut = cutSentences(full, consumed);
       consumed = cut[1];
       cut[0].forEach(queueSpeech);
       showAi(full);
     };
     Promise.resolve(deps.send(mine, onDelta)).then((r) => {
+      clearStall();
       const reply = (r && r.reply) || "";
       if (!tailQueued) {
         const rest = reply.slice(consumed).trim();     // 尾句常不带标点：补进队列，别念半截
@@ -311,6 +331,7 @@ window.VoiceCall = (function () {
       }
       paint();
     }).catch(() => {
+      clearStall();
       caption("sys", "刚才我走神了一下（网络不稳定），你可以再说一次。");
       state = "listening";
       resume();
@@ -356,6 +377,7 @@ window.VoiceCall = (function () {
     if (state === "idle") return;
     clearInterval(watch);
     watch = 0;
+    clearStall();                       // 挂起的兜底不许在退出后还开火
     if (rec) {
       rec.onresult = null; rec.onerror = null; rec.onend = null;   // 摘掉回调，退出后不得再重启
       try { rec.stop(); } catch (e) { /* 已停 */ }

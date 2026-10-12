@@ -190,7 +190,10 @@ window.ChatAgent = (function () {
    * 规则缺失（quoteRules 空）⇒ 不注入（由 _test/strategy_check.py 钉住必须存在，禁静默降级双源）。 */
   function quoteBlockFor(emo, userText, budget) {
     const Q = window.__XINYU_WIT_QUOTES__;
-    if (!Q || !Q.entries || !Q.entries.length || budget < 120) return "";
+    // rulesOnly 为评测专用旗标（_test/quote_eval.py 归因臂注入，生产数据件永不设置）：
+    // true ⇒ 只注入 head+规则、零候选（归因「规则文案本身」的作用）；旗标缺省时本行
+    // 与旧逻辑逐字节等价（仍要求 entries 非空）。
+    if (!Q || (Q.rulesOnly !== true && (!Q.entries || !Q.entries.length)) || budget < 120) return "";
     const rules = (STR.quoteRules || []).join("；");
     if (!rules) return "";
     const hay = String(userText || "");
@@ -200,7 +203,7 @@ window.ChatAgent = (function () {
       if (/[\u4e00-\u9fa5A-Za-z]/.test(g[0]) && /[\u4e00-\u9fa5A-Za-z]/.test(g[1])) grams.add(g);
     }
     const scored = [];
-    for (const e of Q.entries) {
+    for (const e of (Q.rulesOnly === true ? [] : Q.entries)) {
       const emoHit = e.emo.indexOf("all") >= 0 || e.emo.indexOf(emo) >= 0;
       let hits = 0;
       grams.forEach((g) => { if (e.quote.indexOf(g) >= 0) hits++; });
@@ -219,7 +222,7 @@ window.ChatAgent = (function () {
       if (used + item.length > budget) break;
       block += item; used += item.length; n++;
     }
-    return n ? head + block : "";
+    return (n || Q.rulesOnly === true) ? head + block : "";
   }
 
   const SYSTEM = (emo, userText) => {

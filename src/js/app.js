@@ -396,6 +396,9 @@
     } catch (err) {
       thinking.remove();
       CW.push("ai", "刚才我走神了一下（网络不稳定）。你可以再发一次，或点右上角「模型设置」检查连接。", "友好错误态");
+      if (window.VoiceCall && window.VoiceCall.isCalling()) throw err;
+      // 通话态把错误抛回通话层：它的字幕兜底（sys 行）在浮层里看得见，左侧气泡通话用户看不到
+      // （r123 实证：sendTurn 吞掉 return null 时，通话浮层零提示 = 用户侧"没回声"）。
       return null;
     }
   }
