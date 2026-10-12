@@ -289,6 +289,9 @@ def backlog(cards):
         if not val or val in ("无", "无。"):
             continue
         items = [s for s in re.split(r"[；;。]|(?<=.)(?=[①②③④⑤⑥⑦])", val) if len(s.strip()) > 4]
+        # 括号自注（如「（2026-10-12 清账：…已闭合）」）是清账留痕不是未闭合项 —— 不排掉它，
+        # 清账本身会把读数顶上去（r129 一手：闭合两条后台账反而 332→334），台账就不诚实了。
+        items = [s for s in items if not s.strip().startswith(("（", "("))]
         if items:
             rows.append((cid, cards[cid]["file"], len(items)))
     return rows
