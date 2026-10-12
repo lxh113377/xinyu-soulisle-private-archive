@@ -199,6 +199,18 @@ def build_dims():
     if expected is not None and denom != expected:
         raise Inconsistent("参照池分母不自洽：runs[-1].repos=%d 而 peers_expected=%s" % (denom, expected))
     m_src = stamp(metrics_p, {"ts": last.get("ts")})
+    # 第 3 维的覆盖率/变异门 peers 读数：从**同一 run 的质量门同址尺**现算，禁硬编码。
+    # r127 一手：本格原写死「coverage_gate 与 mutation_gate 均 0/16」，而对手 opensoul 真有一条
+    # 覆盖率门（根级 vitest thresholds + iOS 43% 内联门）⇒ 手抄文字与数据脱节。
+    # 这是本文件第三处同族（前两处＝「r126 首采」标签、「本格改前抄台账的 152」注释）。
+    _qgc = (last.get("quality_gate_channel") or {}).get("peers") or {}
+
+    def _qg_fmt(cls):
+        if not _qgc:
+            return "NA(该 run 未采质量门)"
+        yes = sum(1 for v in _qgc.values() if (v.get("classes") or {}).get(cls) is True)
+        unv = sum(1 for v in _qgc.values() if (v.get("classes") or {}).get(cls) is None)
+        return "%d/%d 未验%d" % (yes, len(_qgc) - unv, unv)
     self_row = last.get("self") or {}
 
     caps = sorted(self_row.get("caps") or [])
@@ -246,9 +258,10 @@ def build_dims():
              "归口的 bench_rollup.suites_total() 跑的是工作树脚本，不是 git show HEAD）"),
         cell("self Java 用例", "%d 件 / %d 例｜门 LINE/BRANCH ≥ %s" % (
             jt_files, jt_cases, qg) if jt_files is not None else "NA", "git ls-tree HEAD + server/pom.xml"),
-        cell("peers 有测试结构 / CI unit 步", "%d/%d ＋ %d/%d（coverage_gate 与 mutation_gate 均 0/%d）" % (
+        cell("peers 有测试结构 / CI unit 步", "%d/%d ＋ %d/%d（coverage_gate %s、mutation_gate %s）" % (
             (da.get("peers_quality_tooling") or {}).get("have_test_struct", -1), denom,
-            (da.get("peers_quality_tooling") or {}).get("ci_unit_step", -1), denom, denom)
+            (da.get("peers_quality_tooling") or {}).get("ci_unit_step", -1), denom,
+            _qg_fmt("coverage_gate"), _qg_fmt("mutation_gate"))
             if da.get("peers_quality_tooling") else "NA-DECLARED：缺 peers_quality_tooling 块，补法 python _test/peer_quality_tooling_probe.py --json …",
         sref("peer-quality-tooling-*.json")),
     ]})

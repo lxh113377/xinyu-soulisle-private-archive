@@ -480,7 +480,7 @@ from bench_quality_gates import (QG_CLASSES, QG_CANDIDATES, QG_THRESHOLD_SHAPE,
                                  QG_RUN_CMD, QG_INVOKED_TOKENS, qg_ci_face, qg_ci_pick,
                                  QG_CI_PRIORITY, QG_CI_EXACT, qg_ci_score, qg_gate_line,
                                  qg_tree_candidates,
-                                 qg_invoked_line, qg_exec_verdict, qg_classify,
+                                 qg_invoked_line, qg_exec_verdict, qg_classify, qg_pick_files,
                                  self_quality_gates, quality_gate_audit)
 
 def blind_spot_caps(root, tracked, caps_found):
@@ -1322,6 +1322,33 @@ def _st_selftest_4(st):  # r94 拆出的第 4 段（切点由 AST 求得，跨�
     _g3, _, _u3 = qg_classify({"coverage_gate": ["codecov.yml"]}, {}, "lint")
     if _g3["coverage_gate"] is not None or not _u3:
         print("SELFTEST-FAIL: 候选正文没取到时塌缩成了 False 且没记 unverified：%s %s" % (_g3, _u3))
+        return 1
+    # ── r127-fix 腿：vitest 多行 thresholds（**对手真形状**，opensoul 一手证伪旧式同行正则）
+    _q_vitest = ("export default defineConfig({ test: { coverage: {\n"
+                 "  provider: 'v8',\n  thresholds: {\n    lines: 70,\n    branches: 55,\n  },\n} } })")
+    _g5, _e5, _u5 = qg_classify({"coverage_gate": ["vitest.config.ts"]},
+                                {"vitest.config.ts": _q_vitest}, "")
+    if _g5["coverage_gate"] is not True:
+        print("SELFTEST-FAIL: vitest 多行 thresholds 没被判成覆盖率门（同行正则的漏检形状复发）: %s %s"
+              % (_g5, _e5))
+        return 1
+    _q_prose = "// 覆盖率阈值见 docs/quality.md 一节（本文件此处不列任何指标项）"
+    _g6, _e6, _u6 = qg_classify({"coverage_gate": ["vitest.config.ts"]},
+                                {"vitest.config.ts": _q_prose}, "")
+    if _g6["coverage_gate"] is not False:
+        print("SELFTEST-FAIL: 只提及 thresholds 的散文被判成门（不得从描述推定有牙）: %s" % _g6)
+        return 1
+    # ① 只读到部分候选 ⇒ 未验（把「没读到」折成「没有门」是同一条铁律的反面）
+    _g7, _e7, _u7 = qg_classify({"coverage_gate": ["a.coveragerc", "deep/b.coveragerc"]},
+                                {"a.coveragerc": _q_nooth}, "")
+    if _g7["coverage_gate"] is not None or not _u7:
+        print("SELFTEST-FAIL: 候选只读到一半就判了 False（不得把未读到的候选折成「没有门」）: %s %s"
+              % (_g7, _u7))
+        return 1
+    # ② 候选取样必须深度优先：根级配置不得被深路径挤出取数面（旧写法在 6141 文件的仓上恒失明）
+    _pick = qg_pick_files(["apps/x/pom.xml", "pom.xml", ".coveragerc", "deep/a/b/c.coveragerc"], 2)
+    if set(_pick) != {"pom.xml", ".coveragerc"}:
+        print("SELFTEST-FAIL: 候选取样没做深度优先（根级配置被深路径挤出）: %s" % _pick)
         return 1
     st.update(_q_pom=_q_pom, _s=_s)
     return 0

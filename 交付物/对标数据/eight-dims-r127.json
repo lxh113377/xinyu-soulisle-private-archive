@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/bench_eight_dims_check.py",
  "round": "r127",
- "written_at": "2026-10-12T01:17:12Z",
+ "written_at": "2026-10-12T02:34:15Z",
  "dims": [
   {
    "dim": "功能模块覆盖",
@@ -9,17 +9,17 @@
     {
      "label": "self 计数位",
      "value": "6 项：api_spec/container/deps_autoupdate/emotion_backend_wired/pwa_manifest/pwa_offline",
-     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+     "source": "benchmark-metrics.json@2026-10-12 02:32 UT"
     },
     {
      "label": "self 测量盲区（不是缺功能）",
      "value": "e2e_browser、streaming",
-     "source": "benchmark-metrics.json@2026-10-10 01:12 UT（self_row.caps_blind；口径见 benchmark_metrics.cap_channel_class docstring）"
+     "source": "benchmark-metrics.json@2026-10-12 02:32 UT（self_row.caps_blind；口径见 benchmark_metrics.cap_channel_class docstring）"
     },
     {
      "label": "peers 单格最高",
      "value": "vector_memory=7/16",
-     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+     "source": "benchmark-metrics.json@2026-10-12 02:32 UT"
     },
     {
      "label": "peers 第二通道（r73 尺，样本 2 份·最新件内 runs=1）",
@@ -49,7 +49,7 @@
     {
      "label": "peers 生态",
      "value": "deps_autoupdate=2/16（有包清单才可挂）",
-     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+     "source": "benchmark-metrics.json@2026-10-12 02:32 UT"
     }
    ]
   },
@@ -68,7 +68,7 @@
     },
     {
      "label": "peers 有测试结构 / CI unit 步",
-     "value": "7/16 ＋ 5/16（coverage_gate 与 mutation_gate 均 0/16）",
+     "value": "7/16 ＋ 5/16（coverage_gate 1/15 未验1、mutation_gate 0/16 未验0）",
      "source": "peer-quality-tooling-2026-10-08.json"
     }
    ]
@@ -99,12 +99,12 @@
     {
      "label": "peers vector_memory",
      "value": "7/16",
-     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+     "source": "benchmark-metrics.json@2026-10-12 02:32 UT"
     },
     {
      "label": "peers i18n_locale",
      "value": "3/16",
-     "source": "benchmark-metrics.json@2026-10-10 01:12 UT"
+     "source": "benchmark-metrics.json@2026-10-12 02:32 UT"
     },
     {
      "label": "peers 记忆形态在册面",
@@ -118,7 +118,7 @@
    "cells": [
     {
      "label": "self 30 天提交",
-     "value": "450 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
+     "value": "467 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
      "source": "本轮 git rev-list --count --since=30.days HEAD 实测"
     },
     {
@@ -169,7 +169,7 @@
     {
      "label": "peers 定位抽样",
      "value": "lobehub(A), SillyTavern(A), Open-LLM-VTuber(B), my-neuro(B), letta-code(D), MASCOT(C)",
-     "source": "benchmark-metrics.json@2026-10-10 01:12 UT（repos[].why/tier）"
+     "source": "benchmark-metrics.json@2026-10-12 02:32 UT（repos[].why/tier）"
     }
    ]
   }

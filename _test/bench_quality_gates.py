@@ -51,8 +51,12 @@ QG_CANDIDATES = {
                                    r"|\.secretlintrc[\w.-]*|\.trufflehog|detect_secrets[\w.-]*)$", re.I),
 }
 # 阈值型类的"会让构建失败"形状（正文面；只在这些候选文件里找，避免全仓正文爆炸）
+# r127-fix（由 opensoul 一手证伪）：`thresholds` 与指标词**不得要求同行**——vitest.config.ts 的通行写法是
+#   `thresholds: {` 换行缩进写 `lines: 70,` / `branches: 55,`；旧式 `[^\n]{0,40}?` 恒不命中、`branches`
+#   也不在候选词里 ⇒ 把对手**真有的**覆盖率门读成 `0/16`（并让"我方独有覆盖率门"这条判定假成立）。
 QG_THRESHOLD_SHAPE = {
-    "coverage_gate": re.compile(r"(fail_under|cov-fail-under|check-coverage|thresholds?[^\n]{0,40}?\b(lines|functions|statements)"
+    "coverage_gate": re.compile(r"(fail_under|cov-fail-under|check-coverage"
+                                r"|thresholds?[\s\S]{0,60}?\b(branches|lines|functions|statements)"
                                 r"|<rule>|<limit>|minimum|coverage[^\n]{0,24}?(8|9)\d(\.\d+)?%)", re.I),
     "mutation_gate": re.compile(r"(mutationScoreThreshold|mutationThreshold|<mutationScale|failure_under"
                                 r"|min-msi|mutator[\s\S]{0,30}?(coverage|mutation)|thresholds[\s\S]{0,24}break"
@@ -217,9 +221,17 @@ def qg_classify(cand, blobs, ci_text, ci_complete=True):
                 continue
             hit = next(((f, QG_THRESHOLD_SHAPE[cls].search(blobs[f])) for f in read
                         if QG_THRESHOLD_SHAPE[cls].search(blobs[f] or "")), None)
-            out[cls] = bool(hit)
             if hit:
+                out[cls] = True
                 ev[cls] = "%s :: %s" % (hit[0], hit[1].group(0)[:60])
+            elif len(read) < len(files):
+                # r127-fix：只读到一部分候选就把整类判 False = 把「没读到」写成「没有门」。
+                # 同一条铁律（本文件上方已引）：Unavailable is not zero。命中照旧 True；没命中但面没读全 ⇒ None。
+                out[cls] = None
+                unv.append("%s(候选 %d/%d 正文未取到 ⇒ 不得判「无门」)"
+                           % (cls, len(files) - len(read), len(files)))
+            else:
+                out[cls] = False
         else:
             # r78：执行型三类**不得**因为"没有标准配置文件"就直接判无——自写门禁只看 CI 执行行
             v, why = qg_exec_verdict(cls, files, ci_text, ci_complete)
@@ -265,6 +277,21 @@ def self_quality_gates(rev="HEAD"):
             "partial_errors": "; ".join(errs + errs2)}
 
 
+def qg_pick_files(files, cap):
+    """纯函数：某类的候选正文 → 本轮真去取的 cap 个（排序键：① 路径浅者优先 ② 名短者优先 ③ 小写路径定序）。
+
+    为什么不是 `files[:cap]`：GitHub tree 是**字母序**，深仓里 `apps/*/pom.xml` 会排在根级
+    `vitest.config.ts` 之前 ⇒ 根级配置**结构性永远取不到**（r127 一手：opensoul 6141 文件，
+    真有的覆盖率阈值就写在根级 vitest.config.ts 里，而旧写法把该类读成 0/16）。
+    与 QG_CI_PRIORITY/QG_CI_EXACT 同源纪律，只是换到"候选文件"这一维。
+    """
+    fs = list(files or [])
+    cap = int(cap)
+    if cap <= 0 or len(fs) <= cap:
+        return fs
+    return sorted(fs, key=lambda p: (p.count("/"), len(p.rsplit("/", 1)[-1]), p.lower()))[:cap]
+
+
 def quality_gate_audit(repos, max_fetch=4):
     """peers 侧：tree 挑候选 → 只取候选文件正文（≤max_fetch/仓）→ 同一 qg_classify。"""
     gh, _, __ = _fetch()
@@ -285,7 +312,7 @@ def quality_gate_audit(repos, max_fetch=4):
         cand = qg_tree_candidates(paths)
         blobs = {}
         for cls, files in cand.items():
-            for f in files[:max_fetch]:
+            for f in qg_pick_files(files, max_fetch):
                 if f in blobs:
                     continue
                 try:

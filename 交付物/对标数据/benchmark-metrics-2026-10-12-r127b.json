@@ -1,0 +1,944 @@
+{
+ "generated_by": "_test/benchmark_metrics.py",
+ "peers_expected": 16,
+ "runs": [
+  {
+   "ts": "2026-10-12 02:27 UTC",
+   "repo_count": 16,
+   "self": {
+    "repo": "xinyu-soulisle (私有归档仓，本项目)",
+    "tier": "self",
+    "stars": null,
+    "pushed_at": null,
+    "latest_release": null,
+    "ci_workflows": 4,
+    "language": "JavaScript/Java",
+    "license": null,
+    "default_branch": "main",
+    "docs": [
+     ".env.example",
+     ".github",
+     "CHANGELOG.md",
+     "CONTRIBUTING.md",
+     "README.md",
+     "ROADMAP.md",
+     "SECURITY.md",
+     "docs",
+     "tests"
+    ],
+    "caps": [
+     "api_spec",
+     "container",
+     "deps_autoupdate",
+     "emotion_backend_wired",
+     "pwa_manifest",
+     "pwa_offline"
+    ],
+    "file_count": 26,
+    "caps_blind": [
+     "e2e_browser",
+     "streaming"
+    ],
+    "src_loc_excl_vendor": 5221,
+    "regression_suites": 170,
+    "regression_suites_face": "HEAD",
+    "regression_script_files": 70,
+    "self_face": "HEAD",
+    "self_face_errors": null,
+    "worktree_extra_untracked": 5,
+    "worktree_only_src_files": 1,
+    "ci_yml_error": null,
+    "battery_parse_error": null
+   },
+   "repos": [
+    {
+     "repo": "lobehub/lobehub",
+     "tier": "A",
+     "why": "Web AI 聊天前端工程化最强者（原 lobehub/lobe-chat，2026-09 改名）",
+     "stars": 83148,
+     "pushed_at": "2026-10-12",
+     "language": "TypeScript",
+     "license": "NOASSERTION",
+     "default_branch": "canary",
+     "latest_release": "v2.2.20-canary.4",
+     "ci_workflows": 52,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 19093,
+     "caps": [
+      "api_spec",
+      "container",
+      "deps_autoupdate",
+      "e2e_browser",
+      "i18n_locale",
+      "streaming",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "SillyTavern/SillyTavern",
+     "tier": "A",
+     "why": "头部角色扮演聊天前端，persona/扩展生态参照",
+     "stars": 34332,
+     "pushed_at": "2026-10-02",
+     "language": "JavaScript",
+     "license": "AGPL-3.0",
+     "default_branch": "release",
+     "latest_release": "1.19.0",
+     "ci_workflows": 15,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "tests"
+     ],
+     "file_count": 1010,
+     "caps": [
+      "container",
+      "e2e_browser",
+      "i18n_locale",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
+     "tier": "B",
+     "why": "情绪→可视化映射 + 语音陪伴，与心屿同题",
+     "stars": 14052,
+     "pushed_at": "2026-05-15",
+     "language": "Python",
+     "license": "NOASSERTION",
+     "default_branch": "main",
+     "latest_release": "v1.2.1",
+     "ci_workflows": 13,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md"
+     ],
+     "file_count": 253,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "morettt/my-neuro",
+     "tier": "B",
+     "why": "桌宠 + 记忆型陪伴，活跃迭代参照",
+     "stars": 1390,
+     "pushed_at": "2026-10-05",
+     "language": "JavaScript",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v6.7.5",
+     "ci_workflows": 4,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "docs"
+     ],
+     "file_count": 646,
+     "caps": [
+      "i18n_locale",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "letta-ai/letta-code",
+     "tier": "D",
+     "why": "stateful agent 长期记忆（J4 记忆叙事同构先例，TS/Bun 实现仓）",
+     "stars": 3577,
+     "pushed_at": "2026-10-12",
+     "language": "TypeScript",
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": "v0.34.10",
+     "ci_workflows": 21,
+     "docs": [
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "docs"
+     ],
+     "file_count": 2568,
+     "caps": [
+      "container"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "hello-diana/MASCOT",
+     "tier": "C",
+     "why": "多智能体社交认知陪伴（EMNLP 2026）",
+     "stars": 701,
+     "pushed_at": "2026-08-24",
+     "language": "Python",
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 1,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 81,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "ddxfish/sapphire",
+     "tier": "C",
+     "why": "垂类陪伴 agent，Python + Web UI",
+     "stars": 307,
+     "pushed_at": "2026-10-10",
+     "language": "Python",
+     "license": "AGPL-3.0",
+     "default_branch": "main",
+     "latest_release": "v2.13.1",
+     "ci_workflows": 3,
+     "docs": [
+      ".github",
+      "README.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 1230,
+     "caps": [
+      "container",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "v2rockets/Loyal-Elephie",
+     "tier": "C",
+     "why": "带 RAG 记忆的陪伴（停更反面教材）",
+     "stars": 351,
+     "pushed_at": "2025-02-28",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 124,
+     "caps": [
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Rogendo/Mental-health-Chatbot",
+     "tier": "C",
+     "why": "多语心理健康陪伴，有真实部署主页",
+     "stars": 215,
+     "pushed_at": "2026-09-08",
+     "language": "CSS",
+     "license": null,
+     "default_branch": "master",
+     "latest_release": null,
+     "ci_workflows": 1,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 10,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Lum1104/MER-Factory",
+     "tier": "D",
+     "why": "多模态情绪识别工厂（标注→评测→训练闭环）",
+     "stars": 119,
+     "pushed_at": "2026-03-13",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v0.1.2",
+     "ci_workflows": 1,
+     "docs": [
+      ".env.example",
+      ".github",
+      "README.md",
+      "docs",
+      "test"
+     ],
+     "file_count": 158,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "CheaperjamRen/leemo",
+     "tier": "C",
+     "why": "本地优先桌面陪伴 agent",
+     "stars": 75,
+     "pushed_at": "2026-08-27",
+     "language": "TypeScript",
+     "license": "Apache-2.0",
+     "default_branch": "main",
+     "latest_release": "v0.1.10",
+     "ci_workflows": 1,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 1518,
+     "caps": [
+      "pwa_manifest",
+      "streaming",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "NJX-njx/opensoul",
+     "tier": "C",
+     "why": "小体量但工程齐（13 workflow + 全套文档）",
+     "stars": 58,
+     "pushed_at": "2026-06-04",
+     "language": "TypeScript",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v0.2.4",
+     "ci_workflows": 13,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "README.md",
+      "ROADMAP.md",
+      "SECURITY.md",
+      "docs",
+      "test"
+     ],
+     "file_count": 6141,
+     "caps": [
+      "container",
+      "deps_autoupdate",
+      "e2e_browser",
+      "pwa_manifest",
+      "vector_memory"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "s-nagaev/chibi",
+     "tier": "C",
+     "why": "小体量高频发布节奏样板",
+     "stars": 55,
+     "pushed_at": "2026-10-11",
+     "language": "Python",
+     "license": "MIT",
+     "default_branch": "main",
+     "latest_release": "v1.19.0.dev202610100811",
+     "ci_workflows": 5,
+     "docs": [
+      ".env.example",
+      ".github",
+      "CONTRIBUTING.md",
+      "README.md",
+      "docs",
+      "tests"
+     ],
+     "file_count": 305,
+     "caps": [
+      "container"
+     ],
+     "tree_truncated": false
+    },
+    {
+     "repo": "29-Cu/succhia",
+     "tier": "C",
+     "why": "中文『陪聊』垂类（BLE 硬件），零工程配套",
+     "stars": 87,
+     "pushed_at": "2026-07-25",
+     "language": "HTML",
+     "license": "NOASSERTION",
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 7,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "zeroa234/ryza-ai-revive",
+     "tier": "C",
+     "why": "190★、JS、2026-09-22 仍活跃的同体量陪伴项目",
+     "stars": 211,
+     "pushed_at": "2026-10-05",
+     "language": "JavaScript",
+     "license": "MIT",
+     "default_branch": "master",
+     "latest_release": "v1.2.23",
+     "ci_workflows": 0,
+     "docs": [
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "docs"
+     ],
+     "file_count": 1764,
+     "caps": [],
+     "tree_truncated": false
+    },
+    {
+     "repo": "Bwcx-songyu/MoodChat",
+     "tier": "C",
+     "why": "Java 同栈情绪陪伴垂类（体量小，作技术栈对照）",
+     "stars": 1,
+     "pushed_at": "2026-09-09",
+     "language": "Java",
+     "license": null,
+     "default_branch": "main",
+     "latest_release": null,
+     "ci_workflows": 0,
+     "docs": [
+      "README.md"
+     ],
+     "file_count": 54,
+     "caps": [],
+     "tree_truncated": false
+    }
+   ],
+   "quality_gate_channel": {
+    "peers": {
+     "lobehub/lobehub": {
+      "classes": {
+       "coverage_gate": null,
+       "mutation_gate": false,
+       "lint_gate": true,
+       "typecheck_gate": null,
+       "secret_scan_gate": null
+      },
+      "evidence": {
+       "lint_gate": "自写门禁 ∧ CI 真调用：bun packages/alint/report.ts alint-output.json",
+       "typecheck_gate": "apps/auth/tsconfig.json 在，但 CI 面未取全 ⇒ 不得判「无门」",
+       "secret_scan_gate": " CI 面未取全 ⇒ 不得判「无门」"
+      },
+      "unverified": [
+       "coverage_gate(候选 97/101 正文未取到 ⇒ 不得判「无门」)",
+       "typecheck_gate(CI 面未取全)",
+       "secret_scan_gate(CI 面未取全)"
+      ],
+      "ci_face": "12/29",
+      "candidates": {
+       "coverage_gate": [
+        ".agents/scripts/check/vitest.config.mts",
+        ".agents/skills/deep-review/scripts/vitest.config.ts",
+        "apps/cli/vitest.config.mts"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [
+        "eslint.config.mjs"
+       ],
+       "typecheck_gate": [
+        "apps/auth/tsconfig.json",
+        "apps/cli/tsconfig.json",
+        "apps/desktop/tsconfig.json"
+       ],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "SillyTavern/SillyTavern": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": true,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": ".eslintrc.cjs ∧ CI 执行位=eslint",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "10/10",
+      "candidates": {
+       "coverage_gate": [
+        "tests/jest.config.json"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [
+        ".eslintrc.cjs",
+        "tests/.eslintrc.cjs"
+       ],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "Open-LLM-VTuber/Open-LLM-VTuber": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": ".pre-commit-config.yaml 在而 CI 面取全后未见执行位"
+      },
+      "unverified": [],
+      "ci_face": "6/6",
+      "candidates": {
+       "coverage_gate": [
+        "pyproject.toml"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": [
+        ".pre-commit-config.yaml"
+       ]
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "morettt/my-neuro": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "3/3",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "letta-ai/letta-code": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": true,
+       "typecheck_gate": null,
+       "secret_scan_gate": null
+      },
+      "evidence": {
+       "lint_gate": "biome.json ∧ CI 执行位=standard",
+       "typecheck_gate": "tsconfig.json 在，但 CI 面未取全 ⇒ 不得判「无门」",
+       "secret_scan_gate": " CI 面未取全 ⇒ 不得判「无门」"
+      },
+      "unverified": [
+       "typecheck_gate(CI 面未取全)",
+       "secret_scan_gate(CI 面未取全)"
+      ],
+      "ci_face": "12/17",
+      "candidates": {
+       "coverage_gate": [
+        "python/pyproject.toml"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [
+        "biome.json"
+       ],
+       "typecheck_gate": [
+        "tsconfig.json",
+        "tsconfig.types.json"
+       ],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "hello-diana/MASCOT": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [
+        "pyproject.toml"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "ddxfish/sapphire": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "1/1",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "v2rockets/Loyal-Elephie": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "frontend/tsconfig.json 在而 CI 面取全后未见执行位",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [
+        "frontend/tsconfig.json"
+       ],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "Rogendo/Mental-health-Chatbot": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "Lum1104/MER-Factory": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "1/1",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "CheaperjamRen/leemo": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "tsconfig.json 在而 CI 面取全后未见执行位",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "1/1",
+      "candidates": {
+       "coverage_gate": [
+        "vitest.config.ts"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [
+        "tsconfig.json",
+        "tsconfig.renderer.json",
+        "tsconfig.vendor.json"
+       ],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "NJX-njx/opensoul": {
+      "classes": {
+       "coverage_gate": true,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": true
+      },
+      "evidence": {
+       "coverage_gate": "vitest.config.ts :: thresholds: {\n        lines",
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "tsconfig.json 在而 CI 面取全后未见执行位",
+       "secret_scan_gate": ".pre-commit-config.yaml ∧ CI 执行位=detect-secrets"
+      },
+      "unverified": [],
+      "ci_face": "8/8",
+      "candidates": {
+       "coverage_gate": [
+        "apps/android/app/build.gradle.kts",
+        "apps/android/build.gradle.kts",
+        "skills/local-places/pyproject.toml"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [
+        "tsconfig.json",
+        "tsconfig.plugin-sdk.dts.json"
+       ],
+       "secret_scan_gate": [
+        ".pre-commit-config.yaml",
+        ".secrets.baseline"
+       ]
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "s-nagaev/chibi": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "4/4",
+      "candidates": {
+       "coverage_gate": [
+        "pyproject.toml"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "29-Cu/succhia": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "zeroa234/ryza-ai-revive": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [
+        "android/app/build.gradle",
+        "android/build.gradle"
+       ],
+       "mutation_gate": [],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     },
+     "Bwcx-songyu/MoodChat": {
+      "classes": {
+       "coverage_gate": false,
+       "mutation_gate": false,
+       "lint_gate": false,
+       "typecheck_gate": false,
+       "secret_scan_gate": false
+      },
+      "evidence": {
+       "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+       "secret_scan_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）"
+      },
+      "unverified": [],
+      "ci_face": "0/0",
+      "candidates": {
+       "coverage_gate": [
+        "pom.xml"
+       ],
+       "mutation_gate": [
+        "pom.xml"
+       ],
+       "lint_gate": [],
+       "typecheck_gate": [],
+       "secret_scan_gate": []
+      },
+      "partial": false,
+      "partial_errors": ""
+     }
+    },
+    "self": {
+     "classes": {
+      "coverage_gate": true,
+      "mutation_gate": false,
+      "lint_gate": false,
+      "typecheck_gate": false,
+      "secret_scan_gate": true
+     },
+     "evidence": {
+      "coverage_gate": "server/pom.xml :: minimum",
+      "lint_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+      "typecheck_gate": "无标准配置、且 CI 执行行里没有该类可执行体（步骤名/注释不计）",
+      "secret_scan_gate": "自写门禁 ∧ CI 真调用：python _test/tracked_secret_scan.py --selftest"
+     },
+     "unverified": [],
+     "ci_face": "2/2",
+     "candidates": {
+      "coverage_gate": [
+       "server/pom.xml"
+      ],
+      "mutation_gate": [
+       "server/pom.xml"
+      ],
+      "lint_gate": [],
+      "typecheck_gate": [],
+      "secret_scan_gate": []
+     },
+     "face": "HEAD",
+     "ci_step_count": 34,
+     "ci_steps_homegrown": [
+      "判据脚本语法自检（compileall，锁 CI 的 Python ",
+      "标记层内联样式守卫（CSP style-src 'self' 前提；",
+      "静态资源体积预算守卫（首屏优势不回涨，含 --selftest 防恒",
+      "vendor 供给链守卫（完整性哈希 + 版本声明对账 + 漏登记即",
+      "心理学知识库 源卡⇄数据件 一致性守卫（含 --selftest 防",
+      "心理学知识库 引用关联⇄取证⇄索引 三面守卫（含 --selftes",
+      "情绪评测集门禁（accuracy ≥ 95% 且危机全召回）",
+      "共情策略表 ↔ 词表成对性门禁（含 --selftest 防判据恒真",
+      "密钥零入库扫描（判据与本地电池同源，正则不再内联）",
+      "校验 fat jar 产物（防\"瘦 jar 冒充 fat jar\"）",
+      "起 fat jar（无密钥，仅情绪接口）并跑双端一致性对账",
+      "浏览器引擎身份对账（--machine 真起一次，E3/E4）",
+      "校验 fat jar 产物（防\"瘦 jar 冒充 fat jar\"）"
+     ],
+     "partial_errors": ""
+    },
+    "rule": "阈值型须有失败形状、执行型须配置∧CI；不参与 caps；取不到记 unverified"
+   }
+  }
+ ]
+}
