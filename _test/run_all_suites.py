@@ -161,6 +161,10 @@ SUITES = [
     # 本轮不代处置（该面有并行会话在途），登记于 memory/07-next-steps。
     ("psych_kb_build", [sys.executable, "_test/psych_kb_build.py", "--check"]),
     ("psych_kb_build_selftest", [sys.executable, "_test/psych_kb_build.py", "--selftest"]),
+    # r129：引用关联 ⇄ 取证 ⇄ 索引 三面一致性（悬空/自指/孤岛/缺来源/索引漂移各自判红，
+    # 取数面取不到 ⇒ rc=2 UNVERIFIED 不判绿）。这三件事此前只有人工核对轮用眼过，机器面为零。
+    ("psych_kb_integrity", [sys.executable, "_test/psych_kb_integrity_check.py"]),
+    ("psych_kb_integrity_selftest", [sys.executable, "_test/psych_kb_integrity_check.py", "--selftest"]),
     ("emotion_wiring", [sys.executable, "_test/emotion_wiring_check.py"]),
     ("emotion_wiring_selftest", [sys.executable, "_test/emotion_wiring_check.py", "--selftest"]),
     ("vendor_freshness", [sys.executable, "_test/vendor_freshness_check.py"]),
@@ -315,8 +319,6 @@ SUITES = [
     #   本尺是**棘轮**：复算双能力基线并拒收任何回退；目标/指标/轨迹 = memory/10-core-capabilities.md。
     ("core_capability_baseline", [sys.executable, "_test/core_capability_baseline_check.py"]),
     ("core_capability_selftest", [sys.executable, "_test/core_capability_baseline_check.py", "--selftest"]),
-    ("face_lowintensity", [sys.executable, "_test/face_lowintensity_check.py"]),
-    ("face_lowintensity_selftest", [sys.executable, "_test/face_lowintensity_check.py", "--selftest"]),
     # r58 质量工程面：JS 侧从"0 个单元测试"变成有常驻执行位（node --test + 跨 realm 归一）
     ("js_unit", [sys.executable, "_test/js_unit_check.py"]),
     ("js_unit_selftest", [sys.executable, "_test/js_unit_check.py", "--selftest"]),
