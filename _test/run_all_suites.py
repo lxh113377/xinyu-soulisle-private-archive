@@ -495,6 +495,18 @@ SUITES = [
     #   ⇒ 主流程已接进电池（本块下一条），132→133。台账不足两份时它诚实回 rc=2，不判绿不判红。
     ("perf_ramp_delta", [sys.executable, "_test/perf_ramp_delta_check.py"]),
     ("perf_ramp_delta_selftest", [sys.executable, "_test/perf_ramp_delta_check.py", "--selftest"]),
+    # r130：MySQL 目标库的**行为回执**。立因＝`application.yml` 从 J4 起就写着「生产切 MySQL：
+    #   XINYU_DB_URL/DRIVER/USER/PASSWORD」，而到 2026-10-12 为止 `_test/` 全库 grep `mysql`
+    #   零命中 —— 配置口子存在 ≠ 能力成立（「存在性类能力位须配行为回执」）。
+    #   本件真起 fat jar 连真 MySQL，走完建表→写入→读回→计数→重启不丢→清除六腿，中文/emoji
+    #   做**逐字节**往返对账（字符集是不是 utf8mb4 只有这一腿能证）。
+    #   取库三选一：环境变量 XINYU_MYSQL_JDBC｜`--docker`（自起一次性容器，跑完即删）｜
+    #   `--portability`（**反例腿**：服务器默认字符集 latin1）。无库可用 ⇒ rc=2 未验并给复算命令，
+    #   绝不静默 PASS（R247）；本件**不自动拉镜像**，拉取是网络动作，留给调用方显式做。
+    #   反例腿实测（2026-10-12）：latin1 服务器上 `schema.sql` 建出 latin1 列，中文写入 HTTP 500
+    #   ⇒「utf8mb4 服务端全绿」不足以支撑「MySQL 支持」，故这腿是区分力所在，不是装饰。
+    ("mysql_db", [sys.executable, "_test/mysql_db_check.py"]),
+    ("mysql_db_selftest", [sys.executable, "_test/mysql_db_check.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），
