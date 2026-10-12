@@ -23,6 +23,7 @@
  *   - 停顿到 FORCE_MS 仍判不完整 → **有界收口**（字幕如实标「停顿收口」），绝不无限等。
  *
  * 判据：`_test/voice_call_check.py` C1–C9（桩化 SpeechRecognition / speechSynthesis / getUserMedia）。
+ * wb-echo-L0（2026-10-13）：回声准入闸 —— 收句面/打断面统一过 `isEchoFuzzy + TAIL_MS`，堵「念白回读误当用户输入」。
  */
 window.VoiceCall = (function () {
   const $ = (s) => document.querySelector(s);
@@ -39,12 +40,14 @@ window.VoiceCall = (function () {
   // 这一路音量计流 + 下面的能量门 —— 后者才是「背景噪声不许把话头一直吊着」的那道闸。
   const AUDIO_CST = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
   const NOISE_FLOOR = 0.012;     // 能量门下限：低于此不刷新 lastSpeech（取不到读数时不拦）
+  const TAIL_MS = 600;           // wb-echo-L0 尾音软窗：念白结束后这么久内的转写用更低回声阈值严查（不硬拦快答）
 
   let deps = null, rec = null, SR = null;
   let state = "idle";           // idle | listening | thinking | speaking
   let duplex = "full";          // full=可随时打断  half=讲完再听
   let micOn = true, watch = 0;
   let pending = "", lastSpeech = 0, turnAt = 0, ttf = 0, turnMs = 0;
+  let speakEndAt = 0, recentSpoken = "";   // 末次念白结束时刻 / 上一轮念白（回声比对跨句依据，wb-echo-L0）
   let baseLen = 0, lastLen = 0;   // 已收过口的转写条数 / 本会话累计转写条数（防旧句被重新拼进新句）
   let recAlive = false;           // 识别会话是否还活着：活着就不该再 start()（真机 start 会抛，白折腾一次重启）
   let consumed = 0, speakingBuf = "", tailQueued = false, aiLine = null, lastGum = null;
@@ -109,6 +112,38 @@ window.VoiceCall = (function () {
     // 前缀重叠须扣掉念白没剩内容才算回声；否则同头插话会被误判打不断
     const rest = a.replace(b, "").replace(a.slice(0, 6), "");
     return b.indexOf(a.slice(0, 6)) >= 0 && rest.length < 2;  }
+  /* wb-echo-L0：模糊回声判 —— 对 ASR 错字变体、只听到半句的念白回读兜底。
+     以 a 的近似长度窗扫 b，取字符 bigram Dice 最大值；≥0.6 视为回声。 */
+  function diceWin(a, b) {
+    if (b.indexOf(a) >= 0) return 1;
+    const bg = (s) => { const m = new Set(); for (let i = 0; i + 1 < s.length; i++) m.add(s.slice(i, i + 2)); return m; };
+    const A = bg(a);
+    if (!A.size) return 0;
+    let best = 0;
+    for (const w of [a.length, Math.ceil(a.length * 1.4)]) {
+      for (let i = 0; i + w <= b.length; i += Math.max(1, w - 2)) {
+        const B = bg(b.slice(i, i + w));
+        if (!B.size) continue;
+        let hit = 0;
+        A.forEach((g) => { if (B.has(g)) hit++; });
+        const d = (2 * hit) / (A.size + B.size);
+        if (d > best) best = d;
+      }
+    }
+    return best;
+  }
+  /** 准入判定：当前念白与上一轮念白两面查；精确面优先、模糊面兜底（wb-echo-L0）。
+      soft=尾音软窗内：模糊阈值 0.6→0.45 更严打念白拖尾，但不硬拦真人快答。 */
+  function isEchoFuzzy(t, soft) {
+    const a = norm(t);
+    if (a.length < 3) return false;
+    if (isEcho(t)) return true;
+    const cut = soft ? 0.45 : 0.6;
+    return [speakingBuf, recentSpoken].some((raw) => {
+      const b = norm(raw);
+      return b.length >= 3 && diceWin(a, b) >= cut;
+    });
+  }
 
   /* ── 字幕 ───────────────────────────────────────────────────────── */
   function clearBox(box) { while (box && box.firstChild) box.removeChild(box.firstChild); }
@@ -198,10 +233,13 @@ window.VoiceCall = (function () {
       const got = (said + interim).trim();
       if (!micOn) { pending = ""; return; }              // 静音键：不采集也不收句
       if (!gateOpen(lvl)) return;                        // 能量门：这一帧没人在说话，噪声不配当话头
+      // wb-echo-L0 准入闸：回声先丢弃（尾音窗内阈值放宽更严打）；丢弃同时推进消费位，
+      // 防「被丢的念白残句」留在累计列表里拼进下一句用户话
+      if (isEchoFuzzy(got, performance.now() - speakEndAt < TAIL_MS)) { baseLen = lastLen; return; }
       pending = got;
       lastSpeech = performance.now();
       // 含 thinking：思考中插话也要能接管（旧码只认 speaking）
-      if (state !== "listening" && duplex === "full" && got.length >= 2 && !isEcho(got)) bargeIn();
+      if (state !== "listening" && duplex === "full" && got.length >= 2) bargeIn();
       paint();
     };
     rec.onerror = (e) => {
@@ -264,6 +302,7 @@ window.VoiceCall = (function () {
   function bargeIn() {
     clearStall();                       // 思考期被打断：兜底计时器一并清
     if (window.Voice) window.Voice.cancelSpeech();
+    if (speakingBuf) recentSpoken = speakingBuf;   // 念白留作跨句比对（尾音出水就靠它，wb-echo-L0）
     speakingBuf = "";
     state = "listening";
     turnAt = 0;
@@ -296,6 +335,7 @@ window.VoiceCall = (function () {
     lastSpeech = 0;
     baseLen = lastLen;          // 这句已收口：它之前的转写不再参与下一句的拼装
     if (!mine || state !== "listening") return;
+    if (isEchoFuzzy(mine)) { pending = ""; lastSpeech = 0; return; }   // wb-echo-L0 双保险：漏网回声不许出门
     if (!deps || typeof deps.send !== "function") { state = "listening"; paint(); return; }
     caption("you", mine, how === "停顿收口" ? "停顿收口" : (how === "手动收句" ? "手动收句" : ""));
     metric.user = mine;
@@ -345,7 +385,8 @@ window.VoiceCall = (function () {
       const how = shouldCommit(pending, performance.now() - lastSpeech);
       if (how) commit(pending, how);
     } else if (state === "speaking" && window.Voice && !window.Voice.queueBusy()) {
-      state = "listening";                       // 队列空了 → 轮到用户
+      speakEndAt = performance.now();          // wb-echo-L0 尾音窗起点：刚念完的拖尾不算话头
+      state = "listening";                     // 队列空了 → 轮到用户
       turnAt = 0;
       if (duplex === "half") resume();
       paint();
@@ -359,6 +400,7 @@ window.VoiceCall = (function () {
     SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     state = "listening";
     pending = ""; ttf = 0; turnMs = 0; consumed = 0; speakingBuf = ""; aiLine = null; lastSpeech = 0;
+    speakEndAt = 0; recentSpoken = "";
     baseLen = 0; lastLen = 0;
     metric.ttfb = 0; metric.user = ""; metric.reply = "";
     clearBox($("#call-captions"));
@@ -388,6 +430,7 @@ window.VoiceCall = (function () {
     stopVad();
     state = "idle";
     pending = ""; speakingBuf = ""; turnAt = 0; lastSpeech = 0;
+    speakEndAt = 0; recentSpoken = "";
     $("#call-layer").hidden = true;
     const nb = $("#btn-call");
     if (nb) nb.setAttribute("aria-pressed", "false");
@@ -452,6 +495,6 @@ window.VoiceCall = (function () {
         complete: semanticallyComplete(pending || metric.user), metrics: metric,
         gum: lastGum, videoAsked: !!(lastGum && lastGum.video), lines: $("#call-captions") ? $("#call-captions").children.length : 0 };
     },
-    _unit: { semanticallyComplete, shouldCommit, cutSentences, isEcho, gateOpen }
+    _unit: { semanticallyComplete, shouldCommit, cutSentences, isEcho, isEchoFuzzy, gateOpen }
   };
 })();

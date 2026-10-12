@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+### wb-echo-L0 — 语音回声误触发收口（2026-10-13）
+
+**功能面**
+- `voice-call.js` 收句面回声准入闸：`onresult` 转写先过 `isEchoFuzzy`（精确互含 + 字符 bigram Dice 滑窗，阈值 0.6；尾音软窗内放宽到 0.45）+ 丢弃时同步推进消费位（防残句拼进下一句）—— 堵「TTS 念白被麦克风回读、被 ASR 当用户输入送进共情链路」的直通管道；`bargeIn` 念白移入 `recentSpoken` 供跨句比对；`commit` 前二次校验。（红→绿留痕：硬窗首版误杀快答被 C11/C14 抓住后改软窗，证据在 `_test/voice_call_check.py` C16 与轮次台账。）
+
+**判据面**
+- `voice_call_check.py` 新增 C16（排水后念白回读必须被丢弃 + 异文真话对照腿）：旧码先验红（texts 6→7），新码转绿，全腿 16/16。
+- 存量红登记（非本轮）：`voice_call_soak_check.py` S6/S7 两腿（pre-fix 基线同红）、`deploy_sync_check` 的 `css/voice-call.css`、`size_budget` 3 项 OVER（face-engine / face-smile-rules / voice-call.css）——均属并行轮在途面。
+
+**预算**
+- `size_budget_check.py` 的 `voice-call.js` 上限按实测重登记 23,828→27,672（实测 26,354 +5%，非静默抬限）。
+
 ## [1.8.3] — 2026-10-12
 
 ### r133 — 表达优化专项收口 + 存量判据清理（老大定「先清存量红再上线」）

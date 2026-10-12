@@ -35,6 +35,7 @@
   C14 长轮次稳定性：连打 8 轮不重建识别器、不重复 start、字幕封顶、轮轮都回听
       ⚠️ 本腿是**桩化**的结构稳定性，不等于真机连说 30 分钟；本机无真麦克风，后者只能人测。
   C15 本机神经语音引擎：默认态零探测（公网红线）+ 开关开时目录/路由/通话中切说话人三件齐
+  C16 收句面回声准入（wb-echo-L0）：排水后念白回读不得被当用户输入提交（尾音窗+模糊判）；异文真话对照腿必须照常提交
 
 函数切分（r116 收口轮 / r118 补四段）：loc_guard 的 ≤150 行/函数门把原来的 run_legs（219 行）拆成
   十段（开层/音色/整轮/双工/摄像头/采集链/无TTS/长轮次/退出/本机引擎），每段自带前置缺失即早退，结论仍汇进同一个 legs 字典。
@@ -589,6 +590,50 @@ def legs_duplex(page, f, legs):
     page.locator("#btn-call-duplex").click(timeout=5000)
 
 
+def legs_echo_admit(page, f, legs):
+    """C16 收句面回声准入（wb-echo-L0）：排水后把「刚念过的念白」回读投给 ASR —— 正确行为是
+    丢弃（不写 pending、不起新一轮）；再投异文真话作对照腿（必须照常提交）。"""
+    ok_l, st0 = wait_state(page, "listening", 60)
+    if not ok_l:
+        legs["C16"] = "FAIL"
+        f.append("C16 前置缺失：没在听态（state=%s），准入腿没靶子" % st0)
+        return
+    page.evaluate("() => { window.__vc.speakMs = 400; window.__vc.cancels = 0; }")
+    page.evaluate("() => window.__vcSay('今天有点累想早点睡', true)")
+    ok_sp, st = wait_state(page, "speaking", 80)
+    ok_ls, st2 = wait_state(page, "listening", 80)
+    if not ok_sp or not ok_ls:
+        legs["C16"] = "FAIL"
+        f.append("C16 前置缺失：一轮没走完（speaking=%s listening=%s）" % (st, st2))
+        page.evaluate("() => { window.__vc.speakMs = 40; }")
+        return
+    n0 = len(vc(page)["texts"])     # 基线在 setup 轮提交之后取：此后条数再涨才是回声污染（wb-echo-L0 修的就是它）
+    # 上半段：排水后立刻回读念白（与回复逐字相同）——老码此处 pending 被污染，620ms 后误提交
+    page.evaluate("() => window.__vcSay('第一句先抱住你。第二句给你一个小方法。', true)")
+    page.wait_for_timeout(1200)
+    n1 = len(vc(page)["texts"])
+    pend = page.evaluate("() => window.VoiceCall.inspect().pending")
+    ok_back, st3 = wait_state(page, "listening", 80)
+    # 下半段：异文真话——必须照常提交（证明上半段不是「反正都不收」的空靶）
+    ok_ok = False
+    if ok_back:
+        n2 = len(vc(page)["texts"])
+        page.evaluate("() => window.__vcSay('我其实想聊聊工作上的事', true)")
+        ok_ok = wait_texts(page, n2 + 1)
+    page.evaluate("() => { window.__vc.speakMs = 40; }")
+    if n1 != n0 or pend:
+        legs["C16"] = "FAIL"
+        f.append("C16 念白回声被当用户输入：texts %d→%d pending=%r ⇒ 自触发管道未堵" % (n0, n1, pend))
+    elif not ok_ok:
+        legs["C16"] = "FAIL"
+        f.append("C16 对照腿失效：异文真话没被提交（texts 停在 %d，state=%s）⇒ 上半段可能是空断言"
+                 % (len(vc(page)["texts"]), st3))
+    else:
+        legs["C16"] = "PASS"
+        print("C16 PASS  排水后念白回读被丢弃（pending 空、零新轮次）；异文真话照常提交")
+    wait_state(page, "listening", 80)
+
+
 def legs_camera(page, f, legs):
     """C7 摄像头开着也能通话（注入 FaceEngine 读数；真摄像头腿归 face_check.py）。"""
     page.evaluate("() => { window.FaceEngine = window.FaceEngine || {}; window.FaceEngine.last = function () { return {emotion: 'sad', intensity: 0.6}; }; window.VoiceCall._repaint(); }")
@@ -832,6 +877,7 @@ def run_legs(page, browser, url):
     legs_timbre(page, f, legs)
     legs_turn(page, f, legs)
     legs_duplex(page, f, legs)
+    legs_echo_admit(page, f, legs)
     legs_camera(page, f, legs)
     legs_noise(page, f, legs)
     legs_no_tts(page, f, legs)
