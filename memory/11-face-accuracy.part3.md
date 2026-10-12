@@ -111,6 +111,23 @@ offByEmo.surprise=0.20（上界 worry_speak_B1 .243，下界 fear@0.22 格的 su
   重建才暴露）。判据改双格式：有 miss_at_baseline ⇒ 校验 `pass∪miss=全集 且互不交`；
   无 ⇒ 旧格式 `pass=分母`。selftest 12→14 腿（新格式绿腿 + 交叠红腿）。miss 题词表修复
   归语意轮（emotion-lexicon.js 在途改动避让）。
+- **S3 资料准备（r164）**：渠道全摸底 + 可检出性实测 + 补拍规格定稿。
+  - **渠道矩阵（本轮实测）**：①Commons 分类面二次证伪（Category:Anger 32 文件含音频/路线图/
+    头盔/画作，真人照个位数；Rage/Snarl 近乎空）；②face-api.js 挖尽（仅 angry×2）；③HF
+    `LaurenGurgiolo/9_Facial_Expressions`：anger **350 张**，但 80×80 + Alamy 图库水印 +
+    授权链模糊（Roboflow 二次聚合）⇒ 定级**备选**（仅本机标定、绝不入 git）；④JAFFE 镜像
+    无完整集，放弃。
+  - **MediaPipe 可检出性实测**（探针 `_temp/s3_mediapipe_probe.py`，msedge channel）：
+    80×80 候选 **3/3 检出**；browDown 分布 0.094 / 0.286 / 0.5+（有区分度）；引擎判定
+    anger 1/3、disgust 2/3——**正好印证 S3 修因**（browDown 强信号被判成 disgust）。
+  - **网络通道**：外网请求一律显式走代理 `127.0.0.1:7897`（裸连被吸入本地 56070 死链路
+    超时；GitHub 走 api/gh、HF 走 7897 实测通）。
+  - **补拍规格书（给老大，全程 10 分钟可拍完）**：目标 anger ≥8 张（低强度 4 + 中强度 4；
+    低强度自然版最宝贵——S1 弱信号主题直接需要）；可选加拍 fear/disgust 各 4 张（现零真照）。
+    拍法：手机前后置皆可、光线正常、正脸或轻侧（yaw ≤15°）、距 30~50cm、背景随意。
+    表情参考：低强度＝想着烦心事、眉微压唇抿紧；中强度＝皱眉瞪眼。隐私：照片放本机
+    **不入 git**（T+10 前补 `face_au_export --fixtures-dir` 支持：本机目录独立名册、
+    只入库 52 维 JSON）。
 
 ## 回滚锚（通用）
 
