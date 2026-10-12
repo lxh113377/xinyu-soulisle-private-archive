@@ -103,6 +103,14 @@ offByEmo.surprise=0.20（上界 worry_speak_B1 .243，下界 fear@0.22 格的 su
   `^(?:ℹ|#)\s+tests\s+(\d+)`（re.M 行首锚定，防 TAP 失败 YAML 块缩进注释误匹配）+
   parse_selftest 4 腿反例。验收：CORE-CAP-BASELINE-PASS（N2 31/31 fail=0）+
   PARSE-SELFTEST 4/4 + SELFTEST 12/12。N2 从"下轮修"转为常驻可验尺。
+- **nlu 扩集对账 + 判据自洽修复（r163）**：105 条评测集固化进基线——pass_cases 104 道 +
+  miss_at_baseline 1 道（「整个人都不好了」→sadness）= 全集 105，三件套自洽（复跑
+  CORE-CAP-BASELINE-PASS，回归口径 0/104）。顺带修掉 `--update` 写入端与 ratchet 自洽判据
+  的隐藏矛盾：写入端写 `pass=全集−miss`（104）而判据要求 `len(pass)==denom`（105）⇒
+  带 miss 的基线一重建就自锁变红（r111 建立时全过 85==85，缺陷潜伏至今，今天首次带 miss
+  重建才暴露）。判据改双格式：有 miss_at_baseline ⇒ 校验 `pass∪miss=全集 且互不交`；
+  无 ⇒ 旧格式 `pass=分母`。selftest 12→14 腿（新格式绿腿 + 交叠红腿）。miss 题词表修复
+  归语意轮（emotion-lexicon.js 在途改动避让）。
 
 ## 回滚锚（通用）
 

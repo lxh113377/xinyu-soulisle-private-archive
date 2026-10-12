@@ -149,22 +149,31 @@ def ratchet(cur, base):
             unver.append("N1 同分母对账（评测器未回 misses 清单 ⇒ 空 miss 集不得读成零回归）")
         elif not bfp:
             unver.append("N1 同分母对账（基线无 pass_cases ⇒ 由 --update 补齐后才谈得上零回归）")
-        elif len(bfp) != int(b.get("denominator_at_baseline") or -1):
-            bad.append("N1 基线自相矛盾：pass_cases %d 道 ⇄ denominator_at_baseline %s"
-                       % (len(bfp), b.get("denominator_at_baseline")))
         else:
-            reg = sorted(bfp & cm)
-            notes.append("N1 基线在册题 %d 道中回归 %d 道" % (len(bfp), len(reg)))
-            if reg:
-                bad.append("N1 基线在册题回归 %d/%d 道（指纹 %s）"
-                           % (len(reg), len(bfp), ",".join(reg[:3])))
-            if c["total"] == b["total"]:
-                if c["acc_num"] < b["acc_num"]:
-                    bad.append("N1 准确率回退 %s → %s（同分母 %d 条）"
-                               % (b["accuracy"], c["accuracy"], c["total"]))
+            # 自洽判据双格式（r163 修）：--update 写入 pass=全集−miss，自洽式是
+            # pass ∪ miss_at_baseline = 全集 且互不交；旧格式（r111 式无 miss 记录，
+            # 当时全过）等价于 pass == 分母。旧判据要求 len(pass)==分母 —— 带 miss 的
+            # 基线一重建就自锁变红（本轮一手：104 道 + 1 miss ⇄ 分母 105 被误判矛盾）。
+            den = int(b.get("denominator_at_baseline") or -1)
+            bm = set(b.get("miss_at_baseline") or [])
+            ok_shape = (not (bfp & bm) and len(bfp) + len(bm) == den) if bm else (len(bfp) == den)
+            if not ok_shape:
+                bad.append("N1 基线自相矛盾：pass_cases %d + miss_at_baseline %d ⇄ 分母 %d"
+                           "（须互不交且和等于分母；无 miss_at_baseline 的旧格式须 pass_cases 等于分母）"
+                           % (len(bfp), len(bm), den))
             else:
-                notes.append("分母变更 %d→%d ⇒ 准确率不横比；新增题 miss %d 条只作新观察、不进棘轮"
-                             % (b["total"], c["total"], len(cm - bfp)))
+                reg = sorted(bfp & cm)
+                notes.append("N1 基线在册题 %d 道中回归 %d 道" % (len(bfp), len(reg)))
+                if reg:
+                    bad.append("N1 基线在册题回归 %d/%d 道（指纹 %s）"
+                               % (len(reg), len(bfp), ",".join(reg[:3])))
+                if c["total"] == b["total"]:
+                    if c["acc_num"] < b["acc_num"]:
+                        bad.append("N1 准确率回退 %s → %s（同分母 %d 条）"
+                                   % (b["accuracy"], c["accuracy"], c["total"]))
+                else:
+                    notes.append("分母变更 %d→%d ⇒ 准确率不横比；新增题 miss %d 条只作新观察、不进棘轮"
+                                 % (b["total"], c["total"], len(cm - bfp)))
         if c["crisis_hit"] is not None and b["crisis_hit"] is not None:
             if (c["crisis_hit"], -c["crisis_n"]) < (b["crisis_hit"], -b["crisis_n"]):
                 bad.append("N1 危机召回回退 %d/%d → %d/%d" % (b["crisis_hit"], b["crisis_n"],
@@ -248,7 +257,9 @@ def main():
             print("CORE-CAP-UPDATE-REFUSED：评测集题面取数失败（%s）⇒ 不写基线" % e)
             return 2
         nlu = dict(cur["nlu"])
-        nlu["pass_cases"] = sorted(set(allfp) - set(nlu.get("miss_fp") or []))
+        missfps = sorted(set(nlu.get("miss_fp") or []))
+        nlu["pass_cases"] = sorted(set(allfp) - set(missfps))
+        nlu["miss_at_baseline"] = missfps
         nlu["denominator_at_baseline"] = len(allfp)
         base.update({"nlu": nlu, "face_unit": cur["face_unit"],
                      "vendor": cur["vendor"],
@@ -298,6 +309,12 @@ def selftest(base, cur):
                 "vendor": ven or {"rc": 0}}
 
     OK_BASE = b_of(nlu(3, 100.0, []))
+    # r163：新格式基线（带 miss_at_baseline）两例 —— 一致腿验证「已知 miss 不算回归」，
+    # 坏数据腿验证「pass 与 miss 交叠必红」（自洽判据双格式的应绿/应红两端）
+    MISS_BASE = b_of(nlu(3, 66.7, [C], cases=[A, B]), den=3)
+    MISS_BASE["nlu"]["miss_at_baseline"] = [C]
+    BAD_BASE = b_of(nlu(3, 66.7, [C], cases=[A, B, C]), den=3)
+    BAD_BASE["nlu"]["miss_at_baseline"] = [C]
     legs = [
         ("同分母+准确率降 ⇒ 红（同分母下必同时是基线题回归）", pack(nlu(3, 66.7, [C])),
          OK_BASE, ["N1 准确率回退", "N1 基线在册题回归"], []),
@@ -320,6 +337,10 @@ def selftest(base, cur):
          ["F1 vendor"], []),
         ("基线自相矛盾（题集数⇄登记分母不等） ⇒ 红",
          pack(nlu(3, 100.0, [])), b_of(nlu(3, 100.0, []), den=99), ["基线自相矛盾"], []),
+        ("新格式：已知 miss 在册不判红（pass+miss=分母、互不交）⇒ 绿",
+         pack(nlu(3, 66.7, [C])), MISS_BASE, [], ["note:回归 0"]),
+        ("新格式：pass 与 miss_at_baseline 交叠 ⇒ 红",
+         pack(nlu(3, 100.0, [])), BAD_BASE, ["基线自相矛盾"], []),
         ("真面原样对账 ⇒ 零回退", cur, base, [], []),
     ]
 
