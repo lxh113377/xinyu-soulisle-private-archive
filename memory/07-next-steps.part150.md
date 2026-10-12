@@ -20,6 +20,9 @@
       读数：`coverage_gate 0/16（未验0）` → **`1/15（未验1）例：NJX-njx/opensoul`**（对手真有覆盖率门：
       根级 `vitest.config.ts` thresholds lines70/branches55 ＋ ci.yml 内 iOS 43% 内联门）。
       ⚠️ 同族第三次「手抄文字与数据脱节」（前两处＝「r126 首采」标签、「本格改前抄台账的 152」注释）。
+      **同日第二条腿（S9，精读 Open-LLM-VTuber 衍生）**：`benchmark_metrics.py::vector_memory` 只认
+      `vector/embedding/独立 rag`，认不出 mem0/letta 这类产品名后端 ⇒ 全池 **7/16 → 9/16**（差距比已发布更大）。
+      修法＝产品名按**词元边界**纳入（有意不收 `chroma`：`chroma.min.js` 是配色库），配 3 真阳 + 3 假阳反例腿。
 - [ ] 🟠 **[推荐:R127-09｜agent 自动｜待干净窗口]** **打断语义落差（对齐 Open-LLM-VTuber，本轮原文精读所得）**：
       对方 `AgentInterface.handle_interrupt(heard_response)` 把**被打断前已听到的半句**回传 agent；我方
       `voice-call.js::bargeIn()` 里 `speakingBuf=""` 直接丢弃 ⇒ 模型无感知、答不出"你刚才说到哪"。

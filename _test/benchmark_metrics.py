@@ -65,6 +65,13 @@ DOC_FILES_SET = set(DOC_FILES)
 # 同一条规则也跑在 16 个参照仓的整树路径上 ⇒ 对手侧的 `vector_memory=9/16` 同样被抬高。
 # 修法：`rag` 必须是**独立词元**（前后非字母数字）；`vector`/`embedding` 保持子串（无此类误伤词）。
 RAG_TOKEN_RE = re.compile(r"(^|[^A-Za-z0-9])rag([^A-Za-z0-9]|$)")
+# r127-fix（**假阴侧**，与上方 r70 的假阳侧对称）：`vector`/`embedding`/独立 `rag` 三词识别不了
+# **产品名后端**。一手实证：Open-LLM-VTuber 集成 mem0（向量记忆服务）与 letta（有状态记忆），
+# 文件名 `mem0_llm.py` / `letta_agent.py` 一个词都不含 ⇒ 整池 `vector_memory` 被低估（我们那格
+# 「对手 7/16」随之偏低）。一律**词元边界**匹配，理由同 r70：「palette」含 `letta` 子串但不构成词元。
+# ⚠️ 有意**不收** `chroma`：`chroma.min.js` 是配色库、不是向量库，收了就是新造一批假阳。
+MEM_BACKEND_TOKEN_RE = re.compile(
+    r"(^|[^a-z0-9])(mem0|letta|zep|faiss|qdrant|milvus|pinecone|weaviate|pgvector)([^a-z0-9]|$)")
 
 # 能力探测：按**整树递归**的文件名/后缀匹配（根目录一层探测无判别力——
 # 实测 14 仓的 sw.js / locales 全部落在子目录里，只看根目录会一律报"无"，
@@ -76,7 +83,8 @@ CAP_RULES = {
     "i18n_locale": lambda p: "/locales/" in f"/{p}" or "/i18n/" in f"/{p}" or "/languages/" in f"/{p}",
     "streaming": lambda p: p.rsplit("/", 1)[-1] in ("sse.ts", "sse.js", "use-sse.ts") or "/sse/" in f"/{p}",
     "vector_memory": lambda p: ("vector" in p.lower() or "embedding" in p.lower()
-                                or RAG_TOKEN_RE.search(p.lower()) is not None),
+                                or RAG_TOKEN_RE.search(p.lower()) is not None
+                                or MEM_BACKEND_TOKEN_RE.search(p.lower()) is not None),
     "container": lambda p: p.rsplit("/", 1)[-1] in ("Dockerfile", "docker-compose.yml",
                                                     "docker-compose.yaml"),
     "e2e_browser": lambda p: "/e2e/" in f"/{p}" or "playwright" in p.lower() or "cypress" in p.lower(),
@@ -1126,6 +1134,15 @@ def _st_selftest_3(st):  # r94 拆出的第 3 段（切点由 AST 求得，跨�
         return 1
     if _vm("src/storage/db.js") is _vm("src/rag/store.py"):
         print("SELFTEST-FAIL: 两条相反用例同判 ⇒ 这条控制是恒真的摆设")
+        return 1
+    # ── r127-fix（假阴侧，与上面 r70 假阳侧对称）：**产品名后端**必须被认出；长得像的反例必须仍不命中。
+    #    一手：Open-LLM-VTuber 的 mem0_llm.py / letta_agent.py 在旧规则下全池少算这一仓。
+    _mb_green = ["src/open_llm_vtuber/agent/agents/mem0_llm.py",
+                 "src/open_llm_vtuber/agent/agents/letta_agent.py", "src/store/faiss_index.py"]
+    _mb_red = ["src/palette.js", "src/letter_draft.py", "lib/chroma.min.js"]
+    _mb_bad = [p for p in _mb_green if not _vm(p)] + [p for p in _mb_red if _vm(p)]
+    if _mb_bad:
+        print("SELFTEST-FAIL: 产品名后端匹配失真（假阴/假阳）：" + " ; ".join(_mb_bad))
         return 1
     # ── r74 同址尺（文档维 / 性能维）：五类结构 + 两类内容，每类都配方向相反的腿
     _d1, _e1 = doc_perf_tree_class(["docs/index.md", "src/app.tsx"])
