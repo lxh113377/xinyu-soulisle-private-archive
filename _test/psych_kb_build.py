@@ -11,12 +11,15 @@
 
 E 级（未查证）条目不入产品件 —— 库规 README §2：E 级禁作事实依据。重建时排除并计数。
 --check：重建并与磁盘现有产物逐字节比对（不带时间戳，输出确定性的原因）。
-用法：python _test/psych_kb_build.py [--check]
+--selftest：判据非恒真的取证（11 腿，含 1 条真面变异腿）。夹具全部建在系统临时目录，
+            绝不读写仓库面；正例腿另附「真面 --check 必须 PASS」+「真产物改一个字符必须判不一致」。
+用法：python _test/psych_kb_build.py [--check|--selftest]
 退出码：0=PASS 1=FAIL 2=输入面缺失
 """
 import json
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -46,9 +49,12 @@ EMO_KW = {
 }
 
 
+class BuildFail(Exception):
+    """构建期失败。由 main() 唯一出口转成 rc=1；--selftest 在进程内捕获它做取证。"""
+
+
 def fail(msg):
-    print("PSYCH-KB-BUILD-FAIL: " + msg)
-    sys.exit(1)
+    raise BuildFail(msg)
 
 
 def trim_sentence(text, limit):
@@ -60,10 +66,10 @@ def trim_sentence(text, limit):
     return cut[: best + 1] if best >= int(limit * 0.4) else cut
 
 
-def parse_entries():
-    if not KB_DIR.is_dir():
-        fail("知识库目录缺失 " + str(KB_DIR))
-    files = sorted(p for p in KB_DIR.glob("*.md") if p.name not in ("README.md", "索引.md"))
+def parse_entries(kb_dir=KB_DIR):
+    if not kb_dir.is_dir():
+        fail("知识库目录缺失 " + str(kb_dir))
+    files = sorted(p for p in kb_dir.glob("*.md") if p.name not in ("README.md", "索引.md"))
     if not files:
         fail("篇章文件为空：只有规范与索引，没有任何条目源")
     entries, seen = [], {}
@@ -135,25 +141,184 @@ def build_text(entries, counts, n_files):
     return header
 
 
-def main():
-    entries, counts, n_files = parse_entries()
+def check_pair(kb_dir=KB_DIR, out=OUT):
+    """源卡 ⇄ 产物一致性判定（不打印，供 --check 与 --selftest 共用，避免两套实现）。"""
+    entries, counts, n_files = parse_entries(kb_dir)
     text = build_text(entries, counts, n_files)
-    if "--check" in sys.argv:
-        if not OUT.exists():
-            fail("产物缺失 " + str(OUT))
-        if OUT.read_text("utf-8") != text:
-            fail("产物与知识库源不一致：条目卡更新后未重建（跑一次不带 --check 的本脚本）")
-        print("PSYCH-KB-CHECK-PASS: 产物与源一致（%d 条）" % len(entries))
-        return
-    OUT.write_text(text, encoding="utf-8", newline="\n")
-    size = OUT.stat().st_size
-    ship_n = sum(counts[k] for k in SHIP_LEVELS)
-    print("PSYCH-KB-BUILD-PASS: 入库 %d 条（A:%d B:%d C:%d D:%d，E 排除 %d），"
-          "源文件 %d 个 -> %s（%s bytes）"
-          % (ship_n, counts["A"], counts["B"], counts["C"], counts["D"], counts["E"],
-             n_files, OUT.relative_to(ROOT), format(size, ",")))
-    if ship_n == 0:
-        fail("全部条目均为 E 级，产品件将是空库：先升级条目再重建")
+    if not out.exists():
+        fail("产物缺失 " + str(out))
+    if out.read_text("utf-8") != text:
+        fail("产物与知识库源不一致：条目卡更新后未重建（跑一次不带 --check 的本脚本）")
+    return entries, counts, n_files
+
+
+CARD = "### 条目 %s｜%s\n- 可信度：%s\n- 一句话：%s\n- 内容：%s\n- 来源：略\n"
+
+
+def fixture_dir(files):
+    d = Path(tempfile.mkdtemp(prefix="psychkb_selftest_"))
+    for name, text in files.items():
+        (d / name).write_text(text, encoding="utf-8", newline="\n")
+    return d
+
+
+def raises_buildfail(fn):
+    try:
+        fn()
+    except BuildFail:
+        return True, ""
+    except Exception as e:  # noqa: BLE001  其它异常也算「未按预期失败」，但必须点名
+        return False, "意外异常 %s: %s" % (type(e).__name__, e)
+    return False, "未抛 BuildFail（判据没咬）"
+
+
+ASSIGN = "window.__XINYU_PSYCH_KB__ = "
+
+
+def payload_of(text):
+    """从数据件文本取 JSON 载荷。按赋值锚点切，不用 split("= ") —— 头注释里「源 = 交付物…」也含 "= "。"""
+    return json.loads(text.split(ASSIGN, 1)[1].rsplit(";\n", 1)[0])
+
+
+def selftest():
+    """判据非恒真的取证：正例 5 条 + 该红的 6 条（含真面变异腿）= 11 腿。夹具只落系统临时目录。
+
+    临时件不做删除：本仓禁用磁盘直删（lessons-p0「Windows 删除必须走回收站」），
+    系统临时目录由 OS 回收，脚本内 rmtree 反而会撞那条机械护栏。
+    """
+    results = []
+
+    def leg(name, fn):
+        try:
+            ok, why = fn()
+        except Exception as e:  # noqa: BLE001  失败路径本身不得崩（BLIND-RED 家族）
+            ok, why = False, "腿自身异常 %s: %s" % (type(e).__name__, e)
+        results.append((name, bool(ok), why))
+
+    def ok_parse_one():
+        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-001", "焦虑与放松", "A",
+                                              "一句话谈焦虑", "内容讲放松。")})
+        entries, counts, n_files = parse_entries(d)
+        if len(entries) != 1 or entries[0]["level"] != "A" or n_files != 1:
+            return False, "正例解析得 %d 条/%d 篇" % (len(entries), n_files)
+        if "fear" not in entries[0]["rel"]:
+            return False, "情绪关联未挂上 fear（rel=%s）" % entries[0]["rel"]
+        return True, ""
+
+    def ok_e_excluded():
+        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-002", "已查证条", "A", "甲", "甲内容。")
+                         + CARD % ("PSY-ZZ-003", "未查证条", "E", "乙", "乙内容。")})
+        entries, counts, n_files = parse_entries(d)
+        payload = payload_of(build_text(entries, counts, n_files))
+        if payload["excludedE"] != 1 or len(payload["entries"]) != 1:
+            return False, "E 排除 excludedE=%s entries=%d" % (payload["excludedE"], len(payload["entries"]))
+        return True, ""
+
+    def ok_truncate():
+        long_text = "这是一段足够长的中文内容用来验证句界截断。" * 20
+        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-004", "长内容", "B", "摘要", long_text)})
+        entries, counts, n_files = parse_entries(d)
+        c = entries[0]["content"]
+        if len(c) > CONTENT_MAX or c[-1] not in "。！？；":
+            return False, "截断后 len=%d 末字符=%r" % (len(c), c[-1:])
+        return True, ""
+
+    def ok_ship_zero_guard():
+        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-005", "全是未查证", "E", "甲", "甲内容。")})
+        entries, counts, n_files = parse_entries(d)
+        payload = payload_of(build_text(entries, counts, n_files))
+        if payload["entries"] or payload["excludedE"] != 1:
+            return False, "全 E 面 entries=%d" % len(payload["entries"])
+        return True, ""
+
+    def red_missing_level():
+        d = fixture_dir({"90-夹具.md": "### 条目 PSY-ZZ-010｜缺级\n- 一句话：甲\n- 内容：乙。\n"})
+        return raises_buildfail(lambda: parse_entries(d))
+
+    def red_dup_id():
+        one = CARD % ("PSY-ZZ-011", "同号甲", "A", "甲", "甲内容。")
+        d = fixture_dir({"90-夹具.md": one + one})
+        return raises_buildfail(lambda: parse_entries(d))
+
+    def red_only_spec():
+        d = fixture_dir({"README.md": "规范", "索引.md": "索引"})
+        return raises_buildfail(lambda: parse_entries(d))
+
+    def red_shape_drift():
+        # 半角冒号 + 缺「｜」：行式与 README §3 漂移，解析必须报 0 条而不是静默产出空库
+        d = fixture_dir({"90-夹具.md": "### 条目 PSY-ZZ-012:漂移标题\n- 可信度: A\n- 一句话: 甲\n"})
+        return raises_buildfail(lambda: parse_entries(d))
+
+    def red_bad_level_letter():
+        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-013", "非法级", "F", "甲", "甲内容。")})
+        return raises_buildfail(lambda: parse_entries(d))
+
+    def red_real_face_consistent():
+        entries, counts, n_files = check_pair()
+        if not entries:
+            return False, "真面解析 0 条"
+        return True, ""
+
+    def red_tampered_product():
+        prod = OUT.read_text("utf-8")
+        mid = len(prod) // 2
+        tampered = prod[:mid] + "X" + prod[mid + 1:]
+        d = fixture_dir({})
+        bad = d / "psych-kb.tampered.js"
+        bad.write_text(tampered, encoding="utf-8", newline="\n")
+        return raises_buildfail(lambda: check_pair(KB_DIR, bad))
+
+    leg("正例·单卡解析+情绪关联", ok_parse_one)
+    leg("E 级构建期排除并计数", ok_e_excluded)
+    leg("内容句界截断", ok_truncate)
+    leg("全 E 面产物为空库（供 main 的红腿判定）", ok_ship_zero_guard)
+    leg("缺可信度字段即停", red_missing_level)
+    leg("条目撞号即停", red_dup_id)
+    leg("只有规范与索引即停", red_only_spec)
+    leg("卡行式漂移即停（禁静默产出空库）", red_shape_drift)
+    leg("可信度非法字母即停", red_bad_level_letter)
+    leg("真面源⇄产物一致（正例）", red_real_face_consistent)
+    leg("真产物篡改一位必判不一致（变异腿）", red_tampered_product)
+
+    passed = [n for n, ok, _ in results if ok]
+    failed = [(n, why) for n, ok, why in results if not ok]
+    for name, ok, why in results:
+        print("  %-46s %s%s" % (name, "OK" if ok else "FAIL", ("  " + why) if why else ""))
+    if failed:
+        print("PSYCH-KB-SELFTEST-FAIL: %d/%d 腿通过，失败 %d 条：%s"
+              % (len(passed), len(results), len(failed),
+                 "、".join(n for n, _ in failed)))
+        sys.exit(1)
+    entries, counts, _n = parse_entries()
+    print("PSYCH-KB-SELFTEST-PASS: %d/%d 腿（真面 %d 条 A%d B%d C%d D%d E排除%d｜变异腿咬合 1 处）"
+          % (len(passed), len(results), len(entries), counts["A"], counts["B"], counts["C"],
+             counts["D"], counts["E"]))
+
+
+def main():
+    try:
+        if "--selftest" in sys.argv:
+            selftest()
+            return
+        if "--check" in sys.argv:
+            entries, counts, _n = check_pair()
+            print("PSYCH-KB-CHECK-PASS: 产物与源一致（%d 条，A%d B%d C%d D%d，E 排除 %d）"
+                  % (len(entries), counts["A"], counts["B"], counts["C"], counts["D"], counts["E"]))
+            return
+        entries, counts, n_files = parse_entries()
+        text = build_text(entries, counts, n_files)
+        OUT.write_text(text, encoding="utf-8", newline="\n")
+        size = OUT.stat().st_size
+        ship_n = sum(counts[k] for k in SHIP_LEVELS)
+        print("PSYCH-KB-BUILD-PASS: 入库 %d 条（A:%d B:%d C:%d D:%d，E 排除 %d），"
+              "源文件 %d 个 -> %s（%s bytes）"
+              % (ship_n, counts["A"], counts["B"], counts["C"], counts["D"], counts["E"],
+                 n_files, OUT.relative_to(ROOT), format(size, ",")))
+        if ship_n == 0:
+            fail("全部条目均为 E 级，产品件将是空库：先升级条目再重建")
+    except BuildFail as e:
+        print("PSYCH-KB-BUILD-FAIL: " + str(e))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

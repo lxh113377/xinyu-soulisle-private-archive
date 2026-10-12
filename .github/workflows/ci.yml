@@ -40,6 +40,13 @@ jobs:
         run: |
           python _test/vendor_freshness_check.py
           python _test/vendor_freshness_check.py --selftest
+      # r129：知识库条目卡是**多生产者**文件（AI 入库员 + 人工更正都写），数据件由构建器生成且禁手改。
+      # 这道门在受理面才真正有意义：CI checkout 的就是提交面，而「源卡没入库、数据件是旧的」这种漂移
+      # 在工作树上永远看不见（第 4 轮 24 张源卡未跟踪活了 3 轮，本地电池/CI 双双零告警）。
+      - name: 心理学知识库 源卡⇄数据件 一致性守卫（含 --selftest 防恒真）
+        run: |
+          python _test/psych_kb_build.py --check
+          python _test/psych_kb_build.py --selftest
       - name: 对标源数据台账自证（漂移判据非恒真；联网采集属人工轮次动作，不在 CI 里跑）
         run: python _test/benchmark_metrics.py --selftest
       - name: 情绪评测集门禁（accuracy ≥ 95% 且危机全召回）

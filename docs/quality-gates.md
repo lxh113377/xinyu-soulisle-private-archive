@@ -42,6 +42,7 @@ python _test/ux_guards_check.py          # TTS 朗读 / 对话窗口化 / 响应
 python _test/dock_auto_check.py          # 对话坞滚动收起 / 三态循环 / 演示态让位（D1-D11 逐项独立，禁聚合掩盖）。**r105 接线**：r104 立好后既不在电池也不在 CI，G16 第五腿判为孤儿判据（「文档写了」不等于有人在跑）；接线前 HEAD 面与工作树面各自实测 PASS，服务不可达自回 rc=2 不判绿。
 python _test/build_jar.py --selftest     # 停服务前的属主归类：ours / same-artifact / foreign / unknown 四档，默认只停本工具起的（`--takeover` 才接管）。纯函数离线桩，不起进程、不碰端口、不读产物。立因 r104 实测 `stop_holders()` 按端口无脑杀，把并行会话的验证服务打死三次——被打死的一方只看到「服务自己掉了」，红因无法归因。
 python _test/size_budget_check.py        # 首屏体积预算 + 「新文件必须登记」覆盖判据（漏登记即红）
+python _test/psych_kb_build.py --check    # 心理学知识库「条目卡 ⇄ 产品数据件」一致（源为 `交付物/心理学知识库/*.md`，数据件禁手改）。**r129 接线**：r113 立好后至 r128 既不在电池也不在 CI，只在人工轮次里被想起来跑 —— 第 4 轮 24 张源卡（篇章 13-16）因此以未跟踪状态活了 3 轮，HEAD 面数据件仍停在第 3 轮 74 条；`git archive HEAD` 出的提交面实跑本判据 rc=1「产物与知识库源不一致」，而当时本地三绿。`--selftest` 11 条（当日值，现值由脚本自印；正例 5 + 该红 6，含「真产物篡改一位必判不一致」变异腿与「卡行式漂移不得静默产出空库」）
 python _test/vendor_freshness_check.py   # vendor 完整性哈希 + 版本对账；--check-upstream 报上游漂移
 python _test/benchmark_metrics.py        # 对标源数据台账（16 仓指标 + 与上次快照逐字段漂移）；联网采集，人工轮次跑
 python _test/bench_quality_gates.py      # ↑ 的「质量门同址尺」子系统（r95 整块迁出，14 节点 ast.dump 全等）：五类「能不能让构建失败」+ CI 面相关性取样 `qg_ci_pick` + 三值门面行 `qg_gate_line`。不是电池条目（无 main），由 benchmark_metrics 的 `--quality-gates` 通道调用；变异腿必须改 **本模块** 的全局名（改 benchmark_metrics 的同名变量=空腿，本轮实测两条腿各踩过一次）

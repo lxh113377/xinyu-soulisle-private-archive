@@ -152,6 +152,15 @@ SUITES = [
     ("eol_parity_selftest", [sys.executable, "_test/eol_parity_check.py", "--selftest"]),
     ("size_budget", [sys.executable, "_test/size_budget_check.py"]),
     ("size_budget_selftest", [sys.executable, "_test/size_budget_check.py", "--selftest"]),
+    # r129：心理学知识库「条目卡 ⇄ 产品数据件」一致性判据入阻断链。
+    # 立此条的一手代价：第 4 轮 24 张源卡（篇章 13-16）自 r123 落盘后一直是未跟踪状态，
+    # HEAD 面数据件仍是第 3 轮的 74 条 —— 该判据在 `git archive HEAD` 出的临时面实跑 rc=1
+    # 「产物与知识库源不一致」，而本地电池/CI 从未跑过它（只在人工轮次里被想起来跑一次），
+    # 所以这个漂移活了 3 轮零告警。公网注入的将是旧库，条目卡里的 D 级争议并陈进不了回复。
+    # 同族未接线的另一件：wit_quotes_build.py（表达语料库构建器）同样无 --selftest、不在电池，
+    # 本轮不代处置（该面有并行会话在途），登记于 memory/07-next-steps。
+    ("psych_kb_build", [sys.executable, "_test/psych_kb_build.py", "--check"]),
+    ("psych_kb_build_selftest", [sys.executable, "_test/psych_kb_build.py", "--selftest"]),
     ("emotion_wiring", [sys.executable, "_test/emotion_wiring_check.py"]),
     ("emotion_wiring_selftest", [sys.executable, "_test/emotion_wiring_check.py", "--selftest"]),
     ("vendor_freshness", [sys.executable, "_test/vendor_freshness_check.py"]),
