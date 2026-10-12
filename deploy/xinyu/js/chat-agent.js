@@ -309,11 +309,17 @@ window.ChatAgent = (function () {
     for (const h of history.slice(-HISTORY_MAX)) messages.push(h);
     messages.push({ role: "user", content: text });
     const s = strategyOf(emo);
-    const reply = await llmFetch(messages,
+    const raw = await llmFetch(messages,
       s.temperature ?? STR.defaultTemperature ?? 0.85,
       s.maxTokens ?? STR.defaultMaxTokens ?? 220,
       onDelta);
-    return { reply: reply, kbUsed: sys.kbUsed };
+    /* r133：r132 建了 verifyCitations 但无调用点，本行接上。非流式改写回复；流式已逐字
+     * 吐给用户，改写会让屏幕与内存不一致，故走原文只回计数。 */
+    const v = verifyCitations(raw, sys.kbUsed);
+    const streamed = !!onDelta;
+    return { reply: streamed ? raw : v.text, kbUsed: sys.kbUsed,
+      citeChecked: v.checked, citeMatched: v.matched, citeUnmatched: v.unmatched,
+      citeApplied: !streamed };
   }
 
   const EMOTIONS = Object.keys(STR.strategy);
@@ -383,6 +389,7 @@ window.ChatAgent = (function () {
                face, divergence };
     }
     let reply, mode, streamed = false, kbUsed = [];
+    let citeChecked = 0, citeMatched = 0, citeUnmatched = 0, citeApplied = false;
     // 记录"本轮发给模型前已存在的记忆条数"：record 在之后才写，所以这里取到的是**此前**的条数
     const memBefore = (window.MemoryStore && window.MemoryStore.count) ? window.MemoryStore.count() : 0;
     const dropBefore = droppedCount();   // 同理：概要替代掉的条数要在 remember 之前取
@@ -391,6 +398,8 @@ window.ChatAgent = (function () {
         const o = await onlineReply(text, emo, onDelta);
         reply = o.reply;
         kbUsed = o.kbUsed || [];
+        citeChecked = o.citeChecked || 0; citeMatched = o.citeMatched || 0;
+        citeUnmatched = o.citeUnmatched || 0; citeApplied = !!o.citeApplied;
         mode = "model";
         llmBad = false;
         streamed = !!onDelta;
@@ -407,7 +416,12 @@ window.ChatAgent = (function () {
              dropped: mode === "model" ? dropBefore : 0,
              /* r132：只有真走 LLM 的那一轮才谈得上「依据」——降级/离线模板没注入知识库，
               * 此时标依据就是说谎（与 memory/dropped 同口径）。 */
-             kbUsed: mode === "model" ? kbUsed : [] };
+             kbUsed: mode === "model" ? kbUsed : [],
+             /* r133 引用消费遥测（口径同 memory/dropped，降级/离线恒 0）。见 07-next-steps。*/
+             citeChecked: mode === "model" ? citeChecked : 0,
+             citeMatched: mode === "model" ? citeMatched : 0,
+             citeUnmatched: mode === "model" ? citeUnmatched : 0,
+             citeApplied: mode === "model" ? citeApplied : false };
   }
 
   /* 对外仍叫 respond：包一层 turn()，每轮起止就成了可等的读数（r100） */

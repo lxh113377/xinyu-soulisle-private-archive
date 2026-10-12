@@ -313,17 +313,13 @@ window.ChatAgent = (function () {
       s.temperature ?? STR.defaultTemperature ?? 0.85,
       s.maxTokens ?? STR.defaultMaxTokens ?? 220,
       onDelta);
-    /* r133 接线：r132 建了 verifyCitations 但没接调用点（输出面等于无核对，模型可凭空标编号）。
-     * 这里在**非流式**时改写最终回复；流式下逐字已吐给用户，改写会造成"屏幕上文字与
-     * 内存里文字不一致"，故流式走原文 + 只回计数（口径差异写进返回值的 citeApplied 字段）。 */
+    /* r133：r132 建了 verifyCitations 但无调用点，本行接上。非流式改写回复；流式已逐字
+     * 吐给用户，改写会让屏幕与内存不一致，故走原文只回计数。 */
     const v = verifyCitations(raw, sys.kbUsed);
     const streamed = !!onDelta;
-    return {
-      reply: streamed ? raw : v.text,
-      kbUsed: sys.kbUsed,
+    return { reply: streamed ? raw : v.text, kbUsed: sys.kbUsed,
       citeChecked: v.checked, citeMatched: v.matched, citeUnmatched: v.unmatched,
-      citeApplied: !streamed
-    };
+      citeApplied: !streamed };
   }
 
   const EMOTIONS = Object.keys(STR.strategy);
@@ -421,9 +417,7 @@ window.ChatAgent = (function () {
              /* r132：只有真走 LLM 的那一轮才谈得上「依据」——降级/离线模板没注入知识库，
               * 此时标依据就是说谎（与 memory/dropped 同口径）。 */
              kbUsed: mode === "model" ? kbUsed : [],
-             /* r133 引用消费遥测：模型这一轮实际标了几处依据、其中几处对得上注入集。
-              * 「候选给了但一条都没被消费」是语料库有效性问题的唯一可测信号 —— 没有它，
-              * 引用检出率 0% 只会被当成「模型化用其意」来解释，无从证伪。降级/离线恒为 0。*/
+             /* r133 引用消费遥测（口径同 memory/dropped，降级/离线恒 0）。见 07-next-steps。*/
              citeChecked: mode === "model" ? citeChecked : 0,
              citeMatched: mode === "model" ? citeMatched : 0,
              citeUnmatched: mode === "model" ? citeUnmatched : 0,
