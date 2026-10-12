@@ -53,6 +53,16 @@
 3. **契约判据先报产物身份**：C4 开跑前读 `build`，缺失 ⇒ 点名「以下运行态结果不可当新代码证据」
    （**不判红**——换新产物不由判据控制，判红只会把环境问题刷成常驻红项）；严格模式 `--require-build`
    ⇒ 直接 rc=2 未验，而不是给出一堆 404/405 的红。
+4. **更正注（诚实记录）**：前两轮把「95,429 B 瘦 jar 冒充 fat jar」写成「无人发现」是**不准确**的 ——
+   `jar_shape_check.py` + `server_preflight.py` 的 **P0（r70 立）**一直盯着字节数与 MANIFEST，
+   本轮实测它一句话点出真因（`thin jar｜bytes=95429 libs=0`）。真因是**我们撞了 `mvn package`
+   却没先跑 preflight**，属「有守卫而我没用」，不是「无守卫」。
+   另：`_test/build_jar.py`（r38）本就是「停服务→构建→验货」整套，但其四档归属协议
+   （ours/unknown/same-artifact/foreign，`--takeover` 默认关）**不会**停他人进程
+   ⇒ 8123 被他人持有时它同样构不成解法，旁路构建仍是必要补位。
+   **改写后的教训**：动手前先问「这件事仓里有没有现成的尺」。
+5. **`server_preflight.py` 加了两条归因腿**（r131）：P0 FAIL 时也探一次活并报运行实例 `build`，
+   把「盘上产物不合格」与「运行实例旧」分开归因（本轮实测两者同时成立，此前必被混成一件事）。
 
 **绕开 jar 锁的旁路构建（可复用）**：`mvn package` 撞在他人持有的 `soulisle-server.jar` 上
 （`repackage` 无法 rename 成 `.jar.original`），且 `-Djar.finalName` **无效**。

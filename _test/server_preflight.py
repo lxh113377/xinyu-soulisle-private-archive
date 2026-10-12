@@ -58,6 +58,15 @@ def main() -> int:
     if jar_rc != 0:
         print("PREFLIGHT-FAIL: 产物不合格 ⇒ %s（先跑 `python _test/build_jar.py`，它会先停占 8123 的进程再构建）" % jar_msg)
         print("  ⇒ 别拿这枚 jar 跑回归：先 `python _test/build_jar.py`（它会先停占 8123 的进程再构建再验货）")
+        # r131：P0 抓的是**盘上**那枚；正在跑的可能是另一枚。跑得动就顺手报出运行实例身份，
+        # 免得把「盘上产物坏了」与「运行实例旧」混成一件事（r130/r131 两次都混过）。
+        try:
+            with urllib.request.urlopen(BASE.rstrip("/") + "/api/health", timeout=5) as r:
+                d = json.loads(r.read().decode("utf-8", "replace"))
+            print("  · 运行实例仍在跑，产物身份 = %s" % (d.get("build") or "**缺失**（r131 之前的产物）"))
+            print("    ⇒ 盘上产物不合格 ≠ 运行实例坏；两者要分开归因。")
+        except Exception:
+            print("  · 运行实例也不可达 ⇒ 这一轮连探活都不必做，先修产物。")
         return jar_rc
     url = BASE.rstrip("/") + "/api/health"
     try:
@@ -82,6 +91,15 @@ def main() -> int:
         print("PREFLIGHT-FAIL: status=%s indexFound=%s webRoot=%s ⇒ 服务在但不自证源命中"
               % (data.get("status"), data.get("indexFound"), data.get("webRoot")))
         return 1
+    # r131：把**运行实例的产物身份**也读出来，与 P0 的「盘上产物」对账。
+    # P0 判的是盘上那枚 jar 是不是 fat/新鲜；这一行判的是「**正在跑的**是不是它」——
+    # 两者不是一回事：8123 上可以是昨天那枚（r130/r131 实测正是如此），而 P0 看着盘上是绿的。
+    build = data.get("build")
+    if not build:
+        print("  · 运行实例产物身份: **缺失** ⇒ 该实例是 r131 之前的产物（/api/health 无 build 字段）。"
+              "依赖新接口的套件请另起含新代码的实例，别把这里的绿读成新代码没问题")
+    else:
+        print("  · 运行实例产物身份: %s（与 P0 的盘上产物对不上 ⇒ 跑的是另一枚，勿混用曲线）" % build)
     print("PREFLIGHT-PASS: %s ｜ 服务 status=UP webRoot=%s 前端与vendor均命中"
           % (jar_msg, data.get("webRoot")))
     return 0
