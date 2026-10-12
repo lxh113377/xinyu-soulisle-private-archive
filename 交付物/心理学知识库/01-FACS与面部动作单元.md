@@ -19,10 +19,10 @@
 - 可信度：D
 - 定级理由：Girard 2021（强度伪影）与 Gunnery & Ruben 2016 元分析（感知层部分支持）均为同行评审一手研究且结论对立，按规范强制 D 两方并陈
 - 一句话：心屿 smileKind/masking 判据（AU12+AU6/AU7 比值 0.20）的心理学原型与效度边界：真笑标记在「观察者感知真诚」层面有效，但作为「真心指标」存在强度伪影争议，产品措辞必须用「可能」。
-- 内容：本项目表情侧判据的心理学原型：真笑（Duchenne 笑）= 口部 AU12（颧大肌，对应 blendshape mouthSmile）+ 眼周 AU6/AU7（眼轮匝肌眶部，对应 cheekSquint/eyeSquint）同时参与；社交性微笑只有口部。心屿据此立了三态判据 smileKind（face-engine.js:84-100）：口部微笑<0.35=未检出；眼周/口部比值≥0.20=真笑，否则社交性微笑；社交笑且紧张线索（抿唇/压眉）≥0.30⇒masking=强颜欢笑嫌疑（app.js:129 文案用「可能是强颜欢笑」）。效度两方：支持方——Gunnery & Ruben 2016 元分析（被引约 246）显示观察者确实用 Duchenne 标记判断真诚，视频比照片效应更强；Etcoff 等 2021 的 Botox 自然实验提供感知层因果级补强（AU12 强度匹配下化学移除眼周 Duchenne 标记后，微笑被观察者评为更少感到/更不自发/更不强烈/更不开心，四项均显著；见来源⑤，其「最强版假说未支持、标记可摆出」细节归质疑方）。质疑方——Krumhuber & Manstead 2009 证明眼周参与可以伪装；Girard & Cohn 2021 控制微笑强度/时长后正式检验八项竞争假说：多数被反驳或仅微弱支持，眼周收缩对自评积极情绪的独特信息几乎全部与微笑强度/时长共享、缺乏特异性且高度依赖情境（对观察者评分虽有独特效应，作者称其为「艺术真实」而非「光学真实」）；Gunnery/Hall/Ruben 2013 证明 Duchenne 笑可被刻意做出。产品启示：判据可用但结论必须降格——masking 只能触发探询与标注（「可能是强颜欢笑」「礼貌性微笑+紧绷迹象」这类或然措辞），不能下「你在装」「假笑」断言；ratioOn=0.20 仅由 4 张真笑照标定，扩样本必须复标（rules:196-199）。
+- 内容：本项目表情侧判据的心理学原型：真笑（Duchenne 笑）= 口部 AU12（颧大肌，对应 blendshape mouthSmile）+ 眼周 AU6/AU7（眼轮匝肌眶部，对应 cheekSquint/eyeSquint）同时参与；社交性微笑只有口部。心屿据此立了三态判据 smileKind（face-engine.js:84-100）：口部微笑<0.35=未检出；眼周/口部比值≥0.20=真笑，否则社交性微笑；社交笑且紧张线索（抿唇/压眉）≥0.30⇒masking=强颜欢笑嫌疑（app.js:129 文案用「可能是强颜欢笑」）。效度两方：支持方——Gunnery & Ruben 2016 元分析（被引口径：Crossref 133 / S2 155）显示观察者确实用 Duchenne 标记判断真诚，视频比照片效应更强；Etcoff 等 2021 的 Botox 自然实验提供感知层因果级补强（AU12 强度匹配下化学移除眼周 Duchenne 标记后，微笑被观察者评为更少感到/更不自发/更不强烈/更不开心，四项均显著；见来源⑤，其「最强版假说未支持、标记可摆出」细节归质疑方）。质疑方——Krumhuber & Manstead 2009 证明眼周参与可以伪装；Girard & Cohn 2021 控制微笑强度/时长后正式检验八项竞争假说：多数被反驳或仅微弱支持，眼周收缩对自评积极情绪的独特信息几乎全部与微笑强度/时长共享、缺乏特异性且高度依赖情境（对观察者评分虽有独特效应，作者称其为「艺术真实」而非「光学真实」）；Gunnery/Hall/Ruben 2013 证明 Duchenne 笑可被刻意做出。产品启示：判据可用但结论必须降格——masking 只能触发探询与标注（「可能是强颜欢笑」「礼貌性微笑+紧绷迹象」这类或然措辞），不能下「你在装」「假笑」断言；ratioOn=0.20 仅由 4 张真笑照标定，扩样本必须复标（rules:196-199）。
 - 来源：
   - [Duchenne 标记在感知层有效但作为「真心指标」被指为强度伪影] Girard, J.M., Cohn, J.F., Yin, L. & Morency, L.-P. (2021). Reconsidering the Duchenne Smile: Formalizing and Testing Hypotheses About Eye Constriction and Positive Emotion. Affective Science, 2(1):32–47, DOI 10.1007/s42761-020-00030-w；https://pmc.ncbi.nlm.nih.gov/articles/PMC8317937/（2026-10-11 PMC 页面实抓核实）
-  - [观察者确实用 Duchenne 标记判真诚（视频>照片）] Gunnery, S.D. & Ruben, M.A. (2016) Perceptions of Duchenne and non-Duchenne smiles: A meta-analysis, Cognition and Emotion 30(3):501-515, DOI 10.1080/02699931.2015.1018817（2026-10-11 Crossref 实抓核实：作者 S. D. Gunnery、M. A. Ruben；被引约 246）
+  - [观察者确实用 Duchenne 标记判真诚（视频>照片）] Gunnery, S.D. & Ruben, M.A. (2016) Perceptions of Duchenne and non-Duchenne smiles: A meta-analysis, Cognition and Emotion 30(3):501-515, DOI 10.1080/02699931.2015.1018817（2026-10-12 复核：Crossref is-referenced-by-count=133、S2 citationCount=155，原「被引约 246」无口径可复现，删数字）
   - [Duchenne 笑可被刻意做出，AU6 非「不可伪造」] Gunnery, S.D., Hall, J.A. & Ruben, M.A. (2013). The Deliberate Duchenne Smile. Journal of Nonverbal Behavior（检索转述）
   - [Duchenne 标记可被故意伪装（含眼周参与）] Krumhuber, E.G. & Manstead, A.S.R. (2009) Can Duchenne smiles be feigned?（原 FE-017 来源②并入；未附 URL，该论断另有 Girard & Cohn 2021 与 Gunnery/Hall/Ruben 2013 两条带源支撑）
   - [AU12 匹配下化学移除眼周 Duchenne 标记（AU6 检出率 97%→19%）后，微笑被评为更少感到/更不自发/更不强烈/更不开心（−0.30/−0.25/−0.24/−0.11，均显著）；作者称不支持最强版假说、标记可在无积极情绪时摆出但仍被感知为真] Etcoff, N., Stock, S., Krumhuber, E. G., & Reed, L. I. (2021). A Novel Test of the Duchenne Marker: Smiles After Botulinum Toxin Treatment for Crow's Feet Wrinkles. Frontiers in Psychology, 11, 612654. DOI 10.3389/fpsyg.2020.612654. PMID 33510690（2026-10-11 PMC 全文实抓核实）；https://pmc.ncbi.nlm.nih.gov/articles/PMC7835207/
@@ -43,7 +43,7 @@
 - 一句话：浏览器端 MediaPipe FaceLandmarker 可稳定拿到 478 点人脸网格与 52 维 blendshape（近似 AU 强度），模型+运行时约 13.7MB 且可惰性加载，这是端侧情绪/微表情特征的全部原料。
 - 内容：478 点=468 网格+10 虹膜；52 维 blendshape 为 0~1 系数（近似 FACS 的 AU），输入 256×256 裁剪脸。本仓一手实测：face_landmarker.task 3,758,596B + vision_wasm_internal.wasm 9,574,032B 等合计 13,674,721B，惰性加载（用户点开才下），GPU 优先 CPU 回落，WASM SIMD 探测门（不达标明示降级）。运行口径：8fps 轮询、EMA α=0.3、读数有效期 3000ms。
 - 来源：
-  - [478 点+52 blendshape+256×256 输入] webai.show 技术文档（MediaPipe 模型卡转述）；URL: https://webai.show
+  - [478 点+52 blendshape+256×256 输入] Google AI Edge 官方文档 Face landmark detection guide（页面直连超时，题录经检索与本仓 rules:3 注释互证）；库内互证行见 [[PSY-MM-005]] 来源③
   - [vendor 字节、惰性加载、GPU/CPU 回落、SIMD 探测、8fps/EMA/3000ms] 本仓实测：src/vendor/mediapipe 目录字节；face-mediapipe-bridge.js:18-21,65-66,76-85；face-smile-rules.js:203-207
 - 关联：[[PSY-FE-011]]（支撑：微表情需更高采样率）｜[[PSY-FE-013]]（补充：运行时与预算）
 - 待验证点：官方 ai.google.dev 文档页未直接抓到（超时）；单帧推理延迟未实测
@@ -53,10 +53,10 @@
 - 可信度：B
 - 定级理由：多篇同行评审基准+顶刊综述（PSPI，被引1400+）一致，但基准数字随年份漂移、未达教科书级稳定值
 - 一句话：表情识别存在三层落差：摆拍基准 SOTA 90%+、自然场景大数据 63-66%、而真实自发场景中面部构型与情绪的共现率仅约19%。
-- 内容：硬数据：三层基准给天花板：摆拍精选 RAF-DB（约3万张）SOTA≈90–92%、老混合基准 FER2013 SOTA≈75.2%（人类仅65–68%）、自然场景 AffectNet 8类 SOTA≈63–66%（2024-2025 综述，2026-10-11 检索）。自发真实场景给地板：Barrett 等顶刊综述（PSPI 20(1):1-68，PMC6640856 原文实读）发现实验室自发场景中假设面部构型仅在 19%（.15-.25）的对应情绪事件出现（r=.32）；真实格斗赛后仅 8/55、25/119 名胜者露 Duchenne 真笑；摆拍与自发差异显著。产品含义：任何 FER 模块在真实摄像头上都没有可靠准确率，本仓 MediaPipe blendshape+规则法不例外——自证：r102 实测读数强度 p25 仅 0.47，ratioOn=0.20 仅 4 张真笑照标定（face-smile-rules.js:196-199 自注扩样本必须复标）。
+- 内容：硬数据：三层基准给天花板：摆拍精选 RAF-DB（约3万张）SOTA≈90–92%、老混合基准 FER2013 自报单网 SOTA≈73.28%（人类仅65–68%；Khaireddin & Chen 2021 原文口径）、自然场景 AffectNet 8类 SOTA≈63–66%（2024-2025 综述，2026-10-11 检索）。自发真实场景给地板：Barrett 等顶刊综述（PSPI 20(1):1-68，PMC6640856 原文实读）发现实验室自发场景中假设面部构型仅在 19%（.15-.25）的对应情绪事件出现（r=.32）；真实格斗赛后仅 8/55、25/119 名胜者露 Duchenne 真笑；摆拍与自发差异显著。产品含义：任何 FER 模块在真实摄像头上都没有可靠准确率，本仓 MediaPipe blendshape+规则法不例外——自证：r102 实测读数强度 p25 仅 0.47，ratioOn=0.20 仅 4 张真笑照标定（face-smile-rules.js:196-199 自注扩样本必须复标）。
 - 来源：
   - [自发场景面部构型与情绪共现仅约19%，真笑 8/55 与 25/119] Barrett, Adolphs, Marsella, Martinez & Pollak (2019) Emotional Expressions Reconsidered, Psychological Science in the Public Interest 20(1):1-68；https://pmc.ncbi.nlm.nih.gov/articles/PMC6640856/
-  - [FER2013 人类准确率 65-68%、SOTA 约75.2%] Khaireddin & Chen (2021) State of the Art Performance on FER2013, arXiv（被引400+）；https://arxiv.org
+  - [FER2013 人类准确率 65-68%、自报单网 73.28%] Khaireddin, Z. & Chen, T. (2021) State-of-the-Art Performance on FER2013, arXiv:2105.03588；https://arxiv.org/abs/2105.03588 （S2 citationCount=238）
   - [RAF-DB SOTA 90-92%、AffectNet 8类 63-66%] 2024-2025 FER 综述基准检索（paperswithcode 系数字，2026-10-11）
 - 关联：[[PSY-FE-004]]（支撑——普适性争议的量化面）｜[[PSY-MM-003]]（支撑）
 - 待验证点：FER SOTA 数字随年份漂移（RAF-DB 各文 87.65%~96.51% 不等），引用必须注检索日期；该综述常被转引的『真实场景准确率约50%或更低』一句本轮未在原文核实到，未采用；改用已核实的 .19/.15-.25/8-55/25-119；本仓表情侧缺对外可复跑的准确率指标（文本侧 73 条/98.6% 不适用于表情）
@@ -69,8 +69,10 @@
 - 一句话：口罩遮挡使人脸情绪识别下降约20个百分点（人因研究 88%→68%；机器方法约70.76%），遮挡应显式提示而非继续输出分类。
 - 内容：两类证据一致：人因研究（Face masks impair facial emotion recognition and induce specific emotion confusions, 2022）显示口罩使人脸情绪识别 88%→68%，约掉 20 个百分点，且损伤随情绪类别不同（依赖嘴部线索的情绪掉得更多）；机器方法（Elsayed et al. 2023, PMC10067009）在口罩下 3 类情绪识别 70.76%。含义：口罩不是噪声而是结构性信息缺失——嘴部 blendshape 全零时，依赖嘴部权重的 joy/sadness/contempt 判据全部失效，此时读数不是『低置信』而是『不可判』，应单独出『遮挡』提示而非继续给分类。
 - 来源：
-  - [口罩使人脸情绪识别约掉20个百分点（88%→68%）] Face masks impair facial emotion recognition and induce specific emotion confusions (2022)；2026-10-11 检索
+  - [口罩使人脸情绪识别 88%→68%（3 实验，摘要逐字）] Rinck, M., Primbs, P., Verpaalen, M., & Bijlstra, G. (2022) Face masks impair facial emotion recognition and induce specific emotion confusions. Cognitive Research: Principles and Implications, 7(1), 83. DOI 10.1186/s41235-022-00430-5；https://doi.org/10.1186/s41235-022-00430-5
   - [机器方法口罩下情绪识别 70.76%（3类）] Elsayed, Y. et al. (2023) PMC10067009；https://pmc.ncbi.nlm.nih.gov/articles/PMC10067009
+  - [独立复制①：口罩强烈干扰对面部情绪的读取] Carbon, C.-C. (2020) Wearing Face Masks Strongly Confuses Counterparts in Reading Emotions. Frontiers in Psychology, 11, 566886. DOI 10.3389/fpsyg.2020.566886；https://doi.org/10.3389/fpsyg.2020.566886
+  - [独立复制②：口罩降低情绪识别准确度与感知亲密度] Grundmann, F., Epstude, K., & Scheibe, S. (2021) Face masks reduce emotion-recognition accuracy and perceived closeness. PLOS ONE, 16(4), e0249792. DOI 10.1371/journal.pone.0249792；https://doi.org/10.1371/journal.pone.0249792
 - 关联：[[PSY-FE-015]]（补充——准确率落差的遮挡特例）
 - 待验证点：本仓尚无遮挡检测（2026-10-11 代码实读），嘴部 blendshape 全零启发式为建议方案、未实现
 - 入库：2026-10-11 · 第1轮
