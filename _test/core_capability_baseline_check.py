@@ -87,9 +87,16 @@ def dataset_case_fps(path=None):
 
 
 def parse_node_test(out):
-    """解析 `node --test` 的汇总行（ℹ tests/pass/fail N）。"""
-    g = lambda k: (int(re.search(r"ℹ %s (\d+)" % k, out).group(1))
-                   if re.search(r"ℹ %s (\d+)" % k, out) else None)
+    """解析 `node --test` 的汇总行：spec（`ℹ tests 31`）与 TAP（`# tests 31`）双兼容。
+
+    r162 A0（一手实测）：node 22/24 在 stdout 非 TTY（子进程捕获/管道）时默认输出 TAP
+    reporter（`# ` 前缀），TTY 下默认 spec（`ℹ` 前缀）。旧正则只认 ℹ ⇒ rc=0 全过却
+    解析不到汇总行，N2 误报 UNVERIFIED。两种都是官方 reporter 的合法汇总行，读一种
+    漏一种 = 仪器盲区。行首锚定 + 关键词+数字三元组防 TAP 注释行误匹配。
+    """
+    def g(k):
+        m = re.search(r"^(?:ℹ|#)\s+%s\s+(\d+)" % k, out, re.M)
+        return int(m.group(1)) if m else None
     return {"tests": g("tests"), "pass": g("pass"), "fail": g("fail")}
 
 
@@ -214,7 +221,9 @@ def main():
     cur, unverified = measure()
 
     if a.selftest:
-        return selftest(base, cur)
+        rc_p = parse_selftest()
+        rc_r = selftest(base, cur)
+        return rc_p or rc_r
 
     bad, notes, un2 = ratchet(cur, base)
     unverified = unverified + un2
@@ -333,6 +342,40 @@ def selftest(base, cur):
         print("  " + d)
     print("CORE-CAP-SELFTEST-%s %d/%d 腿（应红的红、应绿的绿，红因点名到题）"
           % ("PASS" if ok else "FAIL", n_ok, len(legs)))
+    return 0 if ok else 1
+
+
+def parse_selftest():
+    """parse_node_test 自证腿（r162 A0 装）：两种官方 reporter 都取到数、无汇总行不读成 0。
+
+    合成输入、零子进程。修的是解析函数本身 ⇒ 反例只钉这里，防将来正则再被改窄/改宽。
+    第 4 腿钉误匹配防护：TAP 失败 YAML 块内缩进的 `# tests 5` 不得顶掉真汇总 31。
+    """
+    legs = [
+        ("spec 汇总（ℹ 前缀，TTY 默认）⇒ 31/31/0",
+         "ℹ tests 31\nℹ suites 0\nℹ pass 31\nℹ fail 0",
+         {"tests": 31, "pass": 31, "fail": 0}),
+        ("TAP 汇总（# 前缀，node22/24 非 TTY 默认）⇒ 31/31/0",
+         "# Subtest: cueRegions\nok 31 - cueRegions\n1..31\n# tests 31\n# suites 0\n# pass 31\n# fail 0",
+         {"tests": 31, "pass": 31, "fail": 0}),
+        ("无汇总行 ⇒ tests None（禁读成 0/禁读成绿）",
+         "ok 1 - some test\n1..1\n",
+         {"tests": None, "pass": None, "fail": None}),
+        ("TAP 失败 YAML 块缩进 # tests 5 不得误匹配 ⇒ 仍取 31/31/0",
+         "not ok 1 - x\n  ---\n  # tests 5\n  ...\n# tests 31\n# pass 31\n# fail 0",
+         {"tests": 31, "pass": 31, "fail": 0}),
+    ]
+    ok, detail = True, []
+    for name, sample, want in legs:
+        got = parse_node_test(sample)
+        wrong = got != want
+        if wrong:
+            ok = False
+        detail.append("%s%s（got %s）" % ("✗" if wrong else "✓", name, got))
+    for d in detail:
+        print("  " + d)
+    print("CORE-CAP-PARSE-SELFTEST-%s %d/%d 腿（spec/TAP 双格式可读、无汇总行不读成绿、缩进注释不误匹配）"
+          % ("PASS" if ok else "FAIL", sum(1 for d in detail if d.startswith("✓")), len(legs)))
     return 0 if ok else 1
 
 
