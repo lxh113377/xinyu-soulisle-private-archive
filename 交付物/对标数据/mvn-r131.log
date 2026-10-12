@@ -33,13 +33,13 @@
 [INFO] -------------------------------------------------------
 [INFO] Running com.xinyu.soulisle.api.ChatControllerTest
 OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
-[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.715 s -- in com.xinyu.soulisle.api.ChatControllerTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.627 s -- in com.xinyu.soulisle.api.ChatControllerTest
 [INFO] Running com.xinyu.soulisle.api.EmotionControllerModelRouteTest
-01:07:22.370 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify: non-200 status=500 body={"emotion":"sadness","intensity":0.72,"confidence":0.83}
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.003 s -- in com.xinyu.soulisle.api.EmotionControllerModelRouteTest
+01:15:50.197 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify: non-200 status=500 body={"emotion":"sadness","intensity":0.72,"confidence":0.83}
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.958 s -- in com.xinyu.soulisle.api.EmotionControllerModelRouteTest
 [INFO] Running com.xinyu.soulisle.api.EmotionControllerTest
-[ERROR] Tests run: 12, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 0.275 s <<< FAILURE! -- in com.xinyu.soulisle.api.EmotionControllerTest
-[ERROR] com.xinyu.soulisle.api.EmotionControllerTest.evalOnRealDataset -- Time elapsed: 0.036 s <<< FAILURE!
+[ERROR] Tests run: 12, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 0.286 s <<< FAILURE! -- in com.xinyu.soulisle.api.EmotionControllerTest
+[ERROR] com.xinyu.soulisle.api.EmotionControllerTest.evalOnRealDataset -- Time elapsed: 0.058 s <<< FAILURE!
 org.opentest4j.AssertionFailedError: expected: <85> but was: <105>
 	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
 	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
@@ -52,7 +52,7 @@ org.opentest4j.AssertionFailedError: expected: <85> but was: <105>
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
 
-[ERROR] com.xinyu.soulisle.api.EmotionControllerTest.evalDetailReturnsEveryRow -- Time elapsed: 0.021 s <<< FAILURE!
+[ERROR] com.xinyu.soulisle.api.EmotionControllerTest.evalDetailReturnsEveryRow -- Time elapsed: 0.015 s <<< FAILURE!
 org.opentest4j.AssertionFailedError: expected: <100.0%> but was: <99.0%>
 	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
 	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
@@ -66,50 +66,50 @@ org.opentest4j.AssertionFailedError: expected: <100.0%> but was: <99.0%>
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
 
 [INFO] Running com.xinyu.soulisle.api.HealthControllerTest
-[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.048 s -- in com.xinyu.soulisle.api.HealthControllerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.055 s -- in com.xinyu.soulisle.api.HealthControllerTest
 [INFO] Running com.xinyu.soulisle.api.MemoryControllerTest
-[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.132 s -- in com.xinyu.soulisle.api.MemoryControllerTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.114 s -- in com.xinyu.soulisle.api.MemoryControllerTest
 [INFO] Running com.xinyu.soulisle.api.MemoryPortControllerTest
-[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.106 s -- in com.xinyu.soulisle.api.MemoryPortControllerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.102 s -- in com.xinyu.soulisle.api.MemoryPortControllerTest
 [INFO] Running com.xinyu.soulisle.api.UsageControllerTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.053 s -- in com.xinyu.soulisle.api.UsageControllerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.058 s -- in com.xinyu.soulisle.api.UsageControllerTest
 [INFO] Running com.xinyu.soulisle.config.AccessLogFilterTest
-01:07:23.313 [main] INFO com.xinyu.soulisle.config.AccessLogFilter -- access {"leg":"/api/chat","method":"GET","status":200,"ms":0,"n":1}
-01:07:23.349 [main] INFO com.xinyu.soulisle.config.AccessLogFilter -- access {"leg":"/api/chat","method":"GET","status":200,"ms":0,"n":1}
-[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.117 s -- in com.xinyu.soulisle.config.AccessLogFilterTest
+01:15:51.154 [main] INFO com.xinyu.soulisle.config.AccessLogFilter -- access {"leg":"/api/chat","method":"GET","status":200,"ms":0,"n":1}
+01:15:51.187 [main] INFO com.xinyu.soulisle.config.AccessLogFilter -- access {"leg":"/api/chat","method":"GET","status":200,"ms":0,"n":1}
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.127 s -- in com.xinyu.soulisle.config.AccessLogFilterTest
 [INFO] Running com.xinyu.soulisle.config.ApiGuardFilterTest
-[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.056 s -- in com.xinyu.soulisle.config.ApiGuardFilterTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.053 s -- in com.xinyu.soulisle.config.ApiGuardFilterTest
 [INFO] Running com.xinyu.soulisle.config.ApiTokenFilterTest
-[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.247 s -- in com.xinyu.soulisle.config.ApiTokenFilterTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.217 s -- in com.xinyu.soulisle.config.ApiTokenFilterTest
 [INFO] Running com.xinyu.soulisle.config.QuotaFilterTest
 [INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.024 s -- in com.xinyu.soulisle.config.QuotaFilterTest
 [INFO] Running com.xinyu.soulisle.config.UsageLedgerTest
-[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in com.xinyu.soulisle.config.UsageLedgerTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s -- in com.xinyu.soulisle.config.UsageLedgerTest
 [INFO] Running com.xinyu.soulisle.engine.EmotionClassifierTest
-[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.186 s -- in com.xinyu.soulisle.engine.EmotionClassifierTest
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.185 s -- in com.xinyu.soulisle.engine.EmotionClassifierTest
 [INFO] Running com.xinyu.soulisle.engine.EmotionEngineTest
-[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.047 s -- in com.xinyu.soulisle.engine.EmotionEngineTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.044 s -- in com.xinyu.soulisle.engine.EmotionEngineTest
 [INFO] Running com.xinyu.soulisle.engine.EmotionLexiconTest
-[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.052 s -- in com.xinyu.soulisle.engine.EmotionLexiconTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.062 s -- in com.xinyu.soulisle.engine.EmotionLexiconTest
 [INFO] Running com.xinyu.soulisle.engine.ModelProxyTest
-01:07:26.044 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify failed (url=http://127.0.0.1:1): java.net.ConnectException
-01:07:26.085 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify: non-200 status=503 body={"emotion":"sadness","intensity":0.8,"confidence":0.93,"latency_ms":12.5}
-01:07:26.087 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify failed (url=http://127.0.0.1:52816): com.fasterxml.jackson.core.JsonParseException: Unexpected character ('<' (code 60)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+01:15:53.862 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify failed (url=http://127.0.0.1:1): java.net.ConnectException
+01:15:53.904 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify: non-200 status=503 body={"emotion":"sadness","intensity":0.8,"confidence":0.93,"latency_ms":12.5}
+01:15:53.906 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify failed (url=http://127.0.0.1:57122): com.fasterxml.jackson.core.JsonParseException: Unexpected character ('<' (code 60)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
  at [Source: (String)"<html>service down</html>"; line: 1, column: 2]
-01:07:26.089 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify: bad-emotion in body={"emotion":"狂喜","confidence":0.9}
-01:07:26.091 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify: confidence missing/non-number in body={"emotion":"joy","intensity":0.5}
-01:07:26.093 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify: empty body
-[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.075 s -- in com.xinyu.soulisle.engine.ModelProxyTest
+01:15:53.907 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify: bad-emotion in body={"emotion":"狂喜","confidence":0.9}
+01:15:53.909 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify: confidence missing/non-number in body={"emotion":"joy","intensity":0.5}
+01:15:53.911 [main] WARN com.xinyu.soulisle.engine.ModelProxy -- local model classify: empty body
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.080 s -- in com.xinyu.soulisle.engine.ModelProxyTest
 [INFO] Running com.xinyu.soulisle.llm.LlmProxyTest
-[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.172 s -- in com.xinyu.soulisle.llm.LlmProxyTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.207 s -- in com.xinyu.soulisle.llm.LlmProxyTest
 [INFO] Running com.xinyu.soulisle.safety.SafetyGuardTest
-[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in com.xinyu.soulisle.safety.SafetyGuardTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in com.xinyu.soulisle.safety.SafetyGuardTest
 [INFO] Running com.xinyu.soulisle.service.MemoryPortServiceTest
-[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.024 s -- in com.xinyu.soulisle.service.MemoryPortServiceTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in com.xinyu.soulisle.service.MemoryPortServiceTest
 [INFO] Running com.xinyu.soulisle.service.MemorySearchServiceTest
-[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in com.xinyu.soulisle.service.MemorySearchServiceTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in com.xinyu.soulisle.service.MemorySearchServiceTest
 [INFO] Running com.xinyu.soulisle.service.MemoryServiceTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.641 s -- in com.xinyu.soulisle.service.MemoryServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.682 s -- in com.xinyu.soulisle.service.MemoryServiceTest
 [INFO] 
 [INFO] Results:
 [INFO] 
@@ -117,7 +117,7 @@ org.opentest4j.AssertionFailedError: expected: <100.0%> but was: <99.0%>
 [ERROR]   EmotionControllerTest.evalDetailReturnsEveryRow:199 expected: <100.0%> but was: <99.0%>
 [ERROR]   EmotionControllerTest.evalOnRealDataset:184 expected: <85> but was: <105>
 [INFO] 
-[ERROR] Tests run: 171, Failures: 2, Errors: 0, Skipped: 0
+[ERROR] Tests run: 172, Failures: 2, Errors: 0, Skipped: 0
 [INFO] 
 [ERROR] There are test failures.
 
@@ -135,6 +135,6 @@ Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  18.124 s
-[INFO] Finished at: 2026-10-13T01:07:27+08:00
+[INFO] Total time:  25.741 s
+[INFO] Finished at: 2026-10-13T01:16:03+08:00
 [INFO] ------------------------------------------------------------------------

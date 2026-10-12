@@ -4,15 +4,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.CodeSource;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -78,19 +79,31 @@ class HealthControllerTest {
         // ① 文件（fat jar 的正常形态）：文件名 + 摘要 + 字节数都得到位，字节数是识别瘦 jar 的关键
         Path jar = tmp.resolve("soulisle-server.jar");
         Files.writeString(jar, "PKfake-jar");
-        String fileId = HealthController.describe(new CodeSource(jar.toUri().toURL(), (java.security.cert.Certificate[]) null));
+        String fileId = HealthController.describe(jar.toFile());
         assertTrue(fileId.startsWith("jar:soulisle-server.jar:"), fileId);
-        assertTrue(fileId.endsWith(":" + Files.size(jar)), "字节数必须在串里——93,975B 的瘦 jar 就是靠它现形：" + fileId);
+        assertTrue(fileId.endsWith(":" + Files.size(jar)), "字节数必须在串里——95,429B 的瘦 jar 就是靠它现形：" + fileId);
 
         // ② 目录（spring-boot:run 直跑 classes）
         Path dir = tmp.resolve("classes");
         Files.createDirectory(dir);
-        String dirId = HealthController.describe(new CodeSource(dir.toUri().toURL(), (java.security.cert.Certificate[]) null));
+        String dirId = HealthController.describe(dir.toFile());
         assertTrue(dirId.startsWith("classes:classes:"), dirId);
 
         // ③ null / ④ 路径不存在：都归 unknown，不许抛（健康端点抛栈会把"服务在"读成"服务挂了"）
         assertEquals("unknown", HealthController.describe(null));
-        assertEquals("unknown", HealthController.describe(
-                new CodeSource(tmp.resolve("no-such-artifact").toUri().toURL(), (java.security.cert.Certificate[]) null)));
+        assertEquals("unknown", HealthController.describe(tmp.resolve("no-such-artifact").toFile()));
+    }
+
+    @Test
+    @DisplayName("resolveSource()：ApplicationHome 给不出时退 classpath 首项，两者皆无才 null")
+    void resolvesSourceWithFallback() {
+        // ApplicationHome 拿不到 ⇒ 用 classpath 首项（fat jar 启动时它就是 jar 路径）。
+        // 这一支必须覆盖：r131 首版用 CodeSource，在 fat jar 的嵌套 URL 下退化成 classes:null:<mtime>，
+        // 恰好丢掉最该看清的 jar 名与字节数。
+        File fromCp = HealthController.resolveSource(null, "app.jar" + File.pathSeparator + "other.jar");
+        assertEquals("app.jar", fromCp.getName(), "fat jar 形态下这一格必须给出 jar 名，否则瘦/fat 无从区分");
+
+        assertNull(HealthController.resolveSource(null, ""));
+        assertNull(HealthController.resolveSource(null, "   "));
     }
 }

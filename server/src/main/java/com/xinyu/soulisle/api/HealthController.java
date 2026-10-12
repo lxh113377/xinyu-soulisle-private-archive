@@ -4,9 +4,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.boot.system.ApplicationHome;
+
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.CodeSource;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HexFormat;
@@ -72,15 +74,44 @@ public class HealthController {
         if (cached != null) {
             return cached;
         }
-        CodeSource cs;
+        ApplicationHome home = null;
         try {
-            cs = HealthController.class.getProtectionDomain().getCodeSource();
+            home = new ApplicationHome(HealthController.class);
         } catch (Exception e) {
-            cs = null;
+            home = null;
         }
-        String v = describe(cs);
+        String v = describe(resolveSource(home, System.getProperty("java.class.path", "")));
         buildId = v;
         return v;
+    }
+
+    /**
+     * 可测：先信 {@link ApplicationHome}（fat jar 下能给出 jar 文件），拿不到就退 classpath 首项。
+     *
+     * <p>⚠️ 第一版用 {@code getProtectionDomain().getCodeSource()} 是**错的**：fat jar 里
+     * 类的 CodeSource 是嵌套 URL（`jar:file:.../app.jar!/BOOT-INF/classes!/`），
+     * 解析出来的 Path 既不是文件也不是正常目录，实测退化成 `classes:null:<mtime>` ——
+     * 恰好把最该看清的「jar 名 + 字节数」丢掉了（那正是区分 95KB 瘦 jar 与 28MB fat jar 的字段）。
+     */
+    static File resolveSource(ApplicationHome home, String classPath) {
+        File src = null;
+        if (home != null) {
+            try {
+                src = home.getSource();
+            } catch (Exception e) {
+                src = null;
+            }
+        }
+        if (src != null) {
+            return src;
+        }
+        if (classPath != null && !classPath.isBlank()) {
+            String first = classPath.split(File.pathSeparator)[0];
+            if (!first.isBlank()) {
+                return new File(first);
+            }
+        }
+        return null;
     }
 
     /**
@@ -91,12 +122,12 @@ public class HealthController {
      * 于是覆盖率被拖到门槛边上（r131 实测 BRANCH 90.07%，距门 0.90 只剩 0.07 点余量）。
      * 给了 seam 之后这几支都能直接喂进去判。
      */
-    static String describe(CodeSource cs) {
+    static String describe(File source) {
         try {
-            if (cs == null || cs.getLocation() == null) {
+            if (source == null) {
                 return "unknown";
             }
-            Path p = Path.of(cs.getLocation().toURI());
+            Path p = source.toPath();
             if (Files.isRegularFile(p)) {
                 // 只读前 64 KiB：整包读进来会白白吃掉 20MB 堆，且摘要本就只需要区分瘦/fat
                 byte[] head;

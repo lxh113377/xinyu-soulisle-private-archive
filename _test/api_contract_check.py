@@ -25,6 +25,7 @@
 import json
 import os
 import re
+import time
 import socket
 import sys
 import urllib.error
@@ -36,7 +37,11 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "docs" / "openapi.yaml"
 BASE = "http://127.0.0.1:8123"
 results = []
+# 限流自愈等待：ApiGuardFilter 桶容量 burst=20、补充 60/分钟（≈1 token/s）⇒ 22s 回满。
+# 写死并写明推导，不写"随便睡一会儿"——睡多久必须能说清来源。
+SETTLE_SECONDS = 22
 NOKEY = []   # 记录哪些探测走了「契约内 500」分支；收尾必须打印，不允许静默放宽
+RATE_LIMITED = []   # 记录哪些探测撞限流后重试过；同样必须打印，不许把环境状态读成契约结论
 
 
 def check(name, ok, detail=""):
@@ -160,6 +165,13 @@ def live_probes(spec, ann=None):
             continue
         url = BASE + (cfg.get("path") or (path if "{sessionId}" not in path else path.replace("{sessionId}", "contract-probe")))
         st, bodytxt = http(verb, url, cfg.get("body"), cfg.get("query"))
+        if st == 429:
+            # r131：**被限流不是契约不符**。令牌桶是服务端共享状态——紧挨着跑完性能基准
+            # （62 次请求）再跑契约，就会看到 /api/usage 与 delete 各吃一个 429（实测）。
+            # 把它判成红，等于让红项长期指向一个不可修的东西。等桶回满重试一次再判。
+            time.sleep(SETTLE_SECONDS)
+            st, bodytxt = http(verb, url, cfg.get("body"), cfg.get("query"))
+            RATE_LIMITED.append(f"{verb} {path}")
         want = cfg.get("status") or [200]
         ok = st in want
         detail = f"{verb} {path} -> {st}"
@@ -345,6 +357,9 @@ def main():
           + ("" if done + len(skipped) == len(ops) else " ⇒ 有接口既不探测也不解释"))
     check("C6b 零豁免（本项目 11 条接口全部可安全真实打；出现豁免必须有人复核）",
           len(skipped) == 0, f"当前豁免 {len(skipped)} 条：{sorted(skipped)}")
+    if RATE_LIMITED:
+        print(f"  · 限流重试：{len(RATE_LIMITED)} 条曾撞上 429（等 {SETTLE_SECONDS}s 后重打一次）"
+              f" —— {'; '.join(RATE_LIMITED)}")
     fails = [r for r in results if not r[1]]
     print(f"\n合计 {len(results)} 项，失败 {len(fails)} 项")
     for n, _, d in fails:
