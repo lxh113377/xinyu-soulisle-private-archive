@@ -126,6 +126,67 @@ def parse_system(post_data):
     return " ".join(m.get("content", "") for m in msgs if m.get("role") == "system")
 
 
+def make_body(scn, used):
+    if scn == "ghost":
+        return FILLER + "〔依据:%s·A〕" % GHOST_ID
+    if scn == "wronglevel":
+        return FILLER + "〔依据:%s·A〕" % (used[0]["id"] if used else GHOST_ID)
+    if scn == "silent":
+        return FILLER
+    cid, clv = (used[0]["id"], used[0]["level"]) if used else (GHOST_ID, "A")
+    return FILLER + "〔依据:%s·%s〕" % (cid, clv)
+
+
+def run_legs(send, last_bubble, get_used, real_level, curious, plain):
+    """C1-C5 的判定体：与浏览器编排解耦（r133 拆 main 溢出用）。返回 (bad, notes, rc)。
+    rc=2 表示主腿拿不到输入（求解释轮没注入），调用方须原样退出。"""
+    bad, notes = [], []
+    used = get_used()
+    if not used:
+        return bad, notes, 2
+    txt = last_bubble()
+    if "已核对" not in txt:
+        bad.append("C1 诚实标注未被认账：气泡无「已核对」字样（meta=%s）" % txt[:120])
+    else:
+        notes.append("C1 诚实标注通过（注入 %s·%s → 已核对）" % (used[0]["id"], used[0]["level"]))
+
+    send(curious, "ghost")
+    txt = last_bubble()
+    if "未查证" not in txt:
+        bad.append("C2 幽灵编号 %s 未被标「未查证」（反臆造主腿失守）：%s" % (GHOST_ID, txt[:120]))
+    elif GHOST_ID not in txt:
+        bad.append("C2 判定未查证时把编号原文删掉了（只许改标记、不许删正文）：%s" % txt[:120])
+    elif FILLER not in txt:
+        bad.append("C2 核对过程吞掉了正文「%s」" % FILLER)
+    else:
+        notes.append("C2 幽灵编号被打未查证且正文零丢失")
+
+    send(curious, "wronglevel")
+    txt = last_bubble()
+    if real_level != "A":
+        if ("已更正" not in txt) or (real_level not in txt):
+            bad.append("C3 把 %s·A（真实 %s）未更正为真实级：%s" % (used[0]["id"], real_level, txt[:120]))
+        else:
+            notes.append("C3 级冒充已更正（模型标 A → 真实 %s）" % real_level)
+    else:
+        notes.append("C3 跳过：本轮注入条目真实级恰为 A，级冒充腿无区分度（不算判红）")
+
+    send(plain, "ghost")
+    txt = last_bubble()
+    if GHOST_ID in txt and "未查证" not in txt:
+        bad.append("C5 未注入知识库的一轮里，模型标的 %s 被当作有效依据：%s" % (GHOST_ID, txt[:120]))
+    else:
+        notes.append("C5 未注入轮的依据标记同样判未查证（或本轮压根没标）")
+
+    send(curious, "silent")
+    txt = last_bubble()
+    if "已核对" in txt:
+        bad.append("C4 模型未标任何依据，界面却显示「已核对」（谎称有据）：%s" % txt[:120])
+    else:
+        notes.append("C4 零标注轮不谎称依据")
+    return bad, notes, 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://127.0.0.1:8123")
@@ -157,16 +218,6 @@ def main():
     PLAIN = "嗯嗯"
     bad, notes = [], []
     state = {"scenario": "honest", "used": [], "post": ""}
-
-    def make_body(scn, used):
-        if scn == "ghost":
-            return FILLER + "〔依据:%s·A〕" % GHOST_ID
-        if scn == "wronglevel":
-            return FILLER + "〔依据:%s·A〕" % (used[0]["id"] if used else GHOST_ID)
-        if scn == "silent":
-            return FILLER
-        cid, clv = (used[0]["id"], used[0]["level"]) if used else (GHOST_ID, "A")
-        return FILLER + "〔依据:%s·%s〕" % (cid, clv)
 
     try:
         with sync_playwright() as p:
@@ -214,58 +265,18 @@ def main():
                 return pg.evaluate("(()=>{const n=document.querySelectorAll('.bubble.ai, .msg.ai, [data-emotion]');"
                                    "return n.length? n[n.length-1].innerText : '';})()")
 
-            # C1：诚实标注 → 已核对
             send(CURIOUS, "honest")
             used = state["used"]
             if not used:
                 print("KB-CITATION-UNVERIFIED: 求解释轮没有注入任何知识条目（kbBlockFor 触发面失效，判据无从下手）")
                 b.close()
                 return 2
-            txt = last_bubble()
-            if "已核对" not in txt:
-                bad.append("C1 诚实标注未被认账：气泡无「已核对」字样（meta=%s）" % txt[:120])
-            else:
-                notes.append("C1 诚实标注通过（注入 %s·%s → 已核对）" % (used[0]["id"], used[0]["level"]))
-
-            # C2：幽灵编号 → 必须未查证，且编号原文保留
-            send(CURIOUS, "ghost")
-            txt = last_bubble()
-            if "未查证" not in txt:
-                bad.append("C2 幽灵编号 %s 未被标「未查证」（反臆造主腿失守）：%s" % (GHOST_ID, txt[:120]))
-            elif GHOST_ID not in txt:
-                bad.append("C2 判定未查证时把编号原文删掉了（只许改标记、不许删正文）：%s" % txt[:120])
-            elif FILLER not in txt:
-                bad.append("C2 核对过程吞掉了正文「%s」" % FILLER)
-            else:
-                notes.append("C2 幽灵编号被打未查证且正文零丢失")
-
-            # C3：级不符 → 按库里真实级更正
-            real_level = by_id.get(used[0]["id"], {}).get("level", "?")
-            send(CURIOUS, "wronglevel")
-            txt = last_bubble()
-            if real_level != "A":
-                if ("已更正" not in txt) or (real_level not in txt):
-                    bad.append("C3 把 %s·A（真实 %s）未更正为真实级：%s" % (used[0]["id"], real_level, txt[:120]))
-                else:
-                    notes.append("C3 级冒充已更正（模型标 A → 真实 %s）" % real_level)
-            else:
-                notes.append("C3 跳过：本轮注入条目真实级恰为 A，级冒充腿无区分度（不算判红）")
-
-            # C5：未注入轮（纯倾诉）里硬标的依据同样不许蒙混
-            send(PLAIN, "ghost")
-            txt = last_bubble()
-            if GHOST_ID in txt and "未查证" not in txt:
-                bad.append("C5 未注入知识库的一轮里，模型标的 %s 被当作有效依据：%s" % (GHOST_ID, txt[:120]))
-            else:
-                notes.append("C5 未注入轮的依据标记同样判未查证（或本轮压根没标）")
-
-            # C4：模型完全不标依据 → 不得出现「已核对」（不谎称）
-            send(CURIOUS, "silent")
-            txt = last_bubble()
-            if "已核对" in txt:
-                bad.append("C4 模型未标任何依据，界面却显示「已核对」（谎称有据）：%s" % txt[:120])
-            else:
-                notes.append("C4 零标注轮不谎称依据")
+            bad, notes, rc = run_legs(send, last_bubble, lambda: state["used"],
+                                      by_id.get(used[0]["id"], {}).get("level", "?"),
+                                      CURIOUS, PLAIN)
+            if rc:
+                b.close()
+                return rc
 
             if errs:
                 bad.append("页面报错 %s" % errs[:3])

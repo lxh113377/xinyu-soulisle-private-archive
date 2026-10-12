@@ -644,6 +644,94 @@ def raises_facemissing(fn):
     return False, "未抛 FaceMissing（取数面坏了却读成没问题）"
 
 
+# r133：URL/DOI 抽取族的四条桩从 selftest 里升为模块级（selftest 原 218 行超 loc_guard
+# 的 150 行/函数上限）。切分点按**主题边界**（URL/DOI 取数面 vs 索引/卡片一致性），
+# 不按行数对半切——那会切出半个函数。腿名与注册顺序不变（顺序是判据的一部分）。
+def leg(name, fn, results):
+    try:
+        ok, why = fn()
+    except Exception as e:  # noqa: BLE001  失败路径本身不得崩
+        ok, why = False, "腿自身异常 %s: %s" % (type(e).__name__, e)
+    results.append((name, bool(ok), why))
+
+
+def url_shape():
+    """抽取腿（r131 首跑实测的自造缺陷的回归位）：中文尾巴不得进 URL，含括号真 DOI 须整条留。"""
+    cases = [
+        ("实取（Europe PMC）；https://eutils.ncbi.nlm.nih.gov/x?id=1 后续正文",
+         "https://eutils.ncbi.nlm.nih.gov/x?id=1"),
+        ("见 https://api.crossref.org/works/10.1016/s0005-7967(97)00070-3（题录实取）",
+         "https://api.crossref.org/works/10.1016/s0005-7967(97)00070-3"),
+        ("链 [text](https://example.org/a/b) 尾", "https://example.org/a/b"),
+        ("https://en.wikipedia.org/wiki/Foo_(bar) 中立页", "https://en.wikipedia.org/wiki/Foo_(bar)"),
+    ]
+    bad = []
+    for line, want in cases:
+        got = [norm_url(m) for m in URL_RE.findall(line)]
+        if want not in got:
+            bad.append("漏抽/截断 %r ⇒ got=%r" % (want, got))
+        bad += ["非 ASCII 漏进 URL %r（源行：%s）" % (g, line[:24])
+                for g in got if any(ord(c) > 126 for c in g)]
+    return (not bad), "；".join(bad)
+
+def doi_shape():
+    """DOI 取数腿：五种承载形态都要取出 DOI，非 DOI 链接必须返回 None（不得猜）。
+
+    前两种是 r129 设计时的形态；`/doi/<doi>` 与 `?doi=<编码>` 是 r131 首跑 --links 实测到的
+    漏面（pnas/sagepub 的 403、psycnet 的 403 因此没走到二通道，被误报成"待人工"）。
+    """
+    want = "10.1016/s0005-7967(97)00070-3"
+    got = [doi_of(u) for u in
+           ("https://doi.org/%s" % want,
+            "https://api.crossref.org/works/" + want,
+            "https://journals.pnas.org/doi/10.1073/pnas.1200155109",
+            "https://psycnet.apa.org/doiLanding?doi=10.1037%2Ft27734-000",
+            "https://www.sciencedirect.com/science/article/abs/pii/S0005796797000703")]
+    bad = []
+    if got[0] != want:
+        bad.append("doi.org 形态回 %r" % got[0])
+    if got[1] != want:
+        bad.append("crossref works 形态回 %r" % got[1])
+    if got[2] != "10.1073/pnas.1200155109":
+        bad.append("出版商 /doi/ 形态回 %r" % got[2])
+    if got[3] != "10.1037/t27734-000":
+        bad.append("百分号编码 ?doi= 形态回 %r" % got[3])
+    if got[4] is not None:
+        bad.append("非 DOI 链接被猜成 %r" % got[4])
+    return (not bad), "；".join(bad)
+
+def url_face_skips_correction():
+    """取数面腿：`- 更正：` 行里的死链留痕不得被当活引用去探活，而正常来源行的链接必须在面上。"""
+    t = (BASE_CARD_A.replace("- 关联：", "  - [甲二] 佐证 https://example.org/live\n- 关联：")
+         + "\n- 更正：2026-10-12 撤下死链 https://example.org/dead\n")
+    d, _idx = fixture_pair(cards_text=t + "\n" + BASE_CARD_B)
+    found = collect_urls(d)
+    ok = ("https://example.org/dead" not in found and "https://example.org/live" in found)
+    return ok, ("探活面=%s（须含 live、不含 dead）" % sorted(found))
+
+def line_doi_attached():
+    """同行裸 DOI 腿（r131 二通道取数面）：出版社落地页 URL 不带 DOI，题录行里写着 ⇒ 必须接上。
+
+    反例两路：URL 自带 DOI 时不得被同行另一个 DOI 顶掉；行内无 DOI 时必须还是 None（不得猜）。
+    """
+    t = (BASE_CARD_A.replace("- 关联：",
+                             "  - [甲丙] Electronics 12(22):4714. DOI 10.3390/electronics12224714；"
+                             "https://www.mdpi.com/2079-9292/12/22/4714\n- 关联：")
+         + "\n" + BASE_CARD_B)
+    d, _idx = fixture_pair(cards_text=t)
+    found = collect_urls(d)
+    u = "https://www.mdpi.com/2079-9292/12/22/4714"
+    bad = []
+    if doi_of_url(u, found.get(u)) != "10.3390/electronics12224714":
+        bad.append("同行裸 DOI 未接上：%r" % (found.get(u) or {}).get("doi"))
+    u2 = "https://doi.org/10.5555/zz001"
+    if doi_of(u2) != "10.5555/zz001":
+        bad.append("URL 自带 DOI 形态回退：%r" % doi_of(u2))
+    if doi_of("https://example.org/no-doi-here") is not None:
+        bad.append("无 DOI 链接被猜出 DOI")
+    return (not bad), "；".join(bad)
+
+
 def selftest():
     """判据非恒真的取证（21 腿）：抽取/取数面 4 ＋ 夹具正例 1 ＋ 该红的 10 ＋ 历史留痕不得判红 1
     ＋ 列序自证 2 ＋ 取数面失效 2 ＋ 真面正例 1（实跑数由收尾行自报，不靠这句自证）。
@@ -654,13 +742,6 @@ def selftest():
     前 3 腿是 r131 首跑 `--links` 踩到的同一族缺陷（正则把中文尾巴吞进 URL、把带括号真 DOI 截断）的回归位。
     """
     results = []
-
-    def leg(name, fn):
-        try:
-            ok, why = fn()
-        except Exception as e:  # noqa: BLE001  失败路径本身不得崩
-            ok, why = False, "腿自身异常 %s: %s" % (type(e).__name__, e)
-        results.append((name, bool(ok), why))
 
     def clean_fixture():
         probs, _s = run(*fixture_pair())
@@ -750,103 +831,27 @@ def selftest():
         probs, stats = run(d, idx)
         return has("索引「一句话」与卡内原文不一致", probs)
 
-    def url_shape():
-        """抽取腿（r131 首跑实测的自造缺陷的回归位）：中文尾巴不得进 URL，含括号真 DOI 须整条留。"""
-        cases = [
-            ("实取（Europe PMC）；https://eutils.ncbi.nlm.nih.gov/x?id=1 后续正文",
-             "https://eutils.ncbi.nlm.nih.gov/x?id=1"),
-            ("见 https://api.crossref.org/works/10.1016/s0005-7967(97)00070-3（题录实取）",
-             "https://api.crossref.org/works/10.1016/s0005-7967(97)00070-3"),
-            ("链 [text](https://example.org/a/b) 尾", "https://example.org/a/b"),
-            ("https://en.wikipedia.org/wiki/Foo_(bar) 中立页", "https://en.wikipedia.org/wiki/Foo_(bar)"),
-        ]
-        bad = []
-        for line, want in cases:
-            got = [norm_url(m) for m in URL_RE.findall(line)]
-            if want not in got:
-                bad.append("漏抽/截断 %r ⇒ got=%r" % (want, got))
-            bad += ["非 ASCII 漏进 URL %r（源行：%s）" % (g, line[:24])
-                    for g in got if any(ord(c) > 126 for c in g)]
-        return (not bad), "；".join(bad)
-
-    def doi_shape():
-        """DOI 取数腿：五种承载形态都要取出 DOI，非 DOI 链接必须返回 None（不得猜）。
-
-        前两种是 r129 设计时的形态；`/doi/<doi>` 与 `?doi=<编码>` 是 r131 首跑 --links 实测到的
-        漏面（pnas/sagepub 的 403、psycnet 的 403 因此没走到二通道，被误报成"待人工"）。
-        """
-        want = "10.1016/s0005-7967(97)00070-3"
-        got = [doi_of(u) for u in
-               ("https://doi.org/%s" % want,
-                "https://api.crossref.org/works/" + want,
-                "https://journals.pnas.org/doi/10.1073/pnas.1200155109",
-                "https://psycnet.apa.org/doiLanding?doi=10.1037%2Ft27734-000",
-                "https://www.sciencedirect.com/science/article/abs/pii/S0005796797000703")]
-        bad = []
-        if got[0] != want:
-            bad.append("doi.org 形态回 %r" % got[0])
-        if got[1] != want:
-            bad.append("crossref works 形态回 %r" % got[1])
-        if got[2] != "10.1073/pnas.1200155109":
-            bad.append("出版商 /doi/ 形态回 %r" % got[2])
-        if got[3] != "10.1037/t27734-000":
-            bad.append("百分号编码 ?doi= 形态回 %r" % got[3])
-        if got[4] is not None:
-            bad.append("非 DOI 链接被猜成 %r" % got[4])
-        return (not bad), "；".join(bad)
-
-    def url_face_skips_correction():
-        """取数面腿：`- 更正：` 行里的死链留痕不得被当活引用去探活，而正常来源行的链接必须在面上。"""
-        t = (BASE_CARD_A.replace("- 关联：", "  - [甲二] 佐证 https://example.org/live\n- 关联：")
-             + "\n- 更正：2026-10-12 撤下死链 https://example.org/dead\n")
-        d, _idx = fixture_pair(cards_text=t + "\n" + BASE_CARD_B)
-        found = collect_urls(d)
-        ok = ("https://example.org/dead" not in found and "https://example.org/live" in found)
-        return ok, ("探活面=%s（须含 live、不含 dead）" % sorted(found))
-
-    leg("URL 抽取形态（中文尾巴/带括号 DOI）", url_shape)
-    leg("DOI 取数五形态 + 非 DOI 返 None", doi_shape)
-    def line_doi_attached():
-        """同行裸 DOI 腿（r131 二通道取数面）：出版社落地页 URL 不带 DOI，题录行里写着 ⇒ 必须接上。
-
-        反例两路：URL 自带 DOI 时不得被同行另一个 DOI 顶掉；行内无 DOI 时必须还是 None（不得猜）。
-        """
-        t = (BASE_CARD_A.replace("- 关联：",
-                                 "  - [甲丙] Electronics 12(22):4714. DOI 10.3390/electronics12224714；"
-                                 "https://www.mdpi.com/2079-9292/12/22/4714\n- 关联：")
-             + "\n" + BASE_CARD_B)
-        d, _idx = fixture_pair(cards_text=t)
-        found = collect_urls(d)
-        u = "https://www.mdpi.com/2079-9292/12/22/4714"
-        bad = []
-        if doi_of_url(u, found.get(u)) != "10.3390/electronics12224714":
-            bad.append("同行裸 DOI 未接上：%r" % (found.get(u) or {}).get("doi"))
-        u2 = "https://doi.org/10.5555/zz001"
-        if doi_of(u2) != "10.5555/zz001":
-            bad.append("URL 自带 DOI 形态回退：%r" % doi_of(u2))
-        if doi_of("https://example.org/no-doi-here") is not None:
-            bad.append("无 DOI 链接被猜出 DOI")
-        return (not bad), "；".join(bad)
-
-    leg("同行裸 DOI 接二通道", line_doi_attached)
-    leg("更正行死链不进探活面", url_face_skips_correction)
-    leg("夹具正例·干净库零问题", clean_fixture)
-    leg("悬空引用必红", dangling)
-    leg("自指必红", selfref)
-    leg("孤岛必红", island)
-    leg("缺来源/来源零子行必红", no_source)
-    leg("缺入库行必红", no_ship_line)
-    leg("索引缺行必红", index_missing_row)
-    leg("索引幽灵行必红", index_ghost_row)
-    leg("索引级别漂移必红", index_level_mismatch)
-    leg("索引篇章漂移必红", index_chapter_mismatch)
-    leg("索引列序漂移必红（取数面自证）", index_column_swap)
-    leg("更正行历史编号不判红（r129 自身缺陷回归）", correction_line_is_history)
-    leg("索引一句话逐字一致⇒零漂移（列序自证）", wording_clean_match)
-    leg("索引一句话被改一个字⇒必抓到", wording_drift_caught)
-    leg("空目录⇒UNVERIFIED 不判绿", empty_kb)
-    leg("只有规范与索引⇒UNVERIFIED 不判绿", spec_only_kb)
-    leg("真面零问题（正例）", real_face_clean)
+    leg("URL 抽取形态（中文尾巴/带括号 DOI）", url_shape, results)
+    leg("DOI 取数五形态 + 非 DOI 返 None", doi_shape, results)
+    leg("同行裸 DOI 接二通道", line_doi_attached, results)
+    leg("更正行死链不进探活面", url_face_skips_correction, results)
+    leg("夹具正例·干净库零问题", clean_fixture, results)
+    leg("悬空引用必红", dangling, results)
+    leg("自指必红", selfref, results)
+    leg("孤岛必红", island, results)
+    leg("缺来源/来源零子行必红", no_source, results)
+    leg("缺入库行必红", no_ship_line, results)
+    leg("索引缺行必红", index_missing_row, results)
+    leg("索引幽灵行必红", index_ghost_row, results)
+    leg("索引级别漂移必红", index_level_mismatch, results)
+    leg("索引篇章漂移必红", index_chapter_mismatch, results)
+    leg("索引列序漂移必红（取数面自证）", index_column_swap, results)
+    leg("更正行历史编号不判红（r129 自身缺陷回归）", correction_line_is_history, results)
+    leg("索引一句话逐字一致⇒零漂移（列序自证）", wording_clean_match, results)
+    leg("索引一句话被改一个字⇒必抓到", wording_drift_caught, results)
+    leg("空目录⇒UNVERIFIED 不判绿", empty_kb, results)
+    leg("只有规范与索引⇒UNVERIFIED 不判绿", spec_only_kb, results)
+    leg("真面零问题（正例）", real_face_clean, results)
 
     passed = [n for n, ok, _ in results if ok]
     failed = [(n, w) for n, ok, w in results if not ok]

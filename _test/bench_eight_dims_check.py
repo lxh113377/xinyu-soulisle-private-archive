@@ -181,6 +181,47 @@ def cell(label, value, source):
 
 
 # ── 各维取数 ────────────────────────────────────────────────────────────────
+def _dim_maintenance(denom):
+    """第 5 维：维护状态（r133 从 build_dims 拆出 —— 原函数 161 行超 loc_guard 的 150 行/函数上限）。
+
+    拆它的理由不只是行数：这一段是**八维里唯一带 CI 降档分支**的（浅克隆面量的是 checkout
+    形状而非项目现状），独立成函数后，CI 降档这套口径不会再混在主体流程里被人顺手改掉。
+    """
+    mt_p, mt = ledger("peer-maintenance-*.json")
+    rel_p, rel = ledger("peer-release-*.json")
+    ir_p, ir = ledger("peer-issue-response-*.json")
+    commits, hdays, tags = maintenance_self()
+    # CI 可移植性（R-CURRENT 第 12 条口径）：runner 是 depth=1 浅克隆，`--since=30.days` 恒读到 1、
+    # tag 面恒为空 ⇒ 这三格在 CI 里量的是 checkout 形状而不是项目现状。明知失真还印进台账，
+    # 下一轮就会有人拿它横比。正解是**逐格降档为 NA 并写明补法**，其余七维照判。
+    in_ci = (os.environ.get("CI") or "").lower() in ("true", "1")
+    if in_ci:
+        commits, hdays, tags = None, None, None
+    peers_rel = ((rel or {}).get("repos") or {})
+    n_rel = sum(1 for k, v in peers_rel.items() if k != "__self__" and isinstance(v, dict) and v.get("release"))
+    n_sem = sum(1 for k, v in peers_rel.items() if k != "__self__" and isinstance(v, dict) and v.get("semver_tag"))
+    val_commits = ("NA-DECLARED：CI 浅克隆面（depth=1），提交率量的是 checkout 形状不是现状；"
+                   "补法=本机 python _test/bench_eight_dims_check.py --round rNNN")
+    if commits is not None:
+        val_commits = "%d 次｜history_days=%d%s" % (
+            commits, hdays, "（<30 ⇒ window_full=false，**禁止横比**）" if hdays < 30 else "")
+    val_tags = ("NA-DECLARED：CI 浅克隆无 tag 面" if tags is None
+                else "%d（一致性由 repo_config G12 独家判，本件不重复设尺）" % tags)
+    return {"dim": DIM_ORDER[5], "cells": [
+        cell("self 30 天提交", val_commits,
+             "本轮 git rev-list --count --since=30.days HEAD 实测" if commits is not None else "CI 面降档"),
+        cell("self tag 数", val_tags,
+             "本轮 git tag 实测 + G12" if tags is not None else "CI 面降档"),
+        cell("peers 提交率 top", top_rates(mt) if mt else "NA(缺 peer-maintenance)",
+             stamp(mt_p, mt) if mt_p else "—"),
+        cell("peers release / semver tag", "%d/%d ＋ %d/%d" % (n_rel, denom, n_sem, denom) if rel else "NA",
+             stamp(rel_p, rel) if rel_p else "—"),
+        cell("peers issue 响应可比性", "NA-DECLARED：%d 条里含 self 在内多条为 NA（零 issue 或样本<3）⇒ 该维不作差距项；"
+             "补法 python _test/peer_issue_response_probe.py --json …（错峰单跑）" %
+             len((ir or {}).get("rows") or {}), stamp(ir_p, ir) if ir_p else "—"),
+    ]}
+
+
 def build_dims():
     """返回 (dims, notes)。dims = [{dim, cells:[{side,label,value,source}]}]。
 
@@ -291,39 +332,7 @@ def build_dims():
 
     dims.append(_dim_memory(dist, denom, m_src))
 
-    mt_p, mt = ledger("peer-maintenance-*.json")
-    rel_p, rel = ledger("peer-release-*.json")
-    ir_p, ir = ledger("peer-issue-response-*.json")
-    commits, hdays, tags = maintenance_self()
-    # CI 可移植性（R-CURRENT 第 12 条口径）：runner 是 depth=1 浅克隆，`--since=30.days` 恒读到 1、
-    # tag 面恒为空 ⇒ 这三格在 CI 里量的是 checkout 形状而不是项目现状。明知失真还印进台账，
-    # 下一轮就会有人拿它横比。正解是**逐格降档为 NA 并写明补法**，其余七维照判。
-    in_ci = (os.environ.get("CI") or "").lower() in ("true", "1")
-    if in_ci:
-        commits, hdays, tags = None, None, None
-    peers_rel = ((rel or {}).get("repos") or {})
-    n_rel = sum(1 for k, v in peers_rel.items() if k != "__self__" and isinstance(v, dict) and v.get("release"))
-    n_sem = sum(1 for k, v in peers_rel.items() if k != "__self__" and isinstance(v, dict) and v.get("semver_tag"))
-    val_commits = ("NA-DECLARED：CI 浅克隆面（depth=1），提交率量的是 checkout 形状不是现状；"
-                   "补法=本机 python _test/bench_eight_dims_check.py --round rNNN")
-    if commits is not None:
-        val_commits = "%d 次｜history_days=%d%s" % (
-            commits, hdays, "（<30 ⇒ window_full=false，**禁止横比**）" if hdays < 30 else "")
-    val_tags = ("NA-DECLARED：CI 浅克隆无 tag 面" if tags is None
-                else "%d（一致性由 repo_config G12 独家判，本件不重复设尺）" % tags)
-    dims.append({"dim": DIM_ORDER[5], "cells": [
-        cell("self 30 天提交", val_commits,
-             "本轮 git rev-list --count --since=30.days HEAD 实测" if commits is not None else "CI 面降档"),
-        cell("self tag 数", val_tags,
-             "本轮 git tag 实测 + G12" if tags is not None else "CI 面降档"),
-        cell("peers 提交率 top", top_rates(mt) if mt else "NA(缺 peer-maintenance)",
-             stamp(mt_p, mt) if mt_p else "—"),
-        cell("peers release / semver tag", "%d/%d ＋ %d/%d" % (n_rel, denom, n_sem, denom) if rel else "NA",
-             stamp(rel_p, rel) if rel_p else "—"),
-        cell("peers issue 响应可比性", "NA-DECLARED：%d 条里含 self 在内多条为 NA（零 issue 或样本<3）⇒ 该维不作差距项；"
-             "补法 python _test/peer_issue_response_probe.py --json …（错峰单跑）" %
-             len((ir or {}).get("rows") or {}), stamp(ir_p, ir) if ir_p else "—"),
-    ]})
+    dims.append(_dim_maintenance(denom))
 
     dc_p, dc = ledger("peer-docs-*.json")          # r122：第 7 维的 peers 分母第一次有数
     n_docs, api_paths, api_ends = docs_self()
