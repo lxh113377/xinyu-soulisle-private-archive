@@ -13,9 +13,13 @@
       且**不入电池**（走 gh api）。下一轮该做两件事：①按 fuse(7d) 节律错峰重采，让漂移尺能比"通道读数"而不是只比文件名法；
       ②`_test/bench_eight_dims_check.py` 里该格的补法死链由 `remedy_audit` 盯，接线路径若变要**先活链再落笔**。
       前提：`python _test/benchmark_metrics.py --cap-channel --out 交付物/对标数据/cap-channel-<date>.json`（单跑勿 burst）。
-- [ ] 🟠 **[推荐:R126-04｜agent 自动]** **`git status` 在本仓不可信**（本轮一手）：`bench_eight_dims_check.py`
-      与 HEAD 差 24/14 行却报"干净"（内容过滤器已配置）。正解＝**每个要编辑的文件先 sha256 ⇄ `git show HEAD:<path>`
-      比字节**（本轮 11 个目标里 10 个 SAME、1 个 DIFF 被避开）。把这条固化成判据：改前先扫"我打算动的面"。
+- [x] 🟠 **[作废:R126-04｜r127 实测否证]** ~~把"改前扫一面"固化成判据~~：r127 复核发现**现有尺已经覆盖这一类**——
+      `_test/eol_parity_check.py` 的红因形态之一就是「工作树字节 != blob 字节（且该文件没有待提交改动）」
+      （本轮实测点名 `交付物/微表情识别-理论与应用综述-2026-10-11.md` 等）。⇒ 再建一条"比字节闸"就是
+      **同一事实两把尺**（违 r123 立的『同一事实只许一处判』）。真正的缺口不是缺尺，是**我没在动手前查现成的尺**：
+      正解＝编辑任何 tracked 件前先跑 `python _test/eol_parity_check.py` 并在其红项里查该路径
+      （口径已写进 `docs/tutorial-04-running-the-checks.md` §5）。一手观察仍保留：`bench_eight_dims_check.py`
+      当时与 HEAD 差 24/14 行而 `git status` 报"干净"（内容过滤器已配置），本轮 11 目标 10 SAME、1 DIFF 被避开。
 - [ ] 🟡 **[推荐:R126-05｜agent 自动]** **性能维按线程记账**（接续 #R123-03，前提未动）：
       `MAX_US_CPU_PER_REQ=12000` 不动；净读数档内带宽先降到 <30% 才谈收紧。**禁止**再提"扣空载能收紧"。
 - [ ] 🟡 **[推荐:R126-06｜agent 自动]** **漂移闸第四次值守**：`--round r127` 应印「漂移=比对 r126」。
