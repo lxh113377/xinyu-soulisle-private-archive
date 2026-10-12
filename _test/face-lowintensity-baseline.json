@@ -3,30 +3,23 @@
   "levels": 5,
   "shapes": 9,
   "hit": 29,
-  "hit_lean": 2,
-  "soft_ok": 4,
-  "uncertain": 2,
-  "wrong_confident": 8,
+  "hit_lean": 10,
+  "soft_ok": 2,
+  "uncertain": 3,
+  "wrong_confident": 1,
   "wrong_names": [
-    "joy@0.12",
-    "anger@0.12",
-    "sadness@0.12",
-    "sadness@0.22",
-    "fear@0.12",
-    "fear@0.22",
-    "surprise@0.12",
-    "disgust@0.12"
+    "fear@0.12"
   ],
   "by_level": {
     "0.12": {
       "n": 9,
-      "hit": 3,
-      "wrong_confident": 6
+      "hit": 8,
+      "wrong_confident": 1
     },
     "0.22": {
       "n": 9,
-      "hit": 4,
-      "wrong_confident": 2
+      "hit": 7,
+      "wrong_confident": 0
     },
     "0.3": {
       "n": 9,
@@ -44,9 +37,9 @@
       "wrong_confident": 0
     }
   },
-  "confident_frames": 37,
-  "acc_on_confident": 0.7838,
-  "uncertain_rate": 0.1778,
+  "confident_frames": 30,
+  "acc_on_confident": 0.9667,
+  "uncertain_rate": 0.3333,
   "updated": "2026-10-12",
   "why": "低强度段三态水位基线；口径与判据同文件 docstring，目标线（有把握帧 ≥95%／不确定 ≤30%）来自 memory/11-face-accuracy.md"
 }

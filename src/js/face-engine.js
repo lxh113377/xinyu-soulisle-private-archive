@@ -170,20 +170,37 @@
     const s = scores(bs);
     const all = R.emotions.map((e) => ({ emotion: e, score: s[e] }))
       .sort((a, b) => b.score - a.score);
-    const main = all[0].emotion;
+    let main = all[0].emotion;
     const sec = all[1];
     const secondary = (sec && sec.score >= all[0].score * R.secondary.ratio
       && sec.score >= R.secondary.floor) ? sec.emotion : null;
     /* 置信度 = 主分 − 次分（margin）。r102 加：旧版每帧都硬给一个情绪、没有"看不出来"
      * 的出口（实测强度 p25 仅 0.47 ⇒ 一半帧本就不确定却输出确定结论，表现为读数乱跳）。 */
     const margin = all[0].score - (sec ? sec.score : 0);
+    /* 弱信号诚实化（r161）：最高非 calm 分量 wt 落在 [on, off) 窄区时——
+     *   calm 赢身份 ⇒ 翻成 wt 并标 weak（治"轻微笑 .22 沉底还笃定显示平静"）；
+     *   情绪赢身份但分数 < off ⇒ 保留情绪、标 weak。
+     * 分数一个数不改（scores 原样调用），只修"笃定"语义 ⇒ F11 饱和率/单调性/序差全不动。
+     * 阈值、窄缝上下界与动态分母证伪记录见 rules.weak 注释。 */
+    let weak = false;
+    const W = R.weak;
+    if (W) {
+      const wt = all.find((x) => x.emotion !== "calm");   // all 降序 ⇒ 第一个非 calm 即最高
+      if (wt && wt.score >= ((W.onByEmo && W.onByEmo[wt.emotion] != null) ? W.onByEmo[wt.emotion] : W.on)) {
+        const offOf = (e) => (W.offByEmo && W.offByEmo[e] != null) ? W.offByEmo[e] : W.off;
+        if (main === "calm" && wt.score < offOf(wt.emotion)) { main = wt.emotion; weak = true; }
+        else if (main !== "calm" && all[0].score < offOf(main)) weak = true;
+      }
+    }
+    const scoreOf = (e) => { const x = all.find((y) => y.emotion === e); return x ? x.score : 0; };
     return {
       emotion: main,
-      intensity: clamp01(all[0].score * (R.gain[main] || 1)),
+      intensity: clamp01(scoreOf(main) * (R.gain[main] || 1)),
       all: all,
       secondary: secondary,
       confidence: clamp01(margin),
-      confident: margin >= (R.confidence ? R.confidence.on : 0),
+      confident: weak ? false : margin >= (R.confidence ? R.confidence.on : 0),
+      weak: weak,               // r161：够真但不够强 ⇒ 界面出「轻微 X（读数仅供参考）」
       color: colorOfFace(main),
       crisis: false,            // 表情既不判危机也不解除危机
       face: true,               // 来源标记：界面/判据据此区分"表情读数"与"文本读数"

@@ -54,6 +54,52 @@
 
 S4 真照片尺已建：`face_au_export.py`（只存参数不存图）+ `face_au_replay_check.py`（纯 node 进电池）。实测真照片 12 张 top-1 100%、有把握帧 10/12；⚠️**语料全表演级强度、零低强度**，sadness/fear/disgust/contempt 零真照 ⇒ **S1 靶场仍只靠 F12**。
 
+## ✅ r161 交付（S1 = 弱信号诚实化；S2 文案同轮落地）
+
+**路线变更记录（重要，防后人重走弯路）**：part2 原定 S1 = 「动态分母」，r161 执行轮用一次性探针
+（`_temp/face_dyndenom_probe.mjs`，已 gitignore）对 7 个候选设计（门 0.18/0.21 × 激活数 ≥1/≥2 ×
+按类开关 × 无证据不笃定）在 F11 全量 CASES + F12 45 格上实跑对比，**全军尽没**：
+
+| 候选 | F11 红项 | F12 笃定错报 | 致命伤 |
+|---|---|---|---|
+| base（不动） | 0 | 8 | — |
+| d1 门0.18/≥1（part2 原案） | **13** | 11（更差） | lips_pressed 虚报 anger、joy/disgust 平局抢赢、饱和率 34.6% 击穿 15% 红线、②d 序差归零 |
+| d2 门0.21/≥1 | 11 | 11 | 同上 |
+| d3 门0.21/≥2 | 8 | 16（更差） | 同上 + speaking 误报 |
+| d4 d3+关 fear/surprise | 4 | 11 | disgust→joy、contempt→joy、饱和 23.1% |
+
+**根因**：动态分母把「加权平均激活度」变成「激活 AU 的平均强度」——lips_pressed 只激活
+anger 的正权 AU（mouthPress）⇒ anger 虚高；joy 与 disgust 互吃对方正权子集 ⇒ 平局抢赢；
+中低强度即顶满 ⇒ 饱和率爆。**方差放大而无信息增益**，不是调参能救的。
+⇒ 改走本机制：**scores 一个数不改，只修 read() 的"笃定"语义**（weak 翻转）。
+⇒ F11 饱和率/单调性/序差/绝对分全部零影响（实测 sat 10.3% 不变），回归面极小。
+
+**落地清单**（src + deploy 同步，SHA256 三类归零；voice-call.css DIFF 属并行会话半成品，按台账不代同步）：
+1. `src/data/face-smile-rules.js`：新增 `weak` 块（on/off/onByEmo/offByEmo + 窄缝标定注释）
+2. `src/js/face-engine.js` `read()`：最高非 calm 分量落入 [on,off) ⇒ calm 赢身份时翻该情绪、
+   标 weak、强制不笃定；intensity 改用翻转后主情绪的分数
+3. `src/js/app.js`：paintHud / faceChipHtml / divergenceHtml 三处出「轻微 X（读数仅供参考）」三态文案
+4. `_test/face_discrim_check.py`：selftest 加反例 13（joy.off→0.20 ⇒ joy_weak 必须红）/
+   反例 14（surprise.on→0.09 ⇒ speaking 必须红）——weak 参数被回调必被抓
+
+**窄缝标定（扫出来的，非拍脑袋；扫描器 = _temp 探针定线模式）**：
+on=0.10（上界 speaking.surprise .12）；onByEmo.surprise=0.13（同 .12，按类抬高，
+否则全局 on 接不住 sadness@0.12 .106）；offByEmo.joy=0.15（上界 joy_weak .167）；
+offByEmo.sadness=0.22（上界 worry_light_A .25，下界 sadness@0.22 .195）；
+offByEmo.surprise=0.20（上界 worry_speak_B1 .243，下界 fear@0.22 格的 surprise .166）；
+全局 off=0.26（旧注释"top≥0.26 才翻得出 calm"同源线）。
+
+**验收数（r161 实跑）**：
+- F11：分类 25/25、8 类、饱和 2/78（2.6%）、低置信 5 条；selftest 15/15 反例全抓
+- F12：笃定错报 **8→1**、有把握帧命中 **78.4%→96.7%**（≥95% 目标线触达）、不确定 33.3%（≤30% 未达，只点名不判红）；基线已 --update 写回
+- N2 单测 31/31；N1 无回归；F1 vendor rc=0
+- **遗留 1 格**：fear@0.12 笃定错报——fear 的 need:2 多区惩罚把 fear 自分压到 surprise 之下
+  ⇒ 该格 wt=surprise .09 < on 不翻。fear 的 need 与低强度段结构冲突，归 S3/M1 复标。
+- 未修仪器（登记）：browser_check UNVERIFIED（开场 done 态 15s 超时，scroll-story 路径，
+  与 face 零关联，同族 R105-02/159）；core_capability 的 N2 UNVERIFIED = 该脚本调 node --test
+  的姿势问题（直接跑 `node --test _test/js/face-engine.unit.test.mjs` 有汇总行 31/31）——修法
+  记入方案文档 A0，下轮仪器修。
+
 ## 回滚锚（通用）
 
 规则改动独立 commit（revert 即回滚）；`face-smile-rules.js` 开关默认 false 起步、灰度参数放 src 版；

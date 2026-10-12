@@ -134,10 +134,12 @@
   function faceChipHtml(v) {
     const hex = rgbHex(v.color);
     const pct = Math.round((v.intensity || 0) * 100);
-    // 低置信度（主次分贴太近）如实显示「读数不稳」，不假装确定（r102）
-    const wobble = v.confident === false
-      ? `<span class="face-wobble" title="主情绪与次情绪分数接近，这一帧的读数仅供参考">读数不稳</span>` : "";
-    return `<span class="emotion-chip"><i class="dot" data-bg="${hex}"></i>表情：${window.FaceEngine.labelOf(v.emotion)}${wobble}`
+    // 低置信度（主次分贴太近）如实显示「读数不稳」；r161 弱信号帧显示「读数仅供参考」，都不假装确定
+    const wobble = v.weak
+      ? `<span class="face-wobble" title="信号够真但不够强，这一帧的读数仅供参考">读数仅供参考</span>`
+      : (v.confident === false
+        ? `<span class="face-wobble" title="主情绪与次情绪分数接近，这一帧的读数仅供参考">读数不稳</span>` : "");
+    return `<span class="emotion-chip"><i class="dot" data-bg="${hex}"></i>表情：${v.weak ? "轻微" : ""}${window.FaceEngine.labelOf(v.emotion)}${wobble}`
       + `<span class="intensity-bar"><i data-w="${pct}" data-bg="${hex}"></i></span></span>` + smileBadgeHtml(v.smile);
   }
   function divergenceHtml(view) {
@@ -145,7 +147,7 @@
     if (!f || !view.divergence) return "";
     // 表情侧可能报文本没有的类（惊讶/厌恶/轻蔑），用 family 归并后再比，
     // 否则「表情说轻蔑、文字说烦躁」会被渲染成"不一致"，而其实是同一族（r102）
-    const fLabel = window.FaceEngine.labelOf(f.emotion);
+    const fLabel = (f.weak ? "轻微" : "") + window.FaceEngine.labelOf(f.emotion);
     if (view.divergence === "disagree") {
       // 老师追问的那条：嘴在笑、话里是苦的 ⇒ 如实写"不一致"，不替用户下结论
       const hint = f.smile && f.smile.masking ? " · 伴紧张线索，可能是强颜欢笑" : "";
@@ -563,12 +565,16 @@ function initFaceHud(deps) {
     $("#face-hud-dot").dataset.bg = hex;
     // 独有三类走 FaceEngine.labelOf；margin 低时如实标「读数不稳」，不假装确定（r102）
     const base = FE.labelOf(view.emotion);
-    /* r113 质量门：画面靠不住（暗/糊/侧脸/嘴被挡）时说清原因并降为参考，不硬报笃定结论 */
+    /* r161 弱信号三态：weak ⇒ 「轻微 X（读数仅供参考）」；与 r113 质量门、r102 读数不稳并联 */
     const q = view.quality;
-    const qTxt = (q && !q.ok) ? "（" + q.reasons.map((r) => ({ lighting: "光线太暗或太亮", blur: "画面模糊",
-      profile: "侧脸幅度大", "mouth-flat": "嘴部区域被遮挡" }[r] || r).join("、")) + "，仅供参考）"
-      : (view.confident === false ? "（读数不稳）" : "");
-    $("#face-hud-emo").textContent = base + qTxt;
+    const qReason = (q && !q.ok) ? q.reasons.map((r) => ({ lighting: "光线太暗或太亮", blur: "画面模糊",
+      profile: "侧脸幅度大", "mouth-flat": "嘴部区域被遮挡" }[r] || r).join("、") : "";
+    const tails = [];
+    if (view.weak) tails.push("读数仅供参考");
+    if (qReason) tails.push(qReason + "，仅供参考");
+    else if (view.confident === false && !view.weak) tails.push("读数不稳");
+    $("#face-hud-emo").textContent = (view.weak ? "轻微" : "") + base
+      + (tails.length ? "（" + tails.join("；") + "）" : "");
     $("#face-hud-bar").dataset.w = Math.round((view.intensity || 0) * 100);
     $("#face-hud-bar").dataset.bg = hex;
     const badge = $("#face-hud-smile");

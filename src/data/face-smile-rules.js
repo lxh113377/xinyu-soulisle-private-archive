@@ -190,6 +190,39 @@ window.__XINYU_FACE_RULES__ = {
    * 的出口（实测强度 p25 仅 0.47 ⇒ 一半帧本就不确定却输出确定结论，表现为读数乱跳）。 */
   confidence: { on: 0.15, lowLabel: "读数不稳" },
 
+  /* ── 弱信号诚实化（r161 S1：治"低强度沉 calm 且界面笃定"）────────────────────
+   * 症状（r124 node 复算 13 向量）：轻微笑 mouthSmile .22 → calm 0.381 > joy 0.217，
+   * 且 margin 0.164 ≥ confidence.on ⇒ 界面**笃定**显示「平静」。argmax 机制本身没错
+   * （calm 确实赢了），错在"赢了身份就笃定" ⇒ 本机制只修"笃定"语义，不动任何分数。
+   * 规则：最高非 calm 分量 wt 落在 [on, off) 窄区时——
+   *   ① calm 赢身份 ⇒ 翻成 wt 并标 weak（界面「轻微 X（读数仅供参考）」，不笃定）；
+   *   ② 情绪赢身份但分数 < off ⇒ 保留情绪、标 weak 不笃定。
+   * ⚠️ 动态分母路线已实测证伪（r161 探针 7 候选全军尽没，细节见下）：门 0.18/0.21 ×
+   *   激活数 ≥1/≥2 全部 F11 红 ≥4 项 + F12 笃定错报不降反升—— lips_pressed 只激活
+   *   anger 正权 AU ⇒ 虚报愤怒；joy/disgust 平局抢赢；饱和率 10.3%→23~36% 击穿 F11
+   *   15% 红线；②d「真悲−担忧」序差归零 ⇒ 代价面从闪一下变成骗人。根因：动态分母把
+   *   "加权平均激活度"变成"激活 AU 的平均强度"，对"哪些 AU 恰好激活"极敏感 ⇒
+   *   方差放大而无信息增益。故不走分母，走本机制（分数零改 ⇒ F11 饱和/单调/序差全不动）。
+   * 窄缝标定法（每条线的上下界都是扫出来的，非拍脑袋；扫描器 = 一次性探针，
+   * 定线数据见 memory/11-face-accuracy.part3 S1 执行记录）：
+   *   on=0.10 上界 = speaking 负样本的 surprise .12（超过它负样本被翻 ⇒ F11 红）；
+   *   onByEmo.surprise=0.13 上界 = 同 speaking .12（按类抬高；全局 on 保持 .10 是为接住
+   *     F12 0.12 档最低的 sadness .106 —— 全局抬到 .13 会丢 anger@0.12 .123/sadness@0.12）；
+   *   offByEmo.joy=0.15 上界 = joy_weak 的 joy .167（F11 锚点：.2 的微笑必须判 calm）；
+   *   offByEmo.sadness=0.22 上界 = worry_light_A 的 sadness .25（r103 红线：轻担忧不得误报低落），
+   *     下界 = sadness@0.22 .195（要接住的轻低落）；
+   *   offByEmo.surprise=0.20 上界 = worry_speak_B1 的 surprise .243（边担忧边说话不得误报），
+   *     下界 = fear@0.22 格的 surprise .166（fear 自分被 need:2 压低的替身分量）；
+   *   全局 off=0.26 = 旧版注释"top≥0.26 才翻得出 calm"的同源线，保持历史语义。
+   * ⚠️ fear@0.12 仍剩 1 格笃定错报：fear 的 need:2 多区惩罚把 fear 自分压到 surprise
+   *   之下 ⇒ 该格 wt 是 surprise .09 < on 不翻。fear 的 need 与低强度段结构冲突，
+   *   归 S3/M1 权重复标，本轮不扩面（11-face-accuracy.md §四 S3）。 */
+  weak: {
+    on: 0.10, off: 0.26,
+    onByEmo: { surprise: 0.13 },
+    offByEmo: { joy: 0.15, sadness: 0.22, surprise: 0.20 }
+  },
+
   /* ── 质量门（r113「表情识别更抗造」）：画面本身靠不住时，读数只能当参考 ──────────
    * 四条信号全部来自本机已有的帧数据，零新增依赖（算术在 face-engine.js 的 assessQuality）：
    *   lighting=整帧平均亮度出窗（过暗/过曝，24×24 缩样）｜blur=缩样灰度方差过低（画面糊）

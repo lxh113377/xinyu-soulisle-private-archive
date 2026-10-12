@@ -508,6 +508,20 @@ def selftest():
               ("      mouthFrownLeft: 0.4, mouthFrownRight: 0.4,",
                "      mouthFrownLeft: 1.0, mouthFrownRight: 1.0,"))
 
+    # 反例 13（r161）：weak.offByEmo.joy 从 0.15 抬到 0.20 ⇒ joy_weak（joy .167）越过窄缝
+    #   被翻成 joy ⇒ F11 负样本假阳性必须红。盯「有人为了轻微笑更灵敏把 joy 的 off 调宽」——
+    #   joy_weak .167 与轻微笑 .137 只差 .03，是整条 weak 机制最窄的一条缝。
+    ran += _rule_case(real_rules, bad, "反例13 weak joy.off 抬到 0.20（joy_weak 被翻成 joy）",
+              ("offByEmo: { joy: 0.15, sadness: 0.22, surprise: 0.20 }",
+               "offByEmo: { joy: 0.20, sadness: 0.22, surprise: 0.20 }"))
+
+    # 反例 14（r161）：weak.onByEmo.surprise 从 0.13 降到 0.09 ⇒ speaking 的 surprise .12
+    #   进入窄区被翻成 surprise ⇒ F11 必须红。盯「全局 on 被顺手调到 surprise 上」——
+    #   speaking .12 是 on 的硬上界（定线扫描值），按类覆盖是唯一同时接住
+    #   sadness@0.12 .106 与挡住 speaking .12 的办法。
+    ran += _rule_case(real_rules, bad, "反例14 weak surprise.on 降到 0.09（speaking 被翻成 surprise）",
+              ("onByEmo: { surprise: 0.13 }", "onByEmo: { surprise: 0.09 }"))
+
     if bad:
         print("F11-SELFTEST-FAIL 实跑 %d 条反例，%d 条没抓到" % (ran, len(bad)))
         for b in bad:
