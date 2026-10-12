@@ -1,5 +1,37 @@
 ## [Unreleased]
 
+## [1.8.3] — 2026-10-12
+
+### r133 — 表达优化专项收口 + 存量判据清理（老大定「先清存量红再上线」）
+
+**功能面**
+- `verifyCitations` 接线（r132 遗留的**零调用点**）：此前函数在、效果不在，模型仍可凭空标
+  〔依据:PSY-XX-999·A〕。本轮接进 `onlineReply`（llmFetch 之后）：非流式改写回复；流式已逐字
+  吐给用户故走原文只回计数（`citeApplied` 显式化口径差异）。
+- 引用消费遥测 `citeChecked/citeMatched/citeUnmatched` 随 `respond()` 返回（降级/离线恒 0）。
+
+**判据面**
+- 新建 `_test/quote_wiring_r133_check.py`：接线腿 A1-A5 + 语料库侧消费面 B1-B5（10 腿）。
+  verifyCitations 三结局由既有 `kb_citation_check` C1-C7 负责，**本件不复验**（禁造第二把尺）。
+- `wit_quotes_build.py --check/--selftest` 入电池（该件早有 15 腿 selftest，缺的只是接线）。
+- 清 4 件 loc_guard 存量超限（4→0）：`benchmark_metrics` 删 2 空行；`kb_citation_check` C1-C5
+  判定体抽 `run_legs()`；`bench_eight_dims` 第 5 维抽 `_dim_maintenance()`；
+  `psych_kb_integrity` URL/DOI 抽取族四条桩升模块级。切分点一律按主题边界，非按行数对半。
+
+**口径更正（重要）**
+- 归因复跑收齐五读数后，「语料库提升表达质量」**不再成立为已证结论**：适配/自然/丰富三维
+  跨跑方向全不稳（丰富度 3 跑里 2 跑为负，seed135 效果门真红）。唯一稳定信号是
+  「注入不会让表达生硬」（生硬率差 full−old 均值 −6.7 pp，5/5 跑 full 不高于 old）。
+  据此本轮**未改写 quoteRules**（两种解释都与读数相容，改产品文案无依据）。
+- `size_budget_check` 的 `chat-agent.js` 上限按实测重登记 25,451→27,000。根因**不是**当期改动：
+  r132 记的「实测 24,239」取自其改动之前，同窗口 face/voice 面又追加过代码，存量已超 255 B。
+- 评测集入库（85→105 条），G8 的「工作树面绿、受理面 HEAD 红」消。
+
+### 版本说明
+v1.8.2 是**远端线**上的发布（`e8462ca`，2026-10-09），本地这条线从未合入它
+（`e103db0` r97 语音轮把 pom 切在 1.8.1）。本地内容已远超该发布点，故从 **v1.8.3** 起版，
+不与远端 v1.8.2 共用同号（那会让同版本号对应两批不同内容）。
+
 ### r131 — 给「来源 URL 必须真实可访问」这条红线装上机器面，并因此改掉三处口径（2026-10-12）
 
 - **新人工轮次模式 `_test/psych_kb_integrity_check.py --links`**（联网 ⇒ **不进电池/CI**）：取数面 = 条目卡
