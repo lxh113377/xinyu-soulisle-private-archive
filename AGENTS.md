@@ -197,12 +197,12 @@
 | 语言 / 运行时 | ✅ **JDK 17** | 本机实测 `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot`；JDK 8（`…jdk-8.0.504.1-hotspot`）是课程作业用，本项目勿混 |
 | 构建 | ✅ **Maven 3.9.9** | `mvn -f server/pom.xml package` → fat jar `server/target/soulisle-server.jar` |
 | Web 框架 | ✅ **Spring Boot 3.2.5**（`spring-boot-starter-web`） | 单体应用，不引入微服务 |
-| 持久层 | ✅ **MyBatis-Plus 3.5.7**；默认 **H2 file**；MySQL 8 驱动已引**可切但未实测** | 表 `chat_message` / `emotion_record`；⚠️ 与初版计划的差异：默认由"H2 内存库"改为 **H2 file**（`server/data/`，已 ignore），因为内存库重启即丢、不算持久 |
+| 持久层 | ✅ **MyBatis-Plus 3.5.7**；默认 **H2 file**；MySQL 8.4 **本地已实测可切**（2026-10-12，runner = `server/mysql-local.ps1`） | 表 `chat_message` / `emotion_record`；⚠️ 与初版计划的差异：默认由"H2 内存库"改为 **H2 file**（`server/data/`，已 ignore），因为内存库重启即丢、不算持久。⚠️ 索引必须内联成表内 `KEY`：MySQL 不支持 `CREATE INDEX IF NOT EXISTS`（实测 ERROR 1064），见 `memory/03-tech-stack.md` 实测记录 |
 | 鉴权 | ⚠️ **改为轻量 token 过滤器**（`xinyu.api-token`，默认空=放行） | ⚠️ 与初版计划的差异：**未引入 Spring Security + JWT**。理由见「决策 #4」 |
 | LLM 接入 | ✅ **JDK 内置 `HttpClient`**（零额外依赖） | 密钥走环境变量 `DEEPSEEK_KEY`，**禁入库** |
 | 情绪引擎 | ✅ Java 已实现（`engine/`）；⚠️ **前端仍用 JS 引擎，尚未接入 `/api/emotion`** | ⚠️ 当前存在**两份真相**（`src/js/emotion-engine.js` + `server/.../EmotionLexicon.java`），已登记为下一 P0 要消除 |
 | 前端 | ✅ **保留现有 Three.js 静态页，零代码改动**（J4 远端记忆为可选项） | ⚠️ 与初版计划的差异：**不由 `static/` 托管**，改**直读 `src/`**（见「决策 #2」） |
-| 部署 | ✅ `java -jar`；`server/Dockerfile` 已交付 | ⚠️ **Docker 本机未安装 → 镜像构建未实测**；v1 的 Cloudflare / CloudBase 保留为降级与对比路径 |
+| 部署 | ✅ `java -jar`；`server/Dockerfile` 已交付 | ⚠️ **镜像构建未实测** —— 更正（2026-10-12 实测）：Docker CLI 本机**已装**（29.8.0），未测的真因是 **Docker Desktop 守护进程没启动**，非"本机无 Docker"；v1 的 Cloudflare / CloudBase 保留为降级与对比路径 |
 
 ## 📋 选型决策记录（由 A-project-handoff 负责维护）
 

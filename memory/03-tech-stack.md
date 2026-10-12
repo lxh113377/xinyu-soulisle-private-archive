@@ -29,15 +29,17 @@
 ## 🎯 目标技术栈（v2 — Java 全栈，2026-09-20 老大定方向 · 选型为假设值待确认）
 
 > ⚠️ **本表未落地项均为「待落地验证」的假设值**（A-project-handoff V3.41.4 立规）：落地阶段必须用**实测值**回填，禁止把计划当既成事实引用。
-> **已落地实测**（可作为事实引用，2026-09-22 J1–J5 全部跑通）：JDK 17 / Maven 3.9.9 / Spring Boot 3.2.5 / 静态页 `static-locations` 直读 `src/` / `POST /api/chat` 契约 1:1 / 情绪引擎 Java 化（与 JS 侧对账一致；**2026-09-23 起为 73 条 / 98.6% / 危机 6-6**，前值 36 条 / 94.4% / 3-3）/ **MyBatis-Plus 3.5.7 + H2 file（默认）**、MySQL 8 驱动已引可切 / `/api/memory/**` 持久化（跨重启实测）/ fat jar `server/target/soulisle-server.jar` / 可选 `XINYU_API_TOKEN` 鉴权。
-> **未落地**（仍属假设）：**Spring Security + JWT 未引入**（J5 改用轻量 token 过滤器，默认关闭）；**Dockerfile 未实测**（本机无 Docker）；**MySQL 实际连接未实测**（仅 H2 跑通）。
+> **已落地实测**（可作为事实引用，2026-09-22 J1–J5 全部跑通）：JDK 17 / Maven 3.9.9 / Spring Boot 3.2.5 / 静态页 `static-locations` 直读 `src/` / `POST /api/chat` 契约 1:1 / 情绪引擎 Java 化（与 JS 侧对账一致；**2026-09-23 起为 73 条 / 98.6% / 危机 6-6**，前值 36 条 / 94.4% / 3-3）/ **MyBatis-Plus 3.5.7 + H2 file（默认）**、**MySQL 8.4 本地实测（2026-10-12，见下）** / `/api/memory/**` 持久化（跨重启实测）/ fat jar `server/target/soulisle-server.jar` / 可选 `XINYU_API_TOKEN` 鉴权。
+> **MySQL 8.4 实测记录（2026-10-12，本机一手）**：本机已装 MySQL 8.4.9（`C:\Program Files\MySQL\MySQL Server 8.4`，此前只装了二进制、从未初始化）。本轮初始化了一个**开发态**实例（数据目录 `D:\xinyu_mysql\data` 在仓库外、只绑 `127.0.0.1`、root 空口令、不装 Windows 服务），并以环境变量切库跑通全链：启动 DDL 自建两表两索引 → 写入 → 重启后仍在（`/api/memory/stats` 1/1）→ 中文 utf8mb4 无损。复算入口 = `powershell -File server\mysql-local.ps1 -Action Start|Serve|Status|Stop`（本轮实装，含 4 条反例腿）。
+> ⚠️ **切库时发现并修掉的 DDL 缺陷**：`schema.sql` 原写的 `CREATE INDEX IF NOT EXISTS` 在 **MySQL 上报 `ERROR 1064`**（那是 MariaDB/H2 语法；MySQL 8.4 不支持），而改写成裸 `CREATE INDEX` 又会让**两侧第二次启动都报错**（H2 42111 / MySQL 1061，因 `spring.sql.init.mode=always` 每次启动都跑）⇒ 两条索引已改为**内联进 `CREATE TABLE` 的 `KEY`**，幂等由表级 `IF NOT EXISTS` 承载。代价：H2 必须带 `MODE=MySQL`（默认 URL、`.env.example`、`Dockerfile` 三处本就都带）。此前"双兼容"只是声称、从未在真 MySQL 上跑过。
+> **未落地**（仍属假设）：**Spring Security + JWT 未引入**（J5 改用轻量 token 过滤器，默认关闭）；**Dockerfile 未实测**（更正：Docker CLI 本机已装 29.8.0，2026-10-12 实测 —— 未实测的真因是 **Docker Desktop 守护进程没启动**，不是"本机无 Docker"）。
 
 | 层 | 选型（✅=已实测落地） | 备注（含实际落地差异） |
 |---|---|---|
 | 语言 / 运行时 | ✅ **JDK 17** | 本机实测 `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot`；JDK 8（`…jdk-8.0.504.1-hotspot`）是课程作业用，本项目勿混 |
 | 构建 | ✅ **Maven 3.9.9** | `mvn -f server/pom.xml package` → fat jar `server/target/soulisle-server.jar` |
 | Web 框架 | ✅ **Spring Boot 3.2.5**（`spring-boot-starter-web`） | 单体应用，不引入微服务 |
-| 持久层 | ✅ **MyBatis-Plus 3.5.7**；默认 **H2 file**；MySQL 8 驱动已引**可切但未实测** | 表 `chat_message` / `emotion_record`；⚠️ 与初版计划的差异：默认由"H2 内存库"改为 **H2 file**（`server/data/`，已 ignore），因为内存库重启即丢、不算持久 |
+| 持久层 | ✅ **MyBatis-Plus 3.5.7**；默认 **H2 file**；MySQL 8.4 **本地已实测可切**（2026-10-12，含 runner 脚本） | 表 `chat_message` / `emotion_record`；⚠️ 与初版计划的差异：默认由"H2 内存库"改为 **H2 file**（`server/data/`，已 ignore），因为内存库重启即丢、不算持久。切库零代码改动（4 个环境变量）；索引必须内联成表内 `KEY`（MySQL 不支持 `CREATE INDEX IF NOT EXISTS`，见上方实测记录） |
 | 鉴权 | ⚠️ **改为轻量 token 过滤器**（`xinyu.api-token`，默认空=放行） | ⚠️ 与初版计划的差异：**未引入 Spring Security + JWT**。理由见「决策 #4」 |
 | LLM 接入 | ✅ **JDK 内置 `HttpClient`**（零额外依赖） | 密钥走环境变量 `DEEPSEEK_KEY`，**禁入库** |
 | 情绪引擎 | ✅ Java 已实现（`engine/`）；⚠️ **前端仍用 JS 引擎，尚未接入 `/api/emotion`** | ⚠️ 当前存在**两份真相**（`src/js/emotion-engine.js` + `server/.../EmotionLexicon.java`），已登记为下一 P0 要消除 |
