@@ -127,11 +127,54 @@ def h4_memory_search_present():
     return True, "控制器 + openapi + 人读手册 三处齐备"
 
 
+def h5_daily_quota_present():
+    """r130：成本**总量**闸（瞬时令牌桶挡不住「每分钟 1 次、一天 1440 次」的慢速白嫖）。"""
+    ledger = java_file(Path("config") / "UsageLedger.java")
+    filt = java_file(Path("config") / "QuotaFilter.java")
+    ctl = java_file(Path("api") / "UsageController.java")
+    if ledger is None:
+        return False, "UsageLedger.java 不在磁盘上"
+    if filt is None or "daily-quota-exceeded" not in filt:
+        return False, "QuotaFilter 里没有日额熔断的错误体语义"
+    if ctl is None or "/api/usage" not in ctl:
+        return False, "UsageController 里没有 /api/usage 路由"
+    yml = YML.read_text(encoding="utf-8", errors="replace") if YML.exists() else ""
+    if "daily-requests" not in yml:
+        return False, "application.yml 没有 daily-requests 配置位（闸没有开关等于不可运营）"
+    for doc, need in ((SPEC, "/api/usage"), (MANUAL, "/api/usage")):
+        if not doc.exists():
+            return False, f"{doc.name} 不在磁盘上"
+        if need not in doc.read_text(encoding="utf-8", errors="replace"):
+            return False, f"{doc.name} 没有声明 /api/usage"
+    return True, "台账 + 过滤器 + 读数端点 + 配置位 + openapi + 人读手册 六处齐备"
+
+
+def h6_memory_port_present():
+    """r130：记忆可携带（导出/导入）。`skipped` 是幂等的判别串，不是可省略的计数。"""
+    svc = java_file(Path("service") / "MemoryPortService.java")
+    ctl = java_file(Path("api") / "MemoryPortController.java")
+    if svc is None:
+        return False, "MemoryPortService.java 不在磁盘上"
+    if "skipped" not in svc:
+        return False, "导入实现里没有 skipped 计数 ⇒ 幂等这条性质没有可判的把手"
+    if ctl is None or "/api/memory/export" not in ctl or "/api/memory/import" not in ctl:
+        return False, "控制器里缺 export/import 两条路由"
+    for doc, need in ((SPEC, "/api/memory/export"), (MANUAL, "/api/memory/export"),
+                      (SPEC, "/api/memory/import"), (MANUAL, "/api/memory/import")):
+        if not doc.exists():
+            return False, f"{doc.name} 不在磁盘上"
+        if need not in doc.read_text(encoding="utf-8", errors="replace"):
+            return False, f"{doc.name} 没有声明 {need}"
+    return True, "服务 + 控制器 + openapi + 人读手册 四处齐备（含幂等计数把首）"
+
+
 CHECKS = [
     ("H1 限流闸在位（429 + Retry-After + 令牌桶）", h1_rate_limit_present),
     ("H2 请求体上限在位且默认值非零", h2_body_cap_present),
     ("H3 结构化访问日志在位且不记载荷/密钥", h3_access_log_present),
     ("H4 BM25 长期记忆检索三处齐备", h4_memory_search_present),
+    ("H5 按日用量闸与读数端点齐备（成本总量面）", h5_daily_quota_present),
+    ("H6 记忆导出/导入齐备且幂等计数在首（数据可携带）", h6_memory_port_present),
 ]
 
 
@@ -192,6 +235,21 @@ def selftest():
         mutate(MANUAL, "/api/memory/search", "/api/removed")
         if h4_memory_search_present()[0]:
             bad.append("H4 变异腿：手册删掉接口后仍判绿 ⇒ H4 恒真")
+
+        # H5/H6：把人读手册里的端点改名，必须翻红。
+        # ⚠️ 这里**必须全量替换**而不是 mutate() 的单次替换：`/api/usage` 在 API.md 里
+        # 出现在章节标题与 curl 示例两处，只替一处 ⇒ 另一处仍在 ⇒ 断言照绿（同 r128 的
+        # 「锚点必须只出现一次」，但那次的正解是换锚点，这次的正解是全替换——因为任何一处
+        # 存活都构成「文档没删干净」，我们要的就是这个语义）。
+        for anchor, repl, fn, label in (
+                ("/api/usage", "/api/removed-usage", h5_daily_quota_present, "H5"),
+                ("/api/memory/export", "/api/removed-export", h6_memory_port_present, "H6")):
+            text = MANUAL.read_text(encoding="utf-8")
+            if anchor not in text:
+                raise AssertionError(f"变异腿空操作：手册里找不到 {anchor}")
+            MANUAL.write_text(text.replace(anchor, repl), encoding="utf-8")
+            if fn()[0]:
+                bad.append(f"{label} 变异腿：手册改名 {anchor} 后仍判绿 ⇒ {label} 恒真")
     except AssertionError as e:
         bad.append(str(e))
     finally:
@@ -211,7 +269,7 @@ def selftest():
     if still_ok:
         bad.append(f"还原后仍判红（变异没被完全撤销）：{still_ok}")
 
-    print("SELFTEST-PASS: H1/H2/H3/H4 四条变异腿均把对应断言打翻、还原后原样零红"
+    print("SELFTEST-PASS: H1–H6 六条变异腿均把对应断言打翻、还原后原样零红"
           if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
     return 1 if bad else 0
 
@@ -234,7 +292,7 @@ def main():
         print("SERVER-HARDENING-FAIL")
         return 1
     print(f"合计 {total} 项，红 0")
-    print("SERVER-HARDENING-PASS 限流闸/体上限/访问日志/BM25 检索 四道能力均仍在位")
+    print("SERVER-HARDENING-PASS 限流闸/体上限/访问日志/BM25 检索/按日用量闸/记忆导出导入 六道能力均仍在位")
     return 0
 
 

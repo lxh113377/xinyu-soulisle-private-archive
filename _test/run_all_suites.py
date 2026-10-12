@@ -135,6 +135,13 @@ SUITES = [
     # 只防塌方级退化（直读变落库 / 线程池打满 / 危机路径开始打 LLM），不防抖动 ⇒ 才有资格进阻断链。
     ("perf_baseline", [sys.executable, "_test/perf_baseline_check.py", BASE]),
     ("perf_baseline_selftest", [sys.executable, "_test/perf_baseline_check.py", "--selftest"]),
+    # r130：八维第 4 维从「不可测」转「self 可复算」。**只接 selftest 腿进整跑** ——
+    # 主流程要打真实 8123 且服务不在时它诚实回 rc=2（未验），接进电池等于把「环境未起服务」
+    # 当成红项刷屏；带外复算命令见 docs/quality-gates.md。
+    ("perf_api_selftest", [sys.executable, "_test/perf_api_check.py", "--selftest"]),
+    # r130：教程面腐烂判据（第 7 维）。全离线（只读 docs/），故主流程与 selftest 都进电池。
+    ("docs_tutorial", [sys.executable, "_test/docs_tutorial_check.py"]),
+    ("docs_tutorial_selftest", [sys.executable, "_test/docs_tutorial_check.py", "--selftest"]),
     # r40c：报告里的「不可比 / 受限于 / 仅保证」类边界结论必须自带取证口径（M5⑫ 的执行器）。
     # 首跑就在自己的报告里点名一处 r35 遗留（无可比口径 无取证），修文案后才转绿 ⇒ 判据非装饰。
     ("disclaimer_forensics", [sys.executable, "_test/disclaimer_forensics_lint.py", "--all"]),  # r41: 分母改从目录现读

@@ -23,7 +23,9 @@
 退出码：0=API-CONTRACT-PASS 1=任一判据失败 2=环境异常（jar 不可达 / 缺 PyYAML / 缺 yaml 文件）
 """
 import json
+import os
 import re
+import socket
 import sys
 import urllib.error
 import urllib.request
@@ -113,6 +115,11 @@ def http(method, url, body=None, query=None):
             return r.status, r.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8", "replace")
+    except (TimeoutError, socket.timeout, urllib.error.URLError, OSError) as e:
+        # r130：超时/连接失败必须落成**读数**而不是抛栈。抛栈的代价是整条 C4 链连它前面
+        # 已经 PASS 的十几条一起消失（本轮实测：探测挂住 60s ⇒ 脚本崩在栈里，rc=1 却看不出
+        # 是哪条挂的）。同族于 r105 的 BLIND-RED：「超时须落未验/点名红，而非抛栈」。
+        return None, f"{type(e).__name__}: {e}"
 
 
 def annotated_ops(spec):
@@ -132,11 +139,14 @@ def annotated_ops(spec):
 
 def live_probes(spec, ann=None):
     """C4：按固定顺序跑（先写后查再删），不依赖 spec 里的书写顺序。返回 (探测数, 豁免集合)。"""
+    # 顺序即语义：先写后查再删。r130 在 delete 之前插入 export/import（导入会落数据，
+    # 必须排在清理之前，否则探测自己写的条目会被下一轮的清理假设打乱）。
     order = [("/api/health", "get"), ("/api/emotion/lexicon", "get"), ("/api/emotion/eval", "get"),
              ("/api/emotion", "post"), ("/api/chat", "post"),
              ("/api/memory/emotion", "post"), ("/api/memory/message", "post"),
              ("/api/memory/stats", "get"), ("/api/memory/emotions", "get"),
              ("/api/memory/messages", "get"), ("/api/memory/search", "get"),
+             ("/api/memory/export", "get"), ("/api/memory/import", "post"), ("/api/usage", "get"),
              ("/api/memory/{sessionId}", "delete")]
     ann = ann if ann is not None else annotated_ops(spec)
     skipped = {k: v[1] for k, v in ann.items() if isinstance(v, tuple)}
@@ -153,6 +163,9 @@ def live_probes(spec, ann=None):
         want = cfg.get("status") or [200]
         ok = st in want
         detail = f"{verb} {path} -> {st}"
+        if st is None:
+            # 连不上/超时：点名到具体端点并带上异常类型，不当绿也不静默跳过
+            detail = f"{verb} {path} -> 未验（{bodytxt[:80]}）"
         # r28：CI runner 没有上游密钥（密钥不落仓）。那种环境下 `POST /api/chat` 的**契约正确响应**
         # 就是 `500 {"error":"no-key"}`（错误体与 v1 逐字一致，本来就是 J2 的验收项之一）。
         # 只对「这一条端点 + 这个错误体」放宽，并把走了哪条分支打印出来 —— 静默放宽等于没判。
@@ -260,8 +273,20 @@ def selftest():
 
 
 def main():
+    global BASE
     if "--selftest" in sys.argv:
         sys.exit(selftest())
+    # r130：8123 上跑的可能是他人旧产物（瘦 jar 无新路由），那时 C4 会整片假红。
+    # 给一个显式换基址的口子，就能在「含新代码的实例」上完成运行态对账，
+    # 而不是靠 x-live-skip 把新接口永久豁免掉（C6b 会因此判红，正是它的作用）。
+    base = os.environ.get("XINYU_CONTRACT_BASE", "").strip()
+    if "--base" in sys.argv:
+        idx = sys.argv.index("--base")
+        if idx + 1 < len(sys.argv):
+            base = sys.argv[idx + 1].strip()
+    if base:
+        BASE = base.rstrip("/")
+        print(f"  · 运行态基址 = {BASE}（--base 覆盖，非默认 8123）")
     if not SPEC.exists():
         print("API-CONTRACT-ENV-ERROR: 缺 docs/openapi.yaml")
         return 2
@@ -287,7 +312,7 @@ def main():
               not mb, " ; ".join(mb) or f"yaml {len(spec.get('paths') or {})} 路径逐条在册、零幽灵")
     st, _ = http("get", BASE + "/api/health")
     if st != 200:
-        print("API-CONTRACT-ENV-ERROR: fat jar 未在 8123 运行（C4 需要它）")
+        print(f"API-CONTRACT-ENV-ERROR: 服务未在 {BASE} 运行（C4 需要它）")
         return 2
     ops = spec_ops(spec)
     ann = annotated_ops(spec)

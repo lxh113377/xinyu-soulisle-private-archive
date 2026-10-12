@@ -1,0 +1,56 @@
+{
+  "generated_by": "_test/perf_api_check.py",
+  "collected_at": "2026-10-12T23:59:09+0800",
+  "base_url": "http://127.0.0.1:8123",
+  "fingerprint": {
+    "service": "xinyu-soulisle",
+    "stage": "J5",
+    "java": "17.0.20.1",
+    "webRoot": "C:\\Users\\37533\\Desktop\\workspace\\项目\\陪聊\\src",
+    "indexFound": true,
+    "vendorFound": true
+  },
+  "rounds": 30,
+  "endpoints": {
+    "health": {
+      "n": 30,
+      "ok": 30,
+      "fail": 0,
+      "mean_ms": 12.73,
+      "p50_ms": 15.08,
+      "p95_ms": 15.93,
+      "max_ms": 16.32
+    },
+    "emotion": {
+      "n": 30,
+      "ok": 30,
+      "fail": 0,
+      "mean_ms": 10.77,
+      "p50_ms": 14.55,
+      "p95_ms": 15.92,
+      "max_ms": 16.01
+    }
+  },
+  "concurrency": {
+    "n": 32,
+    "ok": 32,
+    "fail": 0,
+    "mean_ms": 2.13,
+    "p50_ms": 2.19,
+    "p95_ms": 2.48,
+    "max_ms": 2.62,
+    "level": 8,
+    "elapsed_ms": 12.79,
+    "rps": 2502.39
+  },
+  "thresholds": {
+    "health": {
+      "p95_ms": 50
+    },
+    "emotion": {
+      "p95_ms": 50
+    }
+  },
+  "comparable": false,
+  "comparable_reason": "peers 基准在册 0/16（peer_perf_probe 三通道，2026-10-12 现采）"
+}

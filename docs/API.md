@@ -1,6 +1,6 @@
 # 心屿 MindIsle API 手册（人类可读版）
 
-> 机器契约唯一真相源 = `docs/openapi.yaml`（12 路径，`_test/api_contract_check.py` 强制：文档不缺/不虚/前端不偷调/运行态一致/零豁免探测，
+> 机器契约唯一真相源 = `docs/openapi.yaml`（15 路径，`_test/api_contract_check.py` 强制：文档不缺/不虚/前端不偷调/运行态一致/零豁免探测，
 > 并自 r89 起**把本手册也钉进对账**（C7：yaml 每条路径必须在本文件出现、本文件不得虚报接口、上方路径计数必须等于实值）——
 > 手册此前"没有任何读者"，yaml 一改它就静默过期）。
 > 基地址：本地 `http://127.0.0.1:8123`；公网 Pages 只有 `/api/chat`（其余接口不在此形态暴露）。
@@ -35,8 +35,16 @@
 | `GET /api/memory/stats?sessionId=` | `{sessionId,emotions,messages}`（AC-OBS-10 判据口） |
 | `GET /api/memory/search?q=&sessionId=&limit=10` | `{query,pool,count,results[]}`（r128：BM25 长期记忆检索；sessionId 可省＝全库检索，score 只在本次候选集内可比） |
 | `DELETE /api/memory/{sessionId}` | `{ok,removed}`（对应界面"清除我的数据"） |
+| `GET /api/memory/export?sessionId=&limit=500` | `{schema,sessionId,counts,messages[],emotions[]}`（r130：数据**可携带**；`sessionId` 必填，不给就 400 —— 不开"匿名导出全库"这个口子） |
+| `POST /api/memory/import` | `{schema:"xinyu-memory/1",sessionId,messages[],emotions[]}` → `{ok,inserted,skipped,rejected}`（r130：**幂等**，判重键＝消息 (role,content) / 情绪 (emotion,text)；单批 ≤500，结构性错误整批拒绝不导一半） |
 
-## 5. 鉴权与错误码总表
+## 5. 用量读数 `GET /api/usage` → 200（r130）
+
+`curl http://127.0.0.1:8123/api/usage` → `{day,requests,tokens,requestLimit,tokenLimit,tokensAreEstimated:true}`。
+`tokens` 是「请求体字节数 ÷ 4」的**粗估**，不是上游计费口径；`requestLimit/tokenLimit` 为 0 表示不限。
+配合 `QuotaFilter` 的按日熔断：日额打满后 `/api/chat` 返 429 + `X-Quota-Day-Used/-Limit` + `Retry-After`（到次日零点）。
+
+## 6. 鉴权与错误码总表
 
 - `xinyu.api-token` 留空=全放行；置非空后缺/错头 401（`/api/health` 与静态页始终放行）。
 - 通用：400 `bad-json`｜500 `no-key`｜502 上游｜404 `dataset-not-found`（仅 eval）。

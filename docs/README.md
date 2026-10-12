@@ -5,7 +5,7 @@
 
 | 文件 | 内容 | 谁在用（机器强制） |
 |---|---|---|
-| [`openapi.yaml`](openapi.yaml) | 服务端 11 条接口的**唯一机器可读契约**（请求/响应 schema、错误码、SSE 语义） | `_test/api_contract_check.py`：C1 不缺文档 / C2 不虚文档（幽灵路径）/ C3 前端不得偷调 / C4 运行态状态码与必需键一致 / C6 覆盖度精确对账 / C5 自证判据非恒真。已入全量电池与 CI `java-build` |
+| [`openapi.yaml`](openapi.yaml) | 服务端 **15 条**接口的**唯一机器可读契约**（请求/响应 schema、错误码、SSE 语义） | `_test/api_contract_check.py`：C1 不缺文档 / C2 不虚文档（幽灵路径）/ C3 前端不得偷调 / C4 运行态状态码与必需键一致 / C6 覆盖度精确对账 / C5 自证判据非恒真。已入全量电池与 CI `java-build` |
 | [`API.md`](API.md) | 人读 API 手册（curl 示例、字段、错误码、三层 memory 开关） | `_test/api_contract_check.py` C7（r89 新增）：yaml 每条路径必须在手册出现 / 手册不得虚报接口 / 手册声明的路径计数必须等于实值 |
 | [`EXTENSIONS.md`](EXTENSIONS.md) | 扩展手册：词表 SSOT、共情策略、LLM 上游切换、记忆 provider、部署目标、第三方集成清单 | 人工维护；接口面变动由 C7 与 `_test/engine_consistency_check.py` 兜住，本目录由 `_test/repo_config_check.py` G19 盯「在不在索引里」 |
 | [`PERF-BASELINE.md`](PERF-BASELINE.md) | 性能基线口径与预算表（p95 / 吞吐 / 四目标预算），把"自证"变成可引用的数 | `_test/perf_baseline_check.py`（同机棘轮，超限即红） |
@@ -13,6 +13,8 @@
 | [`tutorial-02-crisis-referral.md`](tutorial-02-crisis-referral.md) | 教程 02：危机转介——优先级为什么在调模型之前、转介落点、**危机词表 ⇄ SafetyGuard 高危词表不得互相冒充**（「跳楼」实测只在后者） | 断言由 `python _test/browser_check.py` 与 `mvn -B -f server/pom.xml test` 复算；条数一律现读不写死 |
 | [`tutorial-03-memory-switches.md`](tutorial-03-memory-switches.md) | 教程 03：记忆三层开关——代码层 `isRemote()`／本地演示 `remote: true`／公网层刻意不开，以及熔断为什么必须存在 | 复算 `_test/j4_memory_check.py` + `GET /api/memory/stats`；对外表述红线见 `memory/AGENTS.md` 决策 #3 |
 | [`tutorial-04-running-the-checks.md`](tutorial-04-running-the-checks.md) | 教程 04：跑判据——三态退出码（没量到 ≠ 达标）、改完至少跑哪四条、G4/G8/G12/G16/G19 各咬什么、反例腿的三种形态、Windows 三个执行坑 | 本仓自述面：套件数一律 `run_all_suites.py --list` 现读，README 那句由 `_test/suite_count_sync.py --apply` 对齐（不手抄） |
+| [`tutorial-05-memory-portability.md`](tutorial-05-memory-portability.md) | 教程 05：记忆可携带——导出/导入一分钟版、**导入为什么必须幂等**（判重键与 500 条窗口）、整批拒绝的三种情况、为什么导出强制 `sessionId`（不开全量下载口） | 复算 `python _test/api_contract_check.py`（C4 运行态含 export/import）+ `mvn -B -f server/pom.xml test`（`MemoryPortServiceTest`） |
+| [`tutorial-06-cost-and-performance.md`](tutorial-06-cost-and-performance.md) | 教程 06：成本闸与性能基准——令牌桶 ⇄ 按日台账**两道闸的互补关系**、`/api/usage` 三分钟自查、**token 是估算不是账单**、性能尺的三条使用纪律（不横比 / rounds 别超 burst / 换产物重校准） | `python _test/perf_api_check.py [--calibrate\|--selftest]`；服务端侧 `UsageLedgerTest` / `QuotaFilterTest` |
 | [`quality-gates.md`](quality-gates.md) | 判据体系明细：每条套件的口径 + 复算命令（**条数一律从 `run_all_suites.py` 的 SUITES 现读，本文件不抄数**） | `_test/repo_config_check.py` G16：电池脚本 ⇄ 本文档双向对账（漏登/幽灵登都红） |
 | [`QUICKSTART.md`](QUICKSTART.md) | 三步上手：静态页 / fat jar / 容器，每条路的「起来了」判据、给密钥的三种落点、十分钟自证清单与起不来的排查顺序 | 人工维护；本文的存在性由 `_test/peer_docs_probe.py` 计入本仓文档四类位（教程位），命令真伪随 `docs/quality-gates.md` 与 `_test/repo_config_check.py` G19 一起对账 |
 | [`data-and-privacy.md`](data-and-privacy.md) | 数据与隐私面：本地存储什么、谁能清除、危机转介的边界 | `_test/data_rights_check.py`（真点击清除 + 落库回执） |

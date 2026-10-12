@@ -48,6 +48,17 @@ xinyu:
   # r128 结构化访问日志（AccessLogFilter）：只记元数据，绝不记请求体/响应体/密钥。
   access-log:
     enabled: ${XINYU_ACCESS_LOG_ENABLED:true}
+  # r130 成本面**总量闸**（QuotaFilter + UsageLedger）：上面的令牌桶只堵「单位时间内来得快」，
+  # 结构上挡不住「每分钟 1 次、一天 1440 次」的慢速白嫖 ⇒ 补按自然日累计与日额熔断。
+  # daily-tokens 默认 0 = 不限：token 是「字节数/4」的粗估，不是上游计费口径，
+  # 拿它做硬门槛前请先确认自己能接受这个误差（/api/usage 会如实标 tokensAreEstimated=true）。
+  quota:
+    enabled: ${XINYU_QUOTA_ENABLED:true}
+    # 默认 2000/日刻意宽松：宁可多花一点，也不能打断既有 185 条回归电池的自调用
+    daily-requests: ${XINYU_QUOTA_DAILY_REQUESTS:2000}
+    daily-tokens: ${XINYU_QUOTA_DAILY_TOKENS:0}
+    # 默认只计量 /api/chat —— 全仓唯一真花钱的端点
+    paths: ${XINYU_QUOTA_PATHS:/api/chat}
   # 情绪词表单一真相源（前端与服务端共用同一份文件）：
   #   ${XINYU_LEXICON} 直接指向文件；未设则用 ${XINYU_WEB_ROOT}/data/emotion-lexicon.js
   #   —— 即 src/data/emotion-lexicon.js（fat jar）或 /app/web/data/...（Docker）。

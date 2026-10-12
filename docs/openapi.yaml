@@ -270,6 +270,73 @@ paths:
               schema:
                 type: object
                 required: [query, pool, count, results]
+  /api/memory/export:
+    get:
+      tags: [memory]
+      summary: 导出该会话全部记忆（r130 新增，数据可携带权）
+      description: >-
+        对应「数据能带走」这半边权利（清除权在 DELETE /api/memory/{sessionId}）。
+        **sessionId 必填**：刻意不提供「不传参数就导出全库」的形态 —— 那等于给任何拿到地址的人开全量下载。
+        导出件 schema 版本逐字等于 `xinyu-memory/1`，导入端按此比对，不接受模糊匹配。
+      parameters:
+        - { in: query, name: sessionId, required: true, schema: { type: string } }
+        - { in: query, name: limit, required: false, schema: { type: integer, default: 500, maximum: 500 } }
+      x-live-check:
+        method: get
+        query: { sessionId: "contract-probe" }
+        status: [200]
+        required_keys: [schema, sessionId, counts, messages, emotions]
+      responses:
+        "200":
+          description: 导出件
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemoryExport" }
+        "400": { $ref: "#/components/responses/BadJson" }
+  /api/memory/import:
+    post:
+      tags: [memory]
+      summary: 导入记忆（r130 新增，幂等）
+      description: >-
+        **幂等是硬要求**：判重键为消息 (role, content) 与情绪 (emotion, text)，命中即 skipped。
+        用户换机器时会「导一次、不确定、再导一次」，不幂等会在几秒内把历史翻倍。
+        判重窗口＝该会话最近 500 条（MemoryService.MAX_LIMIT），更深的历史不参与判重。
+        单批上限 500 条；结构性错误（schema 不匹配/超限/缺 sessionId）**整批拒绝**，绝不导入一半。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemoryImport" }
+      x-live-check:
+        method: post
+        body: { schema: "xinyu-memory/1", sessionId: "contract-probe", messages: [{ role: user, content: "导入探测" }], emotions: [{ emotion: "calm", intensity: 0.2, text: "探测" }] }
+        status: [200]
+        required_keys: [ok, inserted, skipped, rejected]
+      responses:
+        "200":
+          description: 导入结果
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemoryImportResult" }
+        "400": { $ref: "#/components/responses/BadJson" }
+  /api/usage:
+    get:
+      tags: [health]
+      summary: 按日用量读数（r130 新增，成本面总量闸的观测口）
+      description: >-
+        回传当日累计请求数与估算 token 及两个限额。**token 是「请求体字节数/4」的粗估**，
+        不是上游计费口径（响应里带 `tokensAreEstimated:true` 明示），别拿它对账账单。
+        本端点只回计数，不含请求体/响应体/会话内容/密钥 —— 泄漏面只有「今天被调用了几次」。
+      x-live-check:
+        method: get
+        status: [200]
+        required_keys: [day, requests, tokens, requestLimit, tokenLimit, tokensAreEstimated]
+      responses:
+        "200":
+          description: 用量快照
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Usage" }
   /api/memory/{sessionId}:
     delete:
       tags: [memory]
@@ -310,6 +377,83 @@ components:
     ChatResponse:
       type: object
       description: 上游透传，形状由 OpenAI 兼容端决定，本项目不重包装
+    MemoryExport:
+      type: object
+      required: [schema, sessionId, counts, messages, emotions]
+      properties:
+        schema: { type: string, example: "xinyu-memory/1" }
+        exportedAt: { type: string }
+        sessionId: { type: string }
+        counts:
+          type: object
+          required: [messages, emotions]
+          properties:
+            messages: { type: integer }
+            emotions: { type: integer }
+        messages:
+          type: array
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role: { type: string, enum: [user, assistant] }
+              content: { type: string }
+              createdAt: { type: string, nullable: true }
+        emotions:
+          type: array
+          items:
+            type: object
+            required: [emotion]
+            properties:
+              emotion: { type: string }
+              intensity: { type: number }
+              secondary: { type: string, nullable: true }
+              text: { type: string }
+              createdAt: { type: string, nullable: true }
+    MemoryImport:
+      type: object
+      required: [schema, sessionId]
+      properties:
+        schema: { type: string, example: "xinyu-memory/1" }
+        sessionId: { type: string }
+        messages:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role: { type: string, enum: [user, assistant] }
+              content: { type: string }
+        emotions:
+          type: array
+          items:
+            type: object
+            required: [emotion]
+            properties:
+              emotion: { type: string }
+              intensity: { type: number, default: 0.5 }
+              secondary: { type: string, nullable: true }
+              text: { type: string }
+    MemoryImportResult:
+      type: object
+      required: [ok, inserted, skipped, rejected]
+      properties:
+        ok: { type: boolean }
+        sessionId: { type: string }
+        inserted: { type: integer }
+        skipped: { type: integer, description: 与库内或本批次内已有条目重复 ⇒ 未写入 }
+        rejected: { type: integer, description: 条目非法（角色越权/内容空白/情绪名为空）⇒ 未写入 }
+    Usage:
+      type: object
+      required: [day, requests, tokens, requestLimit, tokenLimit, tokensAreEstimated]
+      properties:
+        day: { type: string, example: "2026-10-12" }
+        requests: { type: integer }
+        tokens: { type: integer }
+        requestLimit: { type: integer, description: "0 = 不限" }
+        tokenLimit: { type: integer, description: "0 = 不限" }
+        tokensAreEstimated: { type: boolean, example: true }
     EmotionOutcome:
       type: object
       required: [lex, final, path]

@@ -1,0 +1,181 @@
+{
+ "generated_by": "_test/peer_perf_probe.py",
+ "denominator": 16,
+ "rows": [
+  {
+   "repo": "lobehub/lobehub",
+   "tier": "",
+   "class": "unverified",
+   "err": "read tcp 10.194.123.246:62084->20.205.243.168:443: wsarecv: An existing connection was forcibly closed by the remote hos"
+  },
+  {
+   "repo": "SillyTavern/SillyTavern",
+   "tier": "",
+   "class": "unverified",
+   "err": "read tcp 10.194.123.246:53034->20.205.243.168:443: wsarecv: An existing connection was forcibly closed by the remote hos"
+  },
+  {
+   "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 299,
+   "workflow_files": 6,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "morettt/my-neuro",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 797,
+   "workflow_files": 3,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "letta-ai/letta-code",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 2735,
+   "workflow_files": 17,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "hello-diana/MASCOT",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 99,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "ddxfish/sapphire",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 1446,
+   "workflow_files": 1,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "v2rockets/Loyal-Elephie",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 147,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "Rogendo/Mental-health-Chatbot",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 15,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "Lum1104/MER-Factory",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 194,
+   "workflow_files": 1,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "CheaperjamRen/leemo",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 1740,
+   "workflow_files": 1,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "NJX-njx/opensoul",
+   "tier": "",
+   "bench_files": [
+    "scripts/bench-continuity.mjs",
+    "scripts/bench-model.ts"
+   ],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 6715,
+   "workflow_files": 8,
+   "ci_bench_steps": [],
+   "class": "files-only"
+  },
+  {
+   "repo": "s-nagaev/chibi",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 336,
+   "workflow_files": 4,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "29-Cu/succhia",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 14,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "zeroa234/ryza-ai-revive",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 2467,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  },
+  {
+   "repo": "Bwcx-songyu/MoodChat",
+   "tier": "",
+   "bench_files": [],
+   "result_files": [],
+   "tree_truncated": false,
+   "path_count": 82,
+   "workflow_files": 0,
+   "ci_bench_steps": [],
+   "class": "none"
+  }
+ ],
+ "na": [
+  "lobehub/lobehub(unverified)",
+  "SillyTavern/SillyTavern(unverified)"
+ ],
+ "measured": 0,
+ "ts": "2026-10-12T15:51:08Z"
+}
