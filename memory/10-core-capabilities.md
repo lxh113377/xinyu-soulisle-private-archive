@@ -15,7 +15,7 @@
 
 ```bash
 python _test/core_capability_baseline_check.py            # 复算 + 棘轮对账
-python _test/core_capability_baseline_check.py --selftest # 反例自证（4/4 可演习）
+python _test/core_capability_baseline_check.py --selftest # 反例自证（12 腿可演习，r127 起；旧口径 4/4）
 python _test/core_capability_baseline_check.py --update   # 更优读数写回基线（只升不降）
 ```
 
