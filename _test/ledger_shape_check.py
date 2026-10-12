@@ -16,11 +16,18 @@ battery-timing / timing-coupling …）。r122 我用一个自造键名 `blind_o
 落点选择：本件是**报告型看守**（advisory 的判据本体，但红项照 rc=1 阻断电池），
 它不替代龄期尺，也不替代 G8/G4——同一事实只在各自的尺上判一次：
 龄期尺判"新不新"，本件判"形状认不认得、有没有如实声明"。
+
+r127-S5 增第五条腿「族名归一撞名」（一手：我把探针输出写成 `peer_memory-2026-10-12.json`，
+而族名是 `peer-memory`）：写错分隔符会长出一个**新族**（内容合法 ⇒ 分类落在 ABSENT，不红），
+真族则停在旧样本上，而旧样本在 fuse 内 ⇒ 龄期尺照绿 ⇒ **改名＝台账静默过期且两把尺都不报**。
+判据：族名把连字符/下划线/大小写归一后同键 ⇒ 必有一个拼法是错的，红并同时点名两种拼法。
+`.partial` 后缀**不**参与归一：它是同一族的降级态，盘上确与正族并存（归一了会造出假的永红）。
 """
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -42,6 +49,21 @@ def classify(dec, found):
     if found == 0 and dec == 0:
         return "CLEAR"
     return "DECLARED"
+
+
+def stem_key(stem):
+    """族名归一：连字符/下划线/大小写差异视为同一族（r127-S5 一手事故＝ peer-memory 写成 peer_memory）。
+    `.partial` 一律**不**剥：它是同一族的降级态且盘上确与正族并存，剥了会造出假的永红判据。"""
+    return re.sub(r"[-_]", "", stem).lower()
+
+
+def near_dup_groups(stems):
+    """纯函数：族名列表 → 归一后撞名的组 [(key, [stems…])]（>1 个拼法才算）。
+    同一族被两种拼法写开的后果是"真族静默过期、假族没人读"——两把现成的尺都不会红。"""
+    g = {}
+    for s in stems:
+        g.setdefault(stem_key(s), []).append(s)
+    return sorted((k, sorted(v)) for k, v in g.items() if len(v) > 1)
 
 
 def census(dir_path, pattern="*.json"):
@@ -122,7 +144,20 @@ def selftest():
             bad.append("⑦变异腿失效：把 `na` 换成 `blind_or_na` 后本尺竟照认/照绿")
     except Exception as e:
         bad.append("⑧契约腿没跑成（%s）⇒ 不得当成已验" % type(e).__name__)
-    print("SELFTEST-%s（%d 类分类桩 + 在册形状词汇 5 桩 + 生产者契约与变异腿）"
+    # ⑨-⑫ 族名归一撞名（r127-S5 一手事故的形状：peer-memory 被写成 peer_memory）
+    # ⚠️ 夹具喂的必须是 **stem**（族名，去掉日期尾）——真面 census 交上来的就是 stem；
+    # 首版我喂了整文件名（带 -2026-10-08），日期数字各异 ⇒ 归一后不同键 ⇒ 三条腿全假绿，
+    # 靠端到端演习（临时目录真注入文件）当场对上才暴露。夹具形状必须等于真面形状。
+    if near_dup_groups(["peer-memory", "peer-docs"]) != []:
+        bad.append("⑨正例面失效：两个不同族的干净名单竟被判撞名")
+    got = near_dup_groups(["peer-memory", "peer_memory"])
+    if len(got) != 1 or got[0][1] != ["peer-memory", "peer_memory"]:
+        bad.append("⑩反例失效：连字符⇄下划线的同族没被抓到（实得 %s）" % got)
+    if near_dup_groups(["benchmark-metrics", "benchmark-metrics-r93", "benchmark-metrics.partial"]):
+        bad.append("⑪边界失效：轮次后缀与 .partial 被误并成撞名（会在真面上造出假的永红判据）")
+    if len(near_dup_groups(["Peer-Memory", "peer-memory"])) != 1:
+        bad.append("⑫大小写腿失效：仅大小写不同的同族没被抓到")
+    print("SELFTEST-%s（%d 类分类桩 + 在册形状词汇 5 桩 + 生产者契约与变异腿 + 撞名 4 腿）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(cases) + 2))
     return 1 if bad else 0
 
@@ -146,20 +181,24 @@ def main():
     counts = {}
     for _s, st, _dec, _f, _w in rows:
         counts[st] = counts.get(st, 0) + 1
+    dups = near_dup_groups([r[0] for r in rows])
     red = [(s, st, dec, f, why) for s, st, dec, f, why in rows if st in RED_STATES]
+    red += [(v[0], "NEAR-DUP", 0, 0,
+             "族名归一后撞名：%s（两种拼法必有一错；后果＝真族静默过期而假族没人读）" % " / ".join(v))
+            for _k, v in dups]
     if a.json:
         Path(a.json).write_bytes(json.dumps(
             {"generated_by": "_test/ledger_shape_check.py", "dir": str(d),
-             "families": len(rows), "counts": counts,
+             "families": len(rows), "counts": counts, "near_dup": [list(v) for _k, v in dups],
              "red": [{"stem": s, "state": st, "declared": dec, "found": f, "why": w}
                      for s, st, dec, f, w in red]}, ensure_ascii=False, indent=1).encode("utf-8") + b"\n")
     line = ("LEDGER-SHAPE-%s 族 %d｜有义务 %d(CLEAR %d＋DECLARED %d＋DIVERGE %d)｜"
-            "无义务 ABSENT %d｜盲区 %d｜读不动 %d"
+            "无义务 ABSENT %d｜盲区 %d｜读不动 %d｜撞名 %d 组"
             % ("FAIL" if red else "PASS", len(rows),
                counts.get("CLEAR", 0) + counts.get("DECLARED", 0) + counts.get("DIVERGE", 0),
                counts.get("CLEAR", 0), counts.get("DECLARED", 0), counts.get("DIVERGE", 0),
                counts.get("ABSENT", 0), counts.get("UNDECLARED-BLIND", 0),
-               counts.get("UNREADABLE", 0)))
+               counts.get("UNREADABLE", 0), len(dups)))
     if red:
         for s, st, dec, f, why in red[:10]:
             print("- 红-" + st + ": " + "%s 声明 %s／件内 %d｜%s" % (s, dec, f, why))
