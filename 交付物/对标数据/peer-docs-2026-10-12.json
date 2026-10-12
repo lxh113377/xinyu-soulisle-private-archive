@@ -142,7 +142,7 @@
    "docs_site": 1,
    "readme_bytes": 21885,
    "docs_md_files": 11,
-   "path_count": 303,
+   "path_count": 305,
    "class": "3/4"
   },
   {
@@ -180,11 +180,11 @@
   },
   {
    "api_spec": 1,
-   "guide": 1,
+   "guide": 5,
    "contributing": 1,
    "docs_site": 1,
    "readme_bytes": 22134,
-   "docs_md_files": 8,
+   "docs_md_files": 12,
    "repo": "self（心屿 MindIsle 本仓）",
    "class": "4/4",
    "face": "HEAD 面 git ls-tree -r HEAD（与 peers 同面）"
@@ -207,5 +207,5 @@
   "docs_site": 10
  },
  "note": "四类位＝API 规范 / 教程 / 贡献指南 / 独立文档区；0/4 只在取数面完整时成立，失明一律单列 unverified 不折算成零",
- "ts": "2026-10-11T22:17:24Z"
+ "ts": "2026-10-12T00:16:28Z"
 }

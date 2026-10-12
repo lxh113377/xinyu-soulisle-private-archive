@@ -1,7 +1,7 @@
 {
  "generated_by": "_test/bench_eight_dims_check.py",
  "round": "r126",
- "written_at": "2026-10-11T23:20:10Z",
+ "written_at": "2026-10-12T00:16:38Z",
  "dims": [
   {
    "dim": "功能模块覆盖",
@@ -118,7 +118,7 @@
    "cells": [
     {
      "label": "self 30 天提交",
-     "value": "438 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
+     "value": "439 次｜history_days=22（<30 ⇒ window_full=false，**禁止横比**）",
      "source": "本轮 git rev-list --count --since=30.days HEAD 实测"
     },
     {
@@ -148,7 +148,7 @@
    "cells": [
     {
      "label": "self 文档件数 / openapi⇄端点",
-     "value": "15 件｜openapi 11 paths ⇄ Java 11 映射（差 0）｜同尺四类位=4/4（HEAD 面取数，与 peers 同一条 classify_docs）",
+     "value": "19 件｜openapi 11 paths ⇄ Java 11 映射（差 0）｜同尺四类位=4/4（HEAD 面取数，与 peers 同一条 classify_docs）",
      "source": "HEAD 面 git ls-tree + docs/openapi.yaml + 控制器注记；四类位＝_test/peer_docs_probe.py self_only()"
     },
     {
