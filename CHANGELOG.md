@@ -1,5 +1,37 @@
 ## [Unreleased]
 
+### r126 — 八维对标第六轮：清两条我方常驻红 + 台账形状契约推广 + 教程分章 + 第二通道首采（2026-10-12）
+
+- **让位轮次号**：入场即撞并行会话把 `_test/bench_eight_dims_check.py` 改到半程（06:53 写入，调用点已落 `def` 未落
+  ⇒ 我抓到一次 `NameError: _dim_memory`，40 秒后同命令 PASS；其 docstring 已署 r125）⇒ 我方取 **r126**。
+  一手：本仓 `git status` **不可信**（该件与 HEAD 差 24/14 行却报"干净"），故本轮对每个拟编辑文件先做
+  `sha256(工作树) ⇄ sha256(git show HEAD:<path>)`，11 个目标 10 SAME、1 DIFF 被避开。
+- **新增 `_test/suite_count_sync.py`**：README 那句「全量电池（N 套件）」已**手抄过期两次**（r117、r123 写下 157
+  被他人 `f9c7ee6` 加两条套件顶过期 ⇒ `G4` 两面齐红）。本件把"改那一行"收成一条命令：分母**复用** G4 同一个
+  `repo_config_check.battery_count()`（不造第二把尺），字节级只改那一段并**载回确认**；匹配 0 处/2 处、分母取不到
+  一律拒写（`unverified`，禁 0 顶替）。判绿仍由 `repo_config` G4 独家判。⇒ `repo_config_check` 红 **4 → 2**（G12/G8 保留）。
+- **新增常驻判据 `_test/ledger_shape_check.py`（对标改造二 · 修类）**：把「NA 声明义务」普查的取数面从
+  `peer-*.json`（龄期尺 18 族）换到**全目录 `*.json`（53 族）**——r122 那颗 `blind_or_na` 雷是"恰好在册"才被抓到的，
+  不在任何尺的取数面里的 35 族犯同样的错不会红。词汇表仍只在 `ledger_age_check` 一处（新增公开 `shape_contract()`），
+  分四态：`UNDECLARED-BLIND`（有 NA 痕迹却无声明，红）／`DIVERGE`（声明<件内，红）／`ABSENT`（无义务，只点数——
+  不分这档就会造出一条永远绿不了的尺）／`UNREADABLE`（红）。契约同时挪到 `peer_docs_probe`/`peer_perf_probe` 的
+  **写路径**（认不出形状 ⇒ 拒绝落盘），并让龄期尺 `UNVERIFIED` 门面行带上全龄期读数（一族坏不吞 18 族结论）。
+  演习：Temp 副本注入合成盲区族 ⇒ `rc=1` 且只点名那一族；现面 `LEDGER-SHAPE-PASS 族 54｜盲区 0｜读不动 0`。
+- **教程手册化（第 7 维剩余差距）**：`docs/tutorial-01-offline-demo.md`／`-02-crisis-referral`／
+  `-03-memory-switches`／`-04-running-the-checks`，并同步 `docs/README.md` 索引（G19 现读 docs 13 件全部在册）。
+  命名即口径：文档维的教程位**按文件名**判（命中 `quickstart|tutorial|how-to|guide|handbook`），写在 README 章节里不算。
+  写作中当场纠掉两处不实：`_test/emotion_eval_java_check.py` **不存在**（删该命令）、
+  「跳楼」只在 `SafetyGuard.java:60` 而**不在**危机词表（lexicon grep=0）。
+- **第二观测通道首采（第 1 维口径不对称）**：r73 立的 `benchmark_metrics --cap-channel` **从没真跑过** ⇒
+  peers 的 `streaming`/`e2e_browser` 一直只由文件名单独得出（下限被读成现状），self 那两格一直只由 `caps_blind` 自述。
+  本轮 16 仓 ×（description+homepage+README）全采到、未验 0 ⇒ `交付物/对标数据/cap-channel-2026-10-12.json`，
+  并接进八维第 1 维（格 25→26）。读数**没有美化我们**：`streaming` 内容法仍=2（另 1 仓是 media_stream），
+  `e2e_browser` 由文件名法的 3 降到内容法的 **1** 个真 `test_e2e` ⇒ 换尺让对手变少，不是让我们变多。
+  基线未被顶：`benchmark-metrics.json` 的 mtime 与 git 面均未变。
+- **八维台账**：`eight-dims-r126.json/.md` ⇒ `EIGHT-DIMS-PASS 维 8/8｜格 26｜NA声明 1｜补法死链 0｜漂移=比对 r123｜退化红 0`。
+- 报告与日志：`交付物/对标分析报告-2026-10-12-r126.md`、`memory/2026-10-12-r126.md`（+ `.part2.md` 续页，
+  主壳原稿 5,481B 超 4,096B 硬限 ⇒ 换卷承载，原文未删）。
+
 ### face-diag — 表情识别准确率诊断与优化方案（2026-10-12，零 src 改动）
 
 **表情识别（双核心能力之一，本轮为诊断+方案，无代码改动故无单测增量，N2 维持 31/31 实测）**：

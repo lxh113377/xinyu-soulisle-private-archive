@@ -447,6 +447,9 @@ SUITES = [
     # r123：表情引擎离线腿的**可证伪性**常驻判据（r122 那 5 条新用例是靠一次性 TEMP 探针自证的，
     #   下一轮不带记忆的人重跑不了 ⇒ 固化进仓，断言「定向破坏必各自翻红 + 不破坏时全绿」两侧都在）。
     ("js_engine_mut", ["node", "_test/js_engine_mut.mjs"]),
+    ("suite_count_sync_selftest", [sys.executable, "_test/suite_count_sync.py", "--selftest"]),
+    ("ledger_shape_check", [sys.executable, "_test/ledger_shape_check.py"]),
+    ("ledger_shape_selftest", [sys.executable, "_test/ledger_shape_check.py", "--selftest"]),
     ("settle_wait_selftest", [sys.executable, "_test/settle_wait.py", "--selftest"]),
     # r98：「判据把成败押在机器时刻上」这一族的普查尺。立因是 r96 连吃两条同根 CI 红
     #   （j4_memory 定长 8s 押落库时刻 / data_rights 快照⇄导出跨时刻），当时把两处升到

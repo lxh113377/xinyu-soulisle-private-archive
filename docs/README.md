@@ -9,6 +9,10 @@
 | [`API.md`](API.md) | 人读 API 手册（curl 示例、字段、错误码、三层 memory 开关） | `_test/api_contract_check.py` C7（r89 新增）：yaml 每条路径必须在手册出现 / 手册不得虚报接口 / 手册声明的路径计数必须等于实值 |
 | [`EXTENSIONS.md`](EXTENSIONS.md) | 扩展手册：词表 SSOT、共情策略、LLM 上游切换、记忆 provider、部署目标、第三方集成清单 | 人工维护；接口面变动由 C7 与 `_test/engine_consistency_check.py` 兜住，本目录由 `_test/repo_config_check.py` G19 盯「在不在索引里」 |
 | [`PERF-BASELINE.md`](PERF-BASELINE.md) | 性能基线口径与预算表（p95 / 吞吐 / 四目标预算），把"自证"变成可引用的数 | `_test/perf_baseline_check.py`（同机棘轮，超限即红） |
+| [`tutorial-01-offline-demo.md`](tutorial-01-offline-demo.md) | 教程 01：离线演示——三条降级路（WebGL／在线 LLM／服务端记忆）、零密钥三步起步、单变量对照为什么有效、三个"看起来坏了" | 存在性由 `_test/peer_docs_probe.py` 计入本仓教程位（**按文件名判**，故命名带 `tutorial-`）；引用的脚本路径须实测存在，索引一致性由 G19 双向对账 |
+| [`tutorial-02-crisis-referral.md`](tutorial-02-crisis-referral.md) | 教程 02：危机转介——优先级为什么在调模型之前、转介落点、**危机词表 ⇄ SafetyGuard 高危词表不得互相冒充**（「跳楼」实测只在后者） | 断言由 `python _test/browser_check.py` 与 `mvn -B -f server/pom.xml test` 复算；条数一律现读不写死 |
+| [`tutorial-03-memory-switches.md`](tutorial-03-memory-switches.md) | 教程 03：记忆三层开关——代码层 `isRemote()`／本地演示 `remote: true`／公网层刻意不开，以及熔断为什么必须存在 | 复算 `_test/j4_memory_check.py` + `GET /api/memory/stats`；对外表述红线见 `memory/AGENTS.md` 决策 #3 |
+| [`tutorial-04-running-the-checks.md`](tutorial-04-running-the-checks.md) | 教程 04：跑判据——三态退出码（没量到 ≠ 达标）、改完至少跑哪四条、G4/G8/G12/G16/G19 各咬什么、反例腿的三种形态、Windows 三个执行坑 | 本仓自述面：套件数一律 `run_all_suites.py --list` 现读，README 那句由 `_test/suite_count_sync.py --apply` 对齐（不手抄） |
 | [`quality-gates.md`](quality-gates.md) | 判据体系明细：每条套件的口径 + 复算命令（**条数一律从 `run_all_suites.py` 的 SUITES 现读，本文件不抄数**） | `_test/repo_config_check.py` G16：电池脚本 ⇄ 本文档双向对账（漏登/幽灵登都红） |
 | [`QUICKSTART.md`](QUICKSTART.md) | 三步上手：静态页 / fat jar / 容器，每条路的「起来了」判据、给密钥的三种落点、十分钟自证清单与起不来的排查顺序 | 人工维护；本文的存在性由 `_test/peer_docs_probe.py` 计入本仓文档四类位（教程位），命令真伪随 `docs/quality-gates.md` 与 `_test/repo_config_check.py` G19 一起对账 |
 | [`data-and-privacy.md`](data-and-privacy.md) | 数据与隐私面：本地存储什么、谁能清除、危机转介的边界 | `_test/data_rights_check.py`（真点击清除 + 落库回执） |

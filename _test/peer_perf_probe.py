@@ -210,6 +210,17 @@ def main():
                "rows": rows, "na": na, "measured": n_measured,
                "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     txt = json.dumps(payload, ensure_ascii=False, indent=1)
+    # 落盘前自断形状（r126 推广：契约词汇唯一权威在 `ledger_age_check.shape_contract`）——
+    # 认不出就不落盘。r122 一手：一份形状违规的台账能让整把龄期尺降档成未验，而肇事探针自己照印 PASS。
+    try:
+        import ledger_age_check as LA
+        _dec, _kind = LA.shape_contract(payload)
+    except Exception as e:                                   # noqa: BLE001
+        _dec, _kind = None, "ruler-unavailable(%s)" % type(e).__name__
+    if _dec is None:
+        print("PEER-PERF-UNVERIFIED: 产物形状不被 ledger_age_check 认得（%s）⇒ 拒绝落盘，"
+              "也不得读成已采到" % _kind)
+        return 2
     if a.json:
         Path(a.json).write_bytes((txt + "\n").encode("utf-8").replace(b"\r\n", b"\n"))
     print("PEER-PERF-%s：在册 %d/%d 仓有基准行为（measured*），NA %d，truncated 面单列不折算成零"

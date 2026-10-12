@@ -97,6 +97,44 @@ def sref(pat):
     return stamp(p, payload)
 
 
+def cap_channel_val(path, payload):
+    """第 1 维 peers 的**第二观测通道**格（r126 接线；台账由 r73 那条通道首次真跑得出）。
+
+    为什么单列一格而不是并进 `caps`：`streaming`/`e2e_browser` 两格此前 peers 侧**只由文件名规则**
+    单独得出，于是"streaming=2/16"其实是被读成现状的**下限**；self 侧则长期只由 `caps_blind` 自述。
+    两格从没有在同一把尺上比过。本通道用**同一份** `cap_channel_class` 吃 description+homepage+README
+    正文（self 只有 README blob ⇒ 输入更窄，命中即为真，未命中只说明"README 没写"），
+    只做复核与下限揭示，**不参与 caps 计数**——参与了就是"自己用尺 A、别人用尺 B"的反向版本。
+    """
+    if path is None or not isinstance(payload, dict):
+        return ("NA-DECLARED：缺 cap-channel 台账 ⇒ 该维无第二通道读数；"
+                "补法 python _test/benchmark_metrics.py --cap-channel "
+                "--out 交付物/对标数据/cap-channel-<date>.json")
+    runs = payload.get("runs") or []
+    if not runs:
+        return "NA-DECLARED：台账里 runs 为空（采过但没落成读数）⇒ 不折算成 0/16"
+    last = runs[-1] if isinstance(runs[-1], dict) else {}
+    chan = last.get("cap_channel") or {}
+    if not isinstance(chan, dict) or not chan:
+        return "NA-DECLARED：最近一次 run 没有 cap_channel 逐仓读数 ⇒ 不得读成「对手都没有」"
+    unv = sorted(k for k, v in chan.items() if not isinstance(v, dict)
+                 or str(v.get("streaming", "")).startswith("unverified"))
+    st, e2 = {}, {}
+    for v in chan.values():
+        if not isinstance(v, dict):
+            continue
+        for bucket, key in ((st, "streaming"), (e2, "e2e_browser")):
+            cls = str(v.get(key) or "none")
+            bucket[cls] = bucket.get(cls, 0) + 1
+    f = lambda d: " ".join("%s=%d" % kv for kv in sorted(d.items(), key=lambda x: -x[1])) or "—"
+    me = last.get("cap_channel_self") or {}
+    return ("peers %d/%d 仓有读数（未验 %d）｜streaming：%s｜e2e_browser：%s ‖ self 同尺：streaming=%s "
+            "e2e=%s（self 只喂 README blob ⇒ 命中即为真，未命中≠没有）"
+            % (len(chan), payload.get("peers_expected") or len(chan), len(unv),
+               f(st), f(e2), me.get("streaming") or "unverified",
+               me.get("e2e_browser") or "unverified"))
+
+
 def docs_peers_val(path, payload):
     """第 7 维 peers 格。取数面＝`_test/peer_docs_probe.py` 的一次 git tree 快照。
 
@@ -163,11 +201,14 @@ def build_dims():
         for c in (r.get("caps") or []):
             dist[c] = dist.get(c, 0) + 1
     top_peer = sorted(dist.items(), key=lambda kv: -kv[1])
+    cc_p, cc = ledger("cap-channel-*.json")     # r126：第二通道首采（16 仓 × description+homepage+README）
     dims.append({"dim": DIM_ORDER[0], "cells": [
         cell("self 计数位", "%d 项：%s" % (len(caps), "/".join(caps) or "—"), m_src),
         cell("self 测量盲区（不是缺功能）", "、".join(blind) or "无",
              "%s（self_row.caps_blind；口径见 benchmark_metrics.cap_channel_class docstring）" % m_src),
         cell("peers 单格最高", "%s=%d/%d" % (top_peer[0][0], top_peer[0][1], denom) if top_peer else "NA(池空)", m_src),
+        cell("peers 第二通道（r73 尺，r126 首采）", cap_channel_val(cc_p, cc),
+             "cap-channel 台账 " + sref("cap-channel-*.json")),
         cell("peers 危机语料覆盖", "池内多数仓无标注危机集；self 有 6 条冻结样本",
              "peer-capability-safety 台账 " + sref("peer-capability-safety-*.json")),
     ]})
@@ -621,10 +662,28 @@ def selftest():
     na = audit(mk_dims({2: [cell("a", "NA-DECLARED：x", "s")]}))[1]
     if len(na) != 1:
         bad.append("NA 计数不成立：期望 1 实得 %d" % len(na))
+    # r126 第二通道格：两向缺一即失效——缺台账要如实 NA，有台账要把读数算对。
+    if "NA-DECLARED" not in cap_channel_val(None, None):
+        bad.append("通道格在缺台账时没落 NA（会被读成「对手都没有」）")
+    fake = {"peers_expected": 3, "runs": [{"cap_channel": {
+        "a/a": {"streaming": "token_stream", "e2e_browser": "none"},
+        "b/b": {"streaming": "media_stream", "e2e_browser": "test_e2e"},
+        "c/c": {"streaming": "unverified", "e2e_browser": "unverified"}},
+        "cap_channel_self": {"streaming": "token_stream", "e2e_browser": "test_e2e"}}]}
+    got = cap_channel_val("x.json", fake)
+    if "3/3" not in got or "未验 1" not in got or "token_stream=1" not in got \
+            or "self 同尺：streaming=token_stream" not in got:
+        bad.append("通道格读数不对：%s" % got[:120])
+    for name, payload in (("runs 为空", {"runs": []}),
+                          ("逐仓读数缺失", {"runs": [{"cap_channel": {}}]})):
+        v = cap_channel_val("x.json", payload)
+        if not v.startswith("NA-DECLARED") or "仓有读数" in v:
+            bad.append("空样本被折成分母（%s）：%s ⇒ 正是本通道要防的假零" % (name, v[:70]))
     bad += drift_selftest()      # r121：跨轮漂移腿（只生成不比对＝表绿着漂）
     bad += remedy_selftest()
     print("EIGHT-DIMS-SELFTEST-%s（%d 类结构桩 + %d 类漂移桩 + 基线自证 + 恒绿守卫 + NA 计数"
-          " + 补法死链 5 向：活链绿/死链红/未入库点名/无补法不拦/占位符点名）"
+          " + 补法死链 5 向：活链绿/死链红/未入库点名/无补法不拦/占位符点名"
+          " + 第二通道 4 向：缺台账 NA/读数对/runs 空不折零/逐仓缺失不折零）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(STUBS), len(DRIFT_STUBS)))
     return 1 if bad else 0
 

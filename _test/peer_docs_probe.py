@@ -162,9 +162,9 @@ def shape_contract(payload):
     """
     try:
         import ledger_age_check as LA
-    except Exception:                                      # noqa: BLE001
-        return None
-    return LA.declared_na(payload)
+    except Exception as e:                                   # noqa: BLE001
+        return (None, "ruler-unavailable(%s)" % type(e).__name__)
+    return LA.shape_contract(payload)
 
 
 def run_selftest():
@@ -258,6 +258,12 @@ def main():
     # r122 我就是用了 blind_or_na 把那条**常驻判据**打成的未验（一手：declared_na() 直查返回 (None,"unknown")），
     # 所以这里把形状契约写成断言（见 _shape_contract），而不是靠人记得键名。
     payload = build_payload(rows, blind)
+    # 落盘前的形状自断（r126 把契约从 selftest 挪到**写路径**上）：认不出就不落盘，
+    # 免得一份形状违规的台账先污染目录、再由下一轮的龄期尺把整尺打成未验。
+    dec, kind = shape_contract(payload)
+    if dec is None:
+        print("PEER-DOCS-UNVERIFIED: 本探针产物形状不被 ledger_age_check 认得（kind=%s）⇒ 拒绝落盘" % kind)
+        return 2
     if a.json:
         Path(a.json).write_bytes((json.dumps(payload, ensure_ascii=False, indent=1) + "\n")
                                  .encode("utf-8").replace(b"\r\n", b"\n"))

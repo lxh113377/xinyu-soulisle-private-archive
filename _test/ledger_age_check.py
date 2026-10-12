@@ -233,6 +233,20 @@ def declared_na(d):
     return None, "unknown"
 
 
+def shape_contract(d):
+    """**生产者侧契约的公开入口**（r126 推广）：写台账的脚本在落盘前调它自断形状。
+
+    为什么放在尺子这一侧而不是各自抄一份：词汇表只许有一处（同一事实只许一处判）。
+    生产者的责任不是"知道有哪些形状"，而是"落盘前问一次尺子认不认"。
+    返回 `(声明数|None, 形状名)`；第一项为 None ⇒ 本件会被 `na_census` 判 `NA-UNKNOWN`，
+    而在册的 `peer-*` 族里那会让**整把尺**降档成 rc=2 未验（r122 一手实测：键名写成
+    `blind_or_na` 后 17 族一起没有结论，而肇事探针自己的门面照样印 PASS）。调用方应拒绝落盘。
+    """
+    if not isinstance(d, dict):
+        return (None, "not-a-dict")
+    return declared_na(d)
+
+
 def na_census(d):
     """单份台账 → (状态, 声明数, 件内数, 形状)。四态 CLEAR/DECLARED/DIVERGE/UNKNOWN。"""
     if not isinstance(d, dict):
@@ -544,8 +558,13 @@ def main():
                   % (len(within), len(over), len(und), len(rows)))
         return 1
     if na_unknown:
-        print("LEDGER-AGE-UNVERIFIED（龄期面全绿，但件内 NA 有 %d 族认不出形状/读不动 ⇒ "
-              "整尺不得记 PASS，也不得记成 0 分叉）" % len(na_unknown))
+        # 门面行带全读数（r126）：一族形状认不出，其余各族的龄期结论照样要能被读到。
+        # 只印"未验"两个字会让下游把 18 族的读数一起丢掉——电池的 fold_detail 只留末条判据行，
+        # 行里没有数就等于没测过（同族教训见 memory「Folded verdict lines carry values」）。
+        print("LEDGER-AGE-UNVERIFIED（件内 NA 有 %d 族认不出形状/读不动 ⇒ 整尺不得记 PASS，也不得记成 0 分叉）"
+              "｜龄期面全绿：族 %d｜≤fuse %d｜超 fuse %d｜无日期 %d｜分歧 %d｜恒等式 %s"
+              % (len(na_unknown), len(rows), len(within), len(over), len(und), len(div),
+                 "成立" if identity_ok else "不成立"))
         return 2
     print("LEDGER-AGE-PASS（peer 台账 %d 族：≤fuse %d｜超 fuse %d｜无日期可判 %d｜分歧 %d｜"
           "NA分叉=%d(waived %d)｜恒等式 %s）"
