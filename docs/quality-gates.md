@@ -72,7 +72,7 @@ python _test/live_sync_check.py          # 线上 `/` 与 deploy/xinyu 逐字节
 python _test/safety_guard_check.py        # 输入侧护栏行为验证：注入 6 例必须点名 + 正常 6 例不得误伤（含 --selftest）
 python _test/eol_parity_check.py         # 行尾确定性：工作树字节 == 仓库 blob 字节 + binary 形状（E1–E4，8 类 --selftest）
 python _test/patch_apply.py --selftest       # 补丁器自证：锚点失配/歧义/同义/插入/正常/缺失 + 行尾两侧 八类行为（防"没报错=生效了"）
-python _test/api_contract_check.py       # 接口契约三方对账（控制器↔docs/openapi.yaml↔前端）+ 11 条运行态真实打 + C6 零漏探测 + C7（r89）人读手册 API.md ⇄ yaml 双向对账（缺/虚/计数过期都红，`--selftest` ㉑类篡改各证一腿）
+python _test/api_contract_check.py       # 接口契约三方对账（控制器↔docs/openapi.yaml↔前端）+ 15 条运行态真实打 + C6 零漏探测 + C7（r89）人读手册 API.md ⇄ yaml 双向对账（缺/虚/计数过期都红，`--selftest` ㉑类篡改各证一腿）。**r131 起先报产物身份**：读 `/api/health` 的 `build`（`jar:<名>:<摘要12>:<字节数>` / `classes:<目录>:<mtime>`），缺失 ⇒ 打的是 r131 之前的产物，会**显式点名**"以下运行态结果不可当新代码证据"（不判红，因为换新产物不由本判据控制，判红只会把环境问题刷成红项）；要严格就用 `--require-build` ⇒ 该情形直接 rc=2 未验而非给出一堆 404/405 的红。`--base URL` 换基址（8123 上是他人旧产物时用这个打含新代码的实例）
 python _test/repo_config_check.py --online # 仓库配置自洽：dependabot schema/目录可达 + 文档数字断言==机器实测 + 默认分支受理面
 
 # ↓ r57 补登记：以下 16 条在电池里，而本节（被当作"判据清单"来读）从来没有它们。

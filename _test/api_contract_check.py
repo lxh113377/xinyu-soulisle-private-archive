@@ -310,10 +310,30 @@ def main():
         mb = manual_legs(set((spec.get("paths") or {})), mdp.read_text("utf-8", errors="replace"))
         check("C7 人读手册对账（API.md ⇄ openapi.yaml：不缺/不虚/计数不失）",
               not mb, " ; ".join(mb) or f"yaml {len(spec.get('paths') or {})} 路径逐条在册、零幽灵")
-    st, _ = http("get", BASE + "/api/health")
+    st, health_body = http("get", BASE + "/api/health")
     if st != 200:
         print(f"API-CONTRACT-ENV-ERROR: 服务未在 {BASE} 运行（C4 需要它）")
         return 2
+    # r131：**运行态结果必须注明它是从哪份产物上量出来的**。
+    # `build` 是自 r131 起的产物身份；缺失 ⇒ 打的是更早的产物（本仓实测：8123 上就是这种）。
+    # 此前「旧产物没有新路由」只能靠某条超时去猜，于是同一份绿被反复误读成"新代码没问题"。
+    # 不据此判红（换新产物不由本判据控制，判红只会把环境问题刷成红项），但**绝不允许静默**。
+    build = None
+    try:
+        build = (json.loads(health_body) or {}).get("build")
+    except Exception:
+        build = None
+    legacy = not build
+    print("  · 运行态产物身份: build=%s" % (build if build else "**缺失** ⇒ 这是 r131 之前的产物"))
+    if legacy:
+        print("    ⚠ 以下 C4 结果来自**无产物身份的旧实例**：新接口的运行态证据请以"
+              " `python _test/api_contract_check.py --base <含新代码的实例>` 为准。")
+        if "--require-build" in sys.argv:
+            # r131：严格模式。旧产物上的 404/405 不是"接口错了"，是"这份产物里根本没有它"——
+            # 把那当作红会让红项长期挂着却不指向任何可修的东西。严格模式下直接判未验。
+            print("API-CONTRACT-UNVERIFIED: 该实例无产物身份（r131 之前的产物）⇒"
+                  " --require-build 下不予置评（rc=2）。换新产物后复跑。")
+            return 2
     ops = spec_ops(spec)
     ann = annotated_ops(spec)
     done, skipped = live_probes(spec, ann)
@@ -329,7 +349,13 @@ def main():
     print(f"\n合计 {len(results)} 项，失败 {len(fails)} 项")
     for n, _, d in fails:
         print("  🔴", n, d)
-    print("API-CONTRACT-PASS" if not fails else "API-CONTRACT-FAIL")
+    if fails:
+        print("API-CONTRACT-FAIL")
+    elif legacy:
+        print("API-CONTRACT-PASS（⚠ 运行态打的是**无产物身份的旧实例**，"
+              "本轮的绿只能证明旧产物这些接口还在，不能当新代码的证据）")
+    else:
+        print("API-CONTRACT-PASS")
     return 1 if fails else 0
 
 
