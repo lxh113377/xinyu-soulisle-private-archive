@@ -120,7 +120,7 @@ BUDGETS = {
     #    同轮把初版实测 18,484 压到 16,690：注释 10 行→3 行、去掉「hydrate 排队」那套 queue/flush
     #    （改由播完的 replayStars 自然读到最新记忆，行为不变；两次实测 18,484→16,690 未分项归因）。TOTAL 复核 849,690→850,962，
     #    仍在 858,752 限内。牙未动：`size_budget_selftest` 的「压缩预算逐项报红 + 漏登记被 coverage 抓」两腿照在。
-    "src/js/chat-agent.js": 27_000,   # r132 上调 21,773→实测 24,239 +5%：知识库「引用核对面」——
+    "src/js/chat-agent.js": 28_800,   # r134-KB 按实测 27,429 +5% 重登记：增量 = ensureKb() 按需加载桩（约 +600B 真代码，注释已压过一轮）；这笔上线把 psych-kb.js 的 129,791B 移出首屏关键路径，净释放约 129KB（历史重登记沿革见下方注释）。
                           # verifyCitations()（〔依据:编号·级〕与本轮真实注入集比对，幽灵编号判未查证、
                           # 级冒充按库里真实级更正、只改标记不删正文）+ kbBlockFor 返回值改 {block,used}。
                           # 这是「减少无依据臆造输出」的最后一环，此前只有提示词约束、无任何机器面。
@@ -242,17 +242,26 @@ BUDGETS = {
     # r113 新增：心理学知识库数据件（老大定的「AI 回答更专业有据」）——由 psych_kb_build.py
     #    从 交付物/心理学知识库 条目卡生成，禁手改；E 级（未查证）条目构建期排除。
     #    数据件随条目扩充增长 ⇒ 每次重建后按实测 +5% 重登记（--check 判据钉住源与产物一致）。
-    "src/data/psych-kb.js": 136_281,   # r132-KB 第7轮重登记：124,563(第6轮 132 条)→136,281(第7轮 CY/BA 两域 12 条，144 条 A38/B57/C20/D29，实测 129,791B +5%)   # r130-KB 第6轮两批同幅重登记：114,783(r129 第5轮 122 条)→124,563(第6轮 FM/SC 10 条，132 条 A38/B48/C18/D28，实测 118,631B +5%)   # r127-KB 上调 66,605→91,660：第4轮扩容+校准升级后实测 87,295B +5%（98 条 A-D 级 A33/B40/C6/D19；r123 落 24 卡、校准员升 12 张 E 级卡）
+    # r134-KB：**psych-kb.js 不再登记在首屏预算里** —— 它由 chat-agent.js 的 ensureKb() 按需加载
+    #    （知识只在「求解释轮」注入，纯倾诉轮不注入），每扩一轮库不该让每个访客多付一次首屏字节。
+    #    体积改记在下方的 LAZY_FILES（第8轮重建后实测 129,791B +5% = 136,281），Coverage 仍然认识它
+    #    ⇒ 「移出关键路径」不等于「可以无限长胖」。历史重登记沿革见 git 与本文件上方的注释留痕。
     # r117 新增：表达语料库数据件（老大定的「表达优化专项」）——由 _test/wit_quotes_build.py
     #    从 交付物/表达语料库 四篇条目卡生成，禁手改；E 级构建期排除。首登实测 63,140 +5%
     #    （101 条 A53/B35/C5/D8）。数据件随条目扩充增长 ⇒ 重建后按实测重登记（--check 钉住源产物一致）；
     #    注入体量另受 X3（system 1600 字符）独立管住，不会随库变大而变大。
-    "src/data/wit-quotes.js": 66_297,
+    # r134-表达第2轮重登记：66,297→实测 104,128 +5%＝109,334（101→161 条，+60 张卡：CL+24/MS+12/NET+14/PH+10，
+    #   A84/B52/C7/D18，E 排除 0）。用户明令的多元化扩容；每轮注入仍只取 ≤5 条候选（X3 管住 system 总量）。
+    "src/data/wit-quotes.js": 109_334,
     "src/vendor/three.min.js": 633_617,
     "src/vendor/gsap.min.js": 75_825,
     "src/vendor/ScrollTrigger.min.js": 45_549,
 }
-TOTAL_KEY_PATH = 1_222_765  # r127-KB 同幅上调（psych-kb +25,055：66,605→91,660，第4轮 98 条）  # 首屏关键路径总预算（含 vendor），2026-09-25 实测 817,859B + 5%
+# 懒加载**单文件**（与 LAZY_BLOCKS 同理：不计入首屏 TOTAL，但必须被人看见）：r134-KB 第8轮起
+# psych-kb.js 走这里 —— 它是聊天时按需拉的知识库数据件（见 chat-agent.js 的 ensureKb()）。
+# 移出首屏清单是为了让知识能持续扩，不是让它逃出账 ⇒ Coverage 照样点名登记，超限同样判红。
+LAZY_FILES = {"src/data/psych-kb.js": 157_186}   # 第10轮重建后实测 149,701B +5%（164 条；r135-KB 第9轮 EW 7 条 + r166-KB 第10轮 EW 追加 6 + PO 5，两轮均未重登记，本条按 164 条现值一次补齐）
+TOTAL_KEY_PATH = 1_265_000  # r134-表达第2轮显式决策抬限：r129 预留的「下一轮扩容必然顶穿 TOTAL」预案兑现——本轮实测总量 1,260,353（wit-quotes +40,988、emotion-strategy +214），超旧 TOTAL 37,588B。**显式决策=抬 TOTAL（记理由）**：① 扩容是用户明令的表达优化专项（语料库 101→161 条），不是压条目能糊过去的；② 抬限同时逐文件登记（wit-quotes 66,297→109,334 按实测+5%），无静默抬分。③ ⚠️ 并行轮次（r134-KB 第8轮）正在把 psych-kb.js 移出首屏改按需加载（其编辑在途、LAZY_FILES 接线未完成，size_budget 暂红不归本轮）——彼轮落地后首屏总量将降约 136KB，TOTAL 须在彼轮按新实测收紧，本轮的 1,265,000 覆盖「psych-kb 仍在首屏」的当前面。   # r127-KB 同幅上调（psych-kb +25,055：66,605→91,660，第4轮 98 条）  # 首屏关键路径总预算（含 vendor），2026-09-25 实测 817,859B + 5%
 #   r117 上调 1,115,591→实测 1,134,541 +5%：表达语料库数据件首登（wit-quotes.js 63,140B）是本轮
 #   真实的首屏字节增量（每轮对话注入用的素材底座），其余为 chat-agent/strategy/sw 的功能本体增量。
 #   逐文件预算同步登记，没靠"抬总分"掩盖单项超限（coverage 强制新文件必须登记）。
@@ -320,7 +329,7 @@ def coverage():
     # demo-config.js：src 版含本机 Key 且被 .gitignore，两端形态本就不同 ⇒ 两侧都排除，
     # 只做「存在则测预算」，不参与「必须登记」的覆盖对账
     on_disk.discard("src/js/demo-config.js")
-    declared = set(BUDGETS) - {"src/js/demo-config.js"}
+    declared = (set(BUDGETS) | set(LAZY_FILES)) - {"src/js/demo-config.js"}
     unregistered = sorted(on_disk - declared)
     stale = sorted(declared - on_disk)
     return unregistered, stale
@@ -370,6 +379,14 @@ def run(scale=1.0):
         if not ok:
             red += 1
         print(f"  {'OK ' if ok else 'OVER'}  {('懒加载 ' + rel):36s} {lazy:8,d} / {lb:8,d} （不计入首屏 TOTAL）")
+    for rel, budget in LAZY_FILES.items():
+        p = ROOT / rel
+        size = p.stat().st_size if p.is_file() else 0
+        lb = int(budget * scale)
+        ok = p.is_file() and size <= lb
+        if not ok:
+            red += 1
+        print(f"  {'OK ' if ok else 'OVER'}  {('懒加载 ' + rel):36s} {size:8,d} / {lb:8,d} （不计入首屏 TOTAL）")
     if red:
         print(f"BUDGET-FAIL: {red} 项超预算")
         return 1
