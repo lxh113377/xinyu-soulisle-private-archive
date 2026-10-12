@@ -70,8 +70,43 @@ RAG_TOKEN_RE = re.compile(r"(^|[^A-Za-z0-9])rag([^A-Za-z0-9]|$)")
 # 文件名 `mem0_llm.py` / `letta_agent.py` 一个词都不含 ⇒ 整池 `vector_memory` 被低估（我们那格
 # 「对手 7/16」随之偏低）。一律**词元边界**匹配，理由同 r70：「palette」含 `letta` 子串但不构成词元。
 # ⚠️ 有意**不收** `chroma`：`chroma.min.js` 是配色库、不是向量库，收了就是新造一批假阳。
+# 词元表**导出**给消费方复用（`peer_memory_probe._hit_retr` 同病同表，禁第二份副本）。
+MEM_BACKEND_TOKENS = ("mem0", "letta", "zep", "faiss", "qdrant", "milvus", "pinecone",
+                      "weaviate", "pgvector")
 MEM_BACKEND_TOKEN_RE = re.compile(
-    r"(^|[^a-z0-9])(mem0|letta|zep|faiss|qdrant|milvus|pinecone|weaviate|pgvector)([^a-z0-9]|$)")
+    r"(^|[^a-z0-9])(" + "|".join(MEM_BACKEND_TOKENS) + r")([^a-z0-9]|$)")
+# r127-S11（**假阳侧的第二形态**，一手取自本仓自己的样本）：品牌词元撞上**仓自己的名字**时，
+# 路径里出现 `letta` 不含任何信息。letta-ai/letta-code 整树 `vector_memory` 命中 16 条，逐条看是
+# `bin/letta.js`、`assets/letta-code-demo.gif`、`.github/workflows/letta.yml`、`python/letta_code/__init__.py`
+# ——全是最普通的入口/素材/CI 文件。对照 Open-LLM-VTuber 的两条命中
+# `agent/agents/mem0_llm.py`、`agent/agents/letta_agent.py`：**同一路径另有集成限定词**。
+# 修法＝品牌词元必须与集成限定词**同路径共现**才算证据（限定词表刻意不含 config/settings：
+# 太通用，`letta.config.json` 这类品牌自有件会照样溜进来）。
+# ⚠️ 残留天花板（如实登记，不当已解决）：路径词无法区分"集成了后端 X"与"产品本体就是 X"，
+# 所以对 letta-code 这类仓，本轴只能判"路径面无集成证据"，不能判"它没有向量记忆"。
+MEM_BACKEND_QUAL_RE = re.compile(
+    r"(^|[^a-z0-9])(" + "|".join((
+        "agent", "agents", "llm", "memory", "memories", "mem", "store", "stores", "storage",
+        "client", "provider", "providers", "backend", "service", "services", "index", "indices",
+        "db", "rag", "vector", "vectors", "embedding", "embeddings", "retrieval", "sdk",
+        "connector", "connectors", "integration", "integrations", "adapter", "adapters",
+        "plugin", "plugins")) + r")([^a-z0-9]|$)")
+
+
+def mem_backend_hit(path):
+    """品牌词元 ∧ 集成限定词同路径共现 ⇒ 记忆后端集成证据（单一判据，caps 尺与记忆探针共用）。"""
+    p = (path or "").lower()
+    return (MEM_BACKEND_TOKEN_RE.search(p) is not None
+            and MEM_BACKEND_QUAL_RE.search(p) is not None)
+
+
+# selftest 用例放在**模块级**：判据腿在 selftest 第 3 段、PASS 叙述在第 6 段，
+# 走 `st` 传递要多两处耦合（本文件的分段是 AST 切出来的，跨段量极易漏绑）。
+MB_INTEGRATION_CASES = ["src/open_llm_vtuber/agent/agents/mem0_llm.py",
+                        "src/open_llm_vtuber/agent/agents/letta_agent.py",
+                        "src/store/faiss_index.py"]
+MB_BRAND_ONLY_CASES = ["bin/letta.js", "assets/letta-code-demo.gif",
+                       ".github/workflows/letta.yml", "python/letta_code/__init__.py"]
 
 # 能力探测：按**整树递归**的文件名/后缀匹配（根目录一层探测无判别力——
 # 实测 14 仓的 sw.js / locales 全部落在子目录里，只看根目录会一律报"无"，
@@ -84,7 +119,7 @@ CAP_RULES = {
     "streaming": lambda p: p.rsplit("/", 1)[-1] in ("sse.ts", "sse.js", "use-sse.ts") or "/sse/" in f"/{p}",
     "vector_memory": lambda p: ("vector" in p.lower() or "embedding" in p.lower()
                                 or RAG_TOKEN_RE.search(p.lower()) is not None
-                                or MEM_BACKEND_TOKEN_RE.search(p.lower()) is not None),
+                                or mem_backend_hit(p)),
     "container": lambda p: p.rsplit("/", 1)[-1] in ("Dockerfile", "docker-compose.yml",
                                                     "docker-compose.yaml"),
     "e2e_browser": lambda p: "/e2e/" in f"/{p}" or "playwright" in p.lower() or "cypress" in p.lower(),
@@ -1137,12 +1172,28 @@ def _st_selftest_3(st):  # r94 拆出的第 3 段（切点由 AST 求得，跨�
         return 1
     # ── r127-fix（假阴侧，与上面 r70 假阳侧对称）：**产品名后端**必须被认出；长得像的反例必须仍不命中。
     #    一手：Open-LLM-VTuber 的 mem0_llm.py / letta_agent.py 在旧规则下全池少算这一仓。
-    _mb_green = ["src/open_llm_vtuber/agent/agents/mem0_llm.py",
-                 "src/open_llm_vtuber/agent/agents/letta_agent.py", "src/store/faiss_index.py"]
+    _mb_green = MB_INTEGRATION_CASES
     _mb_red = ["src/palette.js", "src/letter_draft.py", "lib/chroma.min.js"]
     _mb_bad = [p for p in _mb_green if not _vm(p)] + [p for p in _mb_red if _vm(p)]
     if _mb_bad:
         print("SELFTEST-FAIL: 产品名后端匹配失真（假阴/假阳）：" + " ; ".join(_mb_bad))
+        return 1
+    # ── r127-S11（品牌词元的**假阳侧**）：品牌名撞上仓自己的名字时，路径里出现品牌词不含信息。
+    #    一手（本仓自己的样本）：letta-ai/letta-code 整树命中 16 条全是
+    #    `bin/letta.js` / `assets/letta-code-demo.gif` / `.github/workflows/letta.yml` 这类自有件。
+    #    前置条件自证同 r70：这些路径必须**在只查品牌词元的旧写法下真会命中**，否则是打空靶。
+    _brand_only = lambda p: MEM_BACKEND_TOKEN_RE.search((p or "").lower()) is not None
+    _mb2 = MB_BRAND_ONLY_CASES
+    _bogus2 = [p for p in _mb2 if not _brand_only(p)]
+    if _bogus2:
+        print("SELFTEST-FAIL: 品牌自有件用例不成立（旧写法本就不会命中，白测）：" + " ; ".join(_bogus2))
+        return 1
+    _bad2 = [p for p in _mb2 if _vm(p)]
+    if _bad2:
+        print("SELFTEST-FAIL: 品牌自有件仍被算成记忆后端集成（限定词没生效）：" + " ; ".join(_bad2))
+        return 1
+    if _vm("src/agent/agents/mem0_llm.py") is _vm("bin/letta.js"):
+        print("SELFTEST-FAIL: 集成件与品牌自有件同判 ⇒ 限定词这条腿是恒真的摆设")
         return 1
     # ── r74 同址尺（文档维 / 性能维）：五类结构 + 两类内容，每类都配方向相反的腿
     _d1, _e1 = doc_perf_tree_class(["docs/index.md", "src/app.tsx"])
@@ -1624,6 +1675,8 @@ def _st_selftest_6(st):  # r94 拆出的第 6 段（切点由 AST 求得，跨�
           "r30 盲区点名三侧正确（有证据→点名、无证据→空、已看见→不重复）；"
           "r31 离线四分类各判对 + 训练语境不冒充离线壳 + 摘掉归因正则即翻判（变异体）+ 零输入判 none；"
           f"r70 vector_memory 匹配器 {len(_must_red)} 条假阳全拒 + {len(_must_green)} 条真阳全收；"
+          f"r127 产品名后端 {len(MB_INTEGRATION_CASES)} 条真阳 + r127-S11 品牌自有件 "
+          f"{len(MB_BRAND_ONLY_CASES)} 条假阳全拒（限定词共现腿，用例逐字取自 letta-ai/letta-code 真面）；"
           "r71 self 行取数面 = git HEAD（未入库件结构性进不了人口，零人口不判绿）；"
           "r73 流式/端到端通道：四类归因 + 4 条真实冒充反例 + 变异体 + 通道不带 caps 键；"
           "r74 同址尺：docs/agent/changelog(根级)/bench/CI性能步 五类各有相反用例 + 长度不冒充好文档 + "

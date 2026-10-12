@@ -111,7 +111,10 @@
     ],
     "summary": [],
     "ctxwin": [],
-    "retrieval": [],
+    "retrieval": [
+     "src/open_llm_vtuber/agent/agents/letta_agent.py",
+     "src/open_llm_vtuber/agent/agents/mem0_llm.py"
+    ],
     "assembly": [
      "prompts/__init__.py",
      "prompts/prompt_loader.py",
@@ -126,7 +129,7 @@
    },
    "edge": [
     "yes(import)",
-    "src/open_llm_vtuber/agent/agent_factory.py → basicmemoryagent",
+    "src/open_llm_vtuber/agent/agent_factory.py → basic_memory_agent",
     2
    ],
    "err": ""
@@ -185,7 +188,11 @@
      "src/agent/subagents/context-budget.ts",
      "src/backend/dev/context-window-overflow.ts"
     ],
-    "retrieval": [],
+    "retrieval": [
+     "src/agent/prompts/letta.md",
+     "src/agent/prompts/letta_local_memfs.md",
+     "src/agent/prompts/letta_no_memfs.md"
+    ],
     "assembly": [
      "scripts/agent-watch/verify-pr-identity.test.ts",
      "scripts/agent-watch/verify-pr-identity.ts",
@@ -521,8 +528,12 @@
  "denominator": 17,
  "blind": 5,
  "usable": 12,
- "self_paths_scanned": 1112,
- "ceiling_note": "引用边通道是**正向回执**：none-in-sample / NA 两态都不构成「该仓没做记忆回灌」的结论；且 peers 无行为注入条件，本面只比「有没有制度化」，不比「做得好不好」。r102 起 NA（含字段级 edge-NA）如实计入声明位 ⇒ 顶层 blind 数与件内 NA 哨兵数不再分叉。",
+ "na_records_before_dedupe": 5,
+ "na_integrity": "OK",
+ "na_phantom_repos": [],
+ "na_dup_rows": [],
+ "self_paths_scanned": 1120,
+ "ceiling_note": "引用边通道是**正向回执**：none-in-sample / NA 两态都不构成「该仓没做记忆回灌」的结论；且 peers 无行为注入条件，本面只比「有没有制度化」，不比「做得好不好」。r102 起 NA（含字段级 edge-NA）如实计入声明位 ⇒ 顶层 blind 数与件内 NA 哨兵数不再分叉。r127-S11 起 blind 的计数单位=**仓**（同仓的仓级+字段级 NA 合并成一条）。",
  "edge_na_repos": [
   "hello-diana/MASCOT",
   "Rogendo/Mental-health-Chatbot",

@@ -14,7 +14,7 @@
      yes(真取到引用) / none-in-sample(抽了 N 个装配件都没见到) / NA(没取到)。
      ⚠️ 只有 yes 是证据；后两态**不得**写成"该仓没做记忆回灌"（抽样为空 ≠ 不存在）。
 用法：python _test/peer_memory_probe.py [--json out.json] [--self-only] [--selftest]
-退出码：0=分母齐且无 NA 1=存在 NA 或 selftest 未过 2=无 GitHub token（环境）
+退出码：0=分母齐、无 NA 且台账完好 1=存在 NA／恒等式或台账完好性失败／selftest 未过 2=无 GitHub token（环境）
 """
 import argparse
 import base64
@@ -26,8 +26,8 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from benchmark_metrics import PEERS, ROOT
-from gh_cred import gh_credential
+from benchmark_metrics import PEERS, ROOT, mem_backend_hit      # noqa: E402
+from gh_cred import gh_credential                               # noqa: E402
 
 NOISE = re.compile(r"(^|/)(node_modules|\.venv|venv|dist|build|target|vendor|\.git|_shots|"
                    r"web_raw|video_raw|__pycache__|\.next|miniprogram_npm"
@@ -47,6 +47,9 @@ SUM_TOKENS_PREFIX = ("summar",)                       # summarize / summary / su
 CTX_QUALIFIERS = {"manager", "window", "budget", "compress", "compression", "builder",
                   "truncat", "truncated", "truncation", "orchestrator", "store"}
 RETR_TOKENS = {"retrieval", "rerank", "hyde", "chunking"}
+# r127：**产品名记忆后端**也属检索轴（一手：Open-LLM-VTuber 的 mem0_llm.py / letta_agent.py 在原规则下
+# 整仓 retrieval 轴为空）。判据**整条复用** caps 尺的 `mem_backend_hit`（词元表 + 限定词规则同一份，
+# 禁第二份副本；r127-S11 的假阳侧教训：品牌词撞仓名时路径不含信息）。
 # 反向词：`memory` 段但同时含这些词的是**泄漏/OOM 测试件**，不是记忆能力
 ANTI = {"leak", "leaks", "oom", "malloc", "gc", "heap"}
 
@@ -86,13 +89,15 @@ def _hit_ctx(segs):
     return False
 
 
-def _hit_retr(segs):
+def _hit_retr(segs, path=""):
     for g in segs:
         if "rag" in g or (g & RETR_TOKENS):
             return True
         if "embedding" in g and (g & {"store", "index", "db", "search"}):
             return True
-    return False
+    # 品牌后端这一路**整条委托**给 caps 尺的同一个判据（r127-S11）：词元表同一份、
+    # "品牌词元必须与集成限定词共现"这条规则也同一份，两把尺不会各说各话。
+    return mem_backend_hit(path)
 
 
 def classify_tree(paths):
@@ -109,7 +114,7 @@ def classify_tree(paths):
             out["summary"].append(p)
         if len(out["ctxwin"]) < 3 and _hit_ctx(segs):
             out["ctxwin"].append(p)
-        if len(out["retrieval"]) < 3 and _hit_retr(segs):
+        if len(out["retrieval"]) < 3 and _hit_retr(segs, p):
             out["retrieval"].append(p)
         if len(out["assembly"]) < 6 and ASSEMBLY.search(p) \
                 and (set().union(*segs) & {"prompt", "prompts", "messages", "chain", "agent",
@@ -293,6 +298,23 @@ def selftest():
         ok += 1
     else:
         fail.append("反例①裸子串 rag 未隔离：%s" % t2["retrieval"])
+    # r127：产品名记忆后端（mem0/letta…）必须进检索轴——与 caps 尺同一份词元表；
+    #       而"长得像"的反例（palette 含 letta 子串、letter 含 lett）必须仍不命中。
+    t8 = classify_tree(["src/agent/agents/mem0_llm.py", "src/agent/agents/letta_agent.py"])
+    if t8["retrieval"]:
+        ok += 1
+    else:
+        fail.append("r127 产品名后端未进检索轴（一手：Open-LLM-VTuber 整仓 retrieval 为空）：%s"
+                    % t8["retrieval"])
+    t9 = classify_tree(["src/ui/palette.js", "src/letter_draft.py",
+                        # r127-S11 一手假阳（letta-ai/letta-code 的真实路径）：品牌名撞仓名，
+                        # 只查词元会整仓白送一条检索轴；这些路径**没有**任何集成限定词。
+                        "bin/letta.js", "assets/letta-code-demo.gif",
+                        ".github/workflows/letta.yml"])
+    if not t9["retrieval"]:
+        ok += 1
+    else:
+        fail.append("r127 反例误伤（palette/letter/品牌自有件被判成检索件）：%s" % t9["retrieval"])
     # 反例②：React 的 createContext 目录不等于"上下文窗口管理"
     t3 = classify_tree(["src/context/AppContext.tsx", "src/context/theme.tsx"])
     if not t3["ctxwin"]:
@@ -356,9 +378,38 @@ def selftest():
         ok += 1
     else:
         fail.append("field_na 反例 none-in-sample 被当成 NA（取到了不许记未验）")
+    # ── r127-S11：NA 台账的计数单位=仓（一仓同时命中仓级+字段级只算一次）──
+    rows_c = [{"repo": "a/b"}, {"repo": "c/d"}, {"repo": "e/f"}]
+    ent, cs = na_census(rows_c, [{"repo": "a/b", "why": "http=TimeoutError"}],
+                        ["a/b", "c/d"])
+    if (len(ent) == 2 and ent[0]["repo"] == "a/b" and "TimeoutError" in ent[0]["why"]
+            and "edge-NA" in ent[0]["why"] and cs["raw"] == 3 and cs["distinct"] == 2):
+        ok += 1
+    else:
+        fail.append("r127-S11 同仓双命中未合并（一次超时被计成两个样本）：%r %r" % (ent, cs))
+    # 反例：合并不得顺手把"没发生过的失败"合掉——两仓各一次失败仍是两条
+    ent2, cs2 = na_census(rows_c, [], ["a/b", "c/d"])
+    if len(ent2) == 2 and cs2["raw"] == 2 and cs2["distinct"] == 2:
+        ok += 1
+    else:
+        fail.append("r127-S11 反例 两仓各一次 NA 被合并成 %d 条" % len(ent2))
+    # 台账完好性：幽灵仓（名单里有、rows 里没有）与重名仓必须被**点名**，不许静默去重
+    _ent3, cs3 = na_census(rows_c, [{"repo": "ghost/x", "why": "empty-tree"}], [])
+    if cs3["phantom"] == ["ghost/x"]:
+        ok += 1
+    else:
+        fail.append("r127-S11 幽灵仓未被点名：%r ⇒ usable 会从 rows 侧数出比 blind+usable==total 不成立的值" % cs3)
+    _ent4, cs4 = na_census([{"repo": "a/b"}, {"repo": "a/b"}, {"repo": "c/d"}], [], ["a/b"])
+    if cs4["dup_rows"] == ["a/b"]:
+        ok += 1
+    else:
+        fail.append("r127-S11 重名仓（分母本身不可信）未被点名：%r" % cs4)
     for x in fail:
         print("  SELFTEST-FAIL " + x)
-    expected = 13
+    # 声明分支数=在册腿数（13 → 19：+2 条 r127 检索词元腿、+4 条 r127-S11 NA 计数腿）。
+    # 这里**故意保留手抄常量**：它的作用是"某条腿被编辑吞掉时立刻红"，
+    # 若改成 len(实际执行腿) 就成了永真式（与本轮抓掉的 `n-x+x==n` 同族）。
+    expected = 19
     print("MEMPEER-SELFTEST: %d/%d%s" % (ok, expected,
           "" if ok + len(fail) == expected else "  ⚠️ 分支数 %d≠%d" % (ok + len(fail), expected)))
     return 0 if ok == expected and ok + len(fail) == expected else 1
@@ -374,6 +425,35 @@ def field_na(rows):
     return [r["repo"] for r in rows if tuple(r.get("edge") or ("",))[0] == "NA"]
 
 
+def na_census(rows, repo_na, edge_na_repos):
+    """NA 台账：计数单位是**仓**，不是记录条数（r127-S11 一手）。
+
+    同一仓可同时命中两类失败——树取空（仓级）时它的引用边必然也是 NA（字段级），
+    旧写法把两条都塞进 `na` ⇒ 一次网络抖动吃掉 1 个样本却报成 blind +2、usable −2
+    （实测：letta-ai/letta-code `http=TimeoutError` 那轮 12→10）。
+    合并规则：仓级原因优先保留，字段级并入同一 why；名单里出现 rows 之外的仓 = 幽灵，
+    rows 里出现重名仓 = 分母本身不可信，两者都要**报出来**而不是静默去重。
+    """
+    order = [r["repo"] for r in rows]
+    dup = sorted({s for s in order if order.count(s) > 1})
+    merged, why = [], {}
+    for x in repo_na:
+        s = x["repo"]
+        if s not in why:
+            why[s] = x.get("why") or "empty-tree"
+            merged.append(s)
+    for s in edge_na_repos:
+        if s in why:
+            why[s] += "+edge-NA(引用边未取到)"
+        else:
+            why[s] = "edge-NA(引用边未取到)"
+            merged.append(s)
+    entries = [{"repo": s, "why": why[s]} for s in merged]
+    phantom = [s for s in merged if s not in order]
+    return entries, {"raw": len(repo_na) + len(edge_na_repos), "distinct": len(merged),
+                     "dup_rows": dup, "phantom": phantom}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", default="")
@@ -386,16 +466,16 @@ def main():
     if not token and not a.self_only:
         print("MEMPEER-UNVERIFIED: 无 GitHub token ⇒ 无法取 peers（不判 0，判环境未验）")
         sys.exit(2)
-    rows, na = [], []
+    rows, repo_na = [], []
     st, sdoc, se, sn = self_snapshot()
     rows.append({"repo": "__self__", "tier": "-", **{"tree": st}, "readme": sdoc, "edge": list(se)})
     if not a.self_only:
         for p in PEERS:
             t, trunc, doc, edge, err = probe_repo(p["repo"], token)
             if not t:
-                na.append({"repo": p["repo"], "why": err or "empty-tree"})
+                repo_na.append({"repo": p["repo"], "why": err or "empty-tree"})
             elif trunc:
-                na.append({"repo": p["repo"], "why": "tree-truncated(结构面只见到部分)"})
+                repo_na.append({"repo": p["repo"], "why": "tree-truncated(结构面只见到部分)"})
             rows.append({"repo": p["repo"], "tier": p["tier"], "tree": t,
                          "readme": doc, "edge": list(edge), "err": err})
     n = len(rows)
@@ -405,34 +485,49 @@ def main():
     # blind=0 而件内 5 处 `"NA(` 分叉（r101 一手实测：MASCOT / Mental-health-Chatbot /
     # MER-Factory / succhia / MoodChat 五仓）。语义上引用边取不到 = **该轴未验**，
     # 不是"该仓没做记忆回灌"的反证（见 ceiling_note）⇒ 计入 na/blind 才是如实声明。
+    # r127-S11：两路 NA 合并**按仓去重**（一仓树取空时引用边必然也 NA ⇒ 旧法双计，
+    # 一次超时把 usable 12→10 报成"少两个样本"，实际只少一个）。
     edge_na = field_na(rows)
-    na = na + [{"repo": s, "why": "edge-NA(引用边未取到)"} for s in edge_na]
+    na, cstats = na_census(rows, repo_na, edge_na)
+    na_set = {e["repo"] for e in na}
+    # usable 从 rows 侧**独立**数出来，不由 blind 反推 —— 反推会让下面这条恒等式变成
+    # `n-x+x==n` 的永真式（旧写法正是永真式，一条永远绿的尺；r127-S11 实测抓出）。
+    usable = len([r for r in rows if r["repo"] not in na_set])
+    ident_ok = (usable + len(na) == n)
+    intact_ok = not cstats["phantom"] and not cstats["dup_rows"]
     print("== r52 记忆与上下文管理面对标（16 仓 + self）==")
     for r in rows:
         print("%-36s %s" % (r["repo"], verdict(r["tree"], r["readme"], tuple(r["edge"]))))
-    print("应测 %d ｜ NA/截断 %d ｜ 恒等式 usable+NA==total：%s"
-          % (n, len(na), "OK" if n - len(na) + len(na) == n else "FAIL"))
+    print("应测 %d ｜ NA 仓 %d（去重前记录 %d 条）｜ usable %d＋NA %d==%d：%s ｜ 台账完好（无幽灵/无重名仓）：%s"
+          % (n, len(na), cstats["raw"], usable, len(na), n,
+             "OK" if ident_ok else "FAIL",
+             "OK" if intact_ok else "FAIL(幽灵 %s／重名仓 %s)" % (cstats["phantom"], cstats["dup_rows"])))
     if na:
         for x in na:
             print("  NA %s: %s" % (x["repo"], x["why"]))
     if edge_na:
-        print("  （其中 %d 仓是**字段级** NA：引用边没取到 ⇒ 该轴未验，不当反证）" % len(edge_na))
+        print("  （其中 %d 仓是**字段级** NA：引用边没取到 ⇒ 该轴未验，不当反证；"
+              "与仓级同仓的已合并，不重复计数）" % len(edge_na))
     if a.json:
         # 必须 write_bytes：Windows 下 write_text 把 "\n" 译成 "\r\n"，而 eol_parity 判据要求
         # 工作树字节 == git blob 字节 ⇒ 一份"跑一次就把自己写脏"的产物等于给下轮留假红。
         # （同族：本仓 07 卷 4KB 判据当年也是栽在 write_text 的 CRLF 上。r52 实测被抓。）
         Path(a.json).write_bytes(json.dumps(
-            {"repos": rows, "na": na, "denominator": n, "blind": len(na), "usable": n - len(na),
+            {"repos": rows, "na": na, "denominator": n, "blind": len(na), "usable": usable,
+             "na_records_before_dedupe": cstats["raw"],
+             "na_integrity": "OK" if intact_ok else "FAIL",
+             "na_phantom_repos": cstats["phantom"], "na_dup_rows": cstats["dup_rows"],
              "self_paths_scanned": sn,
              "ceiling_note": "引用边通道是**正向回执**：none-in-sample / NA 两态都不构成"
                              "「该仓没做记忆回灌」的结论；且 peers 无行为注入条件，"
                              "本面只比「有没有制度化」，不比「做得好不好」。"
                              "r102 起 NA（含字段级 edge-NA）如实计入声明位 ⇒ "
-                             "顶层 blind 数与件内 NA 哨兵数不再分叉。",
+                             "顶层 blind 数与件内 NA 哨兵数不再分叉。"
+                             "r127-S11 起 blind 的计数单位=**仓**（同仓的仓级+字段级 NA 合并成一条）。",
              "edge_na_repos": edge_na},
             ensure_ascii=False, indent=1).encode("utf-8"))
         print("快照 → " + a.json)
-    sys.exit(1 if na else 0)
+    sys.exit(0 if (not na and intact_ok and ident_ok) else 1)
 
 
 if __name__ == "__main__":
