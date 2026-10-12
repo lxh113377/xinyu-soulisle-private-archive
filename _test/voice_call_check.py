@@ -36,9 +36,12 @@
       ⚠️ 本腿是**桩化**的结构稳定性，不等于真机连说 30 分钟；本机无真麦克风，后者只能人测。
   C15 本机神经语音引擎：默认态零探测（公网红线）+ 开关开时目录/路由/通话中切说话人三件齐
   C16 收句面回声准入（wb-echo-L0）：排水后念白回读不得被当用户输入提交（尾音窗+模糊判）；异文真话对照腿必须照常提交
+  C17 跨轮回读（wb-echo-L1）：轮1念白在轮2之后回读必须被丢弃（老码单槽只保最近一条 ⇒ 先验红）
+  C18 barge-in 能量突增判据（wb-echo-L1）：纯函数组（基线 2× / 300ms 内 ≥2 采样 / 无读数放行）+ 降级仍可打断
+  C19 尾音窗边界（wb-echo-L1）：同一边界样本（dice≈0.500）窗内 0.45 严查丢弃 / 窗外 0.6 放行提交
 
 函数切分（r116 收口轮 / r118 补四段）：loc_guard 的 ≤150 行/函数门把原来的 run_legs（219 行）拆成
-  十段（开层/音色/整轮/双工/摄像头/采集链/无TTS/长轮次/退出/本机引擎），每段自带前置缺失即早退，结论仍汇进同一个 legs 字典。
+  多段（开层/音色/整轮/双工/回声准入/回声L1/摄像头/采集链/无TTS/长轮次/退出/本机引擎），每段自带前置缺失即早退，结论仍汇进同一个 legs 字典。
   等态一律走 wait_state / wait_text 的**完成态轮询**，不留装饰性定长等待
   （timing_coupling 的 C1_HARD 棘轮只认「等完直接读一个确定值」这种形状）。
 
@@ -634,6 +637,144 @@ def legs_echo_admit(page, f, legs):
     wait_state(page, "listening", 80)
 
 
+def _leg_echo_cross(page, f, legs):
+    """C17 跨轮回读（wb-echo-L1）：轮1念白在轮2之后回读 —— 老码单槽只保最近一条，此路必漏。"""
+    ok_l, st = wait_state(page, "listening", 60)
+    if not ok_l:
+        legs["C17"] = "FAIL"
+        f.append("C17 前置缺失：没在听态（state=%s）" % st)
+        return
+    page.evaluate("""() => {
+      window.__vc1n = 0;
+      window.ChatAgent.respond = function (text, onDelta) {
+        window.__vc.llmCalls += 1; window.__vc.texts.push(text); window.__vc1n += 1;
+        const rep = window.__vc1n === 1 ? "今晚的月色真温柔。" : "热水已经帮你续上啦。";
+        if (onDelta) onDelta(rep);
+        return Promise.resolve({ reply: rep, mode: "model" });
+      };
+    }""")
+    page.evaluate("() => { window.__vc.speakMs = 300; }")
+    n0 = len(vc(page)["texts"])
+    page.evaluate("() => window.__vcSay('先说第一件事', true)")
+    ok1 = wait_texts(page, n0 + 1)
+    _, st1 = wait_state(page, "listening", 80)
+    n1 = len(vc(page)["texts"])
+    page.evaluate("() => window.__vcSay('再补第二件事', true)")
+    ok2 = wait_texts(page, n1 + 1)
+    _, st2 = wait_state(page, "listening", 80)
+    if not (ok1 and ok2 and st1 == "listening" and st2 == "listening"):
+        legs["C17"] = "FAIL"
+        f.append("C17 前置缺失：两轮没走完（ok=%s/%s st=%s/%s）" % (ok1, ok2, st1, st2))
+        return
+    n2 = len(vc(page)["texts"])
+    page.evaluate("() => window.__vcSay('今晚的月色真温柔。', true)")   # 轮1念白的迟到回读
+    page.wait_for_timeout(1300)
+    n3 = len(vc(page)["texts"])
+    pend = page.evaluate("() => window.VoiceCall.inspect().pending")
+    _, st3 = wait_state(page, "listening", 80)
+    if n3 == n2 and not pend and st3 == "listening":
+        legs["C17"] = "PASS"
+        print("C17 PASS  跨轮回读被丢弃（轮1念白在轮2后回读：texts 停 %d、pending 空）" % n2)
+    else:
+        legs["C17"] = "FAIL"
+        f.append("C17 跨轮回读漏网：texts %d→%d pending=%r（单槽只保最近一条）" % (n2, n3, pend))
+
+
+BUMP_JS = """() => {
+  const U = window.VoiceCall._unit, o = [];
+  const ck = (name, got, want) => o.push([name, String(got) === String(want), got, want]);
+  if (typeof U.bumpOkFrom !== "function") return [["bumpOkFrom 缺失（老码）", false, "undefined", "function"]];
+  const mk = (a) => a.map((p) => ({ t: p[0], v: p[1] }));
+  ck("无历史=放行（降级）", U.bumpOkFrom([], 10000), true);
+  ck("样本不足=放行", U.bumpOkFrom(mk([[9800, 0.02]]), 10000), true);
+  ck("平铺基线上无突增=不放行", U.bumpOkFrom(mk([[8400,0.02],[8800,0.02],[9200,0.02],[9600,0.02],[9800,0.02],[9900,0.02],[9950,0.02]]), 10000), false);
+  ck("低基线人声过噪声地板=放行", U.bumpOkFrom(mk([[8400,0.002],[8800,0.002],[9200,0.002],[9600,0.002],[9800,0.02],[9900,0.025]]), 10000), true);
+  ck("基线2×且300ms内≥2采样=放行", U.bumpOkFrom(mk([[8400,0.02],[8800,0.02],[9200,0.02],[9600,0.02],[9800,0.06],[9900,0.08],[9950,0.07]]), 10000), true);
+  ck("不到2×=不放行", U.bumpOkFrom(mk([[8400,0.02],[8800,0.02],[9200,0.02],[9600,0.02],[9800,0.035],[9900,0.035],[9950,0.035]]), 10000), false);
+  return o;
+}"""
+
+
+def _leg_barge_energy(page, f, legs):
+    """C18 barge-in 能量突增判据（wb-echo-L1）：纯函数组 + 无读数降级路径仍可打断。"""
+    rows = page.evaluate(BUMP_JS)
+    bad = [r for r in rows if not r[1]]
+    page.evaluate("() => { window.__vc.speakMs = 1200; window.__vc.cancels = 0; }")
+    page.evaluate("() => window.__vcSay('能量判据这条先起一轮', true)")
+    got_sp, st = wait_state(page, "speaking", 80)
+    integ, why = False, "没能进入出声态（state=%s）" % st
+    if got_sp:
+        page.evaluate("() => window.__vcSay('我插一句打断试试', true)")
+        ok_i, st2 = wait_state(page, "listening", 60)
+        integ = ok_i and vc(page)["cancels"] >= 1
+        why = "cancels=%d state=%s" % (vc(page)["cancels"], st2)
+    if bad:
+        legs["C18"] = "FAIL"
+        f.append("C18 能量判据不符: %s" % [[r[0], r[2], r[3]] for r in bad])
+    elif not integ:
+        legs["C18"] = "FAIL"
+        f.append("C18 降级路径失效：无能量读数时打断不再生效（%s）⇒ 宁漏勿误被做成了宁可误伤" % why)
+    else:
+        legs["C18"] = "PASS"
+        print("C18 PASS  能量判据 %d 例（含降级/边界）；桩环境无读数下打断仍生效（%s）" % (len(rows), why))
+
+
+def _leg_tail_window(page, f, legs):
+    """C19 尾音窗边界（wb-echo-L1）：同一边界样本，窗内（0.45）严查丢弃 / 窗外（0.6）放行提交。"""
+    spoken = "我今天心情还不错呢"
+    probe = "今天心情不太好"
+    ok_l, st = wait_state(page, "listening", 60)
+    if not ok_l:
+        legs["C19"] = "FAIL"
+        f.append("C19 前置缺失：没在听态（state=%s）" % st)
+        return
+    page.evaluate("""(rep) => {
+      window.ChatAgent.respond = function (text, onDelta) {
+        window.__vc.llmCalls += 1; window.__vc.texts.push(text);
+        if (onDelta) onDelta(rep);
+        return Promise.resolve({ reply: rep, mode: "model" });
+      };
+    }""", spoken + "。")
+    page.evaluate("() => { window.__vc.speakMs = 300; window.__vc.utts = []; }")
+    n0 = len(vc(page)["texts"])
+    page.evaluate("() => window.__vcSay('先听我完整说一句', true)")
+    ok1 = wait_texts(page, n0 + 1)
+    _, st1 = wait_state(page, "listening", 80)
+    joined = "".join([x["text"] for x in vc(page)["utts"]]).replace(" ", "")
+    if not (ok1 and st1 == "listening" and spoken in joined):
+        legs["C19"] = "FAIL"
+        f.append("C19 前置缺失：样本轮没走完或没念出（ok=%s st=%s joined=%r）" % (ok1, st1, joined[:60]))
+        return
+    n1 = len(vc(page)["texts"])
+    page.evaluate("(t) => window.__vcSay(t, true)", probe + "。")
+    page.wait_for_timeout(1300)
+    n2 = len(vc(page)["texts"])
+    pend = page.evaluate("() => window.VoiceCall.inspect().pending")
+    _, st2 = wait_state(page, "listening", 80)
+    ok_ok = False
+    if n2 == n1 and not pend and st2 == "listening":
+        n3 = len(vc(page)["texts"])
+        page.evaluate("(t) => window.__vcSay(t, true)", probe + "。")
+        ok_ok = wait_texts(page, n3 + 1)
+    if n2 != n1 or pend:
+        legs["C19"] = "FAIL"
+        f.append("C19 窗内边界回读没被严查丢弃：texts %d→%d pending=%r" % (n1, n2, pend))
+    elif not ok_ok:
+        legs["C19"] = "FAIL"
+        f.append("C19 窗外放行失败：同一样本过窗后仍被拦或没提交（texts 停 %d）⇒ 软窗退化成硬拦" % len(vc(page)["texts"]))
+    else:
+        legs["C19"] = "PASS"
+        print("C19 PASS  边界样本（dice≈0.500）：窗内 0.45 严查丢弃 / 窗外 0.6 放行提交")
+
+
+def legs_echo_l1(page, f, legs):
+    """C17-C19（wb-echo-L1）：跨轮回读 / 打断能量判据 / 尾音窗边界；收尾复位假上游与语速。"""
+    _leg_echo_cross(page, f, legs)
+    _leg_barge_energy(page, f, legs)
+    _leg_tail_window(page, f, legs)
+    page.evaluate("() => { window.__vc.speakMs = 40; window.__vcInstallFake(); }")
+
+
 def legs_camera(page, f, legs):
     """C7 摄像头开着也能通话（注入 FaceEngine 读数；真摄像头腿归 face_check.py）。"""
     page.evaluate("() => { window.FaceEngine = window.FaceEngine || {}; window.FaceEngine.last = function () { return {emotion: 'sad', intensity: 0.6}; }; window.VoiceCall._repaint(); }")
@@ -878,6 +1019,7 @@ def run_legs(page, browser, url):
     legs_turn(page, f, legs)
     legs_duplex(page, f, legs)
     legs_echo_admit(page, f, legs)
+    legs_echo_l1(page, f, legs)
     legs_camera(page, f, legs)
     legs_noise(page, f, legs)
     legs_no_tts(page, f, legs)

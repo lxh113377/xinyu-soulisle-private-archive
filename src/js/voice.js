@@ -191,6 +191,12 @@ window.Voice = (function () {
   let queue = [], talking = false;
   const clean = (t) => String(t == null ? "" : t).replace(/\s+/g, " ").slice(0, 400);
   const canSpeak = () => ltOn() || hasTTS();
+  /** wb-echo-L1：统一收尾 —— onEnd 回调（观测项，吞异常）→ 释放队列 → 排下一句。 */
+  function settle(item) {
+    if (item && item.onEnd) { try { item.onEnd(); } catch { /* 回调是观测项 */ } }
+    talking = false;
+    pump();
+  }
   function pump() {
     if (talking || !canSpeak()) return;
     const item = queue.shift();
@@ -198,8 +204,8 @@ window.Voice = (function () {
     talking = true;
     const t = timbre();
     if (t.local) {                                  // 本机神经引擎：一句话一个 WAV，播完再排下一句
-      ltSpeak(clean(item.text), t.sid, item.onStart).then(() => { talking = false; pump(); },
-        () => { talking = false; if (ltOn()) lt.err = "net"; pump(); });
+      ltSpeak(clean(item.text), t.sid, item.onStart).then(() => settle(item),
+        () => { if (ltOn()) lt.err = "net"; settle(item); });
       return;
     }
     let u;
@@ -207,15 +213,17 @@ window.Voice = (function () {
       u = new window.SpeechSynthesisUtterance(clean(item.text));
       applyTimbre(u, t);
       if (item.onStart) u.onstart = () => { try { item.onStart(); } catch { /* 回调是观测项 */ } };
-      u.onend = u.onerror = () => { talking = false; pump(); };
+      u.onend = () => settle(item);                 // 正常播完 → 记 t1（wb-echo-L1）
+      u.onerror = () => { talking = false; pump(); };
       window.speechSynthesis.speak(u);
     } catch { talking = false; queue = []; }        // 约束 2：朗读失败不许把队列挂死
   }
-  /** 送一句进队列；onStart 在该句真正开口时回调（通话层用它记「首声延迟」）。
+  /** 送一句进队列；onStart 在该句真正开口时回调（通话层用它记「首声延迟」/念白 t0）；
+   *  onEnd 在播完时回调（wb-echo-L1 念白 t1，观测项；取消/异常路径可不回调）。
    *  返回 false = 这引擎根本发不出声（调用方据此别把状态翻成「在说」，见 C13）。 */
-  function enqueue(text, onStart) {
+  function enqueue(text, onStart, onEnd) {
     if (!canSpeak()) return false;      // 引擎缺失即拒收：队列里留项 = queueBusy 恒真 = 通话卡死
-    queue.push({ text: text, onStart: onStart }); pump();
+    queue.push({ text: text, onStart: onStart, onEnd: onEnd }); pump();
     return true;
   }
   function cancelSpeech() {

@@ -22,8 +22,9 @@
  *   - 完整且停顿 ≥ SILENCE_MS 才收；
  *   - 停顿到 FORCE_MS 仍判不完整 → **有界收口**（字幕如实标「停顿收口」），绝不无限等。
  *
- * 判据：`_test/voice_call_check.py` C1–C9（桩化 SpeechRecognition / speechSynthesis / getUserMedia）。
+ * 判据：`_test/voice_call_check.py` C1–C19（桩化 SpeechRecognition / speechSynthesis / getUserMedia）。
  * wb-echo-L0（2026-10-13）：回声准入闸 —— 收句面/打断面统一过 `isEchoFuzzy + TAIL_MS`，堵「念白回读误当用户输入」。
+ * wb-echo-L1（2026-10-13）：跨轮回声内容日志（spokenLog）+ duplex 切换冷却 + barge-in 能量突增判据（判据 C17–C19）。
  */
 window.VoiceCall = (function () {
   const $ = (s) => document.querySelector(s);
@@ -41,13 +42,17 @@ window.VoiceCall = (function () {
   const AUDIO_CST = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
   const NOISE_FLOOR = 0.012;     // 能量门下限：低于此不刷新 lastSpeech（取不到读数时不拦）
   const TAIL_MS = 600;           // wb-echo-L0 尾音软窗：念白结束后这么久内的转写用更低回声阈值严查（不硬拦快答）
+  const LOG_MAX = 10;            // wb-echo-L1 念白日志条数上界（跨轮回声判据的容量约束）
+  const DUPLEX_MS = 300;         // wb-echo-L1 切回全双工后延迟再开麦（防残留念白被收进来）
 
   let deps = null, rec = null, SR = null;
   let state = "idle";           // idle | listening | thinking | speaking
   let duplex = "full";          // full=可随时打断  half=讲完再听
   let micOn = true, watch = 0;
   let pending = "", lastSpeech = 0, turnAt = 0, ttf = 0, turnMs = 0;
-  let speakEndAt = 0, recentSpoken = "";   // 末次念白结束时刻 / 上一轮念白（回声比对跨句依据，wb-echo-L0）
+  let speakEndAt = 0;             // 末次念白结束时刻（wb-echo-L0 软窗起点）
+  let spokenLog = [];             // wb-echo-L1 最近念白 {text,t0,t1} 日志（替代单槽 recentSpoken）
+  let lvlHist = [];               // wb-echo-L1 能量读数历史（barge-in 突增判据；空历史=读数不可得=放行）
   let baseLen = 0, lastLen = 0;   // 已收过口的转写条数 / 本会话累计转写条数（防旧句被重新拼进新句）
   let recAlive = false;           // 识别会话是否还活着：活着就不该再 start()（真机 start 会抛，白折腾一次重启）
   let consumed = 0, speakingBuf = "", tailQueued = false, aiLine = null, lastGum = null;
@@ -78,6 +83,16 @@ window.VoiceCall = (function () {
   }
   /** 能量门：噪声不该被当成「还在说话」。读数取不到（无权限/桩）一律放行，宁降级不误伤。 */
   function gateOpen(l) { return l == null || l >= NOISE_FLOOR; }
+  /* wb-echo-L1：barge-in 能量突增判据 —— 近端相对播放前基线 ≥2× 且 300ms 窗内 ≥2 个超阈采样；
+     读数不可得（历史不足）一律放行，宁漏勿误（与 gateOpen 同口径）。 */
+  function bumpOkFrom(hist, now) {
+    const recent = hist.filter((r) => now - r.t <= 300);
+    const base = hist.filter((r) => now - r.t > 400 && now - r.t <= 2000);
+    if (recent.length < 2 || base.length < 2) return true;
+    const bm = base.reduce((a, r) => a + r.v, 0) / base.length;
+    const thr = Math.max(2 * bm, NOISE_FLOOR);
+    return recent.filter((r) => r.v >= thr).length >= 2;
+  }
 
   /* ── 分句（首声延迟的关键：一句收住就送进朗读队列）──────────────── */
   /** 从累计文本里切出「新增且已收住」的句子。返回 [句子数组, 新的消费位置] */
@@ -132,14 +147,14 @@ window.VoiceCall = (function () {
     }
     return best;
   }
-  /** 准入判定：当前念白与上一轮念白两面查；精确面优先、模糊面兜底（wb-echo-L0）。
-      soft=尾音软窗内：模糊阈值 0.6→0.45 更严打念白拖尾，但不硬拦真人快答。 */
+  /** 准入判定：当前念白 + 跨轮念白日志两面查；精确面优先、模糊面兜底（wb-echo-L0/L1）。
+      soft=尾音软窗内（含逐句 t1 软窗）：模糊阈值 0.6→0.45 更严打念白拖尾，但不硬拦真人快答。 */
   function isEchoFuzzy(t, soft) {
     const a = norm(t);
     if (a.length < 3) return false;
     if (isEcho(t)) return true;
     const cut = soft ? 0.45 : 0.6;
-    return [speakingBuf, recentSpoken].some((raw) => {
+    return [speakingBuf].concat(spokenLog.map((e) => e.text)).some((raw) => {
       const b = norm(raw);
       return b.length >= 3 && diceWin(a, b) >= cut;
     });
@@ -233,13 +248,16 @@ window.VoiceCall = (function () {
       const got = (said + interim).trim();
       if (!micOn) { pending = ""; return; }              // 静音键：不采集也不收句
       if (!gateOpen(lvl)) return;                        // 能量门：这一帧没人在说话，噪声不配当话头
-      // wb-echo-L0 准入闸：回声先丢弃（尾音窗内阈值放宽更严打）；丢弃同时推进消费位，
+      // wb-echo-L0 准入闸 + wb-echo-L1 逐句软窗：回声先丢弃（软窗内阈值放宽更严打）；丢弃同时推进消费位，
       // 防「被丢的念白残句」留在累计列表里拼进下一句用户话
-      if (isEchoFuzzy(got, performance.now() - speakEndAt < TAIL_MS)) { baseLen = lastLen; return; }
+      const softWin = performance.now() - speakEndAt < TAIL_MS
+        || spokenLog.some((e) => { const c = e.t1 || e.t0; return c && performance.now() - c < TAIL_MS; });
+      if (isEchoFuzzy(got, softWin)) { baseLen = lastLen; return; }
       pending = got;
       lastSpeech = performance.now();
-      // 含 thinking：思考中插话也要能接管（旧码只认 speaking）
-      if (state !== "listening" && duplex === "full" && got.length >= 2) bargeIn();
+      // 含 thinking：思考中插话也要能接管（旧码只认 speaking）；wb-echo-L1：念白期加能量突增判据（读数不可得时放行）
+      if (state !== "listening" && duplex === "full" && got.length >= 2
+          && (state !== "speaking" || bumpOkFrom(lvlHist, performance.now()))) bargeIn();
       paint();
     };
     rec.onerror = (e) => {
@@ -302,7 +320,7 @@ window.VoiceCall = (function () {
   function bargeIn() {
     clearStall();                       // 思考期被打断：兜底计时器一并清
     if (window.Voice) window.Voice.cancelSpeech();
-    if (speakingBuf) recentSpoken = speakingBuf;   // 念白留作跨句比对（尾音出水就靠它，wb-echo-L0）
+    // wb-echo-L1：念白已在 spokenLog（入队时记录），无需再搬移
     speakingBuf = "";
     state = "listening";
     turnAt = 0;
@@ -321,9 +339,13 @@ window.VoiceCall = (function () {
   }
   function queueSpeech(s) {
     speakingBuf += s;                 // 回声过滤按字面比对，发不出声也得记下我说过什么
+    const entry = { text: s, t0: 0, t1: 0 };     // wb-echo-L1 念白日志（跨轮回声的内容面与时间面）
+    if (spokenLog.length >= LOG_MAX) spokenLog.shift();
+    spokenLog.push(entry);
     const heard = !!window.Voice && window.Voice.enqueue(s, () => {
       if (!ttf && turnAt) { ttf = Math.round(performance.now() - turnAt); metric.ttfb = ttf; paint(); }
-    });
+      entry.t0 = performance.now();
+    }, () => { entry.t1 = performance.now(); });
     if (!heard) { paint(); return; }  // 发不出声就别把状态翻成「在说」，否则永远等不到回听（判据 C13）
     if (state === "thinking") state = "speaking";
     if (state === "speaking" && duplex === "half") pauseRec();
@@ -381,6 +403,7 @@ window.VoiceCall = (function () {
 
   /* ── 节拍器：收句 + 念完回听 ────────────────────────────────────── */
   function tick() {
+    if (lvl != null) { lvlHist.push({ t: performance.now(), v: lvl }); if (lvlHist.length > 60) lvlHist.shift(); }
     if (state === "listening" && pending && lastSpeech) {
       const how = shouldCommit(pending, performance.now() - lastSpeech);
       if (how) commit(pending, how);
@@ -400,7 +423,7 @@ window.VoiceCall = (function () {
     SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     state = "listening";
     pending = ""; ttf = 0; turnMs = 0; consumed = 0; speakingBuf = ""; aiLine = null; lastSpeech = 0;
-    speakEndAt = 0; recentSpoken = "";
+    speakEndAt = 0; spokenLog = []; lvlHist = [];
     baseLen = 0; lastLen = 0;
     metric.ttfb = 0; metric.user = ""; metric.reply = "";
     clearBox($("#call-captions"));
@@ -430,7 +453,7 @@ window.VoiceCall = (function () {
     stopVad();
     state = "idle";
     pending = ""; speakingBuf = ""; turnAt = 0; lastSpeech = 0;
-    speakEndAt = 0; recentSpoken = "";
+    speakEndAt = 0; spokenLog = []; lvlHist = [];
     $("#call-layer").hidden = true;
     const nb = $("#btn-call");
     if (nb) nb.setAttribute("aria-pressed", "false");
@@ -469,7 +492,10 @@ window.VoiceCall = (function () {
     if (dx) dx.addEventListener("click", () => {
       duplex = duplex === "full" ? "half" : "full";
       try { localStorage.setItem(DUPLEX_KEY, duplex); } catch (e) { /* 隐私模式 */ }
-      if (duplex === "full" && state === "listening") resume();
+      // wb-echo-L1：切回全双工先冷却 300ms 再开麦，防残留念白马上被收进来
+      if (duplex === "full" && state === "listening") {
+        setTimeout(() => { if (duplex === "full" && state === "listening") resume(); }, DUPLEX_MS);
+      }
       paint();
     });
     const done = $("#btn-call-done");           // 「说完啦」：停顿判据失灵时的手动出口
@@ -495,6 +521,6 @@ window.VoiceCall = (function () {
         complete: semanticallyComplete(pending || metric.user), metrics: metric,
         gum: lastGum, videoAsked: !!(lastGum && lastGum.video), lines: $("#call-captions") ? $("#call-captions").children.length : 0 };
     },
-    _unit: { semanticallyComplete, shouldCommit, cutSentences, isEcho, isEchoFuzzy, gateOpen }
+    _unit: { semanticallyComplete, shouldCommit, cutSentences, isEcho, isEchoFuzzy, gateOpen, bumpOkFrom }
   };
 })();
