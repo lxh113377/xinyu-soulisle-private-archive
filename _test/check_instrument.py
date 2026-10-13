@@ -20,6 +20,8 @@ r105 把这类记为 BLIND-RED，当时 6 条，本轮收口余下 4 条并立�
 
 守卫：`_test/blindred_guard_check.py`（AST 清点：裸 assert / 裸 wait 且无兜底 ⇒ 判红点名）
 """
+import os
+import subprocess
 import sys
 
 
@@ -50,6 +52,45 @@ def wait_done(page, expr, timeout, name, what):
         unverified(name, "%s（wait_for_function %dms 未完成）" % (what, timeout), e)
 
 
+# r170 S4：环境不可达不是「产品红」也不是「仪器崩」，是**没跑成**。
+# 一手实发（同日两次整跑对照）：8123 无人监听时 `page.goto` 抛
+# `Error: Page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8123/index.html`，
+# 原 `else` 分支把它落成 `NAME-RED …（判据未出结论）` + rc=1 ⇒ 电池记成产品红，
+# 而同仓 `storage_resilience` 对同一事实正确回 rc=2。**同一环境事实在同一次整跑里被落成两档**
+# （一次跑：16 条 ENV-UNVERIFIED vs 9 条 BLIND-RED）——假红会把真红淹掉，且把人往错方向支使。
+ENV_MARKERS = (
+    "ERR_CONNECTION_REFUSED", "ERR_CONNECTION_RESET", "ERR_CONNECTION_ABORTED",
+    "ERR_CONNECTION_TIMED_OUT", "ERR_NAME_NOT_RESOLVED", "ERR_INTERNET_DISCONNECTED",
+    "ERR_ADDRESS_UNREACHABLE", "ERR_EMPTY_RESPONSE",
+    "ECONNREFUSED", "ECONNRESET", "Connection refused", "ConnectionRefusedError",
+    "服务未在", "被测服务不在", "没有监听",
+)
+
+
+def verdict_for(etype_name, msg):
+    """纯函数：(异常类名, 异常消息) → (结论档, rc)。判定写成纯函数，selftest 喂样本即可，
+    不必为每条腿起子进程（起子进程会让「测的到底是哪条」依赖解释器与启动顺序）。
+
+    四档与模块头的语义表一一对应：
+      timeout / env → UNVERIFIED rc=2（判据没跑完：不得当绿，也不得冒充红）
+      assertion     → RED        rc=1（判据跑完，产品/代码判红）
+      instrument    → RED        rc=1（仪器自己的 bug，必须响亮，不许静默）
+    """
+    low = msg or ""
+    if issubclass_name(etype_name, "Timeout") or "Timeout" in etype_name:
+        return "UNVERIFIED", 2
+    if any(m in low for m in ENV_MARKERS):
+        return "UNVERIFIED", 2
+    if etype_name == "AssertionError":
+        return "RED", 1
+    return "RED", 1
+
+
+def issubclass_name(etype_name, frag):
+    """按**名字**判而非按继承判 —— playwright 的 TimeoutError 不继承内置那个（本模块在册的老坑）。"""
+    return frag in (etype_name or "")
+
+
 def install_excepthook(name):
     """进程级兜底：给**顶层脚本形态**的判据装上「永不零结论行」的保险。
 
@@ -63,6 +104,7 @@ def install_excepthook(name):
     语义（与 unverified / instrument_red 完全一致，只是粒度从"一处"变成"一份脚本"）：
       AssertionError        → NAME-RED        rc=1   判据跑完、产品/代码判红
       TimeoutError/*Timeout → NAME-UNVERIFIED rc=2   判据没跑完，不得冒充红
+      环境不可达（r170）    → NAME-UNVERIFIED rc=2   被测服务没起 ≠ 产品红，也不等于仪器崩
       其他异常              → NAME-RED        rc=1   仪器异常（同样点名，不裸抛）
     """
     def hook(etype, e, tb):
@@ -70,16 +112,17 @@ def install_excepthook(name):
             sys.__excepthook__(etype, e, tb)
             return
         msg = str(e) or "(异常无消息 ⇒ 不可归因，须给断言/等待补读数)"
-        # playwright 的 TimeoutError 不继承内置 TimeoutError，故按名字兜住
-        if issubclass(etype, TimeoutError) or "Timeout" in etype.__name__:
-            print("%s-UNVERIFIED 判据未跑完（超时）：%s" % (name, msg))
-            code = 2
-        elif issubclass(etype, AssertionError):
+        kind, code = verdict_for(etype.__name__, msg)
+        if kind == "UNVERIFIED":
+            why = "判据未跑完（超时）" if "Timeout" in etype.__name__ else "被测对象不可达（环境）"
+            print("%s-UNVERIFIED %s：%s: %s" % (name, why, etype.__name__, msg))
+            print("   处置：本件判据没跑成（rc=2）。不得记为绿，也不得记为产品红 ——"
+                  " 先起被测面（定版 jar@8123：java -jar server/target/soulisle-server.jar"
+                  " --server.port=8123）再谈判据结论。")
+        elif etype.__name__ == "AssertionError":
             print("%s-RED 断言未通过：%s" % (name, msg))
-            code = 1
         else:
             print("%s-RED 仪器异常（判据未出结论）：%s: %s" % (name, etype.__name__, msg))
-            code = 1
         print("   （结论行由 check_instrument.install_excepthook 兜底产出，rc=%d）" % code)
         sys.stdout.flush()
         sys.exit(code)
@@ -88,16 +131,47 @@ def install_excepthook(name):
 
 
 if __name__ == "__main__":
-    # --selftest：用「必然超时」的假 page 验证超时真的会落成 UNVERIFIED + rc=2，
-    # 而不是裸抛栈（本模块存在的唯一理由就是这条，必须能自证）。
-    class _TimeoutPage:
-        def wait_for_function(self, *a, **k):
-            raise TimeoutError("模拟：wait_for_function 超时")
-
-    try:
-        wait_done(_TimeoutPage(), "() => true", 10, "SELFTEST", "模拟超时")
-    except SystemExit as e:
-        print("check_instrument 自检：退出码=%s（应为 2 = 未验，不是 0/1）" % e.code)
-        sys.exit(0 if e.code == 2 else 1)
-    print("check_instrument 自检失败：超时没有落成 UNVERIFIED（裸抛了）")
-    sys.exit(1)
+    # --selftest：三件必须各自成立 ——
+    #   ① 真超时/真不可达 ⇒ 落 UNVERIFIED rc=2（本模块存在的理由）
+    #   ② 断言失败与仪器 bug ⇒ **必须仍是 rc=1**（反向腿：只把「该未验的判成未验」的尺
+    #      等于把一切判成未验，那比假红更糟 —— 它会安静地让所有真红消失）
+    #   ③ 端到端：excepthook 装好后真的决定进程退出码
+    bad = []
+    cases = [
+        ("Error", "Page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8123/index.html",
+         "UNVERIFIED", 2),
+        ("TimeoutError", "Timeout 15000ms exceeded", "UNVERIFIED", 2),
+        ("Error", "page.wait_for_function: Execution context was destroyed", "RED", 1),
+        ("AssertionError", "J4 断言：清除后条数应为 0，实测 3", "RED", 1),
+        ("KeyError", "'choices'", "RED", 1),
+    ]
+    for etn, m, want_kind, want_rc in cases:
+        kind, rc = verdict_for(etn, m)
+        if (kind, rc) != (want_kind, want_rc):
+            bad.append("%s/%s → %s/%s（应为 %s/%s）" % (etn, m[:28], kind, rc, want_kind, want_rc))
+    if not ENV_MARKERS:
+        bad.append("环境标记被清空 ⇒ 第一腿恒假")
+    # 端到端腿：起一个子进程，让它在 goto 风格的「不可达」异常下死掉，看真退出码
+    probe = ("import sys; sys.path.insert(0, %r)\n"
+             "from check_instrument import install_excepthook\n"
+             "install_excepthook('E2E')\n"
+             "raise RuntimeError('Page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8123/')\n"
+             % os.path.dirname(os.path.abspath(__file__)))
+    r = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, timeout=60)
+    if r.returncode != 2:
+        bad.append("端到端：不可达异常实得 rc=%s（应为 2）输出=%s" % (r.returncode, (r.stdout or "")[:120]))
+    # 端到端腿②（r112 原有那条的替身）：`wait_done` 遇必然超时必须落 rc=2 而不是裸抛栈。
+    # 原来这条在主进程里直接调 wait_done，靠 SystemExit 读码 —— 一旦它改成抛栈，本自检会**崩**
+    # 而不是报「腿失效」，红因就被读成「文件坏了」。搬进子进程后退出码可核、结论行可核。
+    wd = ("import sys; sys.path.insert(0, %r)\n"
+          "from check_instrument import wait_done\n"
+          "class P:\n"
+          "    def wait_for_function(self, *a, **k): raise TimeoutError('模拟：wait_for_function 超时')\n"
+          "wait_done(P(), '() => true', 10, 'SELFTEST', '模拟超时')\n"
+          % os.path.dirname(os.path.abspath(__file__)))
+    r2 = subprocess.run([sys.executable, "-c", wd], capture_output=True, text=True, timeout=60)
+    if r2.returncode != 2 or "SELFTEST-UNVERIFIED" not in (r2.stdout or ""):
+        bad.append("端到端：wait_done 超时未落 UNVERIFIED+rc=2（实得 rc=%s）" % r2.returncode)
+    print("CHECK-INSTRUMENT-SELFTEST-%s（%d 档判定 + 端到端两条：不可达异常、wait_done 超时）"
+          % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(cases)))
+    sys.exit(1 if bad else 0)

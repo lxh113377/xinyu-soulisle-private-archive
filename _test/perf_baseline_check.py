@@ -57,6 +57,10 @@ MIN_RPS_EMOTION = 50.0
 MAX_RSS_MB = 1200.0            # ≈观测峰值 333.8MB 的 3.6x ⇒ 抓泄漏/无界缓存，不抓抖动
 MAX_US_CPU_PER_REQ = 12000.0   # ≈观测最坏 3092.7µs 的 3.9x ⇒ 抓每请求计算量的数量级退化
 IDLE_WINDOW_S = 1.0        # r123 空载窗口长度（秒）：与负载窗口按 CPU 速率归一，不要求等长
+# r171：令牌桶回满等待。推导写死在这儿，别让人去猜这个数从哪来 ——
+# ApiGuardFilter 默认 burst=20、补充速率 1 token/s ⇒ 空桶到满需 20s，留 2s 余量取 22s。
+# 与 `perf_api_check` 的 settle 常量同口径（两处若不一致，改的那处必须同时改另一处）。
+GUARD_SETTLE_S = 22
 CONC = {"threads": 8, "per_thread": 6}
 # r96：单点并发**必须把档位写进读数本身**。立因是 r95 报告自相矛盾——§1 维度 4 印
 # `吞吐 1013.9 rps`，§5 又写「并发维度仍无读数」（依据是 grep k6/locust 全仓 0 命中）。
@@ -193,6 +197,28 @@ def get(url, body=None):
         return r.status, r.read()
 
 
+def attach_crisis_guard(out, name, last):
+    """把「危机短路未调 LLM」这条口径守卫挂到读数上。
+
+    r171 修一手崩溃：原实现直接 `out[name]["llm_used"] = ...`，而 `out[name]` **只在整轮没出
+    fatal 时才存在**（`for/else` 的 else 分支才赋值）。于是只要 `/api/emotion` 打不通
+    （服务没起、5xx、连接被拒），这里就 `KeyError: 'emotion_crisis'` —— 判据**当场崩掉**，
+    电池记成 BLIND-RED，而 perf 基线自那次起**一直在静默断更**（崩在写台账之前 ⇒ 没有新读数）。
+    关键差别：崩之前它看起来像"性能有问题"，实际是"仪器自己坏了"。
+    现在：键不存在 ⇒ 不写、返回 False，让 fatal 分支正常把这一面报成未验（rc=2）。
+    """
+    if name not in out:
+        return False
+    try:
+        j = json.loads((last or b"").decode("utf-8", "replace"))
+        out[name]["llm_used"] = bool(j.get("llm"))
+        out[name]["resp_keys"] = sorted(j.keys())
+    except Exception as e:
+        out[name]["llm_used"] = None
+        out[name]["guard"] = "UNVERIFIED:%s" % e
+    return True
+
+
 def measure(base, reps):
     targets = [
         ("static_index", base + "/", None),
@@ -208,7 +234,13 @@ def measure(base, reps):
             try:
                 ms, resp = timed(lambda u=url, b=body: get(u, b))
             except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
-                fatal.append("%s: %s" % (name, getattr(e, "reason", e)))
+                # r171：HTTPError 的 `.reason` 可能是空串 ⇒ 原写法印出「取数失败 emotion_crisis: 」
+                # 后面什么都没有，等于又造了一条"点名但不可归因"的红。带上类型与状态码才算点名。
+                detail = getattr(e, "reason", None) or getattr(e, "strerror", None) \
+                    or getattr(e, "msg", None) or "%s: %s" % (type(e).__name__, e)
+                if isinstance(e, urllib.error.HTTPError):
+                    detail = "HTTP %s (%s)｜%s" % (e.code, e.reason or "-", detail)
+                fatal.append("%s: %s" % (name, str(detail)[:120]))
                 break
             lat.append(ms)
             last = resp[1] if isinstance(resp, tuple) else resp
@@ -217,14 +249,9 @@ def measure(base, reps):
                          "p50_ms": round(pct(lat, 50), 1), "p95_ms": round(pct(lat, 95), 1),
                          "max_ms": round(max(lat), 1)}
         if name == "emotion_crisis":
-            # 口径守卫必须 fail-closed：读不到 / 解析失败都算"口径未证"，不许静默当通过
-            try:
-                j = json.loads((last or b"").decode("utf-8", "replace"))
-                out[name]["llm_used"] = bool(j.get("llm"))
-                out[name]["resp_keys"] = sorted(j.keys())
-            except Exception as e:
-                out[name]["llm_used"] = None
-                out[name]["guard"] = "UNVERIFIED:%s" % e
+            # 口径守卫必须 fail-closed：读不到 / 解析失败都算"口径未证"，不许静默当通过；
+            # 而**整轮失败时不得凭空造读数**（r171 一手：那时键根本不存在，原写法直接 KeyError 崩）
+            attach_crisis_guard(out, name, last)
     # 吞吐：只测 health（最轻，测的是服务端并发而非上游）
     if not fatal:
         # r122：资源占用率读数 ⇒ 窗口前后各读一次**被测进程自己**的计数器
@@ -582,6 +609,22 @@ def selftest():
     bb2, _ = judge_ramp(llm_mid, (8, 16, 32, 64))
     if not any("llm_used" in x and "16" in x for x in bb2):
         bad.append("⑲变异体失效：16 档中位数读数里 llm_used=None 没被 judge_ramp 点名 ⇒ 中位数把偷换抹平了")
+    # ㉑ r171 一手崩溃的回归腿：`/api/emotion` 打不通时 `out` 里**根本没有这个键**，
+    #    原写法在那儿直接 `KeyError: 'emotion_crisis'` ⇒ 判据崩在写台账之前，
+    #    电池只记到 BLIND-RED，而性能基线自那次起**静默断更**（没读数 ≠ 读数慢）。
+    crashed = {}
+    try:
+        wrote = attach_crisis_guard(crashed, "emotion_crisis", b"")
+    except KeyError as e:
+        bad.append("㉑失败面仍凭空写读数（KeyError:%s）⇒ 整跑会崩而不是报未验" % e)
+        wrote = None
+    if wrote is not False or crashed:
+        bad.append("㉑失败面被凭空造出读数：wrote=%r 面=%s" % (wrote, crashed))
+    # ㉒ 反向腿：键在场时守卫必须真的挂上 —— 防"整块改成 no-op"把口径守卫静默关掉
+    filled = {"emotion_crisis": {}}
+    if attach_crisis_guard(filled, "emotion_crisis", b'{"llm":null,"final":{}}') is not True \
+            or filled["emotion_crisis"].get("llm_used") is not False:
+        bad.append("㉒键在时守卫没挂上（llm_used 未落）⇒ 口径漂移重新隐身")
     print("SELFTEST-%s" % ("PASS: 百分位/空样本/恒慢/缺面/口径漂移 + 阶梯 正例/双地板/LLM偷换/NA不冒充绿"
                            " + 中位数 取中/带宽/LLM从严/冷启不掺/空样本/接线双证"
                            " + 资源 正常/超工作集/超单请求CPU/缺数不判绿/有数不误未验 + 净CPU 正常/缺读数/除零/负值不抹平"
@@ -620,6 +663,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("base", nargs="?", default="http://127.0.0.1:8123")
     ap.add_argument("--reps", type=int, default=25)
+    ap.add_argument("--no-settle", action="store_true",
+                    help="关掉 r171 的限流自愈重试，专门用于复现「上一个判据的余温把基线打成 429」")
     ap.add_argument("--ramp", default="",
                     help="阶梯并发档位，逗号分隔（如 8,16,32,64）；**默认关**——电池不因此变长，"
                          "由 CI 的 perf-baseline 作业与人工轮次显式开启")
@@ -640,8 +685,20 @@ def main():
         print("PERF-ENV: 被测服务不可达 %s（%s）⇒ 记为未验证，不判绿" % (a.base, type(e).__name__))
         return 2
     m, fatal = measure(a.base, a.reps)
+    # r171：撞**自家限流闸**（429）不是性能退化，也不是被测面坏了 —— 是上一个判据的余温。
+    # r131 已给 `perf_api_check` 定过同一处置：等令牌桶回满再打一次，且**必须点名重试了几次**，
+    # 不许静默。推导：ApiGuardFilter 默认 burst=20、1 token/s ⇒ 满桶需 20s，取 22s 留 2s 余量。
+    # 只重试一次（不是循环放宽）：真被限流打断时第二次仍会 429，那时如实报未验。
+    throttled = [f for f in fatal if "429" in f]
+    retried = 0
+    if throttled and not a.no_settle:
+        print("   限流重试：检出 %d 条 429 ⇒ 等 %ds 让令牌桶回满后重打一次（复算：--no-settle 可关）"
+              % (len(throttled), GUARD_SETTLE_S))
+        time.sleep(GUARD_SETTLE_S)
+        retried = 1
+        m, fatal = measure(a.base, a.reps)
     if fatal:
-        print("PERF-ENV: 取数失败 %s ⇒ 未验证" % "; ".join(fatal))
+        print("PERF-ENV: 取数失败 %s ⇒ 未验证（限流重试次数=%d）" % ("; ".join(fatal), retried))
         return 2
     for name in ("static_index", "vendor_js", "health", "emotion_crisis",
                  "throughput_health", "throughput_emotion"):

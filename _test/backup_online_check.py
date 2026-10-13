@@ -12,6 +12,12 @@ Pages Function（函数侧 CORS 白名单只放行自家来源）。本判据盯
 
 三态：rc=0 PASS / rc=1 FAIL / rc=2 UNVERIFIED（网络层打不开页面等，不判绿）。
 用法：python _test/backup_online_check.py
+     python _test/backup_online_check.py --selftest   # 离线判档桩，不联网
+
+⚠️ r171 加第四档 `UPSTREAM-BILLING`（rc=2，**不是 FAIL**）：2026-10-13 实测上游 DeepSeek 回
+`402 Insufficient Balance` —— 备用线**链路本身是全好的**（B1 品牌、B2 stub 指向、CORS 无报错都过），
+死的是账户余额。原实现把这种情况记成 `B3 FAIL`，于是下一轮的人会去查 CORS/代理，
+而真因只要一次 `curl -D-` 就能看见。判档按**HTTP 状态码**取，不按界面文案猜（文案会被别的分支共用）。
 """
 import io
 import re
@@ -22,7 +28,38 @@ from browser_engine import launch as be_launch   # r113：手写回退收编为�
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[1]
 URL = "https://qwer-d4gf2r76o8829463b-1458054906.tcloudbaseapp.com/xinyu/"
+PROXY = "https://xinyu-soulisle.pages.dev/api/chat"
 TIMEOUT = 60
+
+# 计费/配额类状态码：链路通、上游拒绝，属**外部依赖失败**，不得读成产品缺陷
+BILLING_STATUSES = (402, 429)
+# Cloudflare 边缘策略类（r171 一手：本机 urllib 直打公网函数回 `error code: 1010`
+# =「按访客 IP 限制访问」）⇒ 这一面**在本地不可判**，既不是产品红也不代表线上坏了
+# （浏览器判据带完整头/cookie 时同一条链是通的）。混进 FAIL 就会造出永久假红。
+# ⚠️ 只认 CF 的数字错误码，**不认 "cloudflare" 这个词**：CF 品牌的 402/5xx 页面里也会出现该词，
+#    按词判会把「账户没钱」悄悄降级成「本机不可判」——那是把真红洗成未验，比假红更坏。
+EDGE_POLICY_MARKERS = ("error code: 1010", "error code: 1014", "error code: 1015",
+                       "error code: 1016", "error code: 1020")
+
+
+def classify(status, tag, errors, body=""):
+    """纯函数：(上游状态码, 回复标签, console 错误, 响应体片段) → (档位, 依据)。
+    判定写成纯函数才能离线自证；本函数是**全网唯一**一处「状态码/响应 → 档位」的词汇源，
+    `upstream_state_probe` 直接 import 它，不另立第二把尺。"""
+    blob = ((body or "") + " " + " ".join(errors or [])).lower()
+    if status in BILLING_STATUSES:
+        return "BILLING", "上游 HTTP %s（账户余额/配额）" % status
+    if any(m in blob for m in EDGE_POLICY_MARKERS):
+        return "EDGE-POLICY", "被 Cloudflare 边缘策略拦截（本机 IP 判不了这一面，需带外取证）"
+    if "在线大模型生成" in (tag or ""):
+        return "OK", "回复标签=在线大模型生成"
+    if status and status >= 500:
+        return "UPSTREAM-5XX", "上游 HTTP %s" % status
+    if any(k in " ".join(errors or []) for k in ("CORS", "Access-Control", "Content Security Policy", "404")):
+        return "LINK", "console 报链路错：%s" % (" ".join(errors or []))[:80]
+    if "离线共情模板" in (tag or "") or "暂不可用" in (tag or ""):
+        return "UNKNOWN", "落离线模板但状态码 %s 不属计费/5XX ⇒ 须人工定位" % status
+    return "UNKNOWN", "无有效回复标签（实测 %r）" % (tag or "")[-60:]
 
 
 def main() -> int:
@@ -80,6 +117,16 @@ def main() -> int:
         # B4 从「应用已真正加载」起算：CDN 传播期文档自身的偶发 404（curl 同 URL 200，r86 现场证过）
         # 算取数抖动，不算应用报错；应用真有 CSP/CORS 报错会在对话后继续现形。
         errors.clear()
+        seen = {"status": 0, "body": ""}
+
+        def on_resp(r):
+            if PROXY in r.url:
+                seen["status"] = r.status
+                try:
+                    seen["body"] = (r.text() or "")[:200]
+                except Exception:
+                    pass
+        pg.on("response", on_resp)
         pg.fill("#chat-input", "最近总是失眠，压力好大")
         pg.evaluate("() => document.getElementById('chat-form').requestSubmit()")
         ok = False
@@ -92,8 +139,20 @@ def main() -> int:
             if "在线大模型生成" in tag or "离线共情模板" in tag or "暂不可用" in tag:
                 ok = True
                 break
+        grade, why = classify(seen["status"], tag, errors, seen["body"])
+        if grade in ("BILLING", "EDGE-POLICY"):
+            # 链路好、账户死（或被边缘策略拦）：这是**外部依赖未通**，不是产品红。记 rc=2 并把处置写清楚，
+            # 否则下一轮会拿这条红去查 CORS/代理（今天真往那个方向查过一次）。
+            print("BACKUP-ONLINE-UNVERIFIED: %s｜响应体片段=%r" % (why, seen["body"][:90]))
+            print("   B1/B2（品牌与代理指向）已 %s ⇒ 备用线链路本身通，问题在外部面。"
+                  % ("过" if not fails else "未全过"))
+            print("   处置：BILLING 需充值或换 Key（只有老大能做）；EDGE-POLICY 需带外取证（换网络/浏览器判据）。"
+                  "复算：python _test/upstream_state_probe.py")
+            print("   ⚠️ 禁止为了让它绿而放宽 B3 —— 那等于把「线上当前拿不到在线回复」这条事实抹掉。")
+            b.close()
+            return 2
         ck("B3 备用线拿到真实在线回复（标签含「在线大模型生成」）",
-           "在线大模型生成" in tag, tag[-80:].replace("\n", " "))
+           grade == "OK", "%s｜%s" % (why, tag[-70:].replace("\n", " ")))
         ck("B4 console 零 error", not errors, "; ".join(errors)[:120])
         b.close()
 
@@ -105,5 +164,30 @@ def main() -> int:
     return 0
 
 
+def selftest() -> int:
+    """判档桩：四档各有专属输入，且必须**两向**都能翻（把计费判成红、或把真链路错判成未验，都算失败）。"""
+    cases = [
+        (402, "…离线共情模板 · 情绪双路：LLM 精判失败", [], "BILLING"),
+        (429, "离线共情模板", [], "BILLING"),
+        (200, "…在线大模型生成…", [], "OK"),
+        (500, "离线共情模板", [], "UPSTREAM-5XX"),
+        (200, "离线共情模板", ["Access-Control-Allow-Origin missing"], "LINK"),
+    ]
+    bad = []
+    for st, tag, errs, want in cases:
+        got, why = classify(st, tag, errs)
+        if got != want:
+            bad.append("%s/%s → %s（应 %s）" % (st, tag[:12], got, want))
+    # 反向腿：一条「全对」的输入必须判 OK，否则上面五档可能来自一个恒返回 BILLING 的实现
+    if classify(200, "在线大模型生成", [])[0] != "OK":
+        bad.append("反向腿失效：OK 档被吞 ⇒ 判档实现可能在无条件报计费")
+    # 反向腿②：CORS 错**不得**被降级成未验（那会把真缺陷判成环境问题，假阴性比假红更坏）
+    if classify(200, "离线共情模板", ["CSP blocked"])[0] == "BILLING":
+        bad.append("链路错被误判成计费 ⇒ 真缺陷会被当成账户问题")
+    print("BACKUP-ONLINE-SELFTEST-%s（%d 档判位 + 2 条反向腿，纯函数离线跑）"
+          % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(cases)))
+    return 1 if bad else 0
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(selftest() if "--selftest" in sys.argv else main())

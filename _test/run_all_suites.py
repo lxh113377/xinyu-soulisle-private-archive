@@ -341,6 +341,13 @@ SUITES = [
     # 函数侧 CORS 白名单只放行自家来源）。这条尺真开浏览器发一条消息，标签含
     # 「在线大模型生成」才算过——防止 stub 被改回已死的 service 域名而无人知晓。
     ("backup_online", [sys.executable, "_test/backup_online_check.py"]),
+    # r171：上面那条真腿要开浏览器、还受上游账户余额摆布，而**判档**是本仓代码自己的事 ——
+    # 把 402「没钱了」读成产品缺陷、把 CF 1010「按 IP 限制」读成线上坏了，这两个错与网络无关，
+    # 必须零网络每轮复跑。5 档 + 2 条反向腿（反向腿钉「真缺陷不许被洗成未验」）。
+    ("backup_online_selftest", [sys.executable, "_test/backup_online_check.py", "--selftest"]),
+    # r171：上游状态探针的判档腿。真跑（`upstream_state_probe.py` 单跑）走公网、照 peer_*_probe
+    # 先例**不入电池**；入电池的只有这条离线腿，且判档词汇 import 自 backup_online（一把尺）。
+    ("upstream_state_probe_selftest", [sys.executable, "_test/upstream_state_probe.py", "--selftest"]),
     ("emotion_eval_js", ["node", "_test/emotion_eval.js"]),
     # r111 用户立规：表情识别 + 语意理解 = 多轮迭代核心优先级（每轮第一要务）。
     #   本尺是**棘轮**：复算双能力基线并拒收任何回退；目标/指标/轨迹 = memory/10-core-capabilities.md。
