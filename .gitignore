@@ -109,3 +109,8 @@ nul
 # R269 例外通道（2026-10-12 face-diag 轮登记）：`_tmp_*` 是并行活跃会话的分钟级运行态临时产物
 # （28 份实测 mtime 全在写入窗口内，禁迁 _trash 会打断他方；走 gitignore 降级 quarantine）。
 /_tmp_*
+
+# ASR 评测运行期产物（r176/B3）：_eval_last.json 是判据每次跑出来的临时读数，可复跑重建；
+# _b3_full_auto.json 是带全部 300 条逐样本明细的基线快照，汇总已固化为 asr_eval_baseline.json
+_test/_eval_last.json
+_test/_b3_full_auto.json

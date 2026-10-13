@@ -140,18 +140,34 @@ class AsrJson(BaseModel):
 
 
 @app.post("/asr")
-async def asr(request: Request, file: UploadFile = File(None), payload: AsrJson = None):
+async def asr(request: Request):
+    """两个入口：multipart 的 file 字段，或 JSON 的 audio_b64。
+
+    ⚠ 不用 FastAPI 的 `file: UploadFile = File(None), payload: AsrJson = None` 双 body 签名：
+    实测那样写时纯 JSON 请求会被当成"缺 file"而 400（两个可选 body 组合的解析顺序问题），
+    错误信息还指向不到根因。改成自己按 Content-Type 分派，行为可预测。
+    """
     if not origin_ok(request):
         raise HTTPException(403, "origin not allowed")
-    if file is not None and file.filename:
-        data = await file.read()
-    elif payload and payload.audio_b64:
+    ctype = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if ctype == "application/json":
         try:
-            data = base64.b64decode(payload.audio_b64, validate=True)
+            body = await request.json()
+        except Exception as e:                                # noqa: BLE001
+            raise HTTPException(400, "JSON body 解析失败：%s" % str(e)[:100])
+        b64 = (body or {}).get("audio_b64") or "" if isinstance(body, dict) else ""
+        if not b64:
+            raise HTTPException(400, "audio_b64 为空")
+        try:
+            data = base64.b64decode(b64, validate=True)
         except (binascii.Error, ValueError) as e:
             raise HTTPException(400, "audio_b64 不是合法 base64：%s" % e)
     else:
-        raise HTTPException(400, "缺音频：multipart 的 file 或 JSON 的 audio_b64 至少要给一个")
+        form = await request.form()
+        up = form.get("file")
+        if up is None or not getattr(up, "filename", ""):
+            raise HTTPException(400, "缺音频：multipart 的 file 或 JSON 的 audio_b64 至少要给一个")
+        data = await up.read()
     if not data:
         raise HTTPException(400, "empty audio")
     if len(data) > MAX_BYTES:

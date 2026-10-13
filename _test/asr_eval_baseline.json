@@ -1,0 +1,93 @@
+{
+  "url": "http://127.0.0.1:8321",
+  "n": 300,
+  "total_ref_chars": 3049,
+  "total_dist": 1031,
+  "cer": 0.3381,
+  "ser": 0.95,
+  "cer_canto": 0.3339,
+  "ser_canto": 0.95,
+  "cer_simp": 0.1102,
+  "ser_simp": 0.6533,
+  "zhconv_ok": true,
+  "secs": 87.9,
+  "by_domain": {
+    "NaN": {
+      "n": 300,
+      "cer": 0.3381,
+      "ser": 0.95,
+      "cer_canto": 0.3339,
+      "ser_canto": 0.95,
+      "cer_simp": 0.1102,
+      "ser_simp": 0.6533
+    }
+  },
+  "by_dur_bucket": {
+    "4-6s": {
+      "n": 134,
+      "cer": 0.3584,
+      "ser": 0.9851,
+      "cer_canto": 0.3556,
+      "ser_canto": 0.9851,
+      "cer_simp": 0.1143,
+      "ser_simp": 0.709
+    },
+    "2-4s": {
+      "n": 123,
+      "cer": 0.3472,
+      "ser": 0.9106,
+      "cer_canto": 0.34,
+      "ser_canto": 0.9106,
+      "cer_simp": 0.1244,
+      "ser_simp": 0.561
+    },
+    ">=6s": {
+      "n": 42,
+      "cer": 0.2946,
+      "ser": 0.9762,
+      "cer_canto": 0.2908,
+      "ser_canto": 0.9762,
+      "cer_simp": 0.0885,
+      "ser_simp": 0.7619
+    },
+    "<2s": {
+      "n": 1,
+      "cer": 0.0,
+      "ser": 0.0,
+      "cer_canto": 0.0,
+      "ser_canto": 0.0,
+      "cer_simp": 0.0,
+      "ser_simp": 0.0
+    }
+  },
+  "by_gender": {
+    "NaN": {
+      "n": 262,
+      "cer": 0.3385,
+      "ser": 0.9504,
+      "cer_canto": 0.3336,
+      "ser_canto": 0.9504,
+      "cer_simp": 0.1118,
+      "ser_simp": 0.6679
+    },
+    "male_masculine": {
+      "n": 23,
+      "cer": 0.3363,
+      "ser": 0.9565,
+      "cer_canto": 0.3363,
+      "ser_canto": 0.9565,
+      "cer_simp": 0.1327,
+      "ser_simp": 0.6957
+    },
+    "female_feminine": {
+      "n": 15,
+      "cer": 0.3354,
+      "ser": 0.9333,
+      "cer_canto": 0.3354,
+      "ser_canto": 0.9333,
+      "cer_simp": 0.0506,
+      "ser_simp": 0.3333
+    }
+  },
+  "note": "B3 首条真实基线：Common Voice 22.0 yue test 划分 300 条（ml/build_asr_eval_set.py 固定种子 20261014）"
+}

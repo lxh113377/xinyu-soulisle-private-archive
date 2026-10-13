@@ -1,0 +1,25 @@
+{
+  "source": "JackyHoCL/common_voice_22_yue (Common Voice 22.0 · yue · CC0-1.0)",
+  "split": "test",
+  "seed": 20261014,
+  "counts": {
+    "raw": 5130,
+    "up_votes>=1": 5130,
+    "down_votes<=0": 4719,
+    "ref>=2字": 4719,
+    "时长越界": 7,
+    "通过全部过滤": 893,
+    "最终入选": 300
+  },
+  "total_sec": 1369.8,
+  "audio_dir": "D:\\xinyu-ml\\asr-data\\cv22-yue-eval",
+  "manifest": "C:\\Users\\37533\\Desktop\\workspace\\项目\\陪聊\\_test\\asr_eval_manifest.jsonl",
+  "manifest_sha256": "814930a6fb163b4ab5d830cf9ee5e1d46bcc7d331989bb9e50d985537770c2e8",
+  "filters": {
+    "min_up": 1,
+    "max_down": 0,
+    "min_sec": 1.0,
+    "max_sec": 10.0,
+    "sampled": true
+  }
+}
