@@ -48,6 +48,11 @@ window.VoiceCall = (function () {
   // 这一路音量计流 + 下面的能量门 —— 后者才是「背景噪声不许把话头一直吊着」的那道闸。
   const AUDIO_CST = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
   const NOISE_FLOOR = 0.012;     // 能量门下限：低于此不刷新 lastSpeech（取不到读数时不拦）
+  // r175/A3-2 自适应噪声门：固定门在嘈杂环境下**形同虚设**（底噪 0.05 > 门 0.012 ⇒ 噪声永远"在说话"，
+  // 话头被一直吊着）。门 = clamp(底噪 × NOISE_MULT, NOISE_FLOOR, NOISE_CAP)；底噪估不出来就退回固定门。
+  const NOISE_MULT = 2.5;        // 说话声至少得是底噪的这么多倍
+  const NOISE_CAP = 0.12;        // 上界：再吵也不许把真人说话判成噪声（宁漏勿误，误拦只是晚一帧更新）
+  const AMB_LO = 800, AMB_HI = 5000, AMB_MIN = 8;  // 底噪估计窗口：排除最近 800ms（那可能正是说话声）
   const TAIL_MS = 600;           // wb-echo-L0 尾音软窗：念白结束后这么久内的转写用更低回声阈值严查（不硬拦快答）
   const LOG_MAX = 10;            // wb-echo-L1 念白日志条数上界（跨轮回声判据的容量约束）
   const DUPLEX_MS = 300;         // wb-echo-L1 切回全双工后延迟再开麦（防残留念白被收进来）
@@ -98,8 +103,35 @@ window.VoiceCall = (function () {
     if (silenceMs >= SILENCE_MS * TAIL_GRACE && String(t).trim().length >= MIN_COMPLETE) return "语义收句";
     return "";
   }
-  /** 能量门：噪声不该被当成「还在说话」。读数取不到（无权限/桩）一律放行，宁降级不误伤。 */
-  function gateOpen(l) { return l == null || l >= NOISE_FLOOR; }
+  /** 环境底噪估计：窗口内读数的**下四分位**（宁低不高 ⇒ 门偏松 ⇒ 宁漏勿误）。
+   *  样本不足（刚开麦/桩里没历史）返 null ⇒ 调用方退回固定门。 */
+  function ambientFloor(hist, now) {
+    if (!Array.isArray(hist) || typeof now !== "number") return null;
+    const w = hist.filter((r) => { const d = now - r.t; return d >= AMB_LO && d <= AMB_HI; });
+    if (w.length < AMB_MIN) return null;
+    const vs = w.map((r) => r.v).sort((a, b) => a - b);
+    const v = vs[Math.floor(vs.length * 0.25)];
+    return typeof v === "number" && v > 0 ? v : null;
+  }
+  /** 采集链参数（r175/A3-3）：默认三面旗，可由演示态按环境覆盖（如嘈杂环境关 AGC）。
+   *  ⚠ 边界写死在这里防误解：本函数只作用于**我们自己的 getUserMedia 流**（音量计/打断判据），
+   *  Web Speech 的内部采集 JS 管不到 —— 它不是"给识别引擎降噪"的开关。 */
+  let cstOverride = null;
+  function audioConstraints() { return Object.assign({}, AUDIO_CST, cstOverride || {}); }
+  function setAudioConstraints(p) {
+    cstOverride = (p && typeof p === "object") ? p : null;
+    return audioConstraints();
+  }
+
+  /** 能量门：噪声不该被当成「还在说话」。读数取不到（无权限/桩）一律放行，宁降级不误伤。
+   *  ⚠ **单参调用必须保持改动前的固定门行为** —— voice_call_check 的 4 条 GATE 腿钉的就是这条：
+   *  底噪估不出来（floor 非正）时走 `l >= NOISE_FLOOR`，一个字都不许变。 */
+  function gateOpen(l, floor) {
+    if (l == null) return true;
+    if (typeof floor !== "number" || !(floor > 0)) return l >= NOISE_FLOOR;
+    const thr = Math.min(Math.max(floor * NOISE_MULT, NOISE_FLOOR), NOISE_CAP);
+    return l >= thr;
+  }
   /* wb-echo-L1：barge-in 能量突增判据 —— 近端相对播放前基线 ≥2× 且 300ms 窗内 ≥2 个超阈采样；
      读数不可得（历史不足）一律放行，宁漏勿误（与 gateOpen 同口径）。 */
   function bumpOkFrom(hist, now) {
@@ -164,6 +196,18 @@ window.VoiceCall = (function () {
       const N = window.ASRNormalize;
       return N && typeof N.normalize === "function" ? N.normalize(t) : t;
     } catch (e) { return t; }
+  }
+
+  /** 断句碎片合并（r175 / A3-1）：补投重复与互相包含的片段在这里被吃掉。
+   *  ⚠ 入参必须是 **pickBest 的原文**，不是清洗过的文本 —— 清洗在 mergeFragments 内部做一次，
+   *  喂进去前先洗会导致二次清洗不幂等（asr-normalize.js 红线六）。
+   *  ASRNormalize 缺失/抛异常 ⇒ 降级成「逐段清洗后直接拼」，与改动前逐字同行为。 */
+  function mergeUtterance(parts) {
+    try {
+      const N = window.ASRNormalize;
+      if (N && typeof N.mergeFragments === "function") return N.mergeFragments(parts);
+    } catch (e) { /* 增益项，见下 */ }
+    return (parts || []).map(normalizeUtterance).join("");
   }
 
   /* ── 分句（首声延迟的关键：一句收住就送进朗读队列）──────────────── */
@@ -306,7 +350,9 @@ window.VoiceCall = (function () {
     rec.continuous = true;       // 通话态：一次启动持续听；浏览器自行 end 时靠重启兜住
     rec.maxAlternatives = ALTS;  // wb-echo-L2：旧码写死 1 = 主动丢掉 n-best 里更好的那条
     rec.onresult = (e) => {
-      let interim = "", said = "";
+      // r175/A3-1：改成先收【片段数组】再合并 —— 原来 `said += t` 直接拼，引擎补投的
+      // 重复/包含片段会被拼成整句重复（「我今天有点崩溃我今天有点崩溃了」）。
+      const finals = [], interims = [];
       const list = e.results || [];
       if (list.length < lastLen) baseLen = 0;      // 列表变短 = 换了新会话，旧偏移作废
       lastLen = list.length;
@@ -316,13 +362,15 @@ window.VoiceCall = (function () {
         const r = list[k], alts = [];
         if (r) for (let m = 0; m < (r.length || 0); m++) if (r[m]) alts.push(r[m]);
         if (!alts.length && r && typeof r.transcript === "string") alts.push({ transcript: r.transcript, confidence: 0 });
-        const t = normalizeUtterance(pickBest(alts));   // wb-echo-L2 重排 + r174 归一化（口头语清洗），取不到自然回落 ""
-        if (r && r.isFinal) said += t; else interim += t;
+        // r175/A3-1：这里**只挑候选、不清洗**（清洗统一在 mergeUtterance 里做一次，防二次清洗不幂等）
+        const t = pickBest(alts);                       // wb-echo-L2 重排，取不到自然回落 ""
+        if (r && r.isFinal) finals.push(t); else interims.push(t);
       }
-      const got = (said + interim).trim();
+      const got = (mergeUtterance(finals) + mergeUtterance(interims)).trim();
       if (!micOn) { pending = ""; return; }              // 静音键：不采集也不收句
-      if (!gateOpen(lvl)) return;                        // 能量门：这一帧没人在说话，噪声不配当话头
       const now = performance.now();
+      // r175/A3-2：门随环境底噪走 —— 固定门在嘈杂环境里等于没设门（底噪比门还高，噪声一直"在说话"）
+      if (!gateOpen(lvl, ambientFloor(lvlHist, now))) return;   // 能量门：这一帧没人在说话，噪声不配当话头
       // wb-echo-L2 顺序修正（根因①）+ 分层回声判：**打断判据必须排在回声闸之前**。旧码先 return 掉
       // 回声，真人插话与念白混录时必然被判成回声 ⇒ 这一行永远走不到，这就是「豆包能打断、我们
       // 打不断」的根因。但也不能无脑放行 —— 机器人念白漏进麦克风会自打断成自激励循环。
@@ -367,7 +415,7 @@ window.VoiceCall = (function () {
   function startVad() {
     const md = navigator.mediaDevices;
     if (!md || !md.getUserMedia || !(window.AudioContext || window.webkitAudioContext)) return;
-    lastGum = { audio: AUDIO_CST, video: false };
+    lastGum = { audio: audioConstraints(), video: false };   // r175/A3-3：走参数化入口（默认与旧常量逐字同）
     md.getUserMedia(lastGum)
       .then((stream) => {
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -628,6 +676,8 @@ window.VoiceCall = (function () {
     _injectLevel(v, t) { lvlHist.push({ t: t == null ? performance.now() : t, v: v }); },
     _injectBase(v) { noiseBase = v; },
     _unit: { semanticallyComplete, shouldCommit, cutSentences, isEcho, isEchoFuzzy, gateOpen,
-      bumpOkFrom, bargeOk, baseOf, altScore, pickBest }
+      bumpOkFrom, bargeOk, baseOf, altScore, pickBest,
+      // r175/A3：新增三条缝 —— 断句合并、自适应底噪、采集链参数（判据 E7/E8/C24 用）
+      mergeUtterance, ambientFloor, audioConstraints, setAudioConstraints, lastGum: () => lastGum }
   };
 })();

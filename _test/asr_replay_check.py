@@ -11,6 +11,9 @@
   本件把这件事从「读代码觉得对」变成「回放固定的候选集、逐条判红」。
 
 三道判据（对齐 spike §5.1 的 E1–E5，本轮只立 E1，E2–E4 已由 voice_call_check 的 C1–C23 覆盖）：
+r175/A3 起再加两组浏览器内纯函数门禁（与 E6 同为「带病不许接线」）：
+  E7 断句碎片合并（mergeFragments）：补投重复/包含被吃掉、局部重叠**不许**合并、无重复时等于直拼
+  E8 自适应噪声门 + 采集链参数化：双参抬门、单参必须与改动前逐字同行为、底噪估不出就退回固定门
   E1a 选对：选中条 == 人工判定的正确条（逐字相等）
   E1b 零改写：选中条必须**原样**是某条候选的 transcript（不得截断/拼接/改标点）—— 这条与
       「挑哪条」正交：哪怕挑错条，只要改写了文本就是额外缺陷
@@ -196,12 +199,18 @@ def selftest():
     if not (rel_drop([1.0], [0.96]) < 0.05):
         fails.append("E5 阈值腿失效：4% 的下降竟被判过 5% 阈值")
 
+    # E7/E8 块被掏空检测：写了常量却没填腿 = 判据空跑（本仓名册自证传统，防下一轮悄悄删腿）
+    for nm, blk in (("E7", E7_JS), ("E8", E8_JS)):
+        n = blk.count('ck("')
+        if n < 8:
+            fails.append("%s 判据块腿数 %d < 8（块被掏空就等于没判）" % (nm, n))
+
     if fails:
         for x in fails:
             print("  -", x)
         print("ASR-REPLAY-SELFTEST-FAIL %d 条" % len(fails))
         return 1
-    print("ASR-REPLAY-SELFTEST-PASS 11 腿（CER4+归一化1+前提自证1+选择1+改写1+清洗1+E5阈值2）"
+    print("ASR-REPLAY-SELFTEST-PASS 12 腿（CER4+归一化1+前提自证1+选择1+改写1+清洗1+E5阈值2+判据块2）"
           "；fixture %d 条完整" % len(cases))
     return 0
 
@@ -236,6 +245,56 @@ E6_JS = """() => {
   ck("红线三 句首剥+句末留", U.normalize("嗯那个我今天很累呀"), "我今天很累呀");
   // 函数本身保留可测（默认不接线）：显式调用时才剥
   ck("剥句末函数仍在且可用", U.stripTrailingParticles("我今天很累呀吧"), "我今天很累");
+  return o;
+}"""
+
+
+# E7 断句碎片合并纯函数组（r175/A3-1）：红线四/五/六必须被钉死，否则「合并」会变成偷偷改语义
+E7_JS = """() => {
+  const U = window.ASRNormalize._unit; const o = [];
+  const ck = (n, got, want) => o.push([n, got === want, got, want]);
+  ck("补投全等重复被吃掉", U.mergeFragments(["我今天有点崩溃", "我今天有点崩溃"]), "我今天有点崩溃");
+  ck("后段=前段+续写 取长", U.mergeFragments(["我今天有点崩溃", "我今天有点崩溃了"]), "我今天有点崩溃了");
+  ck("前段含后段 保留前段", U.mergeFragments(["我今天有点崩溃了", "我今天有点崩溃"]), "我今天有点崩溃了");
+  // 🔴 红线四：局部重叠【不许】合并 —— 「崩溃了」+「崩溃了吗」可能是用户真说的（自我修正/结巴/强调）
+  ck("红线四 局部重叠不合并", U.mergeFragments(["我今天有点崩溃了", "崩溃了吗"]), "我今天有点崩溃了崩溃了吗");
+  // 🔴 红线五：无重复无包含 ⇒ 输出必须等于逐段直拼（接线不回归的唯一保障）
+  ck("红线五 两段直拼", U.mergeFragments(["我今天", "有点崩溃"]), "我今天有点崩溃");
+  ck("红线五 三段直拼", U.mergeFragments(["我今天", "有点", "崩溃了"]), "我今天有点崩溃了");
+  ck("空片段跳过", U.mergeFragments(["我今天", "", "崩溃了"]), "我今天崩溃了");
+  ck("全空返空串", U.mergeFragments(["", ""]), "");
+  ck("单段等同 normalize", U.mergeFragments(["嗯那个我今天有点崩溃"]), U.normalize("嗯那个我今天有点崩溃"));
+  ck("每段各洗各的句首", U.mergeFragments(["嗯我今天", "那个有点崩溃"]), "我今天有点崩溃");
+  ck("非数组单值可入", U.mergeFragments("我今天有点崩溃"), "我今天有点崩溃");
+  return o;
+}"""
+
+# E8 自适应噪声门 + 采集链参数化（r175/A3-2、A3-3）
+E8_JS = """() => {
+  const U = window.VoiceCall._unit; const o = [];
+  const ck = (n, got, want) => o.push([n, String(got) === String(want), got, want]);
+  // 单参路径必须与改动前【逐字同行为】—— voice_call_check 的 4 条 GATE 腿钉的就是这条契约
+  ck("单参 读数null放行", U.gateOpen(null), true);
+  ck("单参 0.005 不续命", U.gateOpen(0.005), false);
+  ck("单参 0.05 放行", U.gateOpen(0.05), true);
+  ck("单参 0 不续命", U.gateOpen(0), false);
+  // 双参：底噪抬门（嘈杂环境固定门形同虚设）
+  ck("嘈杂 底噪0.05 抬门后噪声不续命", U.gateOpen(0.05, 0.05), false);
+  ck("嘈杂 底噪0.05 真人0.3仍放行", U.gateOpen(0.3, 0.05), true);
+  ck("安静 底噪0.005 门≈固定门", U.gateOpen(0.02, 0.005), true);
+  ck("底噪非正数 退回固定门", U.gateOpen(0.005, 0), false);
+  ck("底噪null 退回固定门", U.gateOpen(0.05, null), true);
+  // 底噪估计：样本不足不得硬猜
+  const now = 10000, hist = [];
+  for (let i = 0; i < 20; i++) hist.push({ t: now - 1000 - i * 100, v: 0.04 + (i % 3) * 0.01 });
+  ck("底噪估计有值", U.ambientFloor(hist, now) > 0, true);
+  ck("样本不足返null", U.ambientFloor([{ t: now - 1000, v: 0.05 }], now) === null, true);
+  ck("空历史返null", U.ambientFloor([], now) === null, true);
+  // 采集链参数化（⚠ 只作用于我们自己的 getUserMedia 流，管不到 Web Speech 内部采集）
+  const c = U.audioConstraints();
+  ck("默认三面旗", !!(c.echoCancellation && c.noiseSuppression && c.autoGainControl), true);
+  ck("覆盖生效", U.setAudioConstraints({ autoGainControl: false }).autoGainControl, false);
+  ck("覆盖可还原", U.setAudioConstraints(null).autoGainControl, true);
   return o;
 }"""
 
@@ -288,14 +347,14 @@ def main():
                 browser.close()
                 print("ASR-REPLAY-UNVERIFIED 页面打不开 %s（%s）—— 没测到不得判绿" % (URL, str(e)[:80]))
                 return 2
-            page.wait_for_timeout(900)
-            seam = page.evaluate(
-                "() => !!(window.VoiceCall && window.VoiceCall._unit && window.VoiceCall._unit.pickBest"
-                " && window.VoiceCall._unit.altScore)")
-            if not seam:
+            seam = ("() => !!(window.VoiceCall && window.VoiceCall._unit && window.VoiceCall._unit.pickBest"
+                    " && window.VoiceCall._unit.altScore)")
+            try:
+                page.wait_for_function(seam, timeout=12000)
+            except Exception as e:  # noqa: BLE001
                 browser.close()
-                print("ASR-REPLAY-UNVERIFIED 取不到 _unit.pickBest/altScore 这条缝（build 面缺件）"
-                      "—— 没测到不得判绿")
+                print("ASR-REPLAY-UNVERIFIED 12s 内取不到 _unit.pickBest/altScore 这条缝"
+                      "（build 面缺件或装载未完成：%s）—— 没测到不得判绿" % str(e)[:90])
                 return 2
             if not page.evaluate(
                     "() => !!(window.ASRNormalize && window.ASRNormalize._unit"
@@ -313,6 +372,18 @@ def main():
                 print("ASR-REPLAY-FAIL E6 清洗纯函数 %d/%d 条不符（归一化是 A2 的核心，不能带病接线）"
                       % (len(e6bad), len(e6)))
                 return 1
+            # r175/A3：E7 断句合并 + E8 自适应噪声门 —— 与 E6 同为「带病不许接线」的门禁
+            e7 = page.evaluate(E7_JS)
+            e8 = page.evaluate(E8_JS)
+            for tag, what, rows in (("E7", "断句碎片合并", e7), ("E8", "自适应噪声门+采集链", e8)):
+                bad = [r for r in rows if not r[1]]
+                if bad:
+                    browser.close()
+                    for r in bad:
+                        print("  - %s %s: got %r want %r" % (tag, r[0], r[2], r[3]))
+                    print("ASR-REPLAY-FAIL %s %s %d/%d 条不符（A3 前置预处理是需求③的落地，不能带病接线）"
+                          % (tag, what, len(bad), len(rows)))
+                    return 1
             lex = set(page.evaluate(LEX_JS))
             if not lex:
                 browser.close()
@@ -362,8 +433,10 @@ def main():
     mb = sum(before) / len(before) if before else 0.0
     ma = sum(after) / len(after) if after else 0.0
     drop = (mb - ma) / mb if mb > 0 else 0.0
-    print("引擎=%s  词表词数=%d  样本=%d  E6清洗纯函数=%d/%d  分布=%s"
+    print("引擎=%s  词表词数=%d  样本=%d  E6清洗=%d/%d  E7断句=%d/%d  E8噪声门=%d/%d  分布=%s"
           % (face, len(lex), len(cases), len(e6) - len(e6bad), len(e6),
+             len(e7) - len([r for r in e7 if not r[1]]), len(e7),
+             len(e8) - len([r for r in e8 if not r[1]]), len(e8),
              ", ".join(sorted({r["scenario"] for r in rows}))))
     print("E5 归一化增益：构造样本 CER 均值 %.4f → %.4f，相对下降 %.1f%%（阈值 ≥5%%）"
           % (mb, ma, drop * 100))
@@ -378,11 +451,14 @@ def main():
     if drop < 0.05:
         print("ASR-REPLAY-FAIL E5 归一化相对下降仅 %.1f%%（阈值 5%%）—— 清洗没产生可测增益" % (drop * 100))
         return 1
-    print("ASR-REPLAY-PASS 样本=%d 全过 E6=%d/%d 已知缺口=%d%s E5相对下降=%.1f%%"
-          % (len(cases), len(e6) - len(e6bad), len(e6), ngap,
+    print("ASR-REPLAY-PASS 样本=%d 全过 E6=%d/%d E7=%d E8=%d 缺口=%d%s E5下降=%.1f%%"
+          % (len(cases), len(e6) - len(e6bad), len(e6), len(e7), len(e8), ngap,
              ("（%s）" % ",".join(gaps)) if gaps else "", drop * 100))
     return 0
 
 
 if __name__ == "__main__":
+    # r173 兜底：未捕获异常必须留下具名结论行，否则电池只见 rc≠0（BLIND-RED）
+    from check_instrument import install_excepthook
+    install_excepthook("ASR-REPLAY")
     raise SystemExit(main())

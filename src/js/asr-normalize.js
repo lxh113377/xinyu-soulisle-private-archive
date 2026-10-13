@@ -56,6 +56,37 @@ window.ASRNormalize = (function () {
     return s;
   }
 
+  /* ── 断句碎片前置过滤（r175 / A3-1）───────────────────────────────
+   * 真实缺口（一手定位，不是拍脑袋）：`voice-call.js` 的 onresult 把引擎连续投递的片段
+   * 直接 `said += t` 拼起来。Web Speech 在 continuous 模式**重连/补投**时会给出
+   * 【全等重复】或【互相包含】的片段（「我今天有点崩溃」→ 补投「我今天有点崩溃了」），
+   * 直接拼 ⇒ 「我今天有点崩溃我今天有点崩溃了」—— 整句重复进对话，下游模型拿到的是错的话。
+   *
+   * 🔴 红线四：**只去「全等重复」与「包含」，绝不做局部重叠合并**。
+   *   「我今天有点崩溃了」+「崩溃了吗」这类后缀/前缀局部重叠，**可能是用户真说的**
+   *   （自我修正、结巴、强调）。把它合并 = 拿 fidelity 换整洁 —— 与红线三同族，不许做。
+   * 🔴 红线五：无重复、无包含时，输出必须 == 逐段 normalize 后直接拼接（**零改写不变量**）。
+   *   这条是接线不回归的唯一保障，E7 有专门腿钉住。
+   * 🔴 红线六：本函数是**唯一的 normalize 调用点** —— 生产路径必须喂【未经清洗的原文】。
+   *   喂进去再洗一遍不幂等（「那个我今天」洗两次会变成「我今天」），那属于偷偷改语义。
+   */
+  function mergeFragments(parts) {
+    const out = [];
+    (Array.isArray(parts) ? parts : [parts]).forEach((p) => {
+      const t = normalize(p);
+      if (!t) return;                                   // 空片段不进拼接（原路径 += 空串也是空）
+      if (!out.length) { out.push(t); return; }
+      const last = out[out.length - 1];
+      if (t === last) return;                           // 全等重复：后一条是补投，丢
+      if (t.indexOf(last) === 0) { out[out.length - 1] = t; return; }        // 后段 = 前段 + 续写 ⇒ 取长
+      if (last.indexOf(t) === 0) return;                // 后段是前段的前缀 ⇒ 信息已含在前段里，丢
+      if (t.indexOf(last) >= 0) { out[out.length - 1] = t; return; }        // 后段整体含前段 ⇒ 取长
+      if (last.indexOf(t) >= 0) return;                 // 前段整体含后段 ⇒ 保留前段，丢后段
+      out.push(t);
+    });
+    return out.join("");
+  }
+
   /** 归一化主入口：压空白 → 剥【句首】口头语 → 兜底回退。
    *  **只动句首、只动空白，不动句末语气、不改字序、不删实词**（红线一 + 红线三）。 */
   function normalize(t) {
@@ -67,9 +98,10 @@ window.ASRNormalize = (function () {
 
   return {
     normalize,
+    mergeFragments,
     stripLeadingFillers,
     stripTrailingParticles,          // 🔴 默认不接线，见函数头「红线三」
     /** 供判据读取，不参与业务路径 */
-    _unit: { normalize, stripLeadingFillers, stripTrailingParticles, MIN_KEEP }
+    _unit: { normalize, mergeFragments, stripLeadingFillers, stripTrailingParticles, MIN_KEEP }
   };
 })();
