@@ -59,10 +59,25 @@
   "noseSneerLeft": 4e-06,
   "noseSneerRight": 1.2e-05
  },
+ "meta": {
+  "luma": 0.4999,
+  "lumaVar": 0.045488,
+  "lumaBucket": "normal",
+  "yaw": 0.28,
+  "yawBucket": "front",
+  "faceSize": 0.4536,
+  "imgW": 960,
+  "imgH": 960,
+  "thresholds": {
+   "brightMin": 0.16,
+   "brightMax": 0.94,
+   "yawMax": 0.36
+  }
+ },
  "view": {
   "emotion": "joy",
   "intensity": 0.8052385036307662,
-  "confidence": 0.6729090654721783,
+  "confidence": 0.5405796273135905,
   "confident": true
  },
  "source": "https://commons.wikimedia.org/wiki/File:Smiling_young_girl_with_deciduous_teeth.jpg",

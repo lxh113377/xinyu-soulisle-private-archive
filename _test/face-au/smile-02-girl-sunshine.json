@@ -59,10 +59,25 @@
   "noseSneerLeft": 3e-06,
   "noseSneerRight": 4e-06
  },
+ "meta": {
+  "luma": 0.5258,
+  "lumaVar": 0.036729,
+  "lumaBucket": "normal",
+  "yaw": 0.0616,
+  "yawBucket": "front",
+  "faceSize": 0.4835,
+  "imgW": 960,
+  "imgH": 1280,
+  "thresholds": {
+   "brightMin": 0.16,
+   "brightMax": 0.94,
+   "yawMax": 0.36
+  }
+ },
  "view": {
   "emotion": "joy",
   "intensity": 0.783631430813723,
-  "confidence": 0.7357513319034311,
+  "confidence": 0.6878712329931392,
   "confident": true
  },
  "source": "https://commons.wikimedia.org/wiki/File:Young_girl_smiling_with_teeth_in_sunshine.jpg",

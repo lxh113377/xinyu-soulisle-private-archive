@@ -59,6 +59,21 @@
   "noseSneerLeft": 3e-06,
   "noseSneerRight": 6e-06
  },
+ "meta": {
+  "luma": 0.602,
+  "lumaVar": 0.077797,
+  "lumaBucket": "normal",
+  "yaw": 0.1251,
+  "yawBucket": "front",
+  "faceSize": 0.5344,
+  "imgW": 266,
+  "imgH": 292,
+  "thresholds": {
+   "brightMin": 0.16,
+   "brightMax": 0.94,
+   "yawMax": 0.36
+  }
+ },
  "view": {
   "emotion": "surprise",
   "intensity": 0.6728157657921949,

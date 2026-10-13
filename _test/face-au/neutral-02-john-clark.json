@@ -59,11 +59,26 @@
   "noseSneerLeft": 0.0,
   "noseSneerRight": 0.0
  },
+ "meta": {
+  "luma": 0.6022,
+  "lumaVar": 0.034096,
+  "lumaBucket": "normal",
+  "yaw": 0.0311,
+  "yawBucket": "front",
+  "faceSize": 0.2247,
+  "imgW": 556,
+  "imgH": 750,
+  "thresholds": {
+   "brightMin": 0.16,
+   "brightMax": 0.94,
+   "yawMax": 0.36
+  }
+ },
  "view": {
-  "emotion": "calm",
-  "intensity": 0.3203779854638305,
+  "emotion": "sadness",
+  "intensity": 0.16311284181276553,
   "confidence": 0.3708504672936187,
-  "confident": true
+  "confident": false
  },
  "source": "https://commons.wikimedia.org/wiki/File:Name-_John_Clark_%2820156387152%29.jpg",
  "note": ""

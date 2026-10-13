@@ -59,10 +59,25 @@
   "noseSneerLeft": 0.0,
   "noseSneerRight": 0.0
  },
+ "meta": {
+  "luma": 0.6344,
+  "lumaVar": 0.070853,
+  "lumaBucket": "normal",
+  "yaw": -0.0055,
+  "yawBucket": "front",
+  "faceSize": 0.3655,
+  "imgW": 300,
+  "imgH": 250,
+  "thresholds": {
+   "brightMin": 0.16,
+   "brightMax": 0.94,
+   "yawMax": 0.36
+  }
+ },
  "view": {
   "emotion": "anger",
-  "intensity": 0.6489456075106933,
-  "confidence": 0.5049425093375867,
+  "intensity": 0.6489191740472973,
+  "confidence": 0.4802182702792306,
   "confident": true
  },
  "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/angry.jpg",

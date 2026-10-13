@@ -38,7 +38,55 @@ window.__HARNESS__ = { ready: false, err: null };
         const cats = (r.faceBlendshapes && r.faceBlendshapes[0]) ? r.faceBlendshapes[0].categories : null;
         const bs = {};
         if (cats) for (const c of cats) bs[c.categoryName] = c.score;
-        return { faces: (r.faceBlendshapes || []).length, bs, view: window.FaceEngine.read(bs) };
+        /* ── 环境元数据（r173）：以前只存 bs，把 luma/yaw/faceSize 全丢了 ──────────
+         * 为什么非要补：需求要「不同光照 / 不同人脸角度下的准确率」，而没有这两项
+         * 的 fixture 一根切片轴都算不出来（F13 会如实报「不可测」）。
+         * 过程是：luma 走 face-engine.js `assessQuality` 的**同一把尺**（24×24 缩样求
+         * 灰度均值与方差），阈值直接读 R.quality ⇒ **样本分组与线上质量门同源**，
+         * 不是在这里另发明一套分档。yaw 同理，调 FaceEngine.yawRatio（同源函数）。
+         * ⚠️ luma 是**光照代理量**（画面平均亮度），不是照度计读数；
+         *    faceSize = 人脸包围盒宽 / 图宽，作为「距离/构图」代理。
+         *    三者都是**几何统计**，不落任何像素 —— 隐私红线不变。 */
+        let meta = null;
+        try {
+          const Q = window.__XINYU_FACE_RULES__.quality;
+          const W = 24;
+          const cv = document.createElement("canvas");
+          cv.width = W; cv.height = W;
+          const g = cv.getContext("2d", { willReadFrequently: true });
+          g.drawImage(img, 0, 0, W, W);
+          const d = g.getImageData(0, 0, W, W).data;
+          const px = W * W;
+          let mean = 0, vs = 0;
+          for (let i = 0; i < d.length; i += 4) mean += (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
+          mean /= px;
+          for (let i = 0; i < d.length; i += 4) {
+            const gy = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
+            vs += (gy - mean) * (gy - mean);
+          }
+          const lumaVar = vs / px;
+          const lmks = (r.faceLandmarks && r.faceLandmarks[0]) ? r.faceLandmarks[0] : null;
+          const yaw = lmks ? window.FaceEngine.yawRatio(lmks) : null;
+          let faceSize = null;
+          if (lmks) {
+            let x0 = 1, x1 = 0;
+            for (const p of lmks) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; }
+            faceSize = Math.abs(x1 - x0);
+          }
+          // 分档直接用线上质量门的同一对阈值 ⇒ 「运行时判定这帧偏暗」与「这张样本算偏暗」是同一条线
+          const lumaBucket = mean < Q.brightMin ? "dark"
+            : (mean > Q.brightMax ? "overexposed" : "normal");
+          const yawBucket = (yaw == null) ? "unknown"
+            : (Math.abs(yaw) > Q.yawMax ? "profile" : "front");
+          meta = { luma: +mean.toFixed(4), lumaVar: +lumaVar.toFixed(6), lumaBucket: lumaBucket,
+                   yaw: yaw == null ? null : +yaw.toFixed(4), yawBucket: yawBucket,
+                   faceSize: faceSize == null ? null : +faceSize.toFixed(4),
+                   imgW: img.naturalWidth, imgH: img.naturalHeight,
+                   thresholds: { brightMin: Q.brightMin, brightMax: Q.brightMax, yawMax: Q.yawMax } };
+        } catch (e) {
+          meta = { err: String((e && e.message) || e) };
+        }
+        return { faces: (r.faceBlendshapes || []).length, bs, view: window.FaceEngine.read(bs), meta };
       }
     };
   } catch (e) {

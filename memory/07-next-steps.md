@@ -11,7 +11,35 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 ## P0 — 必须做
 - [ ] 🔴 **R172-01 词表提交面分叉（上线件与权威源是两份不同字节）**（2026-10-14 r172）：`data/emotion-lexicon.js` 磁盘两侧 `cmp` 相同，而 HEAD 两侧 blob 不同（`b6bb4506` src vs `56fffc7a` deploy，5068B vs 4976B）⇒ 部署取提交面，**上线的那份是旧词表**。归因 = `77e7163`（10-12 00:55）把两侧提交成不同字节。**阻塞（不是我方能单方完成）**：这两个文件正被并行会话在途修改（`git status` 双双 ` M`，工作树里已对齐未入库）⇒ 不代提交他人 WIP。前提（复算）：`git rev-parse HEAD:src/data/emotion-lexicon.js HEAD:deploy/xinyu/data/emotion-lexicon.js` 两侧同号 且 `python _test/deploy_sync_check.py` rc=0。另欠一条**词条级差集**（本轮只量到字节，R172-05）。
 - [ ] **R172-02 perf 作业的关闸配置尚无远端回执**（2026-10-14 r172）：本轮把 `.github/workflows/perf-baseline.yml` 的 perf job 改成 `XINYU_GUARD_ENABLED: false`（带默认 `burst=20` 时并发档 48 发只有 18 发拿到 2xx ⇒ rc=2 无读数；阶梯档单 rep 对 `/api/emotion` 是 2048 发，任何 burst 都跑不完）。**未闭环原因 = 推不上去**：本地独有 210 提交 ⇄ 远端独有 18 提交，本轮禁 force-push（会毁远端那 18 个）⇒ 需先与并行会话对齐推送顺序。完成标准：`gh run view --json conclusion` 该 job = success 且日志含 `闸态=unguarded`。
-- [ ] 🔴 **心理学知识库第 10 轮入口**（r166-KB，2026-10-13）：沿革 = 第 5/6 轮 34 条（17-22 篇）→ 第 7 轮 r132 12 条（23/24 篇，144 条，README v1.7）→
+- [ ] 🔴 **语音识别方言优化（r172 spike → r173 A1 → r174 A2，2026-10-14）**：证据全文
+      `交付物/语音识别/ASR方言识别可行性-spike-2026-10-14.md`，决策 #12 已登记 `03-tech-stack.md`。
+      **98%/92%/噪声降幅≤3% 三项明确不承诺**（引擎是浏览器 Web Speech、我们碰不到；6 方言里仅粤语有 CC0 语料，
+      四川话 ND 禁衍生，东北/上海/闽南无成体系公开语料）。
+      **A1 已完成**：`_test/asr_replay_check.py` + `_test/asr_replay_fixtures.json`，四态 PASS/FAIL/UNVERIFIED/GAP。
+      **A2 已完成**：新增 `src/js/asr-normalize.js`（口头语清洗）+ `voice-call.js` 两级接线（选候选与清洗分离，
+      保住 pickBest 零改写不变量）+ index.html/sw.js 登记 + deploy 两面同步。
+      实跑 `ASR-REPLAY-PASS 样本=24 全过 E6=12/12 已知缺口=0 E5相对下降=100.0%`（rc=0，自检 11 腿 PASS）；
+      回归 `voice_call_check` C腿23/23 PASS、`browser_check` ALL-ASSERT-PASS、`js_syntax` 37/37 PASS。
+      **A2 被 E5 门槛推翻过一次自己的设计**：初版剥句末语气词，E5 实测 CER 0.0288→0.0462（相对 -60%）判红
+      ⇒ 立红线三「句末语气词一律保留」（情感陪伴场景语气本身是信息），只保留句首口头语清洗。
+      ✅ **公网已发布**（老大 10-14 拍板「只部署我这四个文件」）：`public_check` 线上 **判红=0（10/10）**，
+      `/api/chat` **200**，线上 PRECACHE 30 条全可达且含 `js/asr-normalize.js`。提交 `b8cc842`（12 files/1410）
+      + `5218164`（app.js 括号 1 行）。
+      🔴 **发布中踩三坑，已全部处置（详见 spike 报告 §10）**：① `cca2ce5` 把括号笔误提交进
+      `deploy/xinyu/js/app.js:571` ⇒ 整站不初始化（本地工作树已修好，属「本地绿+线上白屏」，被受理面单独验抓出）；
+      ② 我第一次 `wrangler pages deploy <产物目录>` **把 Pages Functions 丢了**（Function 从 cwd 下的
+      `functions/` 找，不在产物目录里）⇒ 线上 P6/P8/P9 判红 3 条，改以 `deploy/` 为 cwd 重发、回执出现
+      `Uploading Functions bundle` 才转绿；③ `git commit` 在 numstat 核对与提交之间的窗口卷走并行会话 8 件，
+      `reset --soft` + 按路径撤暂存后重做为 12 files。
+      ⚠️ **三件未收**：① `_test/asr_replay_check.py` **仍未接电池**（r105 铁律）；
+      ② `offline_shell_check` **A10 红** = 工作树 `src/index.html`（他人轮未提交）引用 `kb-source-panel.js`
+      而 `src/sw.js` 预缓存未登记 ⇒ 属他人轮缺口，其静态审计中断使 R8/R9a 跑不到，R9a 已用直连独立验证；
+      ③ **git 未推送**（本地领先 origin 216 / 落后 18，仓库早已分叉，推 216 个提交不在本轮授权内）。
+      下一步 = 电池接线 → **B1** 抄决策 #11 产线起 `ml/asr_server.py` sidecar（SenseVoice 粤语 /
+      sherpa-onnx 流式普通话）。
+- [ ] ✅ **心理学知识库已推进到第 12 轮（r172，2026-10-14 实测 189 条）** —— 本行以下仍记第 10 轮(r166)原状，**以本行为现状**：
+      189 条 / 32 篇章（A44 B73 C32 D40，E=0）｜四件判据全绿：`psych_kb_build --check` PASS、`integrity` PASS（零悬空零孤岛·索引双向差集 0·关联边 758）、`--selftest` 16/16（变异腿 3 处）、`kb_wiring` K1-K7 PASS、`kb_citation` C1-C7 PASS｜**新增来源件** `src/data/psych-kb-sources.js`（329,724B 懒加载，189/189 带来源）+ 用户侧「依据可核对面」（点开 = 卡片正文 + 逐条来源 URL，判据 `kb_source_panel_check` 9 腿）；**两处臆造数字已按一手原文更正**：PSY-AP-015（OpenAI「每周超 100 万人」→ 0.15% 周活用户 / 0.05% 消息；「约 90 位专家」→ more than 170；WHO 那句英文不在 PDF 正文里→改挂 p.46 §5 与 p.49 §5.2）与 PSY-MM-001（4.59%/12.7% 是 natural/acted 两组均值，被误读成绝对/相对一对）；**老大当轮拍板并已落地**：C1 表情参与回复基调（三门硬限，判据 `face_tone_check` 22 腿）、C2 摄像头证据注入（默认关+逐次同意，判据同件）；⚠️ 仓内有并行会话在改表情/ASR 面，本轮刻意避开 `face-smile-rules.js` 等文件。
+- [ ] 🔴 **心理学知识库第 10 轮入口**（r166-KB，2026-10-13，**已被上条覆盖**）：沿革 = 第 5/6 轮 34 条（17-22 篇）→ 第 7 轮 r132 12 条（23/24 篇，144 条，README v1.7）→
       第 8 轮 r134-KB 2 条 EM-005/006 + 双库并轨 + 数据件改 `ensureKb()` 懒加载（146 条）→ 第 9 轮 r135-KB EW 域 7 条（153 条，README v1.8）→
       **第 10 轮 r166-KB 11 条**：EW 追加 6 条（PSY-EW-008~013，并入第 9 轮篇章 25）+ PO 域首批 5 条（新建篇章 26），**164 条 A41/B65/C25/D33、E=0，README v1.9**。
       **⚠️ 本轮撞号事故与处置**：开工只读了会话初的快照，落卡时发现并行会话（r135-KB）已落盘 EW 域 7 条并升 README v1.8——两轮同取 `PSY-EW-001` 起，
@@ -25,9 +53,23 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
       ② `--links` 联网复探（人工轮工具，上轮 7 项未核待单线程复探）；③ D 级 33 条人工抽查提示位；
       ④ size_budget 三项**他人轮存量**超限（face-engine 26,561/25,317、face-smile-rules 18,405/14,911、voice-call.css 4,711/4,690）不归本轮，待其轮次自理。
       **选题队列（机器给）**：`python _test/psych_kb_integrity_check.py --backlog`（现读 164 卡 / 未闭合 400+ 项；最重面 06 多模态、14 哀伤、20 拖延）。全文 `part162`
-- [ ] 🟠 **表达优化专项 r133 收尾**：主体 r117/r124 已落地，本轮补三处存量缺口（verifyCitations 接线／构建器入电池／
-      预算按实测重登记，存量超 255 B 非本轮造成）。**未收**：归因五读数下三维方向全不稳 ⇒ quoteRules **不下结论、
-      本轮未动规则文案**；引用检出率五轮恒 0%。全文 `part157` ＋ `part158`（遗留与一手教训）
+- [ ] 🟠 **表达优化专项 r171 第 3 轮（2026-10-13；前两轮 = r117 / r134）**：语料 **161→174 条**
+      （A90/B58/C8/D18，E=0；定向补最薄三层 joy 11→16 / anger 15→22 / 庆祝 11→16）；
+      **机制改动 = 注入候选带「适配条件」fit**：构建期三级取（卡面直写 → 用法压缩 → 场景回落），
+      实测 174 条 = 直写 26（含 `04-哲学思辨` 整卷 22 条）/派生 148/回落 0；注入面排序改用 quote+fit 双信号、
+      排名前 2 条带出 `（用：fit）`，上限 420 **未动**（不挤知识库 N2 面）。同轮删掉产物里零消费者的
+      `usage` 截断副本 ⇒ **条目 +13 而首屏 −20,914B**（104,128→83,214），`size_budget` 逐文件上限
+      **下调** 109,334→86,960（实测 +5%，理由登记在代码注释）。判据：`wit_quotes_build --selftest` 20 腿
+      （补齐 r134 清场丢掉的"真面产物改一字节必判不一致"变异腿 + 其对照腿）、`quote_wiring Q8`
+      （fit 在位 + 首候选逐字对账 + 评测旗标零泄漏）、`quote_eval --selftest` 16 腿**已接进电池**（190→191）。
+      🔴 **本轮欠着的唯一验收件 = 承载面 15 例配对读数：未验**。一手取证：**DeepSeek 余额耗尽**
+      （HTTP 402 Insufficient Balance）⇒ 在线 AI 全链路（本地 jar / fat jar / 公网两线）现在实际都落离线模板，
+      **只有老大能解**（充值或换 Key）；本轮两次跑批（约 700 次调用）确实是余额消耗方之一，如实记。
+      前提命令：`python _test/quote_eval.py --base http://127.0.0.1:8129 --focus heavy15 --judges 3 --reps 2`
+      （上游断时量尺现在 17 秒点名退出 —— 修前是 38 分钟空跑且明细全丢）。
+      4 例冒烟的方向信号（**不构成判定**，p=0.25）：full-vs-old 配对 −0.50/−0.50/−0.88，
+      rules-only 臂 0/8 全胜 full ⇒ 下一轮若承载面仍"受损"，机制二选一：候选 5→1 条，或退 rules-only。
+      全文 `交付物/表达语料库/验收报告.md` r171 节（r134 节含 `_test/` 清场事件披露，勿删）
 - [ ] 🟠 **存量红已清、待整跑复跑 + 双线上线**（老大 10-12 定「先清存量红再上线」）：G8（评测集入库）／
       loc_guard 4→0／G12（切 v1.8.3 打 tag，三源同绿）三项已清，回执 `REPO-CONFIG-PASS 18/18`。**下一步 = 整跑电池复跑，
       绿则双线上线**（单跑全绿 ≠ 电池绿，见 part159 的教训）。全文 `part159`
@@ -61,6 +103,21 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
       `git diff --cached -M` 认「逐字节等价搬卷」＋分母=`ARCHIVE_ROOTS` ⇒ 交付物 184.8→**129.5 MB**
       （corpus 全量不搬，分母由 `disclaimer_forensics_lint --all` 现读）｜C7/G19/R7｜电池 **112**
 - [ ] 🔴 **P0 需老大在场**：撤销曾进过会话输出的明文 Key（r52/r53 各再犯），再消 `demo-config.js` 那条 404。`part37`
+- [ ] 🔴 **R173-face：面部情绪支「90% 断言」三处缺口（2026-10-14 r173）**，证据与逐类数字见
+      `交付物/面部情绪识别-优化与测试报告-2026-10-14-r173.md`（本轮新跑，非引用旧值）。
+      **本轮已闭环**：① 新建 `_test/face_prf_report.py`（F13 逐类 P/R/F1+混淆矩阵+切片，
+      一眼看出 fear 召回率长期 = **0**）② 新建 `_test/face_latency_check.py`（F14 真脸 y4m 假摄像头，
+      实测单帧整链 **p95 7.5~8.5ms ≤ 100ms**，CPU delegate 路径未测列债）
+      ③ 修 fear 召回 0（取消 `need:{fear:2}`；同时把遗留项 **C1 fear@0.12 笃定错报关闭**：笃定错报 1→0，
+      有把握帧 96.7%→**100%**，代价是不确定帧 40.0%→**42.0%**）④ 新增 8 个细分子维度
+      （neutral/duchenne/social/masked/worry/tense/micro/asymmetric，**UI 未接线**）。
+      **未闭环三缺口**：**M3** 光照/角度/人群切片**不可测**（12 张 fixture 无 meta；luma/yaw 引擎已在算、
+      导出没存）⇒ 先给 `face_au_export.py` 加 meta；**M1** fear/sadness/disgust/contempt **零真实标定照**
+      ⇒ 这是「综合 ≥90%」唯一真门槛（REAL 语料现 **83.3%**，差 6.7 个点）；**A6** 2 张中性真人照被读成低落
+      （blendshape 不做身份归一化，个体差异）⇒ per-person 静息基线，但**单张照片自减是自比恒等**，
+      必须有同一个人的「静息+表达」成对样本才算证据。
+      ⚠️ 本轮**未推公网**：face 面 deploy 副本已逐字节归零，但仍有并行会话在途件（`css/style.css`、
+      `data/psych-kb-sources.js` MISSING 等）⇒ 按纪律不代同步，待在途收敛后走标准发版链。
 
 ## 分卷目录
 
@@ -138,4 +195,10 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - **卷43** `07-next-steps.part160.md` — **r130 收口（八维对标四项改造）**：性能可复算尺／成本总量闸／记忆可携带／教程防腐烂，各闭合一个维度；棘轮 H1-H4→H1-H6；电池 185→188、JUnit 134→169；**轮次号入场先看 HEAD 提交信息（r129 已被并行会话占用，本轮取 r130）**。r131 入口五条见该卷
 - **卷155** `07-next-steps.part160.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷156** `07-next-steps.part161.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷157** `07-next-steps.part163.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷158** `07-next-steps.part164.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷159** `07-next-steps.part165.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷160** `07-next-steps.part166.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷161** `07-next-steps.part167.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷162** `07-next-steps.part168.md` — 07-next-steps 分卷（R199 自动拆卷）
 

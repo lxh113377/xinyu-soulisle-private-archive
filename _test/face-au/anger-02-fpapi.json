@@ -59,10 +59,25 @@
   "noseSneerLeft": 0.0,
   "noseSneerRight": 1e-06
  },
+ "meta": {
+  "luma": 0.6823,
+  "lumaVar": 0.062754,
+  "lumaBucket": "normal",
+  "yaw": -0.0058,
+  "yawBucket": "front",
+  "faceSize": 0.6381,
+  "imgW": 172,
+  "imgH": 206,
+  "thresholds": {
+   "brightMin": 0.16,
+   "brightMax": 0.94,
+   "yawMax": 0.36
+  }
+ },
  "view": {
   "emotion": "anger",
-  "intensity": 0.626619642033281,
-  "confidence": 0.4858252542660253,
+  "intensity": 0.6265906644446867,
+  "confidence": 0.4610279182086104,
   "confident": true
  },
  "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/angry_cropped.jpg",

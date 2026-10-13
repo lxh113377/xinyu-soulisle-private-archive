@@ -165,9 +165,66 @@
   }
 
   /** 主入口：blendshape 向量 → 与 EmotionEngine.scan 同构的读数 */
-  function read(bs) {
+  /* ── 细分子维度（r173）─────────────────────────────────────────────────────
+   * 与身份类（joy/sadness/...）**并存**的表情属性，不是新身份类 —— 理由见
+   * rules.subs 的注释：身份类互斥，而这些属性可共存；缺证据的维度一字不写。
+   * prev = 上一帧的**原始** blendshape（未做 EMA），由运行时层的采样循环喂进来；
+   *  不传 ⇒ micro 恒 false 且标 microAvailable=false（不许假装能看，也不许假装看不见）。
+   */
+  const SUB_KEYS = ["neutral", "duchenne", "social", "masked", "worry", "tense",
+                    "micro", "asymmetric"];
+  function subsOf(bs, s, smile, prev) {
+    const S = (R.subs || {});
+    const mx = (a, b) => Math.max(bs[a] || 0, bs[b] || 0);
+    const out = {};
+    /* neutral：最强非平静成分连 weak.on 都没到 ⇒ 帧里没有任何情绪证据 ⇒ 中性。
+       注意与 calm 的关系：calm 是身份类（残余量最大），neutral 是证据陈述（连残都没有）。 */
+    let topNC = 0;
+    for (const emo of R.emotions) {
+      if (emo === "calm") continue;
+      topNC = Math.max(topNC, s[emo] || 0);
+    }
+    out.neutral = topNC < (R.weak ? R.weak.on : 0.10);
+    out.duchenne = !!(smile && smile.kind === "duchenne");
+    out.social = !!(smile && smile.kind === "social");
+    out.masked = !!(smile && smile.masking);
+    const W = S.worry || { browInnerUp: 0.35, mouthFrownMax: 0.20, browDownMax: 0.15 };
+    out.worry = (bs.browInnerUp || 0) >= W.browInnerUp
+      && mx("mouthFrownLeft", "mouthFrownRight") < W.mouthFrownMax
+      && mx("browDownLeft", "browDownRight") < W.browDownMax;
+    const T = S.tense || { mouthPress: 0.30, browDown: 0.30, jawOpenMax: 0.10 };
+    out.tense = (mx("mouthPressLeft", "mouthPressRight") >= T.mouthPress
+                 || mx("browDownLeft", "browDownRight") >= T.browDown)
+      && (bs.jawOpen || 0) < T.jawOpenMax;
+    if (!prev) out.micro = false;
+    else {
+      /* 微表情的两条件：**幅度低** + **比上一帧跳得快**（短时低幅的定义即如此）。
+         ⚠️ 这里的"短"受采样率限制：8fps ⇒ 相邻样本间隔 125ms，真微表情（40~200ms）
+         只能取到 0~2 个样本 ⇒ 本维度在 8fps 下**只能给出存在线索，不能给时长**。
+         要真抓时长，必须把 sample.fps 提到 ≥25 —— 那时要引入独立的快采集通道，
+         因为整体提到 25fps 会让每条推理链的开销涨到原来的 3 倍。
+         跃变量取全向量欧氏距离（不挑单个 AU），防研发阶段挑出一个好看的维度。 */
+      const M = S.micro || { maxAmp: 0.30, minRise: 0.12 };
+      let sq = 0;
+      for (const k in bs) {
+        if (typeof bs[k] !== "number") continue;
+        const d = (bs[k] || 0) - (prev[k] || 0);
+        sq += d * d;
+      }
+      const rise = Math.sqrt(sq);
+      const amp = Math.max(0, Math.max.apply(null,
+        R.emotions.filter((e) => e !== "calm").map((e) => s[e] || 0).concat([0])));
+      out.micro = rise >= M.minRise && amp <= M.maxAmp;
+    }
+    out.asymmetric = smileAsymmetry(bs) >= (R.asym ? R.asym.min : 0.25);
+    out.microAvailable = !!prev;
+    return out;
+  }
+
+  function read(bs, prev) {
     bs = bs || {};
     const s = scores(bs);
+    const smile = smileKind(bs);
     const all = R.emotions.map((e) => ({ emotion: e, score: s[e] }))
       .sort((a, b) => b.score - a.score);
     let main = all[0].emotion;
@@ -206,7 +263,9 @@
       face: true,               // 来源标记：界面/判据据此区分"表情读数"与"文本读数"
       family: R.family ? (R.family[main] || main) : main,  // 与文本六情绪的语义归属（分歧标注用）
       undetectable: R.undetectable,
-      smile: smileKind(bs)
+      smile: smile,
+      /* 细分子维度（r173）：与身份类并存，缺证据的维度为 false 或标不可用 */
+      subs: subsOf(bs, s, smile, prev)
     };
   }
 
@@ -499,6 +558,11 @@
 
   window.FaceEngine = {
     read: read, scores: scores, smileKind: smileKind, cueRegions: cueRegions,
+    /* r173 导出 yawRatio：它本来就是引擎里的纯函数，之前只是没挂出来。
+       `_test/face-harness.html` 要用它对照片算出同一把「侧脸到什么程度」的尺 ——
+       让导出的 meta 与**线上质量门同源**（同一套 R.quality 阈值），而不是另外拍一组数。
+       ⚠️ 它不参与任何判定：导出脚本只把它当作样本的环境元数据存下来。 */
+    yawRatio: yawRatio,
     assessQuality: assessQuality, applyQuality: applyQuality,
     labelOf: labelOfFace,
     capability: capability, whenReady: whenReady, diagnose: diagnose,

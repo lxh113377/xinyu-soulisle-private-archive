@@ -59,11 +59,26 @@
   "noseSneerLeft": 0.0,
   "noseSneerRight": 0.0
  },
+ "meta": {
+  "luma": 0.3107,
+  "lumaVar": 0.011809,
+  "lumaBucket": "normal",
+  "yaw": 0.0156,
+  "yawBucket": "front",
+  "faceSize": 0.1978,
+  "imgW": 613,
+  "imgH": 830,
+  "thresholds": {
+   "brightMin": 0.16,
+   "brightMax": 0.94,
+   "yawMax": 0.36
+  }
+ },
  "view": {
-  "emotion": "calm",
-  "intensity": 0.3252292111621496,
+  "emotion": "sadness",
+  "intensity": 0.1602829601554127,
   "confidence": 0.3817657251148366,
-  "confident": true
+  "confident": false
  },
  "source": "https://commons.wikimedia.org/wiki/File:Name-_Robert_Hall_%2816252447916%29.jpg",
  "note": ""

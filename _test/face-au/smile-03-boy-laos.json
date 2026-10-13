@@ -59,10 +59,25 @@
   "noseSneerLeft": 8e-06,
   "noseSneerRight": 4e-06
  },
+ "meta": {
+  "luma": 0.5227,
+  "lumaVar": 0.019179,
+  "lumaBucket": "normal",
+  "yaw": 0.1949,
+  "yawBucket": "front",
+  "faceSize": 0.5309,
+  "imgW": 960,
+  "imgH": 1440,
+  "thresholds": {
+   "brightMin": 0.16,
+   "brightMax": 0.94,
+   "yawMax": 0.36
+  }
+ },
  "view": {
   "emotion": "joy",
   "intensity": 0.47040613264201653,
-  "confidence": 0.38596275505445893,
+  "confidence": 0.33857272278959,
   "confident": true
  },
  "source": "https://commons.wikimedia.org/wiki/File:Smiling_little_boy_of_Laos.jpg",

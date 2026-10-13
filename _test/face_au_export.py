@@ -153,9 +153,14 @@ def export():
                         continue
                     bs = {k: round(float(v), 6) for k, v in d["bs"].items()}
                     missing_dims = [k for k in WANT_LABELS_DIMENSIONS if k not in bs]
+                    # meta 由 harness 现算（luma / yaw / faceSize），r173 起写进 fixture。
+                    # ⚠️ meta 缺失时必须存 None 而不是空字典：空字典会被下游读成「有 meta 但全空」，
+                    #    而 F13 的分层切片正是靠 meta 有无来决定出数字还是出「不可测」——
+                    #    这两件事必须分得开，否则「没测」又会被当成「测了」。
                     rec = {"file": f, "label": e["label"], "want": WANT[e["label"]],
                            "faces": int(d["faces"]), "dim": len(bs),
                            "missing_dims": missing_dims, "bs": bs,
+                           "meta": d.get("meta") or None,
                            "view": {"emotion": d["view"]["emotion"],
                                     "intensity": d["view"]["intensity"],
                                     "confidence": d["view"]["confidence"],
