@@ -568,7 +568,7 @@ function initFaceHud(deps) {
     /* r161 弱信号三态：weak ⇒ 「轻微 X（读数仅供参考）」；与 r113 质量门、r102 读数不稳并联 */
     const q = view.quality;
     const qReason = (q && !q.ok) ? q.reasons.map((r) => ({ lighting: "光线太暗或太亮", blur: "画面模糊",
-      profile: "侧脸幅度大", "mouth-flat": "嘴部区域被遮挡" }[r] || r).join("、") : "";
+      profile: "侧脸幅度大", "mouth-flat": "嘴部区域被遮挡" }[r] || r)).join("、") : "";
     const tails = [];
     if (view.weak) tails.push("读数仅供参考");
     if (qReason) tails.push(qReason + "，仅供参考");
