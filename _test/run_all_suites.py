@@ -380,6 +380,10 @@ SUITES = [
     ("face_au_replay", [sys.executable, "_test/face_au_replay_check.py"]),
     ("face_au_replay_selftest", [sys.executable, "_test/face_au_replay_check.py", "--selftest"]),
     ("face_au_export_check", [sys.executable, "_test/face_au_export.py", "--check"]),
+    # r173：细分子维度判据（F15）。为什么必须入电池：这些维度**不参与身份类 argmax**，
+    #   F11/F12 那两把尺一条腿都碰不到它们 ⇒ 不常驻执行，退化时其它尺全绿依旧。
+    #   零依赖（纯 node 探针），不占浏览器预算。
+    ("face_subs", [sys.executable, "_test/face_subs_check.py"]),
     # r58 质量工程面：JS 侧从"0 个单元测试"变成有常驻执行位（node --test + 跨 realm 归一）
     ("js_unit", [sys.executable, "_test/js_unit_check.py"]),
     ("js_unit_selftest", [sys.executable, "_test/js_unit_check.py", "--selftest"]),
