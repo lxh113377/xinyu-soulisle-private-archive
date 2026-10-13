@@ -70,12 +70,19 @@ window.__LAT__ = { ready: false, err: null, delegate: null };
 (async () => {
   try {
     const fileset = await FilesetResolver.forVisionTasks(BASE);
-    let lm, delegate = "GPU";
+    // r173 追加 --delegate：CPU 腿是本尺的**最差情况**面。GPU delegate 在无独显/被浏览器
+    // 列入黑名单的机器上会自动回落 CPU，而"回落后会不会超 100ms"从来没人量过 ⇒
+    // 只报 GPU 腿等于只报最好情况的那一半。口径见 main() 的 --delegate。
+    // delegate 由 main() 用 add_init_script 注入 window.__DELEGATE__（**不走 URL query**：
+    // pg.route 的 glob 匹配整条 URL，带 `?delegate=` 会让路由不命中 ⇒ 页面 404 ⇒ 宿主页
+    // 整个模块都不执行，表现为 __LAT__ undefined。这个坑本轮实踩过一次。）
+    const want = window.__DELEGATE__ || "GPU";
+    let lm, delegate = want;
     try {
-      lm = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL, delegate: "GPU" }, runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: false });
+      lm = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL, delegate: want }, runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: false });
     } catch (e) {
-      delegate = "CPU";
-      lm = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL, delegate: "CPU" }, runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: false });
+      if (want !== "CPU") { delegate = "CPU"; lm = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL, delegate: "CPU" }, runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: false }); }
+      else throw e;
     }
     const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
     const v = document.createElement("video");
@@ -129,6 +136,9 @@ def _pct(vals, q):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=N_RUNS)
+    ap.add_argument("--delegate", default="GPU", choices=["GPU", "CPU"],
+                    help="GPU=最好情况（默认）｜CPU=**最差情况**：无独显/被拉黑的机器回落到的路径。"
+                         "两条腿都该量，只报 GPU 等于只报好的一半")
     ap.add_argument("--json", default="", help="机器件落盘路径（默认 _test/face-latency-<stamp>.json）")
     ap.add_argument("--ci", action="store_true", help="CI 面：受管 chromium，不改检验口径")
     args = ap.parse_args()
@@ -165,9 +175,12 @@ def main():
             try:
                 ctx = browser.new_context(permissions=["camera"], viewport={"width": 1280, "height": 900})
                 pg = ctx.new_page()
+                pg.add_init_script("window.__DELEGATE__ = %s;" % json.dumps(args.delegate))
                 pg.route("**/face-latency-harness.html",
                          lambda route: route.fulfill(status=200, content_type="text/html; charset=utf-8",
                                                      body=HARNESS_HTML))
+                page_err = []
+                pg.on("pageerror", lambda e: page_err.append(str(e)))
                 pg.goto(base + HARNESS, wait_until="load")
                 try:
                     pg.wait_for_function(
@@ -175,11 +188,12 @@ def main():
                         timeout=180000)
                 except Exception:  # noqa: BLE001
                     pass
-                st = pg.evaluate("({ready: window.__LAT__.ready, err: window.__LAT__.err,"
-                                 " run: typeof window.__LAT__.run})")
+                st = pg.evaluate("({ready: window.__LAT__ && window.__LAT__.ready,"
+                                 " err: window.__LAT__ ? window.__LAT__.err : '__LAT__ 未定义（宿主页模块没跑起来）',"
+                                 " run: window.__LAT__ ? typeof window.__LAT__.run : null})")
                 if not st.get("ready") or st.get("run") != "function":
-                    print("FACE-LATENCY-UNVERIFIED FaceLandmarker 没起来：%s ⇒ **未验**"
-                          % st.get("err"))
+                    print("FACE-LATENCY-UNVERIFIED FaceLandmarker 没起来：%s ⇒ **未验**（页面错误：%s）"
+                          % (st.get("err"), "; ".join(page_err[:3]) or "无"))
                     return 2
                 delegate = pg.evaluate("window.__LAT__.delegate")
                 res = pg.evaluate("async (n) => window.__LAT__.run(n)", args.runs)
