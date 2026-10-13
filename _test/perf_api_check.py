@@ -383,4 +383,7 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    # r173 兜底：未捕获异常必须留下具名结论行，否则电池只见 rc≠0（BLIND-RED）
+    from check_instrument import install_excepthook
+    install_excepthook("PERF-API")
     sys.exit(main())

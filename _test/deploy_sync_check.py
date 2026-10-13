@@ -123,8 +123,48 @@ def face_problems(src_map, dst_map):
     return missing, diff, extra
 
 
+def side_state(base, rel):
+    """按**内容**判某一侧的工作树态：工作树字节 vs HEAD blob。
+
+    不用 `git status` 的 M 列——那列不是内容证据（在册教训：状态列可因 stat 缓存报脏而字节全等）。
+    `git hash-object` 与 `rev-parse HEAD:<路径>` 都是内容寻址，等号即字节等。
+    """
+    import subprocess
+    p = ROOT / base / rel
+    if not p.exists():
+        return "工作树无此件"
+    try:
+        wt = subprocess.run(["git", "hash-object", "--", str(p)],
+                            capture_output=True, cwd=str(ROOT), timeout=20)
+        hd = subprocess.run(["git", "rev-parse", "-q", "--verify", "HEAD:%s/%s" % (base, rel)],
+                            capture_output=True, cwd=str(ROOT), timeout=20)
+    except (OSError, subprocess.TimeoutExpired):
+        return "取不到"
+    if wt.returncode != 0:
+        return "取不到"
+    if hd.returncode != 0:
+        return "HEAD无此件"
+    return "在途" if wt.stdout.decode().strip() != hd.stdout.decode().strip() else "已入库"
+
+
+def attribute_owner(src_state, dep_state):
+    """两侧在途态 → 「这条红谁能修」。纯函数，离线可测。"""
+    if "取不到" in (src_state, dep_state):
+        return "归属未定(在途态取不到)"
+    if src_state == "工作树无此件" or dep_state == "工作树无此件":
+        return "需人工判(一侧工作树缺件)"
+    if src_state == "在途" or dep_state == "在途":
+        return "他方在途(不代提交他人 WIP)"
+    return "可立即修(两侧均已入库)"
+
+
 def head_face_check():
-    """HEAD 面 src ⇄ deploy/xinyu 对账。返回 (违规列表, 分母, 不可读原因)。"""
+    """HEAD 面 src ⇄ deploy/xinyu 对账。返回 (违规列表, 分母, 不可读原因)。
+
+    r173 每条红目带**归属位**：判据不能只说"分叉了"，还得说清这条能不能由本轮修——
+    一手代价（r172）：同一件事我人工跑了三条命令（rev-parse / cmp / status）才知道"阻塞在他人 WIP"，
+    下一个人不复算就会去改 src 或删账目求绿。
+    """
     sm, err1 = git_blob_map("src")
     dm, err2 = git_blob_map("deploy/xinyu")
     if err1 or err2:
@@ -133,10 +173,18 @@ def head_face_check():
     if total == 0:
         return ["提交面分母为 0：HEAD 里 src/ 没有任何文件 ⇒ 比对结论不作数（R247 零输入不判绿）"], 0, None
     missing, diff, extra = face_problems(sm, dm)
-    bad = ["提交面 MISSING: %s（HEAD 里 src 有、deploy/xinyu 没有）" % r for r in missing]
-    bad += ["提交面 DIFF: %s（HEAD 两侧 blob 号不同 = 交付副本与权威源不是同一份字节）" % r for r in diff]
-    bad += ["提交面 EXTRA: %s（HEAD 的部署副本里有而权威源没有）" % r for r in extra
-            if r not in WHITELIST_EXTRA]
+
+    def tag(kind, r):
+        if kind == "EXTRA":                        # 部署副本多出来的件，权威源侧本就没有
+            return attribute_owner("工作树无此件", side_state("deploy/xinyu", r))
+        return attribute_owner(side_state("src", r), side_state("deploy/xinyu", r))
+
+    bad = ["提交面 MISSING: %s（HEAD 里 src 有、deploy/xinyu 没有）｜归属=%s"
+           % (r, tag("MISSING", r)) for r in missing]
+    bad += ["提交面 DIFF: %s（HEAD 两侧 blob 号不同 = 交付副本与权威源不是同一份字节）｜归属=%s"
+            % (r, tag("DIFF", r)) for r in diff]
+    bad += ["提交面 EXTRA: %s（HEAD 的部署副本里有而权威源没有）｜归属=%s"
+            % (r, tag("EXTRA", r)) for r in extra if r not in WHITELIST_EXTRA]
     return bad, total, None
 
 
@@ -144,6 +192,17 @@ def selftest() -> int:
     """夹具全部走临时目录（参数可注入就是为这个），不碰真实 src/deploy。"""
     import tempfile
     bad = []
+    # r173 归属位（纯函数腿）：判据必须自己说清"这条红谁能修"，
+    # 否则下一个人只有两条路——人工跑三条命令复算，或者误判成"我方缺陷"去改权威源。
+    A = attribute_owner
+    attr = [
+        ("两侧均已入库⇒可立即修", A("已入库", "已入库") == "可立即修(两侧均已入库)"),
+        ("src 在途⇒他方在途", "他方在途" in A("在途", "已入库")),
+        ("deploy 在途⇒他方在途", "他方在途" in A("已入库", "在途")),
+        ("取不到⇒归属未定（不得默认成可修）", "取不到" in A("取不到", "已入库")),
+        ("一侧缺件⇒交人工判", "人工判" in A("工作树无此件", "已入库")),
+    ]
+    bad.extend("归属腿 %s 未成立" % n for n, ok in attr if not ok)
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         s, d = root / "srcf", root / "deployf"
@@ -206,8 +265,8 @@ def selftest() -> int:
     if real_total == 0:
         print("DEPLOYSYNC-SELFTEST-FAIL：真面 HEAD 的 src/ 分母为 0 ⇒ 夹具全绿也不作数")
         return 1
-    print("DEPLOYSYNC-SELFTEST-%s（提交面腿 %d 条 + 函数面 6 类夹具 + 真面分母 %d 个文件；红=%d）"
-          % ("PASS" if not bad else "FAIL", len(heads) + 8, real_total, len(bad)))
+    print("DEPLOYSYNC-SELFTEST-%s（提交面腿 %d 条 + 归属腿 %d 条 + 函数面 6 类夹具 + 真面分母 %d 个文件；红=%d）"
+          % ("PASS" if not bad else "FAIL", len(heads) + 8, len(attr), real_total, len(bad)))
     if bad:
         for x in bad:
             print("  -", x)

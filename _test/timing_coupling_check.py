@@ -535,8 +535,10 @@ REVIEW = {
         "verdict": "debt-open", "sites": 1,
         "why": "点 #btn-face-close 后读 running/hudHidden/liveStreams/mist ⇒ live===0 且 hud 隐藏可等"},
     "face_check.py::page.wait_for_timeout(400)": {
-        "verdict": "debt-open", "sites": 2,
-        "why": "F4 摄像头总闸关/重开两腿，读入口显隐 + ui.reason/ui.state ⇒ 都由同一状态机驱动可等"},
+        "verdict": "debt-open", "sites": 0, "moot": "NEXT_NO_READ",
+        "why": "r173 按现读重锚：采集器读到的两处 400ms（face_check.py:317 pg. / :328 page.）落 **NEXT_NO_READ**"
+               " 桶（等待之后的那条语句不取数）⇒ 不在 C1 评审范围；moot 字段要求现读桶确实是 NEXT_NO_READ，"
+               "若该形状回到 C1_HARD，review_gap 的矛盾腿会当场判红（不是免检通道）"},
     "face_check.py::p8.wait_for_timeout(600)": {
         "verdict": "debt-open", "sites": 1,
         "why": "F8 无设备面：等 ui.reason='no-video-device' 落定 + #face-status 有文案（现在读的就是它们）"},
@@ -574,17 +576,36 @@ def review_gap(rows, review=None):
     """
     review = REVIEW if review is None else review
     need = {}
+    bucket_of = {}
     for r in rows:
+        kk = "%s::%s" % (r["file"], r.get("stmt") or "")
+        bucket_of.setdefault(kk, set()).add(r["bucket"])
         if r["bucket"] != "C1_HARD":
             continue
-        k = "%s::%s" % (r["file"], r.get("stmt") or "")
-        need[k] = need.get(k, 0) + 1
+        need[kk] = need.get(kk, 0) + 1
     missing = sorted(k for k in need if k not in review)
     mismatched = ["%s（现读 %d 条，账记 sites=%s）" % (k, need[k], review[k].get("sites"))
                   for k in sorted(review) if k in need and review[k].get("sites") != need[k]]
-    stale = ["%s（账里有，现读无此形状 ⇒ 锚点陈旧或该件已被改掉）" % k
-             for k in sorted(review) if k not in need]
-    return sum(v for k, v in need.items() if k in review), missing, mismatched + stale
+    # 声明了 moot 却又在 C1 桶里读到 ⇒ 矛盾，必须红（否则"重锚"会变成永久免检通道）
+    contradiction = ["%s（账记 moot=%s，现读却是 C1_HARD %d 条 ⇒ 该形状已回到评审范围）"
+                     % (k, review[k].get("moot"), need[k])
+                     for k in sorted(review) if k in need and review[k].get("moot")]
+    stale = []
+    for k in sorted(review):
+        if k in need:
+            continue
+        obs = bucket_of.get(k)
+        if obs and review[k].get("moot") and review[k]["moot"] in obs and "C1_HARD" not in obs:
+            continue          # 已按现读重锚且桶名对得上 ⇒ 无评审义务，不红也不静默
+        if obs:
+            stale.append("%s（形状仍在，现读桶=%s 而非 C1 ⇒ 需按现读重锚或声明 moot；"
+                         "禁直接把账删了求绿）" % (k, "/".join(sorted(obs))))
+        else:
+            stale.append("%s（账里有，现读无此形状 ⇒ 锚点陈旧或该件已被改掉）" % k)
+    covered = sum(v for k, v in need.items() if k in review)
+    mooted = sorted(k for k in review if review[k].get("moot") and k not in need
+                    and bucket_of.get(k) and review[k]["moot"] in bucket_of[k])
+    return covered, missing, mismatched + contradiction + stale, mooted
 
 
 def blocks_next(blk, idx):
@@ -840,23 +861,34 @@ def selftest():
     fake = [{"file": "a.py", "bucket": "C1_HARD", "stmt": "pg.wait_for_timeout(500)"},
             {"file": "b.py", "bucket": "POLL", "stmt": "pg.wait_for_timeout(9000)"}]
     okk = "a.py::pg.wait_for_timeout(500)"
-    cov, mis, st = review_gap(fake, {okk: {"verdict": "shaped-only", "sites": 1}})
+    cov, mis, st, _mo = review_gap(fake, {okk: {"verdict": "shaped-only", "sites": 1}})
     expect("评审账 覆盖齐 ⇒ 零未评审零对账差", cov == 1 and not mis and not st)
-    cov2, mis2, _s2 = review_gap(fake, {})
+    cov2, mis2, _s2, _mo2 = review_gap(fake, {})
     expect("反例 账清空 ⇒ 该件列为未评审（不得静默）", cov2 == 0 and mis2 == [okk])
-    _c3, _m3, st3 = review_gap(fake, {okk: {"verdict": "x", "sites": 7}})
+    _c3, _m3, st3, _mo3 = review_gap(fake, {okk: {"verdict": "x", "sites": 7}})
     expect("反例 sites 记 7 而现读 1 ⇒ 必须报对账差", bool(st3) and "sites=7" in st3[0])
-    _c4, _m4, st4 = review_gap([], {"ghost.py::pg.wait_for_timeout(9)": {"verdict": "x", "sites": 1}})
+    _c4, _m4, st4, _mo4 = review_gap([], {"ghost.py::pg.wait_for_timeout(9)": {"verdict": "x", "sites": 1}})
     expect("反例 账里有而现读无 ⇒ 锚点陈旧必须点名（防台账变只增不减的坟场）", bool(st4))
-    cov5, _m5, _s5 = review_gap(fake, {okk: {"verdict": "x", "sites": 1},
+    cov5, _m5, _s5, _mo5 = review_gap(fake, {okk: {"verdict": "x", "sites": 1},
                                        "b.py::pg.wait_for_timeout(9000)": {"verdict": "y", "sites": 1}})
     expect("口径腿 非 C1_HARD 的形状不进覆盖数（POLL 那条不得替评审账凑数）", cov5 == 1)
+    # r173 三态归因：形状仍在但换桶 ≠ 锚点陈旧；声明 moot 又回到 C1 ⇒ 必须红
+    bk = "b.py::pg.wait_for_timeout(9000)"
+    _c6, _m6, st6, mo6 = review_gap(fake, {okk: {"sites": 1}, bk: {"sites": 0, "moot": "POLL"}})
+    expect("moot 腿 声明的桶与现读一致 ⇒ 不红且计入可见位", not st6 and mo6 == [bk])
+    _c7, _m7, st7, mo7 = review_gap(fake, {okk: {"sites": 1}, bk: {"sites": 0, "moot": "VARLEN"}})
+    expect("反例 声明桶与现读不符 ⇒ 必须点名（禁把 moot 当橡皮图章）", bool(st7) and "现读桶=POLL" in st7[0])
+    _c8, _m8, st8, mo8 = review_gap(fake + [{"file": "b.py", "bucket": "C1_HARD",
+                                             "stmt": "pg.wait_for_timeout(9000)"}],
+                                    {okk: {"sites": 1}, bk: {"sites": 1, "moot": "POLL"}})
+    expect("矛盾腿 声明 moot 而现读回到 C1 ⇒ 判红并点名（重锚不是免检）",
+           bool(st8) and "回到评审范围" in st8[0] and not mo8)
     # 指纹稳定性：同一语句换行号必须仍是同一个键（锚行号的账会在别人插行时集体错位）
     moved = [{"file": "a.py", "bucket": "C1_HARD", "stmt": "pg.wait_for_timeout(500)", "line": 99}]
     expect("指纹腿 行号变了键不变（评审账不锚行号）", review_gap(moved, {okk: {"sites": 1}})[0] == 1)
     # 真面自证：拿现读面跑一遍，账必须既无未评审也无陈旧（这条红了就是本轮台账没跟上树）
     rrows, _rt, _rb, _ru, _ri = scan_dir(TEST_DIR)
-    rcov, rmis, rstale = review_gap(rrows)
+    rcov, rmis, rstale, rmoot = review_gap(rrows)
     expect("真面 现读 C1_HARD %d 件全部有评审结论（缺 %s）" % (rcov, rmis[:2]), not rmis)
     expect("真面 评审账与现读逐键等值（对不上 %s）" % (rstale[:2],), not rstale)
 
@@ -926,7 +958,7 @@ def main():
         if r["bucket"] == "C1_HARD":
             ent = REVIEW.get("%s::%s" % (r["file"], r.get("stmt") or ""))
             r["verdict"] = ent["verdict"] if ent else None
-    covered, unreviewed, stale = review_gap(rows)
+    covered, unreviewed, stale, mooted = review_gap(rows)
     red = []
     if hard > a.baseline:
         red.append("C1_HARD %d > 基线 %d" % (hard, a.baseline))
@@ -969,6 +1001,10 @@ def main():
             vd[r["verdict"]] = vd.get(r["verdict"], 0) + 1
     print("  - 逐件评审账(r99): 覆盖 %d/%d 件（%s）"
           % (covered, hard, "，".join("%s=%d" % kv for kv in sorted(vd.items())) or "空"))
+    # 免检位必须自己报数（r173）：moot 是"按现读换桶重锚"的声明，不印出来就等于悄悄豁免
+    print("  - 现读换桶免检位(r173): moot=%d%s"
+          % (len(mooted), ("｜" + "、".join("%s→%s" % (k.split("::")[0], REVIEW[k]["moot"])
+                                           for k in mooted)) if mooted else "（无一条免检）"))
     for s in stale[:6]:
         print("  - 评审账对不上: " + s)
     if a.json:

@@ -767,9 +767,13 @@ def main():
                 "{base:'%s',key:'%s',model:'%s',stream:false}))}catch(e){}"
                 % (cfg["base"], cfg["key"], cfg["model"]))
             pg.goto(args.base + "/index.html", wait_until="load", timeout=45000)
-            pg.wait_for_timeout(1500)
-            has = pg.evaluate("!!(window.__XINYU_WIT_QUOTES__ && "
-                              "window.__XINYU_WIT_QUOTES__.entries.length)")
+            try:
+                pg.wait_for_function(
+                    "() => !!(window.__XINYU_WIT_QUOTES__ && "
+                    "window.__XINYU_WIT_QUOTES__.entries.length)", timeout=15000)
+                has = True
+            except Exception:  # noqa: BLE001
+                has = False
             if not has:
                 print("QUOTE-EVAL-UNVERIFIED: 页面未见 wit-quotes 数据件（先起含 src/data 的服务）")
                 b.close()
