@@ -792,4 +792,10 @@ def main():
 
 
 if __name__ == "__main__":
+    # r171：本件 750 行、此前**没有任何未捕获异常兜底** ⇒ 2026-10-13 那次 `KeyError: 'emotion_crisis'`
+    # 崩在结论行之前，电池只记到 BLIND-RED（有 rc、零读数），而性能基线因此静默断更。
+    # 兜底词汇唯一在 `check_instrument.verdict_for`（服务不可达→UNVERIFIED rc=2／仪器 bug→RED rc=1），
+    # 本处不另写一份归因逻辑。
+    from check_instrument import install_excepthook
+    install_excepthook("PERF-BASELINE")
     sys.exit(main())
