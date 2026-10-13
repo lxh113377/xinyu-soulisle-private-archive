@@ -25,6 +25,13 @@
  * 判据：`_test/voice_call_check.py` C1–C19（桩化 SpeechRecognition / speechSynthesis / getUserMedia）。
  * wb-echo-L0（2026-10-13）：回声准入闸 —— 收句面/打断面统一过 `isEchoFuzzy + TAIL_MS`，堵「念白回读误当用户输入」。
  * wb-echo-L1（2026-10-13）：跨轮回声内容日志（spokenLog）+ duplex 切换冷却 + barge-in 能量突增判据（判据 C17–C19）。
+ *
+ * wb-echo-L2（2026-10-13，打断跟手 + 识别准确率）：三条根因的成因与取舍见 CHANGELOG 同日条目。
+ *   一句话：**打断判据必须排在回声闸之前**（旧码顺序反了 ⇒ 插话被判成回声 ⇒ bargeIn 永远走不到）；
+ *   打断基线取**念白前冻结的底噪**（不是念白响度）；能量采样从 tick 的 10Hz 提到 rAF 的 60Hz；
+ *   n-best 用情绪词表重排（`rec.maxAlternatives` 旧码写死 1 = 主动丢掉更好的那条）。
+ *   为什么不引 AEC3 wasm：Web Speech 的识别跑在浏览器内部、拿不到它那条流；打断触发改用我们
+ *   自己那条已开 `echoCancellation` 的流，识别层残留回声由内容闸 + 打断瞬间的偏移重置治。
  */
 window.VoiceCall = (function () {
   const $ = (s) => document.querySelector(s);
@@ -44,6 +51,12 @@ window.VoiceCall = (function () {
   const TAIL_MS = 600;           // wb-echo-L0 尾音软窗：念白结束后这么久内的转写用更低回声阈值严查（不硬拦快答）
   const LOG_MAX = 10;            // wb-echo-L1 念白日志条数上界（跨轮回声判据的容量约束）
   const DUPLEX_MS = 300;         // wb-echo-L1 切回全双工后延迟再开麦（防残留念白被收进来）
+  // wb-echo-L2：打断跟手三参数。基线取念白前冻结的底噪、倍数放宽到 2.2（自建流的 AEC3 已经
+  // 吃掉大部分回声，剩下的底噪与真人插话差距远大于 2×）、窗内至少 3 个采样过阈（防单帧噪声）。
+  const BARGE_MULT = 2.2, BARGE_WIN = 240, BARGE_MIN = 3, HIST_MAX = 400;
+  const TAIL_GRACE = 1.7;        // 连接词收尾的宽限倍率：宽限到即当完整句收，不再死等 FORCE_MS
+  const ALTS = 5;                // n-best 候选数（rec.maxAlternatives）
+  const CRISIS_HINT = /自杀|自残|不想活|活不下去|结束生命|跳楼|割腕|伤害自己/;
 
   let deps = null, rec = null, SR = null;
   let state = "idle";           // idle | listening | thinking | speaking
@@ -53,6 +66,7 @@ window.VoiceCall = (function () {
   let speakEndAt = 0;             // 末次念白结束时刻（wb-echo-L0 软窗起点）
   let spokenLog = [];             // wb-echo-L1 最近念白 {text,t0,t1} 日志（替代单槽 recentSpoken）
   let lvlHist = [];               // wb-echo-L1 能量读数历史（barge-in 突增判据；空历史=读数不可得=放行）
+  let noiseBase = null;           // wb-echo-L2 念白开口那一刻冻结的底噪（打断判据的基线；null=没冻结到=交文本面兜底）
   let baseLen = 0, lastLen = 0;   // 已收过口的转写条数 / 本会话累计转写条数（防旧句被重新拼进新句）
   let recAlive = false;           // 识别会话是否还活着：活着就不该再 start()（真机 start 会抛，白折腾一次重启）
   let consumed = 0, speakingBuf = "", tailQueued = false, aiLine = null, lastGum = null;
@@ -79,6 +93,9 @@ window.VoiceCall = (function () {
     if (!String(t || "").trim()) return "";
     if (silenceMs >= FORCE_MS) return "停顿收口";
     if (silenceMs >= SILENCE_MS && semanticallyComplete(t)) return "语义收句";
+    // wb-echo-L2：连接词收尾的句子旧码只能死等 FORCE_MS（体感=卡住）。给一截宽限窗，
+    // 宽限到即当完整句收，内容一字不截；完整句判据仍在前面，两者同真时同返回。
+    if (silenceMs >= SILENCE_MS * TAIL_GRACE && String(t).trim().length >= MIN_COMPLETE) return "语义收句";
     return "";
   }
   /** 能量门：噪声不该被当成「还在说话」。读数取不到（无权限/桩）一律放行，宁降级不误伤。 */
@@ -92,6 +109,61 @@ window.VoiceCall = (function () {
     const bm = base.reduce((a, r) => a + r.v, 0) / base.length;
     const thr = Math.max(2 * bm, NOISE_FLOOR);
     return recent.filter((r) => r.v >= thr).length >= 2;
+  }
+  /* wb-echo-L2：声学打断判据 —— 与回声**内容**面互不依赖，这是跟手的唯一来源。
+     base = 念白开口前冻结的底噪（拿念白响度当基线会让「念得越响越打不断」）。
+     读数不可得（无麦克风/桩拒了 getUserMedia/底噪没冻结到）⇒ false，交文本面兜底。 */
+  function bargeOk(hist, now, base) {
+    if (!(typeof base === "number" && base > 0)) return false;
+    const win = hist.filter((r) => now - r.t <= BARGE_WIN);
+    if (win.length < BARGE_MIN) return false;                 // 采样不足宁漏勿误
+    const thr = Math.max(base * BARGE_MULT, NOISE_FLOOR * 2);
+    return win.filter((r) => r.v >= thr).length >= BARGE_MIN;
+  }
+  /** 念白开口前的底噪（近 300ms 中位数，取**下中位** —— 宁可把基线压低也不被说话起始那一下抬高）。
+      样本不足返 null —— 宁可降级也不猜。 */
+  function baseOf(hist, t0) {
+    const w = hist.filter((r) => t0 - r.t > 0 && t0 - r.t <= 300).map((r) => r.v).sort((a, b) => a - b);
+    return w.length < BARGE_MIN ? null : w[Math.floor((w.length - 1) / 2)];
+  }
+  /* n-best 重排：用全仓唯一情绪词表（SSOT）给候选打分 —— 通用模型把「抑郁/失眠/倾诉」
+     听错时，词表命中的那条赢；危机词命中额外加权（宁可误召回，安全侧）。
+     两项权重刻意同量级（conf×1.5 ≈ 0~1.5，词表命中 +1.5）：旧口径 conf×10 会让置信度
+     单项压过整个词表面，重排等于没接（同一次改判据把这条从 C23 里抓出来）。
+     词表取不到就纯按置信度，零回归。 */
+  function altScore(a, t) {
+    let s = (a && typeof a.confidence === "number" ? a.confidence : 0) * 1.5, hit = 0;
+    const E = window.EmotionEngine;
+    if (E && E.LEX) {
+      for (const k in E.LEX) {
+        // ⚠️ LEX[k] 的形状是 `{w, color, words}` 不是数组（写错这一层会静默跳过整个词表，
+        //   重排退化成「纯按置信度」—— 本轮 C23 就是这么红出来的）
+        const ws = Array.isArray(E.LEX[k]) ? E.LEX[k] : (E.LEX[k] || {}).words;
+        if (!ws || !ws.length) continue;
+        for (const w of ws) if (w && w.length >= 2 && t.indexOf(w) >= 0 && hit < 4) hit++;
+      }
+    }
+    s += hit * 1.5;
+    return CRISIS_HINT.test(t) ? s + 3 : s;
+  }
+  /** n-best 里挑最好的一条。入参 [{transcript, confidence}]，取不到返 ""。 */
+  function pickBest(list) {
+    const c = [];
+    (list || []).forEach((a) => { if (a && typeof a.transcript === "string" && a.transcript.trim()) c.push(a); });
+    if (!c.length) return "";
+    let b = c[0];
+    for (let i = 1; i < c.length; i++) if (altScore(c[i], c[i].transcript) > altScore(b, b.transcript)) b = c[i];
+    return b.transcript;
+  }
+
+  /** 转写归一化（r174 / A2）：委托 `asr-normalize.js` 的 ASRNormalize。
+   *  模块缺失或抛异常一律原样返回 —— 沿用本模块约束 2「任何异常吞掉，绝不把通话打崩」：
+   *  归一化是增益项，取不到就退化成改动前的原文，不能反过来变成新的故障面。 */
+  function normalizeUtterance(t) {
+    try {
+      const N = window.ASRNormalize;
+      return N && typeof N.normalize === "function" ? N.normalize(t) : t;
+    } catch (e) { return t; }
   }
 
   /* ── 分句（首声延迟的关键：一句收住就送进朗读队列）──────────────── */
@@ -232,7 +304,7 @@ window.VoiceCall = (function () {
     rec.lang = "zh-CN";
     rec.interimResults = true;
     rec.continuous = true;       // 通话态：一次启动持续听；浏览器自行 end 时靠重启兜住
-    rec.maxAlternatives = 1;
+    rec.maxAlternatives = ALTS;  // wb-echo-L2：旧码写死 1 = 主动丢掉 n-best 里更好的那条
     rec.onresult = (e) => {
       let interim = "", said = "";
       const list = e.results || [];
@@ -241,23 +313,30 @@ window.VoiceCall = (function () {
       // 真 SpeechRecognition 的 results 是**整个会话的累计列表**（旧句不会消失）⇒ 已收过口的
       // 前 baseLen 条必须跳过，否则下一句的转写会把上一句重新拼进去 = 重复回答（桩若只投一条会藏住这个缺陷）
       for (let k = baseLen; k < list.length; k++) {
-        const r = list[k];
-        const t = r && r[0] && r[0].transcript ? r[0].transcript : "";
+        const r = list[k], alts = [];
+        if (r) for (let m = 0; m < (r.length || 0); m++) if (r[m]) alts.push(r[m]);
+        if (!alts.length && r && typeof r.transcript === "string") alts.push({ transcript: r.transcript, confidence: 0 });
+        const t = normalizeUtterance(pickBest(alts));   // wb-echo-L2 重排 + r174 归一化（口头语清洗），取不到自然回落 ""
         if (r && r.isFinal) said += t; else interim += t;
       }
       const got = (said + interim).trim();
       if (!micOn) { pending = ""; return; }              // 静音键：不采集也不收句
       if (!gateOpen(lvl)) return;                        // 能量门：这一帧没人在说话，噪声不配当话头
-      // wb-echo-L0 准入闸 + wb-echo-L1 逐句软窗：回声先丢弃（软窗内阈值放宽更严打）；丢弃同时推进消费位，
+      const now = performance.now();
+      // wb-echo-L2 顺序修正（根因①）+ 分层回声判：**打断判据必须排在回声闸之前**。旧码先 return 掉
+      // 回声，真人插话与念白混录时必然被判成回声 ⇒ 这一行永远走不到，这就是「豆包能打断、我们
+      // 打不断」的根因。但也不能无脑放行 —— 机器人念白漏进麦克风会自打断成自激励循环。
+      // 故这里只挡**精确面**（isEcho = 整句互含/前缀重叠，即纯念白），模糊面（diceWin≥0.6）
+      // 仍留在下面的内容闸里。声学面（bargeOk）另有电平把关，不依赖文本。
+      if (state !== "listening" && duplex === "full" && got.length >= 2 && !isEcho(got)
+          && (state !== "speaking" || bargeOk(lvlHist, now, noiseBase) || bumpOkFrom(lvlHist, now))) bargeIn();
+      // 回声准入闸 + 逐句软窗（含打断瞬间手动起算的尾音窗）：回声先丢弃，丢弃同时推进消费位，
       // 防「被丢的念白残句」留在累计列表里拼进下一句用户话
-      const softWin = performance.now() - speakEndAt < TAIL_MS
-        || spokenLog.some((e) => { const c = e.t1 || e.t0; return c && performance.now() - c < TAIL_MS; });
+      const softWin = now - speakEndAt < TAIL_MS
+        || spokenLog.some((x) => { const c = x.t1 || x.t0; return c && now - c < TAIL_MS; });
       if (isEchoFuzzy(got, softWin)) { baseLen = lastLen; return; }
       pending = got;
-      lastSpeech = performance.now();
-      // 含 thinking：思考中插话也要能接管（旧码只认 speaking）；wb-echo-L1：念白期加能量突增判据（读数不可得时放行）
-      if (state !== "listening" && duplex === "full" && got.length >= 2
-          && (state !== "speaking" || bumpOkFrom(lvlHist, performance.now()))) bargeIn();
+      lastSpeech = now;
       paint();
     };
     rec.onerror = (e) => {
@@ -307,6 +386,10 @@ window.VoiceCall = (function () {
           let sum = 0;
           for (let i = 0; i < buf.length; i++) { const d = (buf[i] - 128) / 128; sum += d * d; }
           lvl = Math.sqrt(sum / buf.length);
+          // wb-echo-L2 根因③：旧码把 lvlHist.push 放在 tick() 里（100ms 一采），
+          // 而 lvl 本身是 60Hz 更新的 —— 时间分辨率被砍到 1/6，打断延迟全丢在这。改到这里直接记。
+          lvlHist.push({ t: performance.now(), v: lvl });
+          if (lvlHist.length > HIST_MAX) lvlHist.shift();   // 400 × ~16ms ≈ 6.4s，够基线窗+近端窗
           if (meter) meter.style.setProperty("--lvl", String(Math.min(1, lvl * 3.2)));
           self.timer = requestAnimationFrame(loop);
         };
@@ -325,7 +408,21 @@ window.VoiceCall = (function () {
     state = "listening";
     turnAt = 0;
     aiLine = null;
+    // wb-echo-L2：打断瞬间必须把话头与消费位一起清零 —— 累计列表里已混了念白残句，
+    // 不清则下一句会把残句拼进去（真机连打两次即复现）。cancelSpeech 不派发 onend，
+    // 尾音软窗起点只能手动改写，否则扬声器物理残响会被当话头收进来。
+    pending = ""; lastSpeech = 0;
+    baseLen = lastLen;
+    speakEndAt = performance.now();
     paint();
+  }
+  /** 声学打断面：唯一跟手的来源（文本面被回声闸挡着，见 onresult 注释）。
+      读数不可得即静默返 false，交文本面按 C18 的降级腿接管。 */
+  function bargeWatch(now) {
+    if (duplex !== "full" || state !== "speaking" || !micOn) return false;
+    if (!bargeOk(lvlHist, now, noiseBase)) return false;
+    bargeIn();
+    return true;
   }
   /** 上游挂起兜底：到点清场回听。 */
   function stallOut() {
@@ -345,6 +442,7 @@ window.VoiceCall = (function () {
     const heard = !!window.Voice && window.Voice.enqueue(s, () => {
       if (!ttf && turnAt) { ttf = Math.round(performance.now() - turnAt); metric.ttfb = ttf; paint(); }
       entry.t0 = performance.now();
+      noiseBase = baseOf(lvlHist, entry.t0);   // wb-echo-L2：打断判据的基线只在真正开口那一刻冻结
     }, () => { entry.t1 = performance.now(); });
     if (!heard) { paint(); return; }  // 发不出声就别把状态翻成「在说」，否则永远等不到回听（判据 C13）
     if (state === "thinking") state = "speaking";
@@ -403,7 +501,8 @@ window.VoiceCall = (function () {
 
   /* ── 节拍器：收句 + 念完回听 ────────────────────────────────────── */
   function tick() {
-    if (lvl != null) { lvlHist.push({ t: performance.now(), v: lvl }); if (lvlHist.length > 60) lvlHist.shift(); }
+    // wb-echo-L2：lvlHist 已移到 rAF 里记（60Hz），这里不再重复采；只跑判定
+    if (bargeWatch(performance.now())) return;          // 声学面已接管：本帧不再走收句/念完回听
     if (state === "listening" && pending && lastSpeech) {
       const how = shouldCommit(pending, performance.now() - lastSpeech);
       if (how) commit(pending, how);
@@ -424,6 +523,7 @@ window.VoiceCall = (function () {
     state = "listening";
     pending = ""; ttf = 0; turnMs = 0; consumed = 0; speakingBuf = ""; aiLine = null; lastSpeech = 0;
     speakEndAt = 0; spokenLog = []; lvlHist = [];
+    noiseBase = null;                       // wb-echo-L2：底噪随会话重置（上一通的值不带到下一通）
     baseLen = 0; lastLen = 0;
     metric.ttfb = 0; metric.user = ""; metric.reply = "";
     clearBox($("#call-captions"));
@@ -454,6 +554,7 @@ window.VoiceCall = (function () {
     state = "idle";
     pending = ""; speakingBuf = ""; turnAt = 0; lastSpeech = 0;
     speakEndAt = 0; spokenLog = []; lvlHist = [];
+    noiseBase = null;                       // wb-echo-L2：退出后不留上一通的底噪
     $("#call-layer").hidden = true;
     const nb = $("#btn-call");
     if (nb) nb.setAttribute("aria-pressed", "false");
@@ -519,8 +620,14 @@ window.VoiceCall = (function () {
     inspect() {
       return { state: state, duplex: duplex, micOn: micOn, pending: pending, ttfb: ttf, turnMs: turnMs,
         complete: semanticallyComplete(pending || metric.user), metrics: metric,
-        gum: lastGum, videoAsked: !!(lastGum && lastGum.video), lines: $("#call-captions") ? $("#call-captions").children.length : 0 };
+        gum: lastGum, videoAsked: !!(lastGum && lastGum.video), lines: $("#call-captions") ? $("#call-captions").children.length : 0,
+        noiseBase: noiseBase, histN: lvlHist.length, alts: rec ? rec.maxAlternatives : 0 };   // wb-echo-L2：判据读底噪/采样数/候选数
     },
-    _unit: { semanticallyComplete, shouldCommit, cutSentences, isEcho, isEchoFuzzy, gateOpen, bumpOkFrom }
+    /** 判据专用注入点：往能量历史灌采样 + 冻结底噪，**不参与业务路径**
+     *  （等价于 Analyser 读到真人插话 / 念白前房间安静）。仅供 _test 用。 */
+    _injectLevel(v, t) { lvlHist.push({ t: t == null ? performance.now() : t, v: v }); },
+    _injectBase(v) { noiseBase = v; },
+    _unit: { semanticallyComplete, shouldCommit, cutSentences, isEcho, isEchoFuzzy, gateOpen,
+      bumpOkFrom, bargeOk, baseOf, altScore, pickBest }
   };
 })();

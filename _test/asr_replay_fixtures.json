@@ -1,0 +1,242 @@
+{
+  "_meta": {
+    "version": "V1.0",
+    "round": "r173-asr-replay-stage-a1",
+    "date": "2026-10-14",
+    "what_this_is": "编排层 n-best 回放样本集：每条给一组候选转写+置信度，喂给 src/js/voice-call.js 真实的 pickBest，验它选中的那条是否等于人工判定的正确条。",
+    "what_this_is_NOT": "不是引擎准确率评测集。这些候选是我按方言声学常识【构造】的合成样本，不是真实录音的转写输出；因此本件只能证『编排层选候选的逻辑对不对』，绝不可对外宣称方言识别准确率（真实 CER 需 Common Voice zh-HK 等真实语料，见 spike 报告 §5.2）。",
+    "how_expectations_are_derived": "期望值来自 pickBest 的【设计意图】（见 src/js/voice-call.js:129-157 头注释：词表命中的那条赢、危机词额外加权、同量级权重），不是抄实现算出来的 ⇒ 期望与实现不一致时，报红的是真缺陷，不是样本写错。",
+    "prefix_rule": "谐音/噪声错字候选必须【不含任何词表词】（长度≥2），否则它自己也得分，样本就测不出重排收益。",
+    "probe_word_rule": "带 probe_word 的样本，跑前先用浏览器内真实 EmotionEngine.LEX 核该词真在词表里；不在 ⇒ 该样本前提不成立，记 UNVERIFIED 并点名，不记 FAIL、也不静默跳过。",
+    "tie_rule": "altScore 同分时 pickBest 用严格 > 比较 ⇒ 同分取【靠前】那条。本集用 tie-order 样本把这个边界钉住。"
+  },
+  "cases": [
+    {
+      "id": "cmn-01-plain-conf",
+      "scenario": "普通话",
+      "scene": "安静-近场",
+      "desc": "无词表命中时按置信度取高者",
+      "candidates": [{ "t": "今天还行呀", "c": 0.9 }, { "t": "今天还行吧", "c": 0.3 }],
+      "expect": { "type": "exact", "value": "今天还行呀" },
+      "ref": "今天还行呀"
+    },
+    {
+      "id": "cmn-02-lex-hit",
+      "scenario": "普通话",
+      "scene": "安静-近场",
+      "desc": "词表命中的低置信候选胜出（重排存在的理由）",
+      "candidates": [{ "t": "最近老是失眠", "c": 0.3 }, { "t": "最近老是湿安", "c": 0.85 }],
+      "expect": { "type": "exact", "value": "最近老是失眠" },
+      "ref": "最近老是失眠",
+      "probe_word": "失眠"
+    },
+    {
+      "id": "cmn-03-crisis",
+      "scenario": "普通话",
+      "scene": "嘈杂",
+      "desc": "危机词加权：宁可误召回走安全侧",
+      "candidates": [{ "t": "今天有点累", "c": 0.9 }, { "t": "我不想活了", "c": 0.2 }],
+      "expect": { "type": "exact", "value": "我不想活了" },
+      "ref": "我不想活了"
+    },
+    {
+      "id": "cmn-04-blank-skip",
+      "scenario": "普通话",
+      "scene": "嘈杂",
+      "desc": "纯空白候选被跳过（trim 后为空）",
+      "candidates": [{ "t": "   ", "c": 0.99 }, { "t": "今天还行呀", "c": 0.2 }],
+      "expect": { "type": "exact", "value": "今天还行呀" },
+      "ref": "今天还行呀"
+    },
+    {
+      "id": "cmn-05-nonstring-skip",
+      "scenario": "普通话",
+      "scene": "嘈杂",
+      "desc": "无 transcript 字段的候选被跳过（本条是故意反例，malformed_candidates 让完整性体检放行）",
+      "malformed_candidates": true,
+      "candidates": [{ "c": 0.9 }, { "t": "今天还行呀", "c": 0.2 }],
+      "expect": { "type": "exact", "value": "今天还行呀" },
+      "ref": "今天还行呀"
+    },
+    {
+      "id": "cmn-06-tie-order",
+      "scenario": "普通话",
+      "scene": "远场",
+      "desc": "同分取靠前那条（严格 > 的边界）",
+      "candidates": [{ "t": "我回去了", "c": 0.5 }, { "t": "我吃完饭了", "c": 0.5 }],
+      "expect": { "type": "exact", "value": "我回去了" },
+      "ref": "我回去了"
+    },
+    {
+      "id": "yue-01-homophone",
+      "scenario": "粤语",
+      "scene": "嘈杂",
+      "desc": "粤语同音错字（忟）被低置信正字（焦虑）盖过",
+      "candidates": [{ "t": "我好忟", "c": 0.9 }, { "t": "我好焦虑", "c": 0.25 }],
+      "expect": { "type": "exact", "value": "我好焦虑" },
+      "ref": "我好焦虑",
+      "probe_word": "焦虑"
+    },
+    {
+      "id": "sc-01-homophone",
+      "scenario": "四川话",
+      "scene": "嘈杂",
+      "desc": "四川话俚语错字候选 vs 正字候选（难过）",
+      "candidates": [{ "t": "我不巴适", "c": 0.9 }, { "t": "我难过得很", "c": 0.25 }],
+      "expect": { "type": "exact", "value": "我难过得很" },
+      "ref": "我难过得很",
+      "probe_word": "难过"
+    },
+    {
+      "id": "db-01-homophone",
+      "scenario": "东北话",
+      "scene": "嘈杂",
+      "desc": "东北话口语候选 vs 正字候选（焦虑）",
+      "candidates": [{ "t": "我可闹心了", "c": 0.9 }, { "t": "我焦虑老久了", "c": 0.25 }],
+      "expect": { "type": "exact", "value": "我焦虑老久了" },
+      "ref": "我焦虑老久了",
+      "probe_word": "焦虑"
+    },
+    {
+      "id": "sh-01-homophone",
+      "scenario": "上海话",
+      "scene": "远场",
+      "desc": "上海话候选 vs 正字候选（疲惫）",
+      "candidates": [{ "t": "蛮 tired 的", "c": 0.9 }, { "t": "我疲惫到不行", "c": 0.25 }],
+      "expect": { "type": "exact", "value": "我疲惫到不行" },
+      "ref": "我疲惫到不行",
+      "probe_word": "疲惫"
+    },
+    {
+      "id": "mn-01-homophone",
+      "scenario": "闽南语",
+      "scene": "嘈杂",
+      "desc": "闽南语候选（繁体「煩」单字，词表是「烦躁」故不命中）vs 正字候选（压力）",
+      "candidates": [{ "t": "我有夠煩", "c": 0.9 }, { "t": "我压力有夠大", "c": 0.25 }],
+      "expect": { "type": "exact", "value": "我压力有夠大" },
+      "ref": "我压力有夠大",
+      "probe_word": "压力"
+    },
+    {
+      "id": "scene-noise-mixed",
+      "scenario": "普通话",
+      "scene": "嘈杂-远场",
+      "desc": "引擎把口头语（嗯/那个/有点）混进候选 —— A2 已收：清洗后仍源自这条候选",
+      "candidates": [{ "t": "嗯那个我今天有点崩溃了", "c": 0.88 }, { "t": "我崩溃了", "c": 0.3 }],
+      "expect": { "type": "exact", "value": "嗯那个我今天有点崩溃了" },
+      "expect_norm": { "type": "exact", "value": "我今天有点崩溃了" },
+      "ref": "我今天有点崩溃了",
+      "probe_word": "崩溃"
+    },
+    {
+      "id": "scene-far-short",
+      "scenario": "普通话",
+      "scene": "远场",
+      "desc": "远场短句：两条都【不含词表词】，按置信度取高者（反例：重排不得越权改短句）",
+      "candidates": [{ "t": "我吃完饭了", "c": 0.4 }, { "t": "我回去了", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我回去了" },
+      "ref": "我回去了"
+    },
+    {
+      "id": "norm-01-leading-chain",
+      "scenario": "归一化",
+      "scene": "嘈杂",
+      "desc": "句首口头语连剥三层（嗯→那个→呃）",
+      "candidates": [{ "t": "嗯那个呃我今天有点焦虑", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "嗯那个呃我今天有点焦虑" },
+      "expect_norm": { "type": "exact", "value": "我今天有点焦虑" }
+    },
+    {
+      "id": "norm-02-redline-trailing-keep",
+      "scenario": "归一化",
+      "scene": "安静",
+      "desc": "🔴 红线三：句末语气字「呀」必须**保留**（用户真说出来的语气，剥它损 fidelity）",
+      "candidates": [{ "t": "我今天很累呀", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我今天很累呀" },
+      "expect_norm": { "type": "exact", "value": "我今天很累呀" },
+      "ref": "我今天很累呀"
+    },
+    {
+      "id": "norm-03-redline-trailing-keep-multi",
+      "scenario": "归一化",
+      "scene": "嘈杂",
+      "desc": "🔴 红线三：连着两个句末语气字（呀吧）同样一律保留",
+      "candidates": [{ "t": "我今天很累呀吧", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我今天很累呀吧" },
+      "expect_norm": { "type": "exact", "value": "我今天很累呀吧" },
+      "ref": "我今天很累呀吧"
+    },
+    {
+      "id": "norm-04-mixed-keep-mid",
+      "scenario": "归一化",
+      "scene": "嘈杂",
+      "desc": "剥句首两个口头语后必须**停手**：后面的「说」是实词，不许继续剥",
+      "candidates": [{ "t": "那个就是说我觉得我有点孤独", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "那个就是说我觉得我有点孤独" },
+      "expect_norm": { "type": "exact", "value": "说我觉得我有点孤独" }
+    },
+    {
+      "id": "norm-05-redline-semantic",
+      "scenario": "归一化",
+      "scene": "边界",
+      "desc": "🔴 红线一：带语义的「有点」绝不可动（「有点累」≠「累」）",
+      "candidates": [{ "t": "我今天有点累", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我今天有点累" },
+      "expect_norm": { "type": "exact", "value": "我今天有点累" }
+    },
+    {
+      "id": "norm-06-redline-noempty",
+      "scenario": "归一化",
+      "scene": "边界",
+      "desc": "🔴 红线二：剥到空必须回退原文，「嗯」不得变空串（否则收句判据拿到空文本）",
+      "candidates": [{ "t": "嗯", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "嗯" },
+      "expect_norm": { "type": "exact", "value": "嗯" }
+    },
+    {
+      "id": "norm-07-all-fillers-guard",
+      "scenario": "归一化",
+      "scene": "边界",
+      "desc": "全句几乎都是口头语时按最小长度闸停在「那个」，不洗成空",
+      "candidates": [{ "t": "嗯那个", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "嗯那个" },
+      "expect_norm": { "type": "exact", "value": "那个" }
+    },
+    {
+      "id": "norm-08-whitespace",
+      "scenario": "归一化",
+      "scene": "远场",
+      "desc": "连续空白压成一个（不改字序）",
+      "candidates": [{ "t": "我 今天   有点 焦虑", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我 今天   有点 焦虑" },
+      "expect_norm": { "type": "exact", "value": "我 今天 有点 焦虑" }
+    },
+    {
+      "id": "norm-09-noop",
+      "scenario": "归一化",
+      "scene": "安静",
+      "desc": "干净文本原样通过（归一化不得制造改动）",
+      "candidates": [{ "t": "我今天有点焦虑", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我今天有点焦虑" },
+      "expect_norm": { "type": "exact", "value": "我今天有点焦虑" }
+    },
+    {
+      "id": "edge-empty-list",
+      "scenario": "边界",
+      "scene": "边界",
+      "desc": "空候选列表返回空串（不得抛）",
+      "candidates": [],
+      "expect": { "type": "exact", "value": "" },
+      "ref": ""
+    },
+    {
+      "id": "edge-all-blank",
+      "scenario": "边界",
+      "scene": "边界",
+      "desc": "全是空白候选返回空串",
+      "candidates": [{ "t": " ", "c": 0.9 }, { "t": "\t", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "" },
+      "ref": ""
+    }
+  ]
+}

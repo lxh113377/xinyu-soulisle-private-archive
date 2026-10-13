@@ -21,6 +21,8 @@ const PRECACHE = [
   "/js/settings.js", "/js/voice.js", "/js/emotion-engine.js", "/js/emotion-remote.js",
   "/js/memory-store.js", "/js/scroll-story.js", "/js/three-scene.js",
   "/js/data-rights.js", "/js/sw-register.js", "/js/voice-call.js", "/css/voice-call.css",
+  // r174/A2 转写归一化（口头语清洗）：asr-normalize.js 必须在 voice-call.js 之前就位
+  "/js/asr-normalize.js",
   "/data/emotion-lexicon.js", "/data/emotion-strategy.js",
   // r113 心理学知识库数据件（psych_kb_build.py 生成，源在 交付物/心理学知识库）
   "/data/psych-kb.js",

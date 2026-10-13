@@ -39,6 +39,10 @@
   C17 跨轮回读（wb-echo-L1）：轮1念白在轮2之后回读必须被丢弃（老码单槽只保最近一条 ⇒ 先验红）
   C18 barge-in 能量突增判据（wb-echo-L1）：纯函数组（基线 2× / 300ms 内 ≥2 采样 / 无读数放行）+ 降级仍可打断
   C19 尾音窗边界（wb-echo-L1）：同一边界样本（dice≈0.500）窗内 0.45 严查丢弃 / 窗外 0.6 放行提交
+  C20 打断判据**排在回声闸之前**（wb-echo-L2 根因①）：模糊面像回声但非整句互含的插话仍能打断
+  C21 反向腿：纯念白（整句互含）**不**触发自打断 —— 防把 C20 改成自激励循环
+  C22 声学打断面（wb-echo-L2 根因②）：底噪冻结 + 纯函数组 + 无任何 onresult 事件也能打断
+  C23 n-best 重排（wb-echo-L2 识别准确率）：maxAlternatives=5 已接线 + pickBest 取词表命中的那条
 
 函数切分（r116 收口轮 / r118 补四段）：loc_guard 的 ≤150 行/函数门把原来的 run_legs（219 行）拆成
   多段（开层/音色/整轮/双工/回声准入/回声L1/摄像头/采集链/无TTS/长轮次/退出/本机引擎），每段自带前置缺失即早退，结论仍汇进同一个 legs 字典。
@@ -107,6 +111,17 @@ window.__vc = { utts: [], deltas: [], cancels: 0, gum: [], started: 0, stopped: 
     if (s) s({ results: L });
   };
   window.__vcClearResults = function () { V.results = []; };
+  /* wb-echo-L2：n-best 投喂。形状照真机 —— 每条结果本身是**备选数组**（length + 下标），
+     不是一个扁平对象；桩只给一条扁平对象的话，被测码的候选重排整条都打不到。 */
+  window.__vcSayAlts = function (alts, isFinal) {
+    var L = V.results;
+    if (L.length && !L[L.length - 1].isFinal) L.pop();
+    var r = { isFinal: !!isFinal, length: alts.length };
+    for (var i = 0; i < alts.length; i++) r[i] = { transcript: alts[i].t, confidence: alts[i].c };
+    L.push(r);
+    var s = SR.__sink;
+    if (s) s({ results: L });
+  };
 
   /* ── speechSynthesis：只 patch speak/cancel，utterance/voice 保持真实对象 ── */
   if (window.SpeechSynthesis && window.SpeechSynthesis.prototype) {
@@ -767,6 +782,208 @@ def _leg_tail_window(page, f, legs):
         print("C19 PASS  边界样本（dice≈0.500）：窗内 0.45 严查丢弃 / 窗外 0.6 放行提交")
 
 
+def _leg_barge_order(page, f, legs):
+    """C20/C21（wb-echo-L2 根因①）：打断判据排在回声闸之前 + 分层回声判的精确面闸。
+
+    C20 用的是**模糊面像回声、精确面不互含**的样本 —— 旧码那道 diceWin≥0.6 的闸会把它吃掉，
+    旧序下 bargeIn 走不到 ⇒ 这条在老码上必红（真机症状 = 豆包能打断、我们打不断）。
+    C21 是反向腿：纯念白（整句互含）**不**该触发自打断 —— 否则 C20 的改法就是自激励循环。
+    两条一起才是完整的分层判据，单看 C20 会把「机器人念白漏进麦」当成进步。
+    """
+    # 念白原文 = 被测对象这轮真会念出去的字，模糊面像但不是它的子串/前缀 ⇒ 精确面不拦
+    spoken = "今天心里有点闷，说不上来哪里不对"
+    probe = "今天心里有点闷，不是说不上来"     # ≈ 念白的变体，但两端都不互含
+    ok_l, st = wait_state(page, "listening", 60)
+    if not ok_l:
+        legs["C20"] = "FAIL"
+        legs["C21"] = "FAIL"
+        f.append("C20/C21 前置缺失：没在听态（state=%s）" % st)
+        return
+    page.evaluate("""(rep) => {
+      window.ChatAgent.respond = function (text, onDelta) {
+        window.__vc.llmCalls += 1; window.__vc.texts.push(text);
+        if (onDelta) onDelta(rep);
+        return Promise.resolve({ reply: rep, mode: "model" });
+      };
+    }""", spoken + "。")
+    page.evaluate("() => { window.__vc.speakMs = 1500; window.__vc.cancels = 0; }")
+    n0 = len(vc(page)["texts"])
+    page.evaluate("() => window.__vcSay('先把这一轮念长一点', true)")
+    ok1 = wait_texts(page, n0 + 1)
+    got_sp, st1 = wait_state(page, "speaking", 80)
+    c0 = vc(page)["cancels"]
+    if not (ok1 and got_sp):
+        legs["C20"] = "FAIL"
+        legs["C21"] = "FAIL"
+        f.append("C20/C21 前置缺失：样本轮没进出声态（ok=%s st=%s）" % (ok1, st1))
+        return
+    # C20：模糊面像回声的老闸会拦，必须仍然打断
+    page.evaluate("(t) => window.__vcSay(t, true)", probe + "。")
+    ok_b, st2 = wait_state(page, "listening", 40)
+    c0b = vc(page)["cancels"]
+    c20 = ok_b and c0b > c0
+    # C21 换一轮再来：必须回到**出声态**才谈得上「会不会自打断」，
+    # 在听态投喂任何转写都不会进打断判据，那样的腿是空断言。
+    c21, c21_why = False, "没排出第二个出声轮"
+    ok_l2, st_l2 = wait_state(page, "listening", 40)
+    if ok_l2:
+        page.evaluate("() => { window.__vc.speakMs = 1500; }")
+        n1 = len(vc(page)["texts"])
+        page.evaluate("() => window.__vcSay('再说一句凑第二轮', true)")
+        wait_texts(page, n1 + 1)
+        ok_sp2, st_sp2 = wait_state(page, "speaking", 80)
+        if ok_sp2:
+            c1 = vc(page)["cancels"]
+            page.evaluate("(t) => window.__vcSay(t, true)", spoken + "。")
+            page.wait_for_timeout(500)
+            st3 = state(page)
+            c21 = vc(page)["cancels"] == c1 and st3 == "speaking"
+            c21_why = "cancels %d→%d state=%s" % (c1, vc(page)["cancels"], st3)
+        else:
+            c21_why = "第二轮没进出声态（state=%s）" % st_sp2
+    if not c20:
+        legs["C20"] = "FAIL"
+        f.append("C20 模糊面像回声的插话没能打断（cancels %d→%d state=%s）⇒ 回声闸仍排在打断之前"
+                 % (c0, c0b, st2))
+    else:
+        legs["C20"] = "PASS"
+        print("C20 PASS  回声闸之前的打断：模糊相似插话照样打断（cancels %d→%d）" % (c0, c0b))
+    if not c21:
+        legs["C21"] = "FAIL"
+        f.append("C21 纯念白触发了自打断（%s）⇒ 分层回声判的精确面闸缺失" % c21_why)
+    else:
+        legs["C21"] = "PASS"
+        print("C21 PASS  纯念白不自打断（%s）" % c21_why)
+
+
+def _leg_barge_acoustic(page, f, legs):
+    """C22（wb-echo-L2 根因②）：声学打断面 —— 底噪冻结 + 纯函数组 + **零 onresult 事件**也能打断。
+
+    最后那半条是本腿的重点：老码的打断只挂在 onresult 上，真机上等于「必须先识别出一段文字
+    才可能打断」，而插话混着念白时那段文字恰好被回声闸吃掉 —— 这就是打不断的结构性原因。
+    这里全程不投喂任何转写，只灌能量采样。
+    """
+    rows = page.evaluate("""() => {
+      const U = window.VoiceCall._unit; const o = [];
+      const mk = (a) => a.map((p) => ({ t: p[0], v: p[1] }));
+      const ck = (n, got, want) => o.push([n, got === want, got, want]);
+      if (!U.bargeOk || !U.baseOf) return [["bargeOk/baseOf 缺失（老码）", false, "undefined", "function"]];
+      ck("底噪未冻结=不打断（交文本面）", U.bargeOk(mk([[9800, 0.5]]), 10000, null), false);
+      ck("底噪为0=不打断", U.bargeOk(mk([[9800, 0.5]]), 10000, 0), false);
+      ck("采样不足=不打断", U.bargeOk(mk([[9800, 0.5]]), 10000, 0.01), false);
+      ck("窗内全部低于2.2×=不打断",
+         U.bargeOk(mk([[9800, 0.015], [9850, 0.016], [9900, 0.015], [9950, 0.016]]), 10000, 0.01), false);
+      ck("底噪2.2倍以上且≥3采样=打断（真人插话）",
+         U.bargeOk(mk([[9800, 0.5], [9850, 0.03], [9900, 0.04], [9950, 0.05]]), 10000, 0.01), true);
+      ck("恰在2.2×线=不打断（边界）",
+         U.bargeOk(mk([[9800, 0.5], [9850, 0.0225], [9900, 0.0225], [9950, 0.0225]]), 10000, 0.01), false);
+      ck("全在240ms窗外=不打断",
+         U.bargeOk(mk([[9000, 0.5], [9100, 0.5], [9200, 0.5], [9300, 0.5], [9400, 0.5]]), 10000, 0.01), false);
+      ck("只2个采样过阈=不打断（响的那个在窗外）",
+         U.bargeOk(mk([[9500, 0.5], [9800, 0.05], [9900, 0.05], [9950, 0.015]]), 10000, 0.01), false);
+      o.push(["baseOf 样本不足=null", U.baseOf(mk([[9800, 0.1]]), 10000) === null, "null", "null"]);
+      o.push(["baseOf 取下中位（不被说话起始抬高）",
+              U.baseOf(mk([[9700, 0.1], [9800, 0.2], [9850, 0.3], [9900, 0.4]]), 10000) === 0.2,
+              U.baseOf(mk([[9700, 0.1], [9800, 0.2], [9850, 0.3], [9900, 0.4]]), 10000), 0.2]);
+      o.push(["baseOf 窗外样本不算", U.baseOf(mk([[9000, 0.9], [9100, 0.9], [9200, 0.9]]), 10000) === null,
+              U.baseOf(mk([[9000, 0.9], [9100, 0.9], [9200, 0.9]]), 10000), null]);
+      return o;
+    }""")
+    bad = [r for r in rows if not r[1]]
+    page.evaluate("() => { window.__vc.speakMs = 1500; window.__vc.cancels = 0; }")
+    n0 = len(vc(page)["texts"])
+    page.evaluate("() => window.__vcSay('这轮念久一点好触发声学面', true)")
+    ok1 = wait_texts(page, n0 + 1)
+    got_sp, st = wait_state(page, "speaking", 80)
+    c0 = vc(page)["cancels"]
+    ok_spk = got_sp
+    # 只灌能量，**不投喂任何转写**
+    page.evaluate("""() => {
+      const VC = window.VoiceCall;
+      VC._injectBase(0.01);                       // 冻结念白前的房间底噪
+      const t0 = performance.now();
+      for (let i = 0; i < 4; i++) VC._injectLevel(0.30, t0 - 40 + i * 16);   // 真人插话 ~30×底噪
+    }""")
+    ok_b, st2 = wait_state(page, "listening", 40)
+    integ = ok_b and vc(page)["cancels"] > c0
+    if bad:
+        legs["C22"] = "FAIL"
+        f.append("C22 声学判据不符: %s" % [[r[0], r[2], r[3]] for r in bad])
+    elif not ok_spk:
+        legs["C22"] = "FAIL"
+        f.append("C22 前置缺失：没能进入出声态（state=%s）" % st)
+    elif not integ:
+        legs["C22"] = "FAIL"
+        f.append("C22 零转写下声学面没能打断（cancels %d→%d state=%s）⇒ 打断仍只挂在 onresult 上"
+                 % (c0, vc(page)["cancels"], st2))
+    else:
+        legs["C22"] = "PASS"
+        print("C22 PASS  声学判据 %d 例；零转写下纯靠电平打断（cancels %d→%d）"
+              % (len(rows), c0, vc(page)["cancels"]))
+
+
+def _leg_nbest(page, f, legs):
+    """C23（wb-echo-L2 识别准确率）：maxAlternatives=5 已接线 + pickBest 取词表命中的那条。
+
+    样本刻意做成「置信度低的词表命中句」赢过「置信度高的普通句」—— Web Speech 的 n-best 里
+    领域词常排在后面（引擎不知道「抑郁/失眠」在本项目里的分量），这一条钉的就是重排是否真在生效。
+    """
+    rows = page.evaluate("""() => {
+      const U = window.VoiceCall._unit; const o = [];
+      const ck = (n, got, want) => o.push([n, got === want, got, want]);
+      if (!U.pickBest) return [["pickBest 缺失（老码）", false, "undefined", "function"]];
+      ck("空列表=空串", U.pickBest([]), "");
+      ck("无转写字段=空串", U.pickBest([{ confidence: 0.9 }, null]), "");
+      ck("单候选原样返回", U.pickBest([{ transcript: "你好啊", confidence: 0.5 }]), "你好啊");
+      ck("空转写候选被跳过", U.pickBest([{ transcript: "  ", confidence: 0.99 }, { transcript: "今天还行", confidence: 0.2 }]),
+         "今天还行");
+      ck("置信度高者优先（无词表命中时）",
+         U.pickBest([{ transcript: "今天还行呀", confidence: 0.9 }, { transcript: "今天还行吧", confidence: 0.3 }]),
+         "今天还行呀");
+      ck("词表命中的低置信候选胜出",
+         U.pickBest([{ transcript: "最近老是失眠", confidence: 0.3 }, { transcript: "最近老是湿安", confidence: 0.85 }]),
+         "最近老是失眠");
+      ck("危机词候选加权胜出",
+         U.pickBest([{ transcript: "今天有点累", confidence: 0.9 }, { transcript: "我不想活了", confidence: 0.2 }]),
+         "我不想活了");
+      return o;
+    }""")
+    bad = [r for r in rows if not r[1]]
+    wiring = page.evaluate("() => window.VoiceCall.inspect().alts")
+    if wiring != 5:
+        legs["C23"] = "FAIL"
+        f.append("C23 maxAlternatives 未接线（inspect().alts=%r，旧码是 1）" % wiring)
+        return
+    alt = page.evaluate("""() => {
+      window.__vcSayAlts([{ t: "最近老是湿安", c: 0.9 }, { t: "最近老是失眠", c: 0.3 },
+                          { t: "最近老是士安", c: 0.1 }], true);
+      return { pend: window.VoiceCall.inspect().pending };
+    }""")
+    ok_pend = alt.get("pend") == "最近老是失眠"
+    if bad:
+        legs["C23"] = "FAIL"
+        f.append("C23 pickBest 不符: %s" % [[r[0], r[2], r[3]] for r in bad])
+    elif not ok_pend:
+        legs["C23"] = "FAIL"
+        f.append("C23 真实链上 n-best 没被重排（pending=%r）⇒ maxAlternatives/pickBest 未接线"
+                 % alt.get("pend"))
+    else:
+        legs["C23"] = "PASS"
+        print("C23 PASS  pickBest %d 例；真实链上 n-best 选出词表命中的那条（%r）" % (len(rows), alt.get("pend")))
+
+
+def legs_barge_l2(page, f, legs):
+    """C20-C23（wb-echo-L2）：打断顺序 / 分层回声判反向腿 / 声学打断面 / n-best 重排。"""
+    try:
+        _leg_barge_order(page, f, legs)
+        _leg_barge_acoustic(page, f, legs)
+        _leg_nbest(page, f, legs)
+    finally:
+        # 收尾必须复位假上游与语速：本组腿会替换 ChatAgent.respond 并拉长 speakMs，
+        # 不复位会连累后面的 C13（无 TTS 腿读的是字幕兜底，拿到的是本组的假回复）
+        page.evaluate("() => { window.__vc.speakMs = 40; window.__vcInstallFake(); }")
+
+
 def legs_echo_l1(page, f, legs):
     """C17-C19（wb-echo-L1）：跨轮回读 / 打断能量判据 / 尾音窗边界；收尾复位假上游与语速。"""
     _leg_echo_cross(page, f, legs)
@@ -1020,6 +1237,7 @@ def run_legs(page, browser, url):
     legs_duplex(page, f, legs)
     legs_echo_admit(page, f, legs)
     legs_echo_l1(page, f, legs)
+    legs_barge_l2(page, f, legs)
     legs_camera(page, f, legs)
     legs_noise(page, f, legs)
     legs_no_tts(page, f, legs)
