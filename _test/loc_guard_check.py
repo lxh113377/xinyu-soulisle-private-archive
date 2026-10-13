@@ -131,6 +131,57 @@ def _classify(head, is_java=False):
     return None
 
 
+def _brace_counts(lines):
+    """逐行给出**代码里**的花括号数（成对字符串/字符/模板串、行注释、块注释一律不计）。
+
+    r168 加。原实现直接 `ln.count("{")`，而头注自己承认「跨行注释与字符串里的括号会干扰，
+    故本门只作趋势读数」—— 问题是它同时挂在 **enforce** 上：尺自己算错，却有能力拦下正常提交。
+    一手实发：`ChatControllerTest.java` 241 行、每个方法都不到 20 行，被算成
+    「最长函数 171 行」，因为 JSON 字面量里的 `{`/`}` 把栈深一路带偏（`malformedBody` 起再没归零）。
+    正解是让尺读**代码**而不是读**字符**，而不是给一个启发式的门开豁免名单。
+    """
+    counts = []
+    in_block = False        # 跨行的 /* */ 块注释状态
+    for ln in lines:
+        op = cl = 0
+        i, n = 0, len(ln)
+        quote = ""
+        while i < n:
+            c = ln[i]
+            if in_block:
+                if c == "*" and i + 1 < n and ln[i + 1] == "/":
+                    in_block = False
+                    i += 2
+                    continue
+                i += 1
+                continue
+            if quote:
+                if c == "\\":
+                    i += 2
+                    continue
+                if c == quote:
+                    quote = ""
+                i += 1
+                continue
+            if c == "/" and i + 1 < n and ln[i + 1] == "/":
+                break                                  # 行注释：本行到此为止
+            if c == "/" and i + 1 < n and ln[i + 1] == "*":
+                in_block = True
+                i += 2
+                continue
+            if c in ('"', "'", "`"):
+                quote = c
+                i += 1
+                continue
+            if c == "{":
+                op += 1
+            elif c == "}":
+                cl += 1
+            i += 1
+        counts.append((op, cl))
+    return counts
+
+
 def _brace_blocks(lines, is_java=False):
     """JS/Java 启发式：栈配对 `{`/`}` → [(hint, 行数, 类别)]。
 
@@ -138,17 +189,19 @@ def _brace_blocks(lines, is_java=False):
     ① **只测 depth==0 的块** ⇒ IIFE 内部函数完全不可见（src/js 的函数长此前等于没测）；
        现改为**任意嵌套层**的块都测，嵌套函数不再漏。
     ② 类与 IIFE 模块包装归类为 `class`/`module`，**不进函数长排名**（但行数照常算入文件行数）。
-    仍是启发式：跨行注释与字符串里的括号会干扰，故本门只作趋势读数。
+    r168 修第三点：括号计数改走 `_brace_counts()`，**字符串与注释里的括号不再进栈**
+    （此前头注写「只作趋势读数」却挂在 enforce 上，算错就会拦正常提交）。
     """
     out, stack = [], []
-    for i, ln in enumerate(lines):
-        if "{" in ln:
+    for i, (opens, closes) in enumerate(_brace_counts(lines)):
+        ln = lines[i]
+        if opens:
             head = ln.split("{")[0]
             cat = _classify(head, is_java)
-            for _ in range(ln.count("{")):
+            for _ in range(opens):
                 stack.append((i, ln.strip()[:40], cat))
-        if "}" in ln:
-            for _ in range(ln.count("}")):
+        if closes:
+            for _ in range(closes):
                 if not stack:
                     continue
                 start, hint, cat = stack.pop()
@@ -254,6 +307,36 @@ def selftest():
     r9 = scan_text("c.py", py_cls, DEFAULT_ROWS, DEFAULT_FUNC)
     cases.append(("反例 Python 类 300 行不得判为函数超限",
                   not any("函数长" in o for o in r9["over"]), True))
+    # 8) r168 采集层正向断言（A-get-memory ②-g「读代码的采集层必须有一条正向断言」）：
+    #    字符串与注释里的括号**不得进栈**。一手实发：ChatControllerTest.java 241 行、
+    #    每个方法都不到 20 行，却被旧口径算成「最长函数 171 行」—— JSON 字面量里的
+    #    花括号把栈深一路带偏，从 malformedBody 起再没归零；而这条尺挂在 enforce 上。
+    noisy = ("class T {\n"
+             "    void f() {\n"
+             '        String s = "{\\"a\\":{\\"b\\":1}}";  // 串里的 } 与 { 不算\n'
+             "        /* 块注释里的 { 与 } 也不算\n"
+             "            跨行的 } 同样不算 */\n"
+             + "".join("        x%d = %d;\n" % (i, i) for i in range(8))
+             + "    }\n}\n")
+    rb = scan_text("T.java", noisy, DEFAULT_ROWS, DEFAULT_FUNC)
+    # 手算：f() 从第 2 行开到第 14 行关 ⇒ 13 行；类 15 行走 class 不进函数长排名
+    cases.append(("正向 串/注释里的括号不进栈：实测 max_func=%s 应==手算 13" % rb["max_func"],
+                  rb["max_func"] == 13, True))
+    bc = _brace_counts(noisy.splitlines())
+    cases.append(("正向 _brace_counts 只数代码括号：实测 open=%d close=%d 应==2/2"
+                  % (sum(o for o, _ in bc), sum(c for _, c in bc)),
+                  (sum(o for o, _ in bc), sum(c for _, c in bc)) == (2, 2), True))
+    # 反向腿：把**同一批字符**从「串里/注释里」搬到「代码里」⇒ 计数必须变多。
+    # 这条配对才是判定力所在：只测「噪声被忽略」而不测「代码被计入」，
+    # 一条把括号全归零的坏实现也能通过上一条。
+    moved = noisy.replace('        String s = "{\\"a\\":{\\"b\\":1}}";  // 串里的 } 与 { 不算\n',
+                          "        if (a) { call1(); }\n        if (b) { call2(); }\n")
+    mc = _brace_counts(moved.splitlines())
+    cases.append(("反向 同一批字符落到代码里就必须进栈：实测 open=%d 应 > 2"
+                  % sum(o for o, _ in mc), sum(o for o, _ in mc) > 2, True))
+    mscan = scan_text("T.java", moved, DEFAULT_ROWS, DEFAULT_FUNC)
+    cases.append(("反向 搬进代码后多出的嵌套块必须被量到（尺不是恒零实现）：实测 blocks 最大函数=%s"
+                  % mscan["max_func"], mscan["max_func"] >= 13, True))
     # 7) r94 接线自证变异腿：把电池条目里的 `--enforce` 摘掉 ⇒ 接线判否（门有门但没牙）
     w_ok, note_ok = wiring_report()
     cases.append(("接线 当前电池条目带 --enforce", w_ok is True, True))

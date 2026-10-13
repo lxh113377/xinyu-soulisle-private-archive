@@ -1,0 +1,1416 @@
+{
+ "generated": "2026-10-14T00:26:05",
+ "disclaimer": "本报告的准确率是「判据在**指定语料**上的表现」，不等于「产品在真实人群上的准确率」。REAL 语料 12 张真照片仅覆盖 anger/calm/joy/surprise 四类；fear/sadness/disgust/contempt 四类**零真实样本**（真实召回率未测，不是 100%）。SYNTH/LOWINT 为合成向量，仅证明判据结构有判别力。",
+ "counts": {
+  "REAL": 12,
+  "SYNTH": 26,
+  "LOWINT": 50
+ },
+ "corpora": {
+  "REAL": {
+   "all_frame": {
+    "n": 12,
+    "n_all": 12,
+    "abstain_rate": 0.33333333333333337,
+    "per_class": {
+     "joy": {
+      "support": 4,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 4,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "sadness": {
+      "support": 0,
+      "tp": 0,
+      "fp": 2,
+      "fn": 0,
+      "predicted": 2,
+      "precision": 0.0,
+      "recall": null,
+      "f1": 0.0,
+      "untested": false
+     },
+     "anger": {
+      "support": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 2,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "fear": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "surprise": {
+      "support": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 2,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "disgust": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "contempt": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "calm": {
+      "support": 4,
+      "tp": 2,
+      "fp": 0,
+      "fn": 2,
+      "predicted": 2,
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.6666666666666666,
+      "untested": false
+     },
+     "__UNKNOWN__": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     }
+    },
+    "micro": {
+     "precision": 0.8333333333333334,
+     "recall": 0.8333333333333334,
+     "f1": 0.8333333333333334
+    },
+    "macro_f1": 0.7333333333333333,
+    "accuracy_all_frame": 0.8333333333333334,
+    "classes_tested": 5,
+    "classes_untested": [
+     "fear",
+     "disgust",
+     "contempt",
+     "__UNKNOWN__"
+    ],
+    "confusion": {
+     "joy": {
+      "joy": 4,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "sadness": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "anger": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 2,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "fear": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "surprise": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 2,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "disgust": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "contempt": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "calm": {
+      "joy": 0,
+      "sadness": 2,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 2,
+      "__UNKNOWN__": 0
+     },
+     "__UNKNOWN__": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     }
+    }
+   },
+   "confident_only": {
+    "n": 8,
+    "n_all": 12,
+    "abstain_rate": 0.33333333333333337,
+    "per_class": {
+     "joy": {
+      "support": 4,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 4,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "sadness": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "anger": {
+      "support": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 2,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "fear": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "surprise": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "disgust": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "contempt": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "calm": {
+      "support": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 2,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "__UNKNOWN__": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     }
+    },
+    "micro": {
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "macro_f1": 1.0,
+    "accuracy_all_frame": 1.0,
+    "classes_tested": 3,
+    "classes_untested": [
+     "sadness",
+     "fear",
+     "surprise",
+     "disgust",
+     "contempt",
+     "__UNKNOWN__"
+    ],
+    "confusion": {
+     "joy": {
+      "joy": 4,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "sadness": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "anger": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 2,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "fear": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "surprise": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "disgust": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "contempt": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "calm": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 2,
+      "__UNKNOWN__": 0
+     },
+     "__UNKNOWN__": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     }
+    }
+   }
+  },
+  "SYNTH": {
+   "all_frame": {
+    "n": 26,
+    "n_all": 26,
+    "abstain_rate": 0.23076923076923073,
+    "per_class": {
+     "joy": {
+      "support": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 2,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "sadness": {
+      "support": 6,
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 6,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "anger": {
+      "support": 4,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 4,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "fear": {
+      "support": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "surprise": {
+      "support": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 2,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "disgust": {
+      "support": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "contempt": {
+      "support": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "calm": {
+      "support": 9,
+      "tp": 9,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 9,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "__UNKNOWN__": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     }
+    },
+    "micro": {
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "macro_f1": 1.0,
+    "accuracy_all_frame": 1.0,
+    "classes_tested": 8,
+    "classes_untested": [
+     "__UNKNOWN__"
+    ],
+    "confusion": {
+     "joy": {
+      "joy": 2,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "sadness": {
+      "joy": 0,
+      "sadness": 6,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "anger": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 4,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "fear": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 1,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "surprise": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 2,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "disgust": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 1,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "contempt": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 1,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "calm": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 9,
+      "__UNKNOWN__": 0
+     },
+     "__UNKNOWN__": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     }
+    }
+   },
+   "confident_only": {
+    "n": 20,
+    "n_all": 26,
+    "abstain_rate": 0.23076923076923073,
+    "per_class": {
+     "joy": {
+      "support": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 2,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "sadness": {
+      "support": 5,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 5,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "anger": {
+      "support": 4,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 4,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "fear": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "surprise": {
+      "support": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "disgust": {
+      "support": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "contempt": {
+      "support": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "calm": {
+      "support": 6,
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 6,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "__UNKNOWN__": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     }
+    },
+    "micro": {
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "macro_f1": 1.0,
+    "accuracy_all_frame": 1.0,
+    "classes_tested": 7,
+    "classes_untested": [
+     "fear",
+     "__UNKNOWN__"
+    ],
+    "confusion": {
+     "joy": {
+      "joy": 2,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "sadness": {
+      "joy": 0,
+      "sadness": 5,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "anger": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 4,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "fear": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "surprise": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 1,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "disgust": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 1,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "contempt": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 1,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "calm": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 6,
+      "__UNKNOWN__": 0
+     },
+     "__UNKNOWN__": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     }
+    }
+   }
+  },
+  "LOWINT": {
+   "all_frame": {
+    "n": 50,
+    "n_all": 50,
+    "abstain_rate": 0.42000000000000004,
+    "per_class": {
+     "joy": {
+      "support": 5,
+      "tp": 4,
+      "fp": 0,
+      "fn": 1,
+      "predicted": 4,
+      "precision": 1.0,
+      "recall": 0.8,
+      "f1": 0.888888888888889,
+      "untested": false
+     },
+     "sadness": {
+      "support": 5,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 5,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "anger": {
+      "support": 5,
+      "tp": 5,
+      "fp": 4,
+      "fn": 0,
+      "predicted": 9,
+      "precision": 0.5555555555555556,
+      "recall": 1.0,
+      "f1": 0.7142857142857143,
+      "untested": false
+     },
+     "fear": {
+      "support": 5,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 5,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "surprise": {
+      "support": 5,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 5,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "disgust": {
+      "support": 5,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 5,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "contempt": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "calm": {
+      "support": 20,
+      "tp": 16,
+      "fp": 1,
+      "fn": 4,
+      "predicted": 17,
+      "precision": 0.9411764705882353,
+      "recall": 0.8,
+      "f1": 0.8648648648648648,
+      "untested": false
+     },
+     "__UNKNOWN__": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     }
+    },
+    "micro": {
+     "precision": 0.9,
+     "recall": 0.9,
+     "f1": 0.9
+    },
+    "macro_f1": 0.9240056382913525,
+    "accuracy_all_frame": 0.9,
+    "classes_tested": 7,
+    "classes_untested": [
+     "contempt",
+     "__UNKNOWN__"
+    ],
+    "confusion": {
+     "joy": {
+      "joy": 4,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 1,
+      "__UNKNOWN__": 0
+     },
+     "sadness": {
+      "joy": 0,
+      "sadness": 5,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "anger": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 5,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "fear": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 5,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "surprise": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 5,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "disgust": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 5,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "contempt": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "calm": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 4,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 16,
+      "__UNKNOWN__": 0
+     },
+     "__UNKNOWN__": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     }
+    }
+   },
+   "confident_only": {
+    "n": 29,
+    "n_all": 50,
+    "abstain_rate": 0.42000000000000004,
+    "per_class": {
+     "joy": {
+      "support": 3,
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "sadness": {
+      "support": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 2,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "anger": {
+      "support": 3,
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "fear": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "surprise": {
+      "support": 3,
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "disgust": {
+      "support": 3,
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "contempt": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     },
+     "calm": {
+      "support": 15,
+      "tp": 15,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 15,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "untested": false
+     },
+     "__UNKNOWN__": {
+      "support": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "predicted": 0,
+      "precision": null,
+      "recall": null,
+      "f1": 0.0,
+      "untested": true
+     }
+    },
+    "micro": {
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "macro_f1": 1.0,
+    "accuracy_all_frame": 1.0,
+    "classes_tested": 6,
+    "classes_untested": [
+     "fear",
+     "contempt",
+     "__UNKNOWN__"
+    ],
+    "confusion": {
+     "joy": {
+      "joy": 3,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "sadness": {
+      "joy": 0,
+      "sadness": 2,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "anger": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 3,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "fear": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "surprise": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 3,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "disgust": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 3,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "contempt": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     },
+     "calm": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 15,
+      "__UNKNOWN__": 0
+     },
+     "__UNKNOWN__": {
+      "joy": 0,
+      "sadness": 0,
+      "anger": 0,
+      "fear": 0,
+      "surprise": 0,
+      "disgust": 0,
+      "contempt": 0,
+      "calm": 0,
+      "__UNKNOWN__": 0
+     }
+    }
+   }
+  }
+ },
+ "slices": {
+  "lighting": {
+   "measurable": false,
+   "reason": "无任何样本带该轴标注"
+  },
+  "yaw": {
+   "measurable": false,
+   "reason": "无任何样本带该轴标注"
+  },
+  "age_group": {
+   "measurable": false,
+   "reason": "无任何样本带该轴标注"
+  },
+  "gender": {
+   "measurable": false,
+   "reason": "无任何样本带该轴标注"
+  },
+  "level": {
+   "measurable": true,
+   "buckets": {
+    "__未标注__": {
+     "n": 38,
+     "hit": 36,
+     "hit_confident": 28,
+     "n_confident": 28,
+     "acc_all": 0.9473684210526315,
+     "acc_confident": 1.0
+    },
+    "0.12": {
+     "n": 10,
+     "hit": 9,
+     "hit_confident": 3,
+     "n_confident": 3,
+     "acc_all": 0.9,
+     "acc_confident": 1.0
+    },
+    "0.22": {
+     "n": 10,
+     "hit": 8,
+     "hit_confident": 3,
+     "n_confident": 3,
+     "acc_all": 0.8,
+     "acc_confident": 1.0
+    },
+    "0.3": {
+     "n": 10,
+     "hit": 10,
+     "hit_confident": 7,
+     "n_confident": 7,
+     "acc_all": 1.0,
+     "acc_confident": 1.0
+    },
+    "0.4": {
+     "n": 10,
+     "hit": 9,
+     "hit_confident": 8,
+     "n_confident": 8,
+     "acc_all": 0.9,
+     "acc_confident": 1.0
+    },
+    "0.45": {
+     "n": 10,
+     "hit": 9,
+     "hit_confident": 8,
+     "n_confident": 8,
+     "acc_all": 0.9,
+     "acc_confident": 1.0
+    }
+   },
+   "unlabeled": 38
+  }
+ },
+ "latency_ms": {
+  "n": 88,
+  "p50": 0.013,
+  "p95": 0.0305,
+  "max": 0.5848,
+  "note": "仅 read() 规则层计算耗时，**不含** MediaPipe 拉流与推理"
+ }
+}

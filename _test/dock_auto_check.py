@@ -140,6 +140,58 @@ def main():
             ck("D11 退出全屏后进度回到真实滚动值（不把虚拟值带出全屏）",
                t2 is not None and t_real is not None and abs(t2 - t_real) < 0.02,
                "real=%s exit=%s" % (t_real, t2))
+
+            # r172b（2026-10-14 老大报障修复）：D10 用**空日志**取证，恰好看不见本次真缺陷——
+            # 全屏态 chat-log 可滚时，旧规则让日志先吃滚轮，星雾全程不动（实测复现：上滚时
+            # logTop 1117→217 而 t 恒 1）。新页面预种历史日志，专钉「滚轮优先给星雾」：
+            # 日志可滚且不在边缘时，上下滚都必须推动 virtT 且日志不许位移。
+            pg2 = b.new_page(viewport={"width": 1280, "height": 800})
+            errs2 = []
+            pg2.on("pageerror", lambda e: errs2.append(str(e)[:140]))
+            pg2.add_init_script("""(() => {
+              const hist = [];
+              for (let i = 1; i <= 14; i++) {
+                hist.push({ role: "user", content: "第 " + i + " 条测试消息，今天有点累，想说说学校里的事情。" });
+                hist.push({ role: "assistant", content: "我在这里听着。第 " + i + " 条回复：辛苦你了，慢慢说，不着急。" });
+              }
+              try { localStorage.setItem("peiliao.history.v1", JSON.stringify(hist)); } catch (e) {}
+            })();""")
+            pg2.goto(BASE, wait_until="load")
+            pg2.wait_for_function("() => window.__XINYU__ && window.__XINYU__.opening === 'done'",
+                                  timeout=25000)
+            pg2.wait_for_timeout(600)
+            pg2.evaluate("() => window.scrollTo(0, 0)")
+            pg2.wait_for_timeout(500)
+            pg2.click("#btn-dock")                # 常态 → 全屏
+            pg2.wait_for_timeout(500)
+            d12 = pg2.evaluate("""() => {
+              const log = document.getElementById("chat-log");
+              return { full: document.getElementById("chat-dock").classList.contains("full"),
+                       scrollable: log.scrollHeight > log.clientHeight + 2,
+                       logTop: log.scrollTop, t: window.__XINYU_SCROLL_T__ };
+            }""")
+            in_full12 = d12["full"] and d12["scrollable"] and d12["logTop"] > 100
+            ck("D12-pre 全屏+日志可滚且停底（复现条件就位）", in_full12,
+               "full=%s scrollable=%s logTop=%s" % (d12["full"], d12["scrollable"], d12["logTop"]))
+            if in_full12:
+                pg2.mouse.move(640, 400)           # 视口中央 = chat-log 日志区
+                pg2.mouse.wheel(0, 300)
+                pg2.wait_for_timeout(600)
+                s1 = pg2.evaluate("() => ({ t: window.__XINYU_SCROLL_T__, logTop: document.getElementById('chat-log').scrollTop })")
+                ck("D12a 全屏下滚：virtT 升且日志不位移（滚轮优先给星雾）",
+                   s1["t"] is not None and s1["t"] > d12["t"] and s1["logTop"] == d12["logTop"],
+                   "t %s->%s logTop %s->%s" % (d12["t"], s1["t"], d12["logTop"], s1["logTop"]))
+                pg2.mouse.wheel(0, -300)
+                pg2.wait_for_timeout(600)
+                s2 = pg2.evaluate("() => ({ t: window.__XINYU_SCROLL_T__, logTop: document.getElementById('chat-log').scrollTop })")
+                ck("D12b 全屏上滚：virtT 降且日志不抢滚轮（本次报障主症状）",
+                   s2["t"] is not None and s2["t"] < s1["t"] and s2["logTop"] == d12["logTop"],
+                   "t %s->%s logTop %s->%s" % (s1["t"], s2["t"], d12["logTop"], s2["logTop"]))
+            else:
+                ck("D12a 全屏下滚：virtT 升且日志不位移", False, "未能进入全屏+可滚日志态")
+                ck("D12b 全屏上滚：virtT 降且日志不抢滚轮", False, "未能进入全屏+可滚日志态")
+            ck("D12z 该页面全程无 JS 异常", not errs2, str(errs2[:2]))
+            pg2.close()
             pg.click("#btn-dock")                # 收起 → 常规，恢复 D8 需要的展开态
             pg.wait_for_timeout(400)
 

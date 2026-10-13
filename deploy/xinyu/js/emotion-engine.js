@@ -21,6 +21,19 @@ window.EmotionEngine = (function () {
   const NEG = SRC.neg;
   const DEG = SRC.deg;
   const CONTRAST = SRC.contrast || [];
+  /* 反讽/反问嫌疑标记（r117）：SSOT 的 `irony.markers`。
+   * 为什么要它：像「我可太开心了」「太好了，又加班」这种**字面褒义、实际负面**的话，
+   * 词典层在原理上判不出来（它没有任何词能告诉你这是反话），旧实现是照旧输出一个自信的
+   * 错误标签 joy，离线演示时那就是最终答案。本轮不让它去猜明白，而是让它**自证不确定**：
+   * 命中标记 ⇒ `ironySuspected = true`，调用方据此优先采信 LLM 精判。
+   * 为什么 fail-fast（不 `|| []` 兜底）：静默回落会让「标记根本没加载」和「标记真没命中」
+   * 长得一模一样 —— 那正是本仓反复出现的「假通过」形状。缺这一键必须当场炸。 */
+  const IRONY = (SRC.irony && SRC.irony.markers) || null;
+  if (!Array.isArray(IRONY)) {
+    throw new Error(
+      "[EmotionEngine] 词表缺 irony.markers：请加载 r117 版 src/data/emotion-lexicon.js"
+    );
+  }
   const CRISIS = SRC.crisis;
   const LABELS = SRC.labels;
   const CRISIS_COLOR = SRC.crisisColor;
@@ -102,6 +115,9 @@ window.EmotionEngine = (function () {
       if (s > 0) scores[emo] = s;
     }
     const crisis = CRISIS.some(w => text.includes(w));
+    // 反讽嫌疑（r117）：只挂一个嫌疑标记，**不改任何分数** —— 词典层没有能力翻案，
+    // 它的诚实做法是声明自己不可靠，而不是猜一个更"聪明"的标签。
+    const ironySuspected = IRONY.some(m => text.includes(m));
     let emotion = "calm", intensity = 0.25;
     const entries = Object.entries(scores).sort((a, b) => b[1] - a[1]);
     if (entries.length) {
@@ -113,7 +129,8 @@ window.EmotionEngine = (function () {
       emotion: crisis ? "crisis" : emotion,
       intensity: crisis ? 1 : intensity,
       all: entries.map(([e, v]) => ({ emotion: e, score: +v.toFixed(2) })),
-      color: crisis ? CRISIS_COLOR.slice() : (LEX[emotion] ? LEX[emotion].color : LEX.calm.color)
+      color: crisis ? CRISIS_COLOR.slice() : (LEX[emotion] ? LEX[emotion].color : LEX.calm.color),
+      ironySuspected
     };
   }
 
@@ -142,5 +159,6 @@ window.EmotionEngine = (function () {
 
   // LEX / NEG / DEG / CRISIS 一并导出：供 `_test/engine_consistency_check.py` 与 Java 侧逐项对账
   // （一致性守卫需要比对词表**结构本身**，只比预测汇总可能因巧合相同而漏掉分叉）
-  return { scan, colorOf, labelOf, secondaryOf, palette, LEX, NEG, DEG, CONTRAST, CRISIS };
+  // IRONY 一并导出：与 LEX/NEG/DEG/CONTRAST/CRISIS 同列，供 `engine_consistency_check` 逐项对账
+  return { scan, colorOf, labelOf, secondaryOf, palette, LEX, NEG, DEG, CONTRAST, CRISIS, IRONY };
 })();

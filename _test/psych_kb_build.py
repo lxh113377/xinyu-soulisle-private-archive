@@ -33,6 +33,11 @@ SHIP_LEVELS = ("A", "B", "C", "D")   # E 级不入产品件
 CONTENT_MAX = 320            # 注入用内容截断（句界截断，超长条目保前几句即可撑起 60-120 字回复）
 BOUNDARY_MAX = 60            # 免责短语自身的长度上限（超此值判为正则咬多了 -> fail-fast，不静默灌长段）
 MAX_RELATED = 4              # 每条目自动提取的情绪关联上限
+SRC_OUT = ROOT / "src" / "data" / "psych-kb-sources.js"   # r172：来源件（懒加载，不进首屏）
+SRC_GLOBAL = "window.__XINYU_PSYCH_KB_SRC__"
+URL_RE = re.compile(r"https?://[^\s；;）)】\]]+")
+SRC_HEAD_RE = re.compile(r"^[-\s]*来源：\s*$")
+MAX_SOURCES = 6              # 每条目最多带 6 条来源（面板可滚动；超出的在卡面仍完整保留）
 
 # README §7：治疗类实证条目内须带「不构成医疗/诊断建议」边界句（知识免责，非产品禁令）。
 # 该句在卡面多写在内容末尾 => 会被 CONTENT_MAX 截断静默丢弃，注入 LLM 时就只剩研究结论、
@@ -47,7 +52,7 @@ BOUNDARY_RE = re.compile(
 )
 
 ENTRY_RE = re.compile(r"^### 条目 (PSY-[A-Z]+-\d{3})｜(.+?)\s*$")
-FIELD_RE = re.compile(r"^[-\s]*(可信度|一句话|内容)：(.*)$")
+FIELD_RE = re.compile(r"^[-\s]*(可信度|一句话|内容|定级理由)：(.*)$")
 LEVEL_RE = re.compile(r"^[A-E]$")
 
 # 情绪关联自动提取（builder 侧做，运行时零分词成本）：条目文本里出现哪类情绪词就挂哪类。
@@ -134,14 +139,36 @@ def parse_entries(kb_dir=KB_DIR):
                 if eid in seen:
                     fail("条目 ID 重复：%s（%s 与 %s）" % (eid, seen[eid], path.name))
                 seen[eid] = path.name
-                cur = {"id": eid, "title": title, "level": "", "summary": "", "content": "", "rel": []}
+                cur = {"id": eid, "title": title, "level": "", "summary": "", "content": "",
+                       "rel": [], "reason": "", "src": []}
+                in_src = False
                 continue
             if not cur:
                 continue
+            # 来源子行：`- 来源：` 之后的缩进 `- ` 行。必须先于 FIELD_RE 判。
+            # ⚠️ `- 来源：` 这一行**不在 FIELD_RE 的键集合里**（README §3 的四字段不含来源），
+    # 所以它只能单独判；写进 FIELD_RE 分支里等于死代码（r172 实测「0 条带来源」）。
+            if cur is not None and SRC_HEAD_RE.match(line):
+                in_src = True
+                continue
+            # 子行判据认**缩进**：主字段顶格 `- X：`，来源子行缩进 `  - ...`（卡面真实形态）。
+            # ⚠️ 不可用 lstrip 后判 `- ` —— `- 关联：`/`- 待验证点：`/`- 入库：` 同样满足，
+            #   会被当来源吞走（r172 实测：2 条来源抽成 5 条）。
+            if (cur is not None and in_src and line[:1] in (" ", "\t")
+                    and line.lstrip().startswith("- ")):
+                item = line.lstrip()[2:].strip()
+                if item:
+                    cur["src"].append(item)
+                continue
             f = FIELD_RE.match(line)
             if not f:
+                in_src = False
                 continue
             key, val = f.group(1), f.group(2).strip()
+            if key == "来源":
+                in_src = True          # 下一行起的缩进子行都算来源
+                continue
+            in_src = False
             if key == "可信度":
                 if cur["level"]:
                     fail("条目 %s 可信度字段重复" % cur["id"])
@@ -150,6 +177,8 @@ def parse_entries(kb_dir=KB_DIR):
                 cur["summary"] = val
             elif key == "内容" and not cur["content"]:
                 cur["content"] = val
+            elif key == "定级理由" and not cur["reason"]:
+                cur["reason"] = val
         if cur:
             entries.append(cur)
     if not entries:
@@ -189,6 +218,48 @@ def build_text(entries, counts, n_files):
     return header
 
 
+def build_sources_text(entries):
+    """来源件文本。label 去掉 URL（URL 单独成字段，面板里做成可点链接，省重复字节）。
+
+    与 psych-kb.js 分件的依据：psych-kb.js 逐文件预算余量 5,267 B，塞不下 188 张卡的来源；
+    而来源只在用户点开〔依据〕时才需要，故与 mediapipe/vendor 同走懒加载。
+    """
+    ship = [e for e in entries if e["level"] in SHIP_LEVELS]
+    src = {}
+    for e in ship:
+        items = []
+        for raw in e["src"][:MAX_SOURCES]:
+            m = URL_RE.search(raw)
+            if m:
+                url = m.group(0)
+                label = (raw[:m.start()] + raw[m.end():]).strip(" ；;·-")
+            else:
+                url = ""
+                label = raw.strip()
+            if label or url:
+                items.append({"l": label, "u": url})
+        src[e["id"]] = {"r": e["reason"], "s": items}
+    body = json.dumps({"version": KB_VERSION, "built": BUILT_TAG, "src": src},
+                      ensure_ascii=False, separators=(",", ":"))
+    return ("/* 心屿 · 心理学知识库来源件（r172 由 _test/psych_kb_build.py 生成，禁手改）\n"
+            " * 源 = 交付物/心理学知识库 条目卡的「定级理由 / 来源」两字段（唯一真相源）。\n"
+            " * 分件原因：psych-kb.js 逐文件预算余量 5,267 B，塞不下 188 张卡的完整来源；\n"
+            " * 来源只在用户点开〔依据:编号·级〕时才需要 ⇒ 懒加载，不计入首屏预算。\n"
+            " * 结构：src[编号] = { r: 定级理由, s: [{l: 题录标签, u: URL}] }\n"
+            " * 重建：python _test/psych_kb_build.py */\n"
+            + SRC_GLOBAL + " = " + body + ";\n")
+
+
+def _check_pair_with_src(out_path, src_path):
+    # 与 check_pair 同构，但两个路径都显式传入（供来源件变异腿用）。
+    # 真产物 SRC_OUT 一律不改写 —— 禁在校验腿里动唯一真相源。
+    entries, counts, n_files = parse_entries(KB_DIR)
+    if out_path.read_text('utf-8') != build_text(entries, counts, n_files):
+        fail("正文件不一致")
+    if src_path.read_text('utf-8') != build_sources_text(entries):
+        fail("来源件不一致")
+
+
 def check_pair(kb_dir=KB_DIR, out=OUT):
     """源卡 ⇄ 产物一致性判定（不打印，供 --check 与 --selftest 共用，避免两套实现）。"""
     entries, counts, n_files = parse_entries(kb_dir)
@@ -197,6 +268,11 @@ def check_pair(kb_dir=KB_DIR, out=OUT):
         fail("产物缺失 " + str(out))
     if out.read_text("utf-8") != text:
         fail("产物与知识库源不一致：条目卡更新后未重建（跑一次不带 --check 的本脚本）")
+    src_text = build_sources_text(entries)
+    if not SRC_OUT.exists():
+        fail("来源件缺失 " + str(SRC_OUT) + "（r172 新增件，跑一次不带 --check 的本脚本）")
+    if SRC_OUT.read_text("utf-8") != src_text:
+        fail("来源件与知识库源不一致：条目卡更新后未重建（跑一次不带 --check 的本脚本）")
     return entries, counts, n_files
 
 
@@ -223,9 +299,16 @@ def raises_buildfail(fn):
 ASSIGN = "window.__XINYU_PSYCH_KB__ = "
 
 
-def payload_of(text):
-    """从数据件文本取 JSON 载荷。按赋值锚点切，不用 split("= ") —— 头注释里「源 = 交付物…」也含 "= "。"""
-    return json.loads(text.split(ASSIGN, 1)[1].rsplit(";\n", 1)[0])
+def payload_of(text, assign=None):
+    """从数据件文本取 JSON 载荷。按赋值锚点切，不用 split("= ") —— 头注释里「源 = 交付物…」也含 "= "。
+
+    assign：默认切主数据件（ASSIGN）；来源件用 SRC_GLOBAL 那个全局名，
+    两者字符串不同（__XINYU_PSYCH_KB__ vs __XINYU_PSYCH_KB_SRC__），故必须显式传锚点。
+    """
+    anchor = assign or ASSIGN
+    if anchor not in text:
+        fail("产物里找不到赋值锚点 %r（产物结构漂移？）" % anchor)
+    return json.loads(text.split(anchor, 1)[1].rsplit(";\n", 1)[0])
 
 
 def selftest():
@@ -346,7 +429,55 @@ def selftest():
         bad.write_text(tampered, encoding="utf-8", newline="\n")
         return raises_buildfail(lambda: check_pair(KB_DIR, bad))
 
+    def ok_sources_parsed():
+        # 来源子行抽出来 + URL 拆成独立字段 u + 定级理由抽出来
+        d = fixture_dir({'90-夹具.md': "### 条目 PSY-ZZ-021｜带来源的卡\n- 可信度：B\n- 定级理由：单研究样本有限\n- 一句话：摘要\n- 内容：内容。\n- 来源：\n  - [命题甲] Smith (2020) Journal of Testing；https://doi.org/10.1234/abc\n  - [命题乙] 无 URL 的纯题录\n- 关联：\n- 待验证点：无\n- 入库：2026-10-14 · 第12轮\n"})
+        entries, _c, _n = parse_entries(d)
+        e = entries[0]
+        if e["reason"] != "单研究样本有限":
+            return False, "定级理由未抽到：%r" % e["reason"]
+        if len(e["src"]) != 2:
+            return False, "来源子行抽到 %d 条（应 2）" % len(e["src"])
+        item = payload_of(build_sources_text(entries), SRC_GLOBAL + " = ")["src"]["PSY-ZZ-021"]["s"]
+        if len(item) != 2:
+            return False, "来源件条目数 %d（应 2）" % len(item)
+        if item[0]["u"] != "https://doi.org/10.1234/abc":
+            return False, "URL 未拆出：%r" % item[0]["u"]
+        if "doi.org" in item[0]["l"]:
+            return False, "label 里仍残留 URL（会重复显示）：%r" % item[0]["l"]
+        if item[1]["u"] != "":
+            return False, "无 URL 的题录被编造了 URL：%r" % item[1]["u"]
+        return True, ""
+
+    def red_sources_gate_off():
+        # 变异腿：卡面没有来源行时必须一条都抽不到（抽门不是恒真）
+        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-022", "无来源的卡", "C", "摘要", "内容。")})
+        entries, _c, _n = parse_entries(d)
+        if entries[0]["src"]:
+            return False, "没有来源行的卡却抽到 %d 条" % len(entries[0]["src"])
+        return True, ""
+
+    def red_tampered_src_product():
+        # 变异腿：来源件篡改一位即判红（正文件用真面原件，故红因必来自来源件）
+        src = SRC_OUT.read_text("utf-8")
+        mid = len(src) // 2
+        tmp = Path(tempfile.mkdtemp(prefix="psychkb_srcselftest_"))
+        good_out = tmp / "psych-kb.good.js"
+        bad_src = tmp / "psych-kb-src.bad.js"
+        good_out.write_text(OUT.read_text("utf-8"), encoding="utf-8", newline="\n")
+        bad_src.write_text(src[:mid] + "X" + src[mid + 1:], encoding="utf-8", newline="\n")
+        try:
+            _check_pair_with_src(good_out, bad_src)
+        except BuildFail as e:
+            # 红因必须点名来源件，否则这条腿可能是在正文件那道上红的（等于没验来源件）
+            if "来源件不一致" not in str(e):
+                return False, "判红了但红因不是来源件：%s" % e
+            return True, ""
+        return False, "来源件被篡改却未判红"
     leg("正例·单卡解析+情绪关联", ok_parse_one)
+    leg("来源子行抽出+URL拆字段+定级理由抽出", ok_sources_parsed)
+    leg("无来源行的卡必须抽不到（抽门非恒真）", red_sources_gate_off)
+    leg("来源件篡改一位必判不一致（变异腿）", red_tampered_src_product)
     leg("E 级构建期排除并计数", ok_e_excluded)
     leg("内容句界截断", ok_truncate)
     leg("免责短语截断后仍前置到句首", ok_boundary_kept)
@@ -370,9 +501,10 @@ def selftest():
                  "、".join(n for n, _ in failed)))
         sys.exit(1)
     entries, counts, _n = parse_entries()
-    print("PSYCH-KB-SELFTEST-PASS: %d/%d 腿（真面 %d 条 A%d B%d C%d D%d E排除%d｜变异腿咬合 2 处）"
+    muts = sum(1 for n, ok, _ in results if "变异腿" in n)
+    print("PSYCH-KB-SELFTEST-PASS: %d/%d 腿（真面 %d 条 A%d B%d C%d D%d E排除%d｜变异腿咬合 %d 处）"
           % (len(passed), len(results), len(entries), counts["A"], counts["B"], counts["C"],
-             counts["D"], counts["E"]))
+             counts["D"], counts["E"], muts))
 
 
 def main():
@@ -388,12 +520,22 @@ def main():
         entries, counts, n_files = parse_entries()
         text = build_text(entries, counts, n_files)
         OUT.write_text(text, encoding="utf-8", newline="\n")
+        src_text = build_sources_text(entries)
+        SRC_OUT.write_text(src_text, encoding="utf-8", newline="\n")
         size = OUT.stat().st_size
+        src_size = SRC_OUT.stat().st_size
         ship_n = sum(counts[k] for k in SHIP_LEVELS)
+        ship = [e for e in entries if e["level"] in SHIP_LEVELS]
+        no_src = [e["id"] for e in ship if not e["src"]]
         print("PSYCH-KB-BUILD-PASS: 入库 %d 条（A:%d B:%d C:%d D:%d，E 排除 %d），"
-              "源文件 %d 个 -> %s（%s bytes）"
+              "源文件 %d 个 -> %s（%s bytes）｜来源件 %s（%s bytes，%d 条带来源，%d 条无来源）"
               % (ship_n, counts["A"], counts["B"], counts["C"], counts["D"], counts["E"],
-                 n_files, OUT.relative_to(ROOT), format(size, ",")))
+                 n_files, OUT.relative_to(ROOT), format(size, ","),
+                 SRC_OUT.relative_to(ROOT), format(src_size, ","),
+                 ship_n - len(no_src), len(no_src)))
+        if no_src:
+            print("  ⚠️ 无来源的非 E 条目 %d 张（点开依据面板会显示「来源未登记」）：%s%s"
+                  % (len(no_src), ", ".join(no_src[:8]), " ..." if len(no_src) > 8 else ""))
         if ship_n == 0:
             fail("全部条目均为 E 级，产品件将是空库：先升级条目再重建")
     except BuildFail as e:

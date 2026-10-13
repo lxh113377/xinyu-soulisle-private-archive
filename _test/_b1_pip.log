@@ -1,0 +1,122 @@
+Looking in indexes: https://pypi.tuna.tsinghua.edu.cn/simple
+Requirement already satisfied: sherpa-onnx in d:\xinyu-ml\asr-venv\lib\site-packages (1.13.8)
+Collecting fastapi
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/bd/f4/27e386913417ad32aae42bba48b0c0cce40e9ff2fba1a871ca2702c37324/fastapi-0.143.0-py3-none-any.whl (144 kB)
+Collecting soundfile
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/ed/97/b39c18ac1df45e755ca22b8b00e872929da5d107998a207a5e4ac831bfda/soundfile-0.14.0-py2.py3-none-win_amd64.whl (1.0 MB)
+Collecting datasets
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/24/cc/7f624629846c709ef1c68aa61bfb8d0ae2638cbe265104a1c2f7a630949e/datasets-5.1.0-py3-none-any.whl (604 kB)
+Collecting uvicorn[standard]
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/38/0c/b54a4fdd7f90a3af8b02ebc9ce6712c2c208b7926a2f7bad95c33ebbe943/uvicorn-0.54.0-py3-none-any.whl (87 kB)
+Requirement already satisfied: sherpa-onnx-core==1.13.8 in d:\xinyu-ml\asr-venv\lib\site-packages (from sherpa-onnx) (1.13.8)
+Collecting starlette>=0.46.0 (from fastapi)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/c1/b0/5742e4ac7af5eb58ec3470a537a49d7aa507e5539413e504b3a65ef50ba8/starlette-1.8.0-py3-none-any.whl (79 kB)
+Collecting pydantic>=2.9.0 (from fastapi)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/35/ea/a56b9fe5066f3537b7882f77e9c5dfb26d8c2eefdaed9b5fc73d57b4dc22/pydantic-2.14.1-py3-none-any.whl (488 kB)
+Requirement already satisfied: typing-extensions>=4.8.0 in d:\xinyu-ml\asr-venv\lib\site-packages (from fastapi) (4.16.0)
+Collecting typing-inspection>=0.4.2 (from fastapi)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/67/81/4add07e5172b7ac40d8ed5ff580409a7801a4fe26d529bdd915401dabfbe/typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Collecting annotated-doc>=0.0.2 (from fastapi)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/3e/30/e900b21425a860e195f32e37657aa1f7c7f2b1bfb26f03ca209b90933c06/annotated_doc-0.0.5-py3-none-any.whl (5.3 kB)
+Collecting opentelemetry-api>=1.44.0 (from fastapi)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/1e/41/f7dcf80b81ee8e71c1a2b59f14208bc723edbd89ed027a73b175abf6348e/opentelemetry_api-1.45.1-py3-none-any.whl (60 kB)
+Collecting click>=7.0 (from uvicorn[standard])
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl (125 kB)
+Collecting h11>=0.8 (from uvicorn[standard])
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl (37 kB)
+Collecting httptools>=0.8.0 (from uvicorn[standard])
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/8b/69/813f1bf90be507d4166c437be1a413574d0e0abf36e2fec10c266661b0ee/httptools-0.9.0-cp312-cp312-win_amd64.whl (92 kB)
+Requirement already satisfied: python-dotenv>=0.13 in d:\xinyu-ml\asr-venv\lib\site-packages (from uvicorn[standard]) (1.2.4)
+Requirement already satisfied: pyyaml>=5.1 in d:\xinyu-ml\asr-venv\lib\site-packages (from uvicorn[standard]) (6.0.3)
+Collecting watchfiles>=0.20 (from uvicorn[standard])
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/48/a1/1c4a1b3c8030cd03206232612be8a6e8799093490c220b0fcb935d02b75a/watchfiles-1.3.0-cp310-abi3-win_amd64.whl (290 kB)
+Requirement already satisfied: websockets>=13.0 in d:\xinyu-ml\asr-venv\lib\site-packages (from uvicorn[standard]) (17.2)
+Collecting cffi>=1.0 (from soundfile)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/d9/79/615cc094e2fb508cade7de88d3b4f6c4ec2bab695c97bce9153dc65aadf5/cffi-2.1.1-cp312-cp312-win_amd64.whl (185 kB)
+Requirement already satisfied: numpy in d:\xinyu-ml\asr-venv\lib\site-packages (from soundfile) (2.5.4)
+Collecting filelock (from datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/d7/8b/f837f52905395ba4510fe61f753c24833fb0a9c76e21267bb9f828b664a9/filelock-4.1.1-py3-none-any.whl (132 kB)
+Requirement already satisfied: pyarrow>=24.0.0 in d:\xinyu-ml\asr-venv\lib\site-packages (from datasets) (26.0.0)
+Collecting dill<0.4.2,>=0.3.0 (from datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/1e/77/dc8c558f7593132cf8fefec57c4f60c83b16941c574ac5f619abb3ae7933/dill-0.4.1-py3-none-any.whl (120 kB)
+Collecting pandas (from datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/bd/2a/14b3b17cd75cef4a1ee1af4234eb41cc1afe4103b98c2d80e8916abfd42b/pandas-3.0.6-cp312-cp312-win_amd64.whl (9.7 MB)
+Collecting tqdm>=4.66.3 (from datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl (80 kB)
+Requirement already satisfied: xxhash in d:\xinyu-ml\asr-venv\lib\site-packages (from datasets) (4.0.1)
+Collecting multiprocess<0.70.20 (from datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/71/70/38998b950a97ea279e6bd657575d22d1a2047256caf707d9a10fbce4f065/multiprocess-0.70.19-py312-none-any.whl (150 kB)
+Collecting fsspec<=2026.7.0,>=2023.1.0 (from fsspec[http]<=2026.7.0,>=2023.1.0->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/fd/3c/6a2bf344106328fd04963664a60b9bb6496fc25df8e962fcdc1367285fb9/fsspec-2026.7.0-py3-none-any.whl (206 kB)
+Collecting huggingface-hub<3.0,>=1.31.0 (from datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/eb/b0/0f7b430fd100b3a3b037fdbb314878200241082e607b3383c63d91a13a72/huggingface_hub-2.2.0-py3-none-any.whl (839 kB)
+Requirement already satisfied: packaging in d:\xinyu-ml\asr-venv\lib\site-packages (from datasets) (26.3)
+Requirement already satisfied: pycparser in d:\xinyu-ml\asr-venv\lib\site-packages (from cffi>=1.0->soundfile) (3.11)
+Collecting aiohttp!=4.0.0a0,!=4.0.0a1 (from fsspec[http]<=2026.7.0,>=2023.1.0->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/ae/ce/1f08114679d49655b30a6e0a29858375c94b82c1de1a0bd0a20c2fee8b02/aiohttp-3.14.5-cp312-cp312-win_amd64.whl (506 kB)
+Collecting hf-xet<2.0.0,>=1.6.0 (from huggingface-hub<3.0,>=1.31.0->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/4d/59/b35106dfa71b6eef605dc88bd038fe99c7f86fb132a15b60d0bf2f235b2c/hf_xet-1.7.0-cp38-abi3-win_amd64.whl (3.8 MB)
+Collecting httpx2<3,>=2.0.0 (from huggingface-hub<3.0,>=1.31.0->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/d8/9c/6fe8931fd9f381042a9e4c7d5a7b4cbf7016b252bec0c99a49fce42c3326/httpx2-2.13.1-py3-none-any.whl (95 kB)
+Collecting annotated-types>=0.6.0 (from pydantic>=2.9.0->fastapi)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Collecting pydantic-core==2.50.1 (from pydantic>=2.9.0->fastapi)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/c5/17/8bbd530b8659e9d963f5b16f6cb8e159f4cd174b4d6304e48969ab12dba8/pydantic_core-2.50.1-cp312-cp312-win_amd64.whl (2.2 MB)
+Collecting anyio<5,>=4.0.0 (from starlette>=0.46.0->fastapi)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/12/b8/4bd346e22b28902df4d651910f5242c28d84e4a5c2435ca5c3f797ed7e2e/anyio-4.15.1-py3-none-any.whl (132 kB)
+Collecting colorama (from tqdm>=4.66.3->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+Collecting python-dateutil>=2.8.2 (from pandas->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Requirement already satisfied: tzdata in d:\xinyu-ml\asr-venv\lib\site-packages (from pandas->datasets) (2026.5)
+Collecting aiohappyeyeballs>=2.5.0 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/71/43/1947f06babed6b3f1d7f38b0c767f52df66bfb2bc10b468c4a7de9eceff2/aiohappyeyeballs-2.7.1-py3-none-any.whl (15 kB)
+Collecting aiosignal>=1.4.0 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/fb/76/641ae371508676492379f16e2fa48f4e2c11741bd63c48be4b12a6b09cba/aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+Collecting attrs>=17.3.0 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl (67 kB)
+Collecting frozenlist>=1.1.1 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/b8/af/38e51a553dd66eb064cdf193841f16f077585d4d28394c2fa6235cb41765/frozenlist-1.8.0-cp312-cp312-win_amd64.whl (44 kB)
+Requirement already satisfied: multidict<8.0,>=4.5 in d:\xinyu-ml\asr-venv\lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets) (7.1.0)
+Requirement already satisfied: propcache>=0.2.0 in d:\xinyu-ml\asr-venv\lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets) (0.5.4)
+Collecting yarl<2.0,>=1.25.1 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/bb/cc/51a7b4abf4ac593b8e7eb3794b28e5a35ae26eed8bc04787628d215af82f/yarl-1.25.1-cp312-cp312-win_amd64.whl (102 kB)
+Requirement already satisfied: idna>=2.8 in d:\xinyu-ml\asr-venv\lib\site-packages (from anyio<5,>=4.0.0->starlette>=0.46.0->fastapi) (3.20)
+Collecting httpcore2==2.13.1 (from httpx2<3,>=2.0.0->huggingface-hub<3.0,>=1.31.0->datasets)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/09/ba/a4568248771ce81957bfb7cc600264a40fbcda092391ee1c415c50be4bea/httpcore2-2.13.1-py3-none-any.whl (83 kB)
+Requirement already satisfied: truststore>=0.10 in d:\xinyu-ml\asr-venv\lib\site-packages (from httpx2<3,>=2.0.0->huggingface-hub<3.0,>=1.31.0->datasets) (0.10.5)
+Requirement already satisfied: six>=1.5 in d:\xinyu-ml\asr-venv\lib\site-packages (from python-dateutil>=2.8.2->pandas->datasets) (1.17.0)
+Installing collected packages: yarl, typing-inspection, python-dateutil, pydantic-core, opentelemetry-api, httptools, hf-xet, h11, fsspec, frozenlist, filelock, dill, colorama, click, cffi, attrs, anyio, annotated-types, annotated-doc, aiohappyeyeballs, watchfiles, uvicorn, tqdm, starlette, soundfile, pydantic, pandas, multiprocess, httpcore2, aiosignal, httpx2, fastapi, aiohttp, huggingface-hub, datasets
+[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":500,"threshold":500,"scope":"turn","targets":["D:\\xinyu-ml\\asr-venv\\Lib\\site-packages\\annotated_doc\\py.typed","D:\\xinyu-ml\\asr-venv\\Lib\\site-packages\\annotated_doc-0.0.5.dist-info\\RECORD","D:\\xinyu-ml\\asr-venv\\Lib\\site-packages\\aiohappyeyeballs\\__init__.py","D:\\xinyu-ml\\asr-venv\\Lib\\site-packages\\aiohappyeyeballs\\_staggered.py","D:\\xinyu-ml\\asr-venv\\Lib\\site-packages\\aiohappyeyeballs\\impl.py"],"targetCount":20}
+ERROR: Exception:
+Traceback (most recent call last):
+  File "D:\xinyu-ml\asr-venv\Lib\site-packages\pip\_internal\cli\base_command.py", line 180, in exc_logging_wrapper
+    status = run_func(*args)
+             ^^^^^^^^^^^^^^^
+  File "D:\xinyu-ml\asr-venv\Lib\site-packages\pip\_internal\cli\req_command.py", line 245, in wrapper
+    return func(self, options, args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\xinyu-ml\asr-venv\Lib\site-packages\pip\_internal\commands\install.py", line 452, in run
+    installed = install_given_reqs(
+                ^^^^^^^^^^^^^^^^^^^
+  File "D:\xinyu-ml\asr-venv\Lib\site-packages\pip\_internal\req\__init__.py", line 72, in install_given_reqs
+    requirement.install(
+  File "D:\xinyu-ml\asr-venv\Lib\site-packages\pip\_internal\req\req_install.py", line 856, in install
+    install_wheel(
+  File "D:\xinyu-ml\asr-venv\Lib\site-packages\pip\_internal\operations\install\wheel.py", line 725, in install_wheel
+    _install_wheel(
+  File "D:\xinyu-ml\asr-venv\Lib\site-packages\pip\_internal\operations\install\wheel.py", line 585, in _install_wheel
+    file.save()
+  File "D:\xinyu-ml\asr-venv\Lib\site-packages\pip\_internal\operations\install\wheel.py", line 378, in save
+    os.unlink(self.dest_path)
+  File "D:\CodeBuddy CN\resources\app\extensions\genie\out\vendor\shim\sitecustomize.py", line 1494, in _safe_remove
+    _try_trash(abs_path)
+  File "D:\CodeBuddy CN\resources\app\extensions\genie\out\vendor\shim\sitecustomize.py", line 1396, in _try_trash
+    _check_bulk_delete_guard(abs_path)
+  File "D:\CodeBuddy CN\resources\app\extensions\genie\out\vendor\shim\sitecustomize.py", line 1275, in _check_bulk_delete_guard
+    _flush_bulk_pending(pending, guard_path, node_bin)
+  File "D:\CodeBuddy CN\resources\app\extensions\genie\out\vendor\shim\sitecustomize.py", line 1204, in _flush_bulk_pending
+    _exit_bulk_guard_control(
+  File "D:\CodeBuddy CN\resources\app\extensions\genie\out\vendor\shim\sitecustomize.py", line 1055, in _exit_bulk_guard_control
+    raise SystemExit(1)
+SystemExit: 1

@@ -192,5 +192,159 @@ chat-agent.js 按情绪+话题注入候选（每轮给候选）→ 引用规则�
 ## 决策记录
 - 执行载体 = **dwf 引擎**（动态工作流）：4 研究员 `subagent:general` broker 模式，主控 spawn + `submit` 回灌（sha256 磁盘验收）
 - 候选预算：SYSTEM 1600 字符上限内，quote 块 ≤220 字符与 KB 块共享余量（不足则本轮让位，绝不挤记忆/概要段）
+
+---
+
+# 任务卡 · 心理学知识库第4轮+存量校准 r123（2026-10-12，多代理并行研读轮）
+
+## 本轮目标
+完成心理学知识库第 4 轮：新建篇章 13-16（13 焦虑与担忧 / 14 哀伤与丧失 / 15 睡眠运动与情绪 / 16 弹性与创伤知情），每篇 5-6 条共约 22 条，A-E 五级定级+可核对来源；同时做存量 74 条校准（定级/来源可访问性/引用完整/索引一致/跨卡题录五维复核，问题卡按 README §3 追加「- 更正：」行不静默改写）；重建 psych-kb.js 使 `psych_kb_build --check` 由 FAIL 转 PASS；判据全绿后双线部署（老大 Q4-b）。
+
+## 验收判据（全部当场跑出）
+1. 4 篇章文件条目卡 100% 遵 README §3 行式；编号零撞号（grep 实证）；每篇 5-6 条
+2. `python _test/psych_kb_build.py --check` → PASS（源产物一致，构建标签 v1.3 收口）
+3. `python _test/deploy_sync_check.py` MISSING/DIFF/EXTRA 三类归零（src↔deploy 双副本）
+4. `size_budget_check` / `context_budget_check` PASS（KB 注入 ≤1600 字符双向管住）
+5. 整跑电池 `python _test/run_all_suites.py --exclude-llm` 全绿（部署前硬门槛）
+6. 双线部署回执：DEPLOY-SYNC-PASS + LIVE-SYNC-PASS + PUBLIC-ONLINE-ALL-PASS
+7. 核心能力棘轮 `CORE-CAP-BASELINE-PASS`（语意 85 条/100%、危机 6-6 无回退）
+
+## 负面测试用例
+1. 无来源/E 级条目混入 → 构建期必须排除并计数（excludedE），禁作事实依据
+2. 编号撞号（AX/GR/SL/RS 与既有域混号）→ 入库前 grep 篇章+索引双确认
+3. 编造来源（URL 打不开/题录不实）→ 核对轮逐条核验，不通即降级或剔除
+4. D 级条目只写一方 → 打回，必须两方并陈
+5. 临床/治疗类论断越界 → 须带「不构成治疗建议」边界句
+6. psych-kb.js 增体积超 size_budget → 先报实测值再按惯例调线，禁静默抬限
+7. 并发会话（对标/voice 在途）→ git 提交只 pathspec 本轮文件，提交前 numstat 逐行核归属
+
+## 备选方案与取舍（老大逐题拍板）
+| 决策点 | 选了 | 否掉的 | 理由 |
+|---|---|---|---|
+| 本轮范围 | 第4轮+存量校准一起做 | 只做第4轮 / 只修工程面 | 老大 Q1 选 B |
+| 规模 | 每篇 5-6 条共约 22 条 | 3-4 条快跑 / 8 条+深做 | 与前轮同规格 |
+| 执行方式 | 多代理并行（4 研究员+2 校准员，主进程入库） | 单人顺序 / 先 1 篇试点 | 同 r114/r116 模式 |
+| 发布 | 判据绿即上线双线（Pages+CloudBase） | 只提交不上线 / 先交草稿 | 老大 Q4 选 b，r110 立规惯例 |
+| 取材 | 库现行红线（Europe PMC REST/OpenAlex/Crossref+出版社官网） | 只国内源 / 自定义清单 | README §7 红线 |
+
+## To-Do
+① 门禁+G8+任务卡 ✅ ② 6 子代理并行研读/校准 ⏳ ③ 主进程入库+索引更新 ④ 规范核对+独立审读整改 ⑤ 重建 psych-kb.js+同步 deploy ⑥ 判据全跑+整跑电池 ⑦ CHANGELOG r123+白名单提交 ⑧ 双线部署+在线回执 ⑨ savepoint+经验反哺
+
+## Checkpoint / 回滚预案
+- 每完成一篇章入库即一次 pathspec 提交（仅 交付物/心理学知识库/），回滚 = `git revert <sha>`，禁 reset --hard
+- psych-kb.js 为构建器产物，回滚 = revert 源卡后重跑构建器，数据件禁手改
+- 部署回滚锚 = 上一版 Pages 部署 ID（部署时记录）
+- 并行会话在途改动不纳入本轮任何提交；若电池因他人在途件判红 ⇒ 暂停发布、只本地提交并报老大
+
+## 决策记录
+- 存量校准拆 2 名校准员（篇章 01-06 / 07-12），问题清单主进程统一处置，逐条落更正行
+- 研究员不直接落盘，草稿回传主进程入库（格式/编号纪律集中把控）
+- 保持 E=0 目标：查不到来源就不入库，缺口写进索引变更记录
 - 篇章按体裁分 4 篇：01 文言与古诗词 / 02 名家名句 / 03 网络热句与流行文化 / 04 哲学思辨
 
+
+# 任务卡 · 语音通话收口 r128（2026-10-12，动态工作流执行轮）
+
+## 本轮目标
+按老大五项要求收口端到端语音通话模块（r116/r118 已建骨架，工作树有语音面在途改动）：
+①多音色+可配置接口+通话中动态切换；②纯音频链路与视频/摄像头完全解耦；③完整理解语义前提下的
+低延迟首响（收句×流式出声流水线）；④采集/降噪/端点检测/语义理解/合成/实时播放全链路+状态展示/
+静音/挂断；⑤30 分钟量级连续稳定（不卡顿/不断连/无回声）。执行形态=独立复核+补齐差距+判据全绿
++src→deploy 同步，禁止推倒重写。
+
+## 验收判据（全部当场跑出）
+1. `python _test/voice_call_check.py <url>` → VOICECALL-PASS（C1-C15 全绿）
+2. `python _test/voice_call_soak_check.py <url>` → SOAK-PASS（S1-S8 全绿，含 120 轮等效长稳）
+3. `python _test/browser_check.py <url>` → ALL-ASSERT-PASS（通话面不破主链路）
+4. `python _test/deploy_sync_check.py` → MISSING/DIFF/EXTRA 三类归零
+5. `python _test/size_budget_check.py` → PASS（改动不顶超预算）
+6. 五项需求逐项复核表（covered/partial/gap+证据）落工作流报告；缺口按 severity 处置
+
+## 备选方案与取舍
+| 决策点 | 选了 | 否掉的 | 理由 |
+|---|---|---|---|
+| 执行形态 | 复核+补齐+收口 | 推倒重写 / 只跑判据不动 | 既有产物前置探测：r116/r118 已落地，重写=高风险低收益 |
+| 执行载体 | ZCode CreateWorkflow（动态工作流） | wflow TOML 引擎 | 老大本轮 /workflow 指令在本端映射为 CreateWorkflow 强制 |
+| 真机 30min | 判据层 120 轮快放+人测登记 | 强行桩 30 分钟墙钟 | soak 头已声明：快放只压墙钟、结构 1:1，真麦实录归人测 |
+
+## to-do
+① 门禁+G8+任务卡 ✅ ② 摸底跑判据（C/S/browser/sync/budget）③ 五项需求独立复核
+④ 按缺口补齐（先根因，禁凑绿） ⑤ 复跑收口全绿 ⑥ 报告落盘 ⑦ pathspec 提交+savepoint
+
+## checkpoint / 回滚预案
+- 语音面在途改动+本轮新增 = pathspec 白名单提交（src/js/voice-call.js、src/js/app.js、
+  deploy 同步副本、_test/voice_call_soak_check.py 等），回滚=git revert <sha>，禁 reset --hard
+- 并行轮（对标 r126、psych r123）在途文件零触碰；提交前 numstat 逐行核归属
+- HEAD 漂移（≠8bcce16）即停手重验并发态势
+
+## 决策记录
+- 判据红处置顺序固定：先根因（src 缺陷修 src / 判据缺陷修判据+变异证据），禁改判据凑绿（R263）
+- 本轮不推送：整跑电池（run_all_suites --exclude-llm）是推送前硬门槛，留给推送轮执行
+
+---
+
+# 任务卡 · 语音回声误触发收口（WF-voice-echo-guard / wb-echo-L0，2026-10-13）
+
+## 本轮目标
+堵「TTS 念白被麦克风回读、被 ASR 当用户输入送进共情链路」的误触发管道（直连先例：GM lessons.part567）。
+改法：`src/js/voice-call.js` 收句面新增准入闸（isEchoFuzzy 模糊回声判 + 尾音窗 TAIL_MS）；bargeIn 念白移入 recentSpoken；commit 二次校验。配套：C16 判据腿（先验红后验绿）、deploy 同步、预算行按实测重登记。
+
+## 验收判据（全部当场跑出）
+1. `node --check src/js/voice-call.js` PASS（语法）
+2. `python _test/voice_call_check.py http://127.0.0.1:8123`：C16 旧码先验红 → 新码全绿（VOICECALL-PASS）
+3. `python _test/voice_call_soak_check.py http://127.0.0.1:8123`：SOAK-PASS（S1 打断面零回归）
+4. `python _test/deploy_sync_check.py`：三类归零（本次范围）
+5. `python _test/size_budget_check.py`：voice-call.js 按实测+5% 重登记后 OK（余 3 项 OVER 为并行轮在途，非本轮）
+6. `python _test/browser_check.py http://127.0.0.1:8123`：主链路不回退
+
+## 备选方案与取舍
+| 决策点 | 选了 | 否掉的 | 理由 |
+|---|---|---|---|
+| 修法 | 准入过滤（onresult 前置丢弃）+ 尾音窗 | 仅半双工 pauseRec 兜底 | 保全双工可打断；半双工也治不了 listening 态残留 |
+| 相似度 | 精确互含 + 2-gram Dice 滑窗（阈值 0.6） | 声纹 / 自建 AEC | 零依赖当日落地；后两者归 P2 架构级 |
+| 落点 | voice-call.js 原文件 | 新建独立脚本 | 依赖闭包私有态（speakingBuf/recentSpoken） |
+
+## to-do
+① G8 块+precheck ✅ ② src 改码 ✅ ③ C16 红→绿 ✅（16/16） ④ deploy 同步 ✅ ⑤ 复跑+预算调线 ✅（27,672） ⑥ CHANGELOG+pathspec 提交 ✅ `3d81d72`（未推送：电池归推送轮）
+
+## checkpoint / 回滚预案
+- 回滚=`git revert <sha>`（pathspec 白名单：src/js/voice-call.js、deploy 副本、_test/voice_call_check.py、_test/size_budget_check.py、CHANGELOG.md、memory/2026-10-13-wb-echo-L0.md）
+- 并行会话在途文件零触碰；提交前 numstat 逐行核归属；本轮不推送（整跑电池归推送轮）
+
+## 决策记录
+- 标识 wb-echo-L0（r163 号已被判据线占用，避撞号）
+- 预算调线随提交披露（非静默抬限，实测值入 CHANGELOG）
+
+---
+
+# 任务卡 · face-diag 全案复核续期（r166，2026-10-13）
+
+## 本轮目标
+对「面部表情识别准确率」战役做全案复核（原始需求模板复跑）：以磁盘/Git/判据电池实测重建现状，
+产出六段对标文档（诊断复核/三阶段/执行台账/验证与基线/质量标准/风险预案），
+落 `交付物/表情识别准确率优化方案-2026-10-13-全案复核.md`；不重做诊断、不碰 src/、不代同步并行在途件。
+
+## 验收判据（全部当场跑出）
+1. 判据电池五件套实跑留档：core rc=0（N1 105/99%、N2 31/31、F1 rc=0）｜lowintensity rc=0（96.7%、1/50、40.0%）｜F11 26/26｜replay 有把握 8/8
+2. deploy_sync：face 面归零维持；唯一 DIFF=css/voice-call.css（并行在途，如实披露不代同步）
+3. 复核文档含六段 + 三维根因现状台账（含新发现 A8 fear@0.12 / A9 replay 读数不一致）
+4. 双门禁：dag_precheck [GATE:dag-pass] + upgrade_footer_gate [GATE:evolution-pass]
+
+## 备选方案与取舍
+| 决策点 | 选了 | 否掉的 | 理由 |
+|---|---|---|---|
+| 形态 | 全案复核+续期（新文档） | 重写诊断 / 原地改 10-12 文档 | 既有产物前置探测（Step 0.55 §6.5）：诊断已完成，10-12 为历史执行版留档不动 |
+| 口径 | 按项目架构映射（表情识别/标定样本/判据阈值） | 按人脸识别模板字面硬套 | 项目无自训练模型，硬套会建在错误前提上（r124 同口径） |
+| 数值 | r124 定版值填实占位符（95% / 100ms·500ms） | 重新拍板 | 授权口径已在册，复核轮不重开决策 |
+
+## to-do
+① 现状核验（电池+git）✅ ② GM 锚点（G8+footer+双门禁）✅ ③ 复核文档落盘 ✅
+④ 任务卡/日志/回执 ⑤ pathspec 提交 ⑥ volume 快照 + savepoint
+
+## checkpoint / 回滚预案
+- 回滚 = git revert <本轮 sha>（pathspec 白名单：复核文档 + 回执 + 10-12 文档进度行）
+- 并行会话在途件零触碰；提交前 numstat 逐行核归属；本轮不推送（整跑电池归推送轮）
+
+## 决策记录
+- 模板 ${target_accuracy}/${max_latency} 填实 = r124 定版：有把握帧 top-1 ≥95% / 单帧 p95 ≤100ms 且端到端 ≤500ms
+- 复核新发现：fear@0.12 与 replay 2 张读数不一致 → 均登记 M1 复核项（不改判据不掩盖）

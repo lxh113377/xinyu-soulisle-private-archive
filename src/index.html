@@ -209,11 +209,17 @@
         <span class="fs-track" aria-hidden="true"><i class="fs-knob"></i></span>
         <span class="fs-word" id="face-switch-word">已关闭</span>
       </button>
+      <button id="face-evidence" class="face-switch" type="button" role="switch" aria-checked="false"
+              aria-label="是否允许心屿参考摄像头表情（默认关闭，只对当前页面有效）">
+        <span class="fs-track" aria-hidden="true"><i class="fs-knob"></i></span>
+        <span class="fs-word" id="face-evidence-word">不参考表情</span>
+      </button>
       <button id="btn-face-close" class="ghost-btn tiny" type="button" aria-label="收起面板并关闭摄像头">收起</button>
     </div>
   </section>
   <!-- 隐私声明在小窗滚动区之外：把窗拖到很矮时面板内滚，这句话不能滚出视野 -->
-  <p class="muted pip-note">画面只在你本机的内存里过一遍 —— 不拍照、不上传、不留存。</p>
+  <p class="muted pip-note">画面只在你本机的内存里过一遍 —— 不拍照、不上传、不留存。
+    只有你打开「允许参考表情」，这一轮才会有一句摄像头读数进提示词；关掉即失效。</p>
   <div id="pip-grip" class="pip-grip" aria-hidden="true"></div>
 </aside>
 <!-- 整屏态角落小缩略图：复用**同一条** MediaStream（一个流可挂多个 video 元素），点它收回小窗 -->
@@ -302,9 +308,13 @@
 <script src="js/data-rights.js"></script>
 <script src="js/demo-config.js"></script>
 <script src="js/chat-agent.js"></script>
+<!-- r172：依据可核对面。气泡里的〔依据:编号·级〕点开 = 卡片正文 + 逐条来源与可点 URL，
+     把「证据溯源」从模型侧接到用户侧。本件只读不改，不与 verifyCitations 抢标记形态。 -->
+<script src="js/kb-source-panel.js"></script>
 <script src="js/three-scene.js"></script>
 <script src="js/scroll-story.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/asr-normalize.js"></script>
 <script src="js/voice-call.js"></script>
 <script src="js/chart.js"></script>
 <script src="js/chat-window.js"></script>

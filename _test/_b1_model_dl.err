@@ -1,0 +1,1 @@
+D:\xinyu-ml\asr-venv\Scripts\python.exe: Error while finding module specification for 'huggingface_hub.cli' (ModuleNotFoundError: No module named 'huggingface_hub')

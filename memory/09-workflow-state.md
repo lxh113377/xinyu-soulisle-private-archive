@@ -75,6 +75,11 @@
 | QTE-R3 | P1 | 表达语料库·网络热句与流行文化组（研究员） | done | - | - | 2026-10-12 00:44 | 指针:memory/sessions/quote-research/run-ids.md |
 | QTE-R4 | P1 | 表达语料库·哲学思辨组（研究员） | done | - | - | 2026-10-12 00:44 | sha256:03311a99dd13ea9952c83fdd97c689eba4b7df21dcc07f011955666aec3e1ccf:交付物/表达语料库/04-哲学思辨.md |
 | QTE-V1 | P1 | 表达语料库·核对与审读（五维质检+修订闭环） | done | QTE-R1,QTE-R2,QTE-R3,QTE-R4 | - | 2026-10-12 00:54 | 指针:memory/sessions/quote-research/run-ids.md |
+| VOL-AGG-b5d07b | P2 | 体量治理[L3 产物] 体量余量聚合（56 项） — 另有 56 项待判断，合计 192780973 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-12 07:21 | - |
+| VOL-AGG-6d668c | P2 | 体量治理[L3 产物] 体量余量聚合（57 项） — 另有 57 项待判断，合计 193735506 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-12 10:50 | - |
+| WF-voice-echo-guard | P1 | voice 回声误触发收口：念白期转写污染 pending + 缺尾音窗（voice-call.js 收句侧无过滤） | todo | - | - | 2026-10-13 00:21 | - |
+| VOL-AGG-f12a8a | P2 | 体量治理[L3 产物] 体量余量聚合（61 项） — 另有 61 项待判断，合计 188575995 B——按字节降序只单列前 6 条，余量逐条见 memory/sessions/volume-snapshots.jsonl | todo | - | - | 2026-10-13 02:11 | - |
+| WF-echo-aec-gate | P2 | AEC 入场评估：流式 ASR 件立项时三件同迁（自建采集 + 流式ASR + 参考信号） | todo | - | - | 2026-10-13 02:35 | - |
 
 ## 推进记录
 
@@ -128,6 +133,11 @@
 - [2026-10-12 00:45] QTE-R1 doing → done
 - [2026-10-12 00:45] QTE-V1 todo → doing
 - [2026-10-12 00:54] QTE-V1 doing → done
+- [2026-10-12 07:21] 体量体检登记 1 项（待判断项转任务，id 前缀 VOL-）
+- [2026-10-12 10:50] 体量体检登记 1 项（待判断项转任务，id 前缀 VOL-）
+- [2026-10-13 00:21] WF-voice-echo-guard 新增（P1，todo）
+- [2026-10-13 02:11] 体量体检登记 1 项（待判断项转任务，id 前缀 VOL-）
+- [2026-10-13 02:35] WF-echo-aec-gate 新增（P2，todo）
 
 ## 分卷目录
 

@@ -195,6 +195,15 @@ SUITES = [
     # 只改标记不删正文、降级轮不谎称依据。此前目标里「减少无依据臆造输出」零机器面。
     ("kb_citation", [sys.executable, "_test/kb_citation_check.py"]),
     ("kb_citation_selftest", [sys.executable, "_test/kb_citation_check.py", "--selftest"]),
+    # r172 新增：依据可核对面 —— 证据溯源的**用户侧**最后一公里。
+    #   与上面两条互补不可互替：kb_wiring 管「模型拿到什么」、kb_citation 管「模型标了什么」，
+    #   本件管「用户点开〔依据〕能不能看到卡片正文与原始文献链接」。
+    ("kb_source_panel", [sys.executable, "_test/kb_source_panel_check.py"]),
+    ("kb_source_panel_selftest", [sys.executable, "_test/kb_source_panel_check.py", "--selftest"]),
+    # r172 新增：C1/C2 判据 —— 老大 2026-10-14 当轮拍板的两个对外行为变更
+    #   （表情参与回复基调的硬限三门 / 摄像头证据注入的默认关+逐次同意）。
+    ("face_tone", [sys.executable, "_test/face_tone_check.py"]),
+    ("face_tone_selftest", [sys.executable, "_test/face_tone_check.py", "--selftest"]),
     ("emotion_wiring", [sys.executable, "_test/emotion_wiring_check.py"]),
     ("emotion_wiring_selftest", [sys.executable, "_test/emotion_wiring_check.py", "--selftest"]),
     ("vendor_freshness", [sys.executable, "_test/vendor_freshness_check.py"]),
@@ -329,6 +338,13 @@ SUITES = [
     # （SpeechRecognition 与 ChatAgent.respond），被测的是编排层本身 ⇒ 不进 LLM_SUITES，CI 可跑。
     ("voice_call", [sys.executable, "_test/voice_call_check.py", BASE]),
     ("voice_call_selftest", [sys.executable, "_test/voice_call_check.py", "--selftest"]),
+    # r175 接线：ASR 编排层回放台架（r173 建 / r174 A2 扩 E1n+E5+E6 / r175 A3 扩 E7 断句合并 + E8 自适应噪声门）。
+    # 拖了三轮才接线的原因（不是遗漏，是纪律）：r105 铁律要求接线前 **HEAD 面与工作树面各测一次 rc=0**，
+    # 而 r173/r174 开工时 voice-call.js 与 voice_call_check.py 均有并行会话在途改动，工作树面不代表受理面；
+    # r175 用「按路径单独提交我的 5 个文件」把两个面拉齐（他人件原样留在工作树），此刻 HEAD 面 == 工作树面。
+    # ⚠ 真面依赖 window.ASRNormalize（r174 起是生产依赖，缺件即 build 面缺件，脚本会如实回 UNVERIFIED rc=2）。
+    ("asr_replay", [sys.executable, "_test/asr_replay_check.py", BASE]),
+    ("asr_replay_selftest", [sys.executable, "_test/asr_replay_check.py", "--selftest"]),
     ("browser_check", [sys.executable, "_test/browser_check.py"]),
     ("pixel_dual", [sys.executable, "_test/pixel_dual_check.py"]),
     ("lightshow", [sys.executable, "_test/lightshow_check.py"]),

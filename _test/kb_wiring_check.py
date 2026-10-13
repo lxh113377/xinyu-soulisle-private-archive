@@ -15,7 +15,10 @@ r113 当时的 kb 探针是单腿一次性件（见 quote_wiring_check.py 头部
   K6 反臆造指令文案在位：知识块头部必须含「不要编造文献或数据」「弱化表述」「争议双方」三处约束词
      —— 这三句是「减少无依据臆造」在提示词层的钉子，被删或被改写即红
   K7 数据件面（零浏览器）：产品件里不得出现 E 级；每条必须有 title/summary/rel，
-     content ≤320（构建器截断口径）
+     content 的长度判据 = **「超长必须以免责短语开头」**而非裸字节上限
+      —— r167-KB11b 起构建器会把医疗免责短语**前置到句首**，这批卡的 content 有意超出
+      CONTENT_MAX（README §7 明文「安全优先于字节预算」），裸上限会把它们全判红。
+      常量与正则一律从 psych_kb_build 导入，禁在本文件另立副本（两处副本必然漂移）。
 
 用法：python _test/kb_wiring_check.py [--base http://127.0.0.1:8123] [--selftest]
 退出码：0=全过 1=判红 2=环境未验证（服务/浏览器/数据件不可达）
@@ -33,7 +36,10 @@ sys.path.insert(0, str(ROOT / "_test"))
 KB_MARK = "可依据的心理学知识条目"
 ANTI_FAB_KW = ("不要编造文献或数据", "弱化表述", "争议双方")
 SYSTEM_BUDGET = 1600
-CONTENT_MAX = 320
+# r172：截断口径与免责短语正则**从构建器导入**，不在本文件另立副本。
+# 原先是裸的 CONTENT_MAX = 320，与 psych_kb_build.CONTENT_MAX 成了两份真相，
+# r167-KB11b 改了构建行为而判据没跟着改 ⇒ 实测 8 张卡假红。
+from psych_kb_build import CONTENT_MAX, BOUNDARY_RE
 CRISIS_TEXT = "我不想活了，真的好累"
 CURIOUS_TEXT = "我为什么会反复想同一件难过的事，心理学上有什么原理？"
 PLAIN_TEXT = "嗯嗯"
@@ -76,6 +82,17 @@ def ghost_ids(ids, entries):
     return ["%s·%s" % (i, lv) for i, lv in ids if i not in by_id or by_id[i]["level"] != lv]
 
 
+def starts_with_boundary(text):
+    """content 的**第一句**是否就是医疗免责短语（r167-KB11b 的有意超出形态）。
+
+    判据只认「句首」，不认「句中出现」：构建器 keep_boundary 的语义就是把摘出的免责句
+    **前置到句首**（前置而非后置，因后置会被下一次长度变化再截掉）。若只看句中出现，
+    一条无免责句的超长条目只要在中间塞一个免责短语就能蒙混过关。
+    """
+    head = re.split(r"(?<=。)|(?<=；)", text or "", maxsplit=1)[0]
+    return bool(BOUNDARY_RE.search(head))
+
+
 def check_data_face(entries):
     bad = []
     for e in entries:
@@ -85,13 +102,25 @@ def check_data_face(entries):
         for k in ("title", "summary"):
             if not e.get(k):
                 bad.append("%s 缺 %s" % (e.get("id", "?"), k))
-        if len(e.get("content") or "") > CONTENT_MAX:
-            bad.append("%s 内容 %d 字超截断上限 %d" % (e.get("id", "?"), len(e["content"]), CONTENT_MAX))
+        content = e.get("content") or ""
+        if len(content) > CONTENT_MAX and not starts_with_boundary(content):
+            bad.append("%s 内容 %d 字超截断上限 %d，且句首不是免责短语"
+                       "（有意超出只允许「免责短语前置」这一个理由）"
+                       % (e.get("id", "?"), len(content), CONTENT_MAX))
     return bad
 
 
+def starts_with_boundary_probe_ok():
+    """造一条「超长且句首即免责短语」的样本，长度确保 > CONTENT_MAX。"""
+    head = "本条目不构成医疗诊断建议。"
+    return head + ("这是研究结论，用于把整条撑过截断上限。" * 20)
+
+
 def selftest():
-    """判据非恒真的取证：正例过 + 四类反例必须红（含幽灵编号与约束词被删两条反臆造腿）。"""
+    """判据非恒真的取证：每条腿登记 (名称, 是否反例, 实际是否符合预期)，收尾实算。
+
+    r172 起不再硬编码报数——加腿后硬编码的报数会静默说谎（判据自身失真比判据失守更难发现）。
+    """
     entries = [{"id": "PSY-AX-002", "level": "B", "title": "担忧 vs 反刍", "summary": "s", "content": "c"},
                {"id": "PSY-ER-002", "level": "A", "title": "重评 vs 抑制", "summary": "s", "content": "c"}]
     head = (KB_MARK + "（回答可自然融入，不说教；句末可标〔依据:编号·级〕；"
@@ -100,25 +129,35 @@ def selftest():
     ghost = head + "\n[PSY-ZX-999·B]不存在的条目：s"
     wrong_level = head + "\n[PSY-AX-002·A]级别被改：s"
     no_keywords = KB_MARK + "（随便说说）：\n[PSY-ER-002·A]重评：s"
-    fails = []
-    if KB_MARK not in good:
-        fails.append("正例①块标记被误判")
-    if ghost_ids(extract_ids(good), entries):
-        fails.append("正例②合法编号被判幽灵")
-    if not ghost_ids(extract_ids(ghost), entries):
-        fails.append("反例①（幽灵编号）未被判红")
-    if not ghost_ids(extract_ids(wrong_level), entries):
-        fails.append("反例②（级别不符）未被判红")
-    if all(k in no_keywords for k in ANTI_FAB_KW):
-        fails.append("反例③（约束词被删）未被判红")
-    if not check_data_face([{"id": "PSY-X-001", "level": "E", "title": "t", "summary": "s", "content": "c"}]):
-        fails.append("反例④（E 级混入产品件）未被判红")
-    if check_data_face(entries):
-        fails.append("正例③（合规数据面）被误判")
-    if fails:
-        print("KB-WIRING-SELFTEST-FAIL: " + "；".join(fails))
+
+    # (名称, 是否反例腿, 实际是否符合预期)
+    legs = [
+        ("正例①知识块标记在位", False, KB_MARK in good),
+        ("正例②合法编号不判幽灵", False, not ghost_ids(extract_ids(good), entries)),
+        ("反例①幽灵编号判红", True, bool(ghost_ids(extract_ids(ghost), entries))),
+        ("反例②级别不符判红", True, bool(ghost_ids(extract_ids(wrong_level), entries))),
+        ("反例③约束词被删判红", True, not all(k in no_keywords for k in ANTI_FAB_KW)),
+        ("反例④E 级混入产品件判红", True,
+         bool(check_data_face([{"id": "PSY-X-001", "level": "E", "title": "t",
+                                "summary": "s", "content": "c"}]))),
+        ("正例③合规数据面放行", False, not check_data_face(entries)),
+        # r172：超长口径两腿。判定面 = check_data_face（K7 长度判据）
+        ("正例④超长但句首有免责短语放行（r167-KB11b 有意超出）", False,
+         not check_data_face([{"id": "PSY-ZZ-002", "level": "C", "title": "t", "summary": "s",
+                               "content": starts_with_boundary_probe_ok()}])),
+        ("反例⑤超长且句首无免责短语判红（证明 K7 未退化成摆设）", True,
+         bool(check_data_face([{"id": "PSY-ZZ-003", "level": "C", "title": "t", "summary": "s",
+                                "content": ("这是研究结论，用来把整条撑过截断上限。" * 20)}]))),
+    ]
+    bad = [name for (name, _is_neg, ok) in legs if not ok]
+    pos = sum(1 for (_n, is_neg, ok) in legs if ok and not is_neg)
+    neg = sum(1 for (_n, is_neg, ok) in legs if ok and is_neg)
+    if bad:
+        print("KB-WIRING-SELFTEST-FAIL: %d/%d 腿不符合预期 -> %s"
+              % (len(bad), len(legs), "；".join(bad)))
         return 1
-    print("KB-WIRING-SELFTEST-PASS: 3 正例过 / 4 反例红（含幽灵编号与约束词被删两条反臆造腿）")
+    print("KB-WIRING-SELFTEST-PASS: %d 正例过 / %d 反例红（共 %d 腿，含幽灵编号与约束词被删"
+          "两条反臆造腿、r172 超长口径两腿）" % (pos, neg, len(legs)))
     return 0
 
 
@@ -139,7 +178,10 @@ def main():
     if face:
         bad += ["K7 " + f for f in face[:8]]
     else:
-        notes.append("K7 数据件面 %d 条全部 A-D 级、无超长内容" % len(entries))
+        over = [e["id"] for e in entries
+                if len(e.get("content") or "") > CONTENT_MAX]
+        notes.append("K7 数据件面 %d 条全部 A-D 级；%d 条超长但句首带免责短语"
+                     "（r167-KB11b 有意超出，判据放行）、0 条无理由超长" % (len(entries), len(over)))
 
     try:
         from playwright.sync_api import sync_playwright

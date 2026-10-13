@@ -14,18 +14,12 @@
 - ✅ 电池 54 → **58**，定版整跑独占 **58/58 ALL-GREEN**；README/`docs/quality-gates.md` 声称值由 G4/G10 复算。
 
 ## P1（截止后立即，按此序）
-1. `@SpringBootTest` 上下文冒烟：断言 `/api/health` 三项自证 + 词表加载条数（对标 MoodChat 脚手架，
-   但补上"Spring 上下文真的起得来"这一层——现在只有带外 HTTP 判据在验，jar 起不来在构建期内无人知）。
-2. `voice` / `public_check` 失败面补「网络类 / 产品类」分档（同 `online_check` 本轮做法，别只改一条）。
-3. 整跑累计上游限流的显影：第 N 次起记 `NET-FLAKE(n)` 并保留 rc=1，**不放宽**但要能一眼看出该查上游还是查代码
-   （实证：并发窗口 55/58 三条红 vs 独占 58/58 全绿，同一份代码）。
-4. `@ParameterizedTest` 按 SSOT 逐情绪生成用例（覆盖面按结构单位算，不按人肉句子算）。
-5. 沿用排期：three.js r128→r186、Playwright 假媒体设备、persona 维度记忆、真机帧率。
-
-## 本轮方法论补一条（进 M5 清单候选）
-**账面指标看不见的维度要定期换面量**：`in-build 用例数` 这一维，★/停更/workflow 数/文档件全都不是零，
-唯一 ★1 的 Java 同栈对手反而**有**脚手架 ⇒ "能力矩阵"式对标对本维完全失明。
-与 r37「dependabot 在册但 PR 没人处理」同族：**配置在册 ≠ 行为发生**，能力位 ≠ 使用。
-
-## 受理面回执（本轮收口）
-`a75211a` 首推 → CI `RED: disclaimer_forensics`（自家新判据抓到报告 §9.4 一句裸边界结论）→ 改文案不改判据 → `6c363a0` 重推 → run `36268651657` `conclusion=success`，`ci_status_check` 回 `HEAD = PASS`。`java-build` 的 `mvn package` 在 Linux runner 上实测 `Tests run: 30, Failures: 0`（run 36268051559 原文）⇒ in-build 门禁的跨环境等价性已成实测。
+- [ ] WF-voice-echo-guard voice 回声误触发收口：念白期转写污染 pending + 缺尾音窗（voice-call.js 收句侧无过滤）（由 flow 登记；状态: todo）
+- [x] QTE-V1 表达语料库·核对与审读（五维质检+修订闭环）（由 flow 登记；状态: done）
+- [x] QTE-R4 表达语料库·哲学思辨组（研究员）（由 flow 登记；状态: done）
+- [x] QTE-R3 表达语料库·网络热句与流行文化组（研究员）（由 flow 登记；状态: done）
+- [x] QTE-R2 表达语料库·名家名句组（研究员）（由 flow 登记；状态: done）
+- [x] QTE-R1 表达语料库·文言与古诗词组（研究员：搜集+考据+条目卡落盘）（由 flow 登记；状态: done）
+- [x] WF-r101-对标轮 r101 八维对标 + 四项改造（耦合尺跨函数扩面／ledger_age 件内NA／按档定阈机制+负面结论／G20 声称对账与孤儿判据接线）（由 flow 登记；状态: done）
+- [x] WF-r100-对标轮 r100 八维对标 + 四项改造（判据三态纪律/性能中位数口径/__pendingTurns 完成态/peers 错峰重采）（由 flow 登记；状态: done）
+- [x] WF-r97-voice退出态 voice 退出态真缺陷修复 + v1.8.1 切版（r94/r95/r96 三轮挂账项）（由 flow 登记；状态: done）

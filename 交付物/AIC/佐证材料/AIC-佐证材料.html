@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>心屿 MindIsle · 佐证材料</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "SimSun", sans-serif; color: #1b2430; line-height: 1.7; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 6px; letter-spacing: 1px; }
+  h2 { font-size: 14pt; margin: 22px 0 8px; padding-left: 8px; border-left: 4px solid #4a6cf7; }
+  h3 { font-size: 11pt; margin: 14px 0 6px; color: #34405a; }
+  p, li { font-size: 10pt; margin: 6px 0; }
+  .sub { color: #6b7688; font-size: 9.5pt; }
+  .box { border: 1px solid #d6dcea; border-radius: 6px; padding: 10px 12px; background: #f7f9ff; margin: 10px 0; }
+  .warn { border-color: #e5c07b; background: #fff8ec; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 9.5pt; }
+  th, td { border: 1px solid #c9d2e3; padding: 5px 7px; text-align: left; }
+  th { background: #eef2ff; font-weight: 600; }
+  td.c { text-align: center; }
+  figure { margin: 10px 0; page-break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid #d6dcea; border-radius: 4px; }
+  figcaption { font-size: 9pt; color: #6b7688; margin-top: 4px; }
+  code { font-family: Consolas, monospace; font-size: 8.5pt; background: #f2f4f8; padding: 1px 4px; border-radius: 3px; }
+  pre { background: #f2f4f8; padding: 8px 10px; border-radius: 5px; font-size: 8.5pt; line-height: 1.6; white-space: pre-wrap; }
+  .page-break { page-break-before: always; }
+  .cover { text-align: center; padding: 40px 0 20px; }
+  .cover .rule { height: 3px; background: linear-gradient(90deg, #4a6cf7, #9b6cf7); margin: 14px auto; width: 120px; border-radius: 2px; }
+  ul { margin: 6px 0 6px 18px; padding: 0; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>心屿 MindIsle</h1>
+  <div class="sub">AI 情感陪伴网页应用 · 参赛佐证材料</div>
+  <div class="rule"></div>
+  <div class="sub">赛题：AI+软件创新 ｜ 材料类型：佐证材料（合并 PDF）</div>
+</div>
+
+<div class="box">
+  <strong>真实性声明</strong>
+  <p>本册所载全部数据与截图，均为团队在自有环境下的实际运行结果，可按下文命令现场复跑核验。其中<strong>不含任何第三方机构认证、专利/软件著作权证书、论文录用证明、企业合作意向书或真实用户反馈</strong>——此类材料本团队目前尚未取得，故不在本册中出现，亦不以任何形式虚构。</p>
+  <p>本册性质为<strong>自测留痕证据</strong>，用于支撑作品功能真实可用与效果可验证，<u>不等同于第三方检测报告或应用成效证明</u>。</p>
+</div>
+
+<h2>一、材料目录</h2>
+<table>
+  <tr><th style="width:52px">序号</th><th>材料</th><th style="width:96px">性质</th><th style="width:96px">本册收录</th></tr>
+  <tr><td class="c">1</td><td>情绪识别评测集实测（73 条，离线/在线双口径）</td><td class="c">自测</td><td class="c">✅ 第二节</td></tr>
+  <tr><td class="c">2</td><td>冻结盲测集四路对比（237 条）</td><td class="c">自测</td><td class="c">✅ 第三节</td></tr>
+  <tr><td class="c">3</td><td>服务端构建期测试与覆盖率</td><td class="c">自测</td><td class="c">✅ 第四节</td></tr>
+  <tr><td class="c">4</td><td>功能实测截图（入口 / 三级路由证据 / 危机拦截 / 情绪曲线）</td><td class="c">自测</td><td class="c">✅ 第五节</td></tr>
+  <tr><td class="c">5</td><td>专利证书 / 软件著作权证书</td><td class="c">第三方</td><td class="c">❌ 未取得</td></tr>
+  <tr><td class="c">6</td><td>论文录用或发表证明</td><td class="c">第三方</td><td class="c">❌ 未取得</td></tr>
+  <tr><td class="c">7</td><td>企业合作意向书 / 试点应用证明</td><td class="c">第三方</td><td class="c">❌ 未开展</td></tr>
+  <tr><td class="c">8</td><td>真实用户反馈（试用问卷与访谈）</td><td class="c">用户方</td><td class="c">🔴 采集中</td></tr>
+</table>
+<p class="sub">第 8 项采集完成后，将追加于本册末尾并整体重新出稿；在此之前不在方案中宣称已有用户试点。</p>
+
+<h2>二、情绪识别评测集实测（73 条）</h2>
+<p>评测集 <code>_test/emotion-eval-dataset.json</code>（73 条，含危机类），服务端 <code>GET /api/emotion/eval</code> 可现场复跑，前端与服务端双端逐项对账。</p>
+<table>
+  <tr><th>口径</th><th class="c">准确率</th><th class="c">危机项</th><th>说明</th></tr>
+  <tr><td>离线（词典快判）</td><td class="c">98.6%（72/73）</td><td class="c">6/6</td><td>断网可跑，零成本</td></tr>
+  <tr><td>在线（三级路由）</td><td class="c">98.6%（72/73）</td><td class="c">6/6</td><td>与离线恒等（结构性保证：最终读数均由词典裁决）</td></tr>
+</table>
+
+<h2>三、冻结盲测集四路对比（237 条）</h2>
+<p>盲测集 <code>_test/emotion-blindset.json</code>（237 条，与训练集零交集，口语化生成域）。原始输出 <code>_test/_aic_ref/blindset_4way_report.json</code>。</p>
+<table>
+  <tr><th>判定腿</th><th class="c">准确率（非危机 231 条）</th><th class="c">macro-F1</th><th class="c">平均延迟</th><th class="c">离线可用</th></tr>
+  <tr><td>词典引擎（规则）</td><td class="c">46.3%</td><td class="c">0.433</td><td class="c">≈0 ms</td><td class="c">✅</td></tr>
+  <tr><td><strong>自研微调模型</strong>（chinese-roberta-wwm-ext）</td><td class="c"><strong>92.2%</strong></td><td class="c">0.913</td><td class="c">26.6 ms</td><td class="c">✅</td></tr>
+  <tr><td>云端大模型（可选仲裁）</td><td class="c">97.0%</td><td class="c">0.974</td><td class="c">646.8 ms</td><td class="c">❌</td></tr>
+  <tr><td>三级路由（当前上线策略）</td><td class="c">46.3%</td><td class="c">0.433</td><td class="c">30.5 ms</td><td class="c">✅</td></tr>
+</table>
+<div class="box warn">
+  <strong>如实披露（不掩饰的两处短板）</strong>
+  <p>① <strong>域偏移</strong>：同一引擎在两个基准上结论相反——73 条词典主场 98.6%，237 条口语域仅 46.3%；本地模型在口语域 92.2%。这是分词与语义匹配路线的固有差异，非缺陷隐瞒。<br>
+  ② <strong>危机词表盲区</strong>：盲测 6 条危机改写句，词典仅命中 2 条（"想消失""撑不下去"等口语改写未覆盖）。危机识别为确定性规则短路层，命中即转介专业热线；词表扩充已登记为后续改进项。<br>
+  ③ 模型与云端大模型均未训练危机类（盲测危机 0/6），此系安全设计：危机判定永不概率化。</p>
+</div>
+
+<h2>四、服务端构建期测试与覆盖率</h2>
+<table>
+  <tr><th>项</th><th class="c">实测值</th><th>门禁</th></tr>
+  <tr><td>用例数</td><td class="c">101</td><td>下限由 <code>_test/java_test_guard.py</code> 常驻盯守</td></tr>
+  <tr><td>行覆盖率</td><td class="c">97%</td><td>阈值 0.90，不达标即构建失败</td></tr>
+  <tr><td>分支覆盖率</td><td class="c">95.2%</td><td>阈值 0.90</td></tr>
+</table>
+
+<div class="page-break"></div>
+<h2>五、功能实测截图</h2>
+<p class="sub">以下四图均为本机双服务在线状态下实拍，语义与当前代码一致；可现场复现。</p>
+
+<figure>
+  <img src="../img/s01_entrance.png" alt="应用入口">
+  <figcaption>图 1　应用入口与叙事首屏（本地服务实拍）</figcaption>
+</figure>
+<figure>
+  <img src="../img/s02_chat_consensus.png" alt="三级共识路由证据标签">
+  <figcaption>图 2　对话中的三级情绪路由证据标签（判定路径逐条可见，非黑盒）</figcaption>
+</figure>
+<figure>
+  <img src="../img/s03_crisis.png" alt="危机拦截与热线转介">
+  <figcaption>图 3　危机信号拦截与专业热线转介（规则短路层，确定性触发）</figcaption>
+</figure>
+<figure>
+  <img src="../img/s04_curve.png" alt="情绪曲线">
+  <figcaption>图 4　情绪曲线与历史记录（本机持久化，标注示例数据的部分已明示）</figcaption>
+</figure>
+
+<h2>六、复现命令（评委可现场核验）</h2>
+<pre># 1) 启动双服务（健康双 UP 方为成功）
+powershell -File ml\start_all.ps1
+
+# 2) 浏览器打开 http://127.0.0.1:8123 ，并请求 GET /api/emotion/eval 复跑 73 条评测集
+
+# 3) 237 条冻结盲测集四路对比
+python _test\emotion_blindset_eval.py
+
+# 4) 服务端构建期测试与覆盖率门禁
+mvn -B -f server\pom.xml test</pre>
+
+<h2>七、缺项说明与后续补充</h2>
+<ul>
+  <li><strong>未取得</strong>第三方证书类材料（专利 / 软件著作权 / 论文 / 检测报告 / 合作意向书），本册不作任何替代性陈述。</li>
+  <li><strong>尚未开展</strong>真实用户试点；用户反馈采集模板已就绪，采集完成后追加进本册并整体重新出稿。</li>
+  <li>在此之前，作品方案与答辩材料中关于用户侧的口径一律保持"尚未开展真实用户试点"。</li>
+</ul>
+
+<p class="sub" style="margin-top:18px">本册为合并后的单一 PDF 佐证材料，随材料补充整体重出，不做分册提交。</p>
+
+</body>
+</html>

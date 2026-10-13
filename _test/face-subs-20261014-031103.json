@@ -1,0 +1,205 @@
+{
+ "cases": [
+  {
+   "name": "neutral",
+   "on": [
+    "neutral"
+   ],
+   "off": [
+    "duchenne",
+    "social",
+    "worry",
+    "tense",
+    "asymmetric"
+   ],
+   "subs": {
+    "neutral": true,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": true
+   },
+   "emotion": "calm"
+  },
+  {
+   "name": "duchenne",
+   "on": [
+    "duchenne"
+   ],
+   "off": [
+    "social",
+    "neutral",
+    "worry",
+    "tense"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": true,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "joy"
+  },
+  {
+   "name": "social",
+   "on": [
+    "social"
+   ],
+   "off": [
+    "duchenne",
+    "neutral"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": false,
+    "social": true,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "joy"
+  },
+  {
+   "name": "worry",
+   "on": [
+    "worry"
+   ],
+   "off": [
+    "duchenne",
+    "social",
+    "neutral"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": true,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "sadness"
+  },
+  {
+   "name": "sad",
+   "on": [],
+   "off": [
+    "worry",
+    "neutral"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "sadness"
+  },
+  {
+   "name": "tense",
+   "on": [
+    "tense"
+   ],
+   "off": [
+    "neutral",
+    "duchenne",
+    "social",
+    "worry"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": true,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "anger"
+  },
+  {
+   "name": "asym",
+   "on": [
+    "asymmetric"
+   ],
+   "off": [
+    "duchenne",
+    "neutral"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": false,
+    "social": true,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": true,
+    "microAvailable": false
+   },
+   "emotion": "contempt"
+  },
+  {
+   "name": "micro_noprev",
+   "on": [],
+   "off": [
+    "micro"
+   ],
+   "subs": {
+    "neutral": true,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "calm"
+  },
+  {
+   "name": "micro_withprev",
+   "on": [
+    "microAvailable"
+   ],
+   "off": [],
+   "subs": {
+    "neutral": true,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": true,
+    "asymmetric": false,
+    "microAvailable": true
+   },
+   "emotion": "calm"
+  }
+ ],
+ "bad": [
+  "变异腿没跑起来：F15 探针失败 rc=1：evalmachine.<anonymous>:233\n  gain: { joy: 1.0, sadness: 1.0, anger: 1.0, fear: 1.0, calm: 0.6,\n      ^\n\nSyntaxError: Unexpected token ':'\n    at new Script (node:vm:117:7)\n    at createScript (node:vm:269:10)\n    at runInContext (node:vm:300:10)\n    at file:///D:/app-cache/temp/tmploeyry65/f15_prob"
+ ]
+}

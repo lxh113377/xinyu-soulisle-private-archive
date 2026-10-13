@@ -131,6 +131,12 @@
 │       ├── 应用方案大纲.md
 │       ├── 提交清单与验收状态.md
 │       └── 演示视频脚本.md
+├── 心理学知识库/
+│   ├── README.md
+│   ├── 00-索引.md
+│   ├── 01-情绪分类学与基础理论.md
+│   ├── 02-共情计算与文本情绪识别前沿.md
+│   └── 整合日志.md
 ├── .aiexclude
 ├── AGENTS.md
 └── README.md
@@ -147,6 +153,14 @@
   - `deploy/functions/` — Cloudflare Pages Function
   - `deploy/` 另有 `wrangler.toml` / CloudBase 相关 JSON
 - `交付物/` — iCAN 评审文档与截图（`iCAN评审/`）、提交包大纲（`提交包/`）
+
+### 心理学知识库（2026-10-11 建立，多轮迭代扩充 · **位置 2026-10-14 实测更正**）
+- **`交付物/心理学知识库/`**（**不在仓根** —— 本行此前写成 `心理学知识库/`，且篇章数停在 2 篇，均为 2026-10-12 的旧快照；2026-10-14 实测更正）。
+  实测规模：**32 篇章 / 189 条**（A44 B73 C32 D40，E=0），每条强制标注来源 + **可信度五级制（A 权威共识 / B 强实证 / C 有限实证 / D 观点争议 / E 未验证，E 不入产品件）**。
+  规范与机制见其 `README.md`（§2 五级制、§3 条目卡模板、§4 编号与关联、§7 红线）；`索引.md` 为条目索引表（integrity 判其「一句话」与卡面逐字同文）。
+  产物 = `src/data/psych-kb.js`（注入面）+ `src/data/psych-kb-sources.js`（来源面，懒加载），二者均由 `_test/psych_kb_build.py` 生成、**禁手改**。
+  判据四件：`psych_kb_build.py [--check|--selftest]`、`psych_kb_integrity_check.py [--report|--backlog|--links]`、`kb_wiring_check.py`、`kb_citation_check.py`；用户侧可核对面另有 `kb_source_panel_check.py`。
+  `_下轮计划/` 放计划与盘点（子目录不进构建器解析面）。`_留档-并入-L1L4旧叙事/` 是被并入的旧叙事留档。
 
 ### 验证与记忆
 - `_test/` — 常驻回归脚本：`browser_check.py`（离线降级链路 + 回滚可见性 + 双色 + 滚动淡入淡出）、`pixel_dual_check.py`（双色像素级三用例）、`lightshow_check.py`、`online_check.py`、`public_check.py`、`emotion_eval.js` + `emotion-eval-dataset.json`（评测集：现 **73 条**，本行旧值 36 条见更正注 r76）+ Java 构建期测试 11 类/82 用例（更正注 r77，2026-09-29：旧值 10 类/62 为 r76 当日数；复算一律用 `python _test/java_test_guard.py`，它现读 `server/src/test/java` 的文件数与 `@Test` 数并报余量）（**在 `server/src/test/java/`，不在 `_test/`**）；`_shots/`（脚本生成的截图，已 ignore）

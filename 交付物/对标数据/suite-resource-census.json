@@ -1,18 +1,28 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 150,
- "blind": [],
+ "suites": 208,
+ "blind": [
+  "js_engine_mut"
+ ],
  "timings_from": "battery-timing.json",
  "buckets": {
   "jar8123": {
-   "n": 50,
-   "seconds": 623.8,
+   "n": 63,
+   "seconds": 29.9,
    "members": [
     "preflight",
     "perf_baseline",
     "perf_baseline_selftest",
+    "perf_api_selftest",
     "battery_lock_selftest",
+    "quote_eval_selftest",
+    "kb_wiring",
+    "kb_wiring_selftest",
+    "kb_citation",
+    "kb_citation_selftest",
+    "kb_source_panel",
+    "kb_source_panel_selftest",
     "emotion_wiring",
     "emotion_wiring_selftest",
     "api_contract",
@@ -44,12 +54,15 @@
     "safety_guard_selftest",
     "voice_call",
     "voice_call_selftest",
+    "asr_replay",
+    "asr_replay_selftest",
     "browser_check",
     "pixel_dual",
     "lightshow",
     "online_check",
     "core_capability_baseline",
     "core_capability_selftest",
+    "check_instrument_selftest",
     "storage_resilience",
     "storage_resilience_selftest",
     "ci_perf_wiring",
@@ -58,13 +71,17 @@
     "jar_shape_selftest",
     "entry_reach",
     "entry_reach_selftest",
-    "rescan_shots"
+    "rescan_shots",
+    "quote_wiring",
+    "quote_wiring_selftest"
    ]
   },
   "free": {
-   "n": 98,
-   "seconds": 294.4,
+   "n": 142,
+   "seconds": 160.8,
    "members": [
+    "docs_tutorial",
+    "docs_tutorial_selftest",
     "disclaimer_forensics",
     "disclaimer_forensics_selftest",
     "ci_watch_selftest",
@@ -75,6 +92,14 @@
     "eol_parity_selftest",
     "size_budget",
     "size_budget_selftest",
+    "psych_kb_build",
+    "psych_kb_build_selftest",
+    "wit_quotes_build",
+    "wit_quotes_build_selftest",
+    "psych_kb_integrity",
+    "psych_kb_integrity_selftest",
+    "face_tone",
+    "face_tone_selftest",
     "vendor_freshness",
     "vendor_freshness_selftest",
     "benchmark_selftest",
@@ -121,7 +146,14 @@
     "live_sync",
     "live_sync_alt",
     "backup_online",
+    "backup_online_selftest",
+    "upstream_state_probe_selftest",
     "emotion_eval_js",
+    "face_lowintensity",
+    "face_lowintensity_selftest",
+    "face_au_replay",
+    "face_au_replay_selftest",
+    "face_au_export_check",
     "js_unit",
     "js_unit_selftest",
     "face_check",
@@ -131,10 +163,16 @@
     "quality_peer_selftest",
     "deliverable_inventory",
     "deliverable_inventory_selftest",
+    "tracked_zero_guard",
+    "tracked_zero_guard_selftest",
     "api_egress_headers",
     "api_egress_headers_selftest",
+    "v1_cost_guard",
+    "v1_cost_guard_selftest",
     "js_syntax",
     "js_syntax_selftest",
+    "breakpoint_scale",
+    "breakpoint_scale_selftest",
     "hook_wiring",
     "hook_wiring_selftest",
     "brand_consistency",
@@ -150,6 +188,8 @@
     "ci_contract_selftest",
     "bench_rollup",
     "bench_rollup_selftest",
+    "bench_eight_dims",
+    "bench_eight_dims_selftest",
     "ledger_age",
     "ledger_age_selftest",
     "hygiene_probe_selftest",
@@ -158,11 +198,30 @@
     "browser_engine_declare",
     "browser_engine_declare_selftest",
     "issue_probe_selftest",
+    "blindred_guard",
+    "blindred_guard_selftest",
+    "server_hardening",
+    "server_hardening_selftest",
+    "quote_r133",
+    "quote_r133_selftest",
+    "perf_probe_selftest",
+    "peer_docs_selftest",
+    "suite_count_sync_selftest",
+    "ledger_shape_check",
+    "ledger_shape_selftest",
     "settle_wait_selftest",
     "timing_coupling",
     "timing_coupling_selftest",
     "perf_ramp_delta",
-    "perf_ramp_delta_selftest"
+    "perf_ramp_delta_selftest",
+    "mysql_db",
+    "mysql_db_selftest",
+    "mysql_backup_drill",
+    "mysql_backup_drill_selftest",
+    "mysql_degradation",
+    "mysql_degradation_selftest",
+    "mysql_load_probe",
+    "mysql_load_probe_selftest"
    ]
   },
   "jar8123+port:18123": {
@@ -171,6 +230,13 @@
    "members": [
     "suite_census",
     "suite_census_selftest"
+   ]
+  },
+  "blind": {
+   "n": 1,
+   "seconds": 0.1,
+   "members": [
+    "js_engine_mut"
    ]
   }
  },
@@ -192,7 +258,8 @@
    "target": "_test/perf_baseline_check.py",
    "mode": "real",
    "facets": [
-    "jar8123"
+    "jar8123",
+    "public_net"
    ],
    "exclusive": [
     "jar8123"
@@ -203,11 +270,39 @@
    "target": "_test/perf_baseline_check.py",
    "mode": "stub",
    "facets": [
-    "jar8123"
+    "jar8123",
+    "public_net"
    ],
    "exclusive": [
     "jar8123"
    ]
+  },
+  {
+   "suite": "perf_api_selftest",
+   "target": "_test/perf_api_check.py",
+   "mode": "stub",
+   "facets": [
+    "build",
+    "jar8123",
+    "own_server"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "docs_tutorial",
+   "target": "_test/docs_tutorial_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "docs_tutorial_selftest",
+   "target": "_test/docs_tutorial_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
   },
   {
    "suite": "disclaimer_forensics",
@@ -288,6 +383,155 @@
   {
    "suite": "size_budget_selftest",
    "target": "_test/size_budget_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "psych_kb_build",
+   "target": "_test/psych_kb_build.py",
+   "mode": "real",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "psych_kb_build_selftest",
+   "target": "_test/psych_kb_build.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "wit_quotes_build",
+   "target": "_test/wit_quotes_build.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "wit_quotes_build_selftest",
+   "target": "_test/wit_quotes_build.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "quote_eval_selftest",
+   "target": "_test/quote_eval.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123",
+    "public_net"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "psych_kb_integrity",
+   "target": "_test/psych_kb_integrity_check.py",
+   "mode": "real",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "psych_kb_integrity_selftest",
+   "target": "_test/psych_kb_integrity_check.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "kb_wiring",
+   "target": "_test/kb_wiring_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "kb_wiring_selftest",
+   "target": "_test/kb_wiring_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "kb_citation",
+   "target": "_test/kb_citation_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "kb_citation_selftest",
+   "target": "_test/kb_citation_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "kb_source_panel",
+   "target": "_test/kb_source_panel_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "kb_source_panel_selftest",
+   "target": "_test/kb_source_panel_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "face_tone",
+   "target": "_test/face_tone_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "face_tone_selftest",
+   "target": "_test/face_tone_check.py",
    "mode": "stub",
    "facets": [],
    "exclusive": []
@@ -1028,6 +1272,30 @@
    ]
   },
   {
+   "suite": "asr_replay",
+   "target": "_test/asr_replay_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "asr_replay_selftest",
+   "target": "_test/asr_replay_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
    "suite": "browser_check",
    "target": "_test/browser_check.py",
    "mode": "real",
@@ -1114,6 +1382,23 @@
    "exclusive": []
   },
   {
+   "suite": "backup_online_selftest",
+   "target": "_test/backup_online_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "upstream_state_probe_selftest",
+   "target": "_test/upstream_state_probe.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
    "suite": "emotion_eval_js",
    "target": "_test/emotion_eval.js",
    "mode": "real",
@@ -1141,6 +1426,44 @@
    "exclusive": [
     "jar8123"
    ]
+  },
+  {
+   "suite": "face_lowintensity",
+   "target": "_test/face_lowintensity_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "face_lowintensity_selftest",
+   "target": "_test/face_lowintensity_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "face_au_replay",
+   "target": "_test/face_au_replay_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "face_au_replay_selftest",
+   "target": "_test/face_au_replay_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "face_au_export_check",
+   "target": "_test/face_au_export.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "own_server"
+   ],
+   "exclusive": []
   },
   {
    "suite": "js_unit",
@@ -1215,6 +1538,32 @@
    "exclusive": []
   },
   {
+   "suite": "tracked_zero_guard",
+   "target": "_test/tracked_zero_guard.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "tracked_zero_guard_selftest",
+   "target": "_test/tracked_zero_guard.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "check_instrument_selftest",
+   "target": "_test/check_instrument.py",
+   "mode": "real",
+   "facets": [
+    "build",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
    "suite": "api_egress_headers",
    "target": "_test/api_egress_headers_check.py",
    "mode": "real",
@@ -1233,6 +1582,24 @@
    "exclusive": []
   },
   {
+   "suite": "v1_cost_guard",
+   "target": "_test/v1_cost_guard_check.py",
+   "mode": "real",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "v1_cost_guard_selftest",
+   "target": "_test/v1_cost_guard_check.py",
+   "mode": "stub",
+   "facets": [
+    "public_net"
+   ],
+   "exclusive": []
+  },
+  {
    "suite": "js_syntax",
    "target": "_test/js_syntax_check.py",
    "mode": "real",
@@ -1242,6 +1609,20 @@
   {
    "suite": "js_syntax_selftest",
    "target": "_test/js_syntax_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "breakpoint_scale",
+   "target": "_test/breakpoint_scale_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "breakpoint_scale_selftest",
+   "target": "_test/breakpoint_scale_check.py",
    "mode": "stub",
    "facets": [],
    "exclusive": []
@@ -1504,6 +1885,20 @@
    "exclusive": []
   },
   {
+   "suite": "bench_eight_dims",
+   "target": "_test/bench_eight_dims_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "bench_eight_dims_selftest",
+   "target": "_test/bench_eight_dims_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
    "suite": "ledger_age",
    "target": "_test/ledger_age_check.py",
    "mode": "real",
@@ -1570,6 +1965,114 @@
    "exclusive": []
   },
   {
+   "suite": "blindred_guard",
+   "target": "_test/blindred_guard_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "blindred_guard_selftest",
+   "target": "_test/blindred_guard_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "server_hardening",
+   "target": "_test/server_hardening_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "server_hardening_selftest",
+   "target": "_test/server_hardening_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "quote_wiring",
+   "target": "_test/quote_wiring_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "quote_wiring_selftest",
+   "target": "_test/quote_wiring_check.py",
+   "mode": "stub",
+   "facets": [
+    "browser",
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "quote_r133",
+   "target": "_test/quote_wiring_r133_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "quote_r133_selftest",
+   "target": "_test/quote_wiring_r133_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "perf_probe_selftest",
+   "target": "_test/peer_perf_probe.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "peer_docs_selftest",
+   "target": "_test/peer_docs_probe.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "js_engine_mut",
+   "target": null,
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "suite_count_sync_selftest",
+   "target": "_test/suite_count_sync.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "ledger_shape_check",
+   "target": "_test/ledger_shape_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "ledger_shape_selftest",
+   "target": "_test/ledger_shape_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
    "suite": "settle_wait_selftest",
    "target": "_test/settle_wait.py",
    "mode": "stub",
@@ -1604,6 +2107,66 @@
   {
    "suite": "perf_ramp_delta_selftest",
    "target": "_test/perf_ramp_delta_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "mysql_db",
+   "target": "_test/mysql_db_check.py",
+   "mode": "real",
+   "facets": [
+    "build"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "mysql_db_selftest",
+   "target": "_test/mysql_db_check.py",
+   "mode": "stub",
+   "facets": [
+    "build"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "mysql_backup_drill",
+   "target": "_test/mysql_backup_drill.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "mysql_backup_drill_selftest",
+   "target": "_test/mysql_backup_drill.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "mysql_degradation",
+   "target": "_test/mysql_degradation_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "mysql_degradation_selftest",
+   "target": "_test/mysql_degradation_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "mysql_load_probe",
+   "target": "_test/mysql_load_probe.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "mysql_load_probe_selftest",
+   "target": "_test/mysql_load_probe.py",
    "mode": "stub",
    "facets": [],
    "exclusive": []
