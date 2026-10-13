@@ -567,6 +567,16 @@ SUITES = [
     #   取不到 mysqldump/起不来实例 ⇒ rc=2 未验（不是通过）。selftest 腿离线可常驻整跑。
     ("mysql_backup_drill", [sys.executable, "_test/mysql_backup_drill.py"]),
     ("mysql_backup_drill_selftest", [sys.executable, "_test/mysql_backup_drill.py", "--selftest"]),
+    # r169：MySQL **运行期**故障降级的行为回执。立因＝objective 点名「连接异常、死锁、超时
+    #   等情况下系统能优雅降级」，而修前库挂掉时客户端拿到的是 Spring 白标 500 ——
+    #   「持久面挂了」与「这个请求写得不对」在响应上完全同形，前端无从决定要不要退回本地存储。
+    #   五腿：库面自证(UP/列级 utf8mb4/池活水位) → **拔掉 mysqld** → 写必 503+db-unavailable+
+    #   Retry-After → 读同构 → /api/health 仍 UP（服务面与库面可分离是降级的前提）→
+    #   /api/health/db 报 DOWN 且自身不抛。真起 fat jar 连真 MySQL 8.4，故障注入是真的（等端口释放）。
+    #   边界如实写进件内：Flyway 在启动期迁移 ⇒ 库不可达时应用起不来，那是「不对外服务」而非
+    #   「降级」，本件测的是连接建立之后失效这一类。缺 jar/起不来实例 ⇒ rc=2 未验，不是绿。
+    ("mysql_degradation", [sys.executable, "_test/mysql_degradation_check.py"]),
+    ("mysql_degradation_selftest", [sys.executable, "_test/mysql_degradation_check.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），
