@@ -25,6 +25,14 @@
 
   `- 更正：` 行**跳过**（撤链留痕不算活引用，与 integrity_check --links 同一口径）。
 
+抽取面自检门（r177-KB14 立，闭环第 13 轮遗留 N2）：
+  r131 为 `integrity_check --links` 立的纪律——「抽取面吐出含非 ASCII 的串 ⇒ rc=1 并作废本次读数
+  （那是尺自己坏了）」——在 r173 只写进了 docstring、**没做成守卫**（N2 遗留项）。
+  本脚本的 `scan_doi`/`_clean` 字符白名单本身就是 ASCII，正常路径永不触发该门；
+  它是**不变量断言**：一旦未来有人为「兼容全角括号/CJK」放宽字符集，脏串会被静默查成
+  假 404（假红）或假 200（假绿）⇒ 本门立刻 fail-closed 作废读数，而不是放行。
+  判据腿见 `--selftest`（含「把 scan_doi 打成返回非 ASCII ⇒ 必须 rc=1」的变异腿，证门非恒真）。
+
 为什么不带 build 那种确定性前缀：本脚本是**联网**件 —— README §7 定「联网 ⇒ 只作人工轮次
 工具，不进回归电池与 CI」，故它的读数不参与 BuildSuites 的 GREEN/RED，只作人工轮次取证工具。
 网络不可达时 **rc=2 UNVERIFIED** —— 取不到读数既不判绿也不判红（与 integrity_check 同语义）。
@@ -33,7 +41,8 @@
   python _test/psych_kb_doi_audit.py                                  # 全库
   python _test/psych_kb_doi_audit.py --file 31-心理测量与筛查量表.md    # 单篇
   python _test/psych_kb_doi_audit.py --limit 30                       # 只审前 N 行（探水路）
-退出码：0=无硬性错配 1=发现错配(F0/F1/F2) 2=网络不可核 3=输入面缺失
+  python _test/psych_kb_doi_audit.py --selftest                       # 不联网自证（夹具在临时目录）
+退出码：0=无硬性错配 1=发现错配(F0/F1/F2) **或抽取面自检门 fail-closed** 2=网络不可核 3=输入面缺失
 """
 import json
 import re
@@ -265,6 +274,22 @@ def _segment(line, pos):
     return seg if len(probe.strip()) >= 12 else line
 
 
+def extraction_gate(rows):
+    """抽取面自检门（r177-KB14 立）：DOI 抽取串必须纯 ASCII，否则尺坏 ⇒ 作废读数。
+
+    返回 broken 列表（空 = 门放行）。纪律出处 = r131（integrity_check --links 的同名门），
+    r173 轮只写在 docstring 未做守卫（第 13 轮遗留 N2），本函数补上。
+    为什么必须 fail-closed 而不是放行：含非 ASCII 的串拿去查 Crossref 要么假 404（假红）、
+    要么被平台容错成 200（假绿）——两种都会让整轮读数不可信，而屏幕上 DOI 看着还是干净的。
+    """
+    broken = []
+    for name, entry, line, doi, seg, ndoi in rows:
+        bad = sorted({c for c in doi if ord(c) > 127})
+        if bad:
+            broken.append((name, entry, doi, bad))
+    return broken
+
+
 def collect(files):
     rows = []
     for p in files:
@@ -288,7 +313,65 @@ def collect(files):
     return rows
 
 
+def selftest():
+    """--selftest：不联网、不读仓库面（夹具建在系统临时目录），只证抽取面与自检门。
+
+    三腿：
+      ① 正常抽取腿：干净行 + Elsevier 老式 `(97)` 行 → 抽出 DOI 与预期逐字相等
+         （一行两处 DOI——显式 `DOI x` 与 URL 内 DOI——各出一行，既有行为照钉）；
+      ② 反证腿：①的干净行过门必须零命中——否则②判红可能来自「门常红」，证明不了门有分辨力；
+      ③ 门非恒真腿（变异）：把 scan_doi 打成返回含 CJK 的串 ⇒ extraction_gate 必须全量报坏。
+    """
+    import tempfile
+    legs = []
+
+    def leg(name, ok, detail=""):
+        legs.append((name, bool(ok), detail))
+
+    with tempfile.TemporaryDirectory() as td:
+        kb = Path(td) / "kb"
+        kb.mkdir()
+        f = kb / "99-gate-selftest.md"
+        f.write_text(
+            "### 条目 PSY-XX-999｜自检夹具\n"
+            "- 来源：\n"
+            "  - [干净行] Doe, J. (2020). Title. Journal. DOI 10.1000/clean123；"
+            "https://api.crossref.org/works/10.1000/clean123\n"
+            "  - [Elsevier 老式] Roe, R. (1997). Title. Journal. DOI 10.1016/s0005-7967(97)00070-3；"
+            "https://doi.org/10.1016/s0005-7967(97)00070-3\n",
+            encoding="utf-8")
+        rows = collect([f])
+        dois = [r[3] for r in rows]
+        # 每行 2 个 DOI_HEAD_RE 命中（显式 DOI + URL 内 DOI）⇒ 预期为翻倍 multiset
+        expect = ["10.1000/clean123", "10.1000/clean123",
+                  "10.1016/s0005-7967(97)00070-3", "10.1016/s0005-7967(97)00070-3"]
+        leg("干净行+Elsevier(97) 抽取逐字正确", dois == expect, "got=%r" % dois)
+        gate_clean = extraction_gate(rows)
+        leg("反证：干净行过门零命中", gate_clean == [], "broken=%r" % gate_clean)
+
+        orig = globals()["scan_doi"]
+        try:
+            globals()["scan_doi"] = lambda line, start: "10.1234/坏串-尺坏了"
+            rows_bad = collect([f])
+        finally:
+            globals()["scan_doi"] = orig
+        broken = extraction_gate(rows_bad)
+        leg("变异：scan_doi 吐出非 ASCII ⇒ 门必须 fail-closed",
+            len(rows_bad) > 0 and len(broken) == len(rows_bad),
+            "broken=%d/%d" % (len(broken), len(rows_bad)))
+
+    ok = all(x[1] for x in legs)
+    for name, passed, detail in legs:
+        print("  %s %s%s" % ("PASS" if passed else "FAIL", name,
+                             ("（%s）" % detail) if (detail and not passed) else ""))
+    print("KB-DOI-AUDIT-SELFTEST-%s: %d/%d 腿过"
+          % ("PASS" if ok else "FAIL", sum(1 for x in legs if x[1]), len(legs)))
+    return 0 if ok else 1
+
+
 def main(argv):
+    if "--selftest" in argv:
+        return selftest()
     file_filter = limit = None
     for i, a in enumerate(argv):
         if a == "--file" and i + 1 < len(argv):
@@ -318,6 +401,16 @@ def main(argv):
     rows = collect(files)
     if limit:
         rows = rows[:limit]
+
+    # 抽取面自检门先于任何网络查询：尺坏时绝不拿脏串去刷读数（r177-KB14 闭环 N2）。
+    # 顺序很重要——门若排在网络查询之后，坏尺已经产出一批缓存读数，作废就只剩口头作废。
+    broken = extraction_gate(rows)
+    if broken:
+        print("KB-DOI-AUDIT-GATE-BROKEN: 抽取面吐出含非 ASCII 的 DOI 串 %d 条 ⇒ 作废本次读数（尺坏，非库错）"
+              % len(broken))
+        for name, entry, doi, bad in broken[:5]:
+            print("  · %s · %s · %r（非 ASCII: %s）" % (name, entry, doi, "".join(bad)))
+        return 1
 
     # 同名 DOI 只解析一次。网络件**禁用高并发**（r173 教训：并发 6 ⇒ 边缘限流伪装 404），
     # 取 2 并发 + 磁盘缓存（重跑只补查上次失败者，可续跑、不必一次吃到超时）。
