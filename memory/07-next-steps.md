@@ -9,6 +9,8 @@
 J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.9 环境实证（含 JAVA_HOME=JDK8 的坑）全文 `part17`。
 
 ## P0 — 必须做
+- [ ] 🔴 **R172-01 词表提交面分叉（上线件与权威源是两份不同字节）**（2026-10-14 r172）：`data/emotion-lexicon.js` 磁盘两侧 `cmp` 相同，而 HEAD 两侧 blob 不同（`b6bb4506` src vs `56fffc7a` deploy，5068B vs 4976B）⇒ 部署取提交面，**上线的那份是旧词表**。归因 = `77e7163`（10-12 00:55）把两侧提交成不同字节。**阻塞（不是我方能单方完成）**：这两个文件正被并行会话在途修改（`git status` 双双 ` M`，工作树里已对齐未入库）⇒ 不代提交他人 WIP。前提（复算）：`git rev-parse HEAD:src/data/emotion-lexicon.js HEAD:deploy/xinyu/data/emotion-lexicon.js` 两侧同号 且 `python _test/deploy_sync_check.py` rc=0。另欠一条**词条级差集**（本轮只量到字节，R172-05）。
+- [ ] **R172-02 perf 作业的关闸配置尚无远端回执**（2026-10-14 r172）：本轮把 `.github/workflows/perf-baseline.yml` 的 perf job 改成 `XINYU_GUARD_ENABLED: false`（带默认 `burst=20` 时并发档 48 发只有 18 发拿到 2xx ⇒ rc=2 无读数；阶梯档单 rep 对 `/api/emotion` 是 2048 发，任何 burst 都跑不完）。**未闭环原因 = 推不上去**：本地独有 210 提交 ⇄ 远端独有 18 提交，本轮禁 force-push（会毁远端那 18 个）⇒ 需先与并行会话对齐推送顺序。完成标准：`gh run view --json conclusion` 该 job = success 且日志含 `闸态=unguarded`。
 - [ ] 🔴 **心理学知识库第 10 轮入口**（r166-KB，2026-10-13）：沿革 = 第 5/6 轮 34 条（17-22 篇）→ 第 7 轮 r132 12 条（23/24 篇，144 条，README v1.7）→
       第 8 轮 r134-KB 2 条 EM-005/006 + 双库并轨 + 数据件改 `ensureKb()` 懒加载（146 条）→ 第 9 轮 r135-KB EW 域 7 条（153 条，README v1.8）→
       **第 10 轮 r166-KB 11 条**：EW 追加 6 条（PSY-EW-008~013，并入第 9 轮篇章 25）+ PO 域首批 5 条（新建篇章 26），**164 条 A41/B65/C25/D33、E=0，README v1.9**。
