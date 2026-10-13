@@ -1,0 +1,107 @@
+{
+ "base": "http://127.0.0.1:8147",
+ "reps": 25,
+ "samples": {
+  "guard_probe": {
+   "state": "guarded",
+   "detail": "X-RateLimit-Limit=60 Remaining=95"
+  },
+  "static_index": {
+   "n": 25,
+   "min_ms": 1.3,
+   "p50_ms": 15.4,
+   "p95_ms": 16.7,
+   "max_ms": 27.0
+  },
+  "vendor_js": {
+   "n": 25,
+   "min_ms": 2.3,
+   "p50_ms": 15.4,
+   "p95_ms": 28.6,
+   "max_ms": 28.8
+  },
+  "health": {
+   "n": 25,
+   "min_ms": 1.2,
+   "p50_ms": 12.7,
+   "p95_ms": 27.0,
+   "max_ms": 27.4
+  },
+  "emotion_crisis": {
+   "n": 25,
+   "min_ms": 1.1,
+   "p50_ms": 1.6,
+   "p95_ms": 22.6,
+   "max_ms": 26.8,
+   "llm_used": false,
+   "resp_keys": [
+    "color",
+    "final",
+    "label",
+    "lex",
+    "llm",
+    "model",
+    "path",
+    "secondary"
+   ]
+  },
+  "throughput_health": {
+   "n": 48,
+   "budget": 48,
+   "served": 48,
+   "rejected_429": 0,
+   "other_status": 0,
+   "face": "/api/health",
+   "measurable": true,
+   "rps": 2481.4,
+   "p95_ms": 3.7
+  },
+  "throughput_emotion": {
+   "n": 48,
+   "budget": 48,
+   "served": 48,
+   "rejected_429": 0,
+   "other_status": 0,
+   "face": "/api/emotion",
+   "measurable": true,
+   "rps": 1550.9,
+   "p95_ms": 3.5
+  },
+  "resource": {
+   "pid": 25676,
+   "pid_how": "powershell:Get-NetTCPConnection",
+   "rss_mb": 239.1,
+   "rss_peak_mb": 356.0,
+   "cpu_ms_window": 546.8,
+   "requests": 96,
+   "us_cpu_per_req": 5695.8,
+   "idle_cpu_ms": 0.0,
+   "idle_window_s": 1.0,
+   "us_cpu_per_req_net": 5695.8
+  }
+ },
+ "machine": {
+  "tag": null,
+  "tag_env_set": false,
+  "cpu_count": 32,
+  "cpu_affinity": null,
+  "os": "Windows 11",
+  "python": "3.12.2",
+  "loadavg_1m": null,
+  "taken_at": "2026-10-13T23:53:13+0800"
+ },
+ "budgets": {
+  "static_index": 400.0,
+  "vendor_js": 400.0,
+  "health": 400.0,
+  "emotion_crisis": 400.0
+ },
+ "concurrency": {
+  "single_point_threads": 8,
+  "single_point_requests": 48,
+  "throttled_faces": [],
+  "guard_settle_s": 22
+ },
+ "ramp": null,
+ "breach": []
+}

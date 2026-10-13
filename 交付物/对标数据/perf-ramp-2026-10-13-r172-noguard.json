@@ -1,0 +1,302 @@
+{
+ "base": "http://127.0.0.1:8147",
+ "reps": 25,
+ "samples": {
+  "guard_probe": {
+   "state": "unguarded",
+   "detail": "2xx 且无限流头（闸关或路径豁免）"
+  },
+  "static_index": {
+   "n": 25,
+   "min_ms": 2.4,
+   "p50_ms": 15.4,
+   "p95_ms": 24.6,
+   "max_ms": 27.4
+  },
+  "vendor_js": {
+   "n": 25,
+   "min_ms": 2.3,
+   "p50_ms": 15.3,
+   "p95_ms": 27.3,
+   "max_ms": 27.6
+  },
+  "health": {
+   "n": 25,
+   "min_ms": 2.3,
+   "p50_ms": 15.5,
+   "p95_ms": 16.6,
+   "max_ms": 27.8
+  },
+  "emotion_crisis": {
+   "n": 25,
+   "min_ms": 1.1,
+   "p50_ms": 12.8,
+   "p95_ms": 15.7,
+   "max_ms": 16.7,
+   "llm_used": false,
+   "resp_keys": [
+    "color",
+    "final",
+    "label",
+    "lex",
+    "llm",
+    "model",
+    "path",
+    "secondary"
+   ]
+  },
+  "throughput_health": {
+   "n": 48,
+   "budget": 48,
+   "served": 48,
+   "rejected_429": 0,
+   "other_status": 0,
+   "face": "/api/health",
+   "measurable": true,
+   "rps": 2247.5,
+   "p95_ms": 4.1
+  },
+  "throughput_emotion": {
+   "n": 48,
+   "budget": 48,
+   "served": 48,
+   "rejected_429": 0,
+   "other_status": 0,
+   "face": "/api/emotion",
+   "measurable": true,
+   "rps": 1926.9,
+   "p95_ms": 4.9
+  },
+  "resource": {
+   "pid": 13692,
+   "pid_how": "powershell:Get-NetTCPConnection",
+   "rss_mb": 203.6,
+   "rss_peak_mb": 339.1,
+   "cpu_ms_window": 312.5,
+   "requests": 96,
+   "us_cpu_per_req": 3255.2,
+   "idle_cpu_ms": 15.6,
+   "idle_window_s": 1.0,
+   "us_cpu_per_req_net": 3247.7
+  }
+ },
+ "machine": {
+  "tag": null,
+  "tag_env_set": false,
+  "cpu_count": 32,
+  "cpu_affinity": null,
+  "os": "Windows 11",
+  "python": "3.12.2",
+  "loadavg_1m": null,
+  "taken_at": "2026-10-13T23:54:38+0800"
+ },
+ "budgets": {
+  "static_index": 400.0,
+  "vendor_js": 400.0,
+  "health": 400.0,
+  "emotion_crisis": 400.0
+ },
+ "concurrency": {
+  "single_point_threads": 8,
+  "single_point_requests": 48,
+  "throttled_faces": [],
+  "guard_settle_s": 22
+ },
+ "ramp": {
+  "tiers": [
+   8,
+   16,
+   32,
+   64
+  ],
+  "work_per_thread": 32,
+  "reps_per_tier": 5,
+  "warmup_per_tier": 1,
+  "machine_tag": null,
+  "budget_s": 60,
+  "worst_band_pct": 26.7,
+  "result": {
+   "8": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 2486.5,
+     "p95_ms": 4.9,
+     "max_ms": 9.1,
+     "threads": 8,
+     "n": 256,
+     "band_rps": 13.8,
+     "reps_rps": [
+      2251.5,
+      2486.5,
+      2509.6,
+      2388.9,
+      2561.3
+     ]
+    },
+    "emotion": {
+     "rps": 2443.2,
+     "p95_ms": 4.7,
+     "max_ms": 9.5,
+     "threads": 8,
+     "n": 256,
+     "band_rps": 9.9,
+     "reps_rps": [
+      2443.2,
+      2435.9,
+      2676.2,
+      2437.4,
+      2637.2
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 1.25
+   },
+   "16": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 2643.8,
+     "p95_ms": 8.7,
+     "max_ms": 15.1,
+     "threads": 16,
+     "n": 512,
+     "band_rps": 12.0,
+     "reps_rps": [
+      2676.0,
+      2643.8,
+      2557.4,
+      2755.4,
+      2459.8
+     ]
+    },
+    "emotion": {
+     "rps": 2398.3,
+     "p95_ms": 9.9,
+     "max_ms": 15.6,
+     "threads": 16,
+     "n": 512,
+     "band_rps": 14.6,
+     "reps_rps": [
+      2587.8,
+      2398.3,
+      2559.9,
+      2259.1,
+      2379.5
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 2.43
+   },
+   "32": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 2583.1,
+     "p95_ms": 17.8,
+     "max_ms": 27.2,
+     "threads": 32,
+     "n": 1024,
+     "band_rps": 26.7,
+     "reps_rps": [
+      2583.1,
+      2455.1,
+      2568.1,
+      2724.7,
+      3111.1
+     ]
+    },
+    "emotion": {
+     "rps": 2405.8,
+     "p95_ms": 19.1,
+     "max_ms": 26.8,
+     "threads": 32,
+     "n": 1024,
+     "band_rps": 21.3,
+     "reps_rps": [
+      2358.6,
+      2405.8,
+      2355.8,
+      2687.3,
+      2857.5
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 4.79
+   },
+   "64": {
+    "state": "ok",
+    "reps": 5,
+    "reps_asked": 5,
+    "reps_warmup_dropped": 1,
+    "health": {
+     "rps": 2826.7,
+     "p95_ms": 35.5,
+     "max_ms": 55.9,
+     "threads": 64,
+     "n": 2048,
+     "band_rps": 20.4,
+     "reps_rps": [
+      2826.7,
+      2886.8,
+      2965.0,
+      2699.6,
+      2463.2
+     ]
+    },
+    "emotion": {
+     "rps": 2598.1,
+     "p95_ms": 35.5,
+     "max_ms": 58.2,
+     "threads": 64,
+     "n": 2048,
+     "band_rps": 15.9,
+     "reps_rps": [
+      2443.5,
+      2647.4,
+      2745.7,
+      2369.1,
+      2598.1
+     ],
+     "llm_used": false
+    },
+    "reps_llm": [
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "took_s": 9.09
+   }
+  }
+ },
+ "breach": []
+}

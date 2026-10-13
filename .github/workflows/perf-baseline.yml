@@ -70,6 +70,20 @@ jobs:
       - name: 起 fat jar 并跑性能基线
         env:
           XINYU_WEB_ROOT: ${{ github.workspace }}/src
+          # r172：这一 job 必须显式关闸，否则并发那一半没有读数。
+          # 一手读数（同机备用实例，落盘件在 交付物/对标数据/perf-*-2026-10-13-r172-*）：
+          #   带默认闸（burst=20）跑单点档 8 线程×6=48 发 ⇒ /api/emotion 只有 18/48 拿到 2xx，
+          #   其余 30 发是 429 ⇒ 该面记「无读数」，整轮 rc=2；同批 /api/health（OPEN_PATH 豁免面）
+          #   48 发全过 ⇒ 1859.2 rps 有数——**一条面有数、另一条没数**，所以不能拿"吞吐有读数"当整轮可用。
+          #   把桶开到 96（--xinyu.guard.burst=96）能让单点档跑全：emotion 1550.9 rps @ 48 发、Remaining=95。
+          #   阶梯档跑不全：64 线程档每个 rep 对 /api/emotion 就是 64×32=2048 发，一档 5 次 + 1 次热身
+          #   ⇒ 12288 发，没有任何 burst 取值能让带闸实例过完整条曲线（把 burst 调到能过，等于用「改配置」
+          #   把一个真实缺陷登记成配置噪声），所以选 enabled=false 而不是加大 burst。
+          # 关闸不等于这道门消失：限流/体积/豁免的行为由构建期 server/src/test/.../ApiGuardFilterTest
+          # 钉住（mvn verify 在本 step 之前已跑），而 perf_baseline_check 每次落账都印「闸态=…」行——
+          # 带闸与不带闸的两份台账从此不可混用；并发档被闸拦掉时判据出 rc=2 并点名被拦面，
+          # 不再像修前那样崩成「仪器异常 HTTPError 429」（HEAD 那份脚本在同一台带闸实例上实测的终态）。
+          XINYU_GUARD_ENABLED: "false"
         run: |
           set -e
           java -jar server/target/soulisle-server.jar --server.port=8123 > /tmp/xinyu-perf-server.log 2>&1 &

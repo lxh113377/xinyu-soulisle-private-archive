@@ -1,0 +1,20 @@
+{
+ "kind": "PERF-UNREACHABLE",
+ "base": "http://127.0.0.1:8147",
+ "reps": 25,
+ "declared_burst": 20,
+ "why": "--reps=25 > 声明桶 20 ⇒ 等回满也只回到 20，第 21 发必 429（重试是白等）",
+ "measured": [
+  "emotion_crisis: HTTP 429 (-)｜HTTPError: HTTP Error 429: ｜配额头 Remaining=0 Retry-After=1"
+ ],
+ "machine": {
+  "tag": null,
+  "tag_env_set": false,
+  "cpu_count": 32,
+  "cpu_affinity": null,
+  "os": "Windows 11",
+  "python": "3.12.2",
+  "loadavg_1m": null,
+  "taken_at": "2026-10-13T23:48:04+0800"
+ }
+}

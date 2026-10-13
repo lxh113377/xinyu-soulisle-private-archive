@@ -11,13 +11,23 @@
     落库、静态资源被改成同步阻塞），不是抖动。先量变异、再接进阻断链（无变异数据不钉阈值）。
 
 用法：python _test/perf_baseline_check.py [BASE] [--reps N] [--json out] [--selftest]
-退出码：0=在预算内 1=超预算（性能回归）2=服务不可达/样本不足（未验，不得当通过）
+退出码：0=在预算内 1=超预算（性能回归）2=服务不可达/样本不足/并发档被限流闸吞掉（未验，不得当通过）
+r172 三态口径（一手实测，落盘件可复算）：吞吐相按**状态码分桶**，非 2xx 一律不进 rps/p95。被测面开着
+  ApiGuardFilter（默认 burst=20）时，单点档 8×6=48 发必被拦一部分（--reps 5 在 spare 8148 实跑 ⇒
+  `2xx=18/48，429=30`；--reps 25 时延迟面先撞顶 ⇒ 落 `<json>.partial` 的 PERF-UNREACHABLE），
+  此时并发这一半**没有读数**⇒ 印 `PERF-BASELINE-UNVERIFIED` 并 rc=2，台账落 `<json>.partial` 不覆盖基线。
+  修前形态（HEAD 那份脚本原样跑在同一台带闸 spare 上）：--reps 25 ⇒ rc=2 只报「取数失败 emotion_crisis:
+  HTTP 429」（等 22s 重试仍是 429）；--reps 5 --no-settle ⇒ rc=1 `仪器异常 HTTPError 429`（BLIND-RED，
+  r170 的兜底虽有仪器异常行，但仍无结论、无台账）。**勘误**：这里原写「假绿/账面像合规通过」，盘面否证——
+  旧版从没判过绿；真缺陷是**红因不可归因**：「闸把测量拦住了」被报成「服务/判据坏了」，
+  且没有任何一条面能自证当时闸开没开。
 """
 import argparse
 import glob
 import json
 import os
 import platform
+import re
 import statistics
 import subprocess
 import sys
@@ -26,6 +36,8 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]   # 只用于读**声明面**配置（见 declared_burst）
 
 # 取冻结评测集里的真危机句（r40 实测教训：我自己造的"不想伤害自己"是否定式，没命中危机词表，
 # 于是打到 LLM 上、量出 530ms 的"性能"——那不是性能，是网络。样本必须来自已登记的数据集。）
@@ -189,12 +201,155 @@ def pct(xs, p):
     return s[k]
 
 
+def declared_burst():
+    """读**声明面**的令牌桶容量：`application.yml` 的 `xinyu.guard.burst` 默认值（环境可覆盖）。
+
+    为什么判据需要它：r172 一手实测「延迟面在带闸实例上结构性不可达」——`--reps 25 > 桶 20`，
+    等令牌桶回满也救不了（回满就停在 20），所以 r171 那条 22s settle 重试对这一形态**永远白等**。
+    要把「白等」和「值得等」分开，就得有个不靠运行时假设的容量数；读 yml 而不是在判据里写死 20，
+    是因为 20 属于被测面的配置（改了配置判据跟着变），写死会变成"判据自己造事实"。
+    读不到 ⇒ None：只降级成"不做这个判定"，不猜值、不放宽、不据此判绿。
+    """
+    yml = ROOT / "server" / "src" / "main" / "resources" / "application.yml"
+    try:
+        txt = yml.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    m = re.search(r"^\s*burst:\s*\$\{XINYU_GUARD_BURST:(\d+)\}", txt, re.M)
+    return int(m.group(1)) if m else None
+
+
+def latency_reach(reps, cap):
+    """串行样本数与令牌桶上限的关系。返回 None=可达（settle 重试有意义），否则返回点名理由。
+    `cap is None` ⇒ 声明面读不到，**不判定**（禁止猜一个桶容量来放行或拦人）。"""
+    if cap is None or reps <= cap:
+        return None
+    return ("--reps=%d > 声明桶 %d ⇒ 等回满也只回到 %d，第 %d 发必 429（重试是白等）"
+            % (reps, cap, cap, cap + 1))
+
+
+def required_burst(reps):
+    """跑完整一轮对**受闸路径**（`/api/emotion`）的总需求 + 余量。
+
+    r172 一手纠正：结论行原先建议 `--xinyu.guard.burst=reps+16`，实测 burst=64 时这一轮仍被拦
+    5/48——因为延迟相先吃掉 25 发，吞吐相再打 48 发，同一条受闸路径共需 **73** 发。
+    建议值必须由**本轮自己的请求算术**得出，不能只按触发那条消息的相位算（否则建议本身就是错的）。
+    `/api/health` 与静态页不在受闸面（`ApiGuardFilter.OPEN_PATH`，实测桶排空时 health 仍 48/48 通过），
+    所以只计 emotion 的两相。余量 16 覆盖同机其他会话打到本实例的请求。
+    """
+    return reps + CONC["threads"] * CONC["per_thread"] + 16
+
+
+def partial_receipt(path, d):
+    """把「这一轮为什么没有读数」落到台账位旁的 `.partial`，下一轮才分得清"没跑"与"跑了但不可达"。
+
+    立因：r171 起性能基线断更的真实形态是**一个文件都不留**——判据 rc=2 直接退出，
+    `交付物/对标数据/` 里只剩旧日期的台账，于是"最近一次测量"读起来像"最近没测过"，
+    而实际测过、且每次都被同一个配额硬顶拦回来。留一条带理由的 .partial 才是可归因的缺席。
+    写失败只改变**这条留痕**，不改判据结论（rc 由测量本身决定），但必须出声（stderr）。
+    """
+    if not path:
+        return
+    try:
+        Path(path + ".partial").write_bytes(
+            json.dumps(d, ensure_ascii=False, indent=1).encode("utf-8"))
+    except OSError as e:
+        print("  留痕未写入 %s.partial：%s" % (path, e), file=sys.stderr)
+
+
+def measured_hdr(e):
+    """从 429 响应头取被测面自己报的配额读数（有则点名，无则不编）。"""
+    try:
+        h = e.headers or {}
+        rem, ra = h.get("X-RateLimit-Remaining"), h.get("Retry-After")
+    except AttributeError:
+        return ""
+    if rem is None and ra is None:
+        return ""
+    return "｜配额头 Remaining=%s Retry-After=%s" % (rem, ra)
+
+
+def counted(fn):
+    """跑一次探针，把**状态码**一起带回来。
+
+    r172 一手：`/api/emotion` 的 429 原先走异常路径 ⇒ 在吞吐这一段直接掀掉整轮
+    （`ex.map` 把 HTTPError 抛回主线程，`measure()` 的吞吐块没有 try），判据连结论行都印不出来，
+    兜底钩子只能报「仪器异常」。被闸拦下的那一发是**读数**，不是崩溃。
+    """
+    try:
+        ms, resp = timed(fn)
+        return ms, (resp[0] if isinstance(resp, tuple) else 200)
+    except urllib.error.HTTPError as e:
+        return None, e.code
+
+
+def phase_verdict(res, wall, budget, face):
+    """把一批并发探针折成读数。**非 2xx 一律不进 rps/p95** —— 被限流闸拒掉的那些量的是闸，不是服务端。
+
+    立此函数的算术（r172 实测，spare 实例 8147、闸按默认配）：等令牌桶回满 22s 后打 48 并发
+    `/api/emotion` ⇒ `status={200:20, 429:28}`；紧接着再打一次 ⇒ `{429:48}`，而那一趟的
+    表观 rps 反而从 446 涨到 573（拒得越快显得越"吞吐高"）。所以既不能把 429 当延迟，
+    也不能把它算进吞吐，只能如实记「这一档没有读数」并给出口径。
+    """
+    served = [ms for ms, code in res if ms is not None and 200 <= code < 300]
+    rejected = sum(1 for _, code in res if code == 429)
+    other = sum(1 for _, code in res
+                if code is not None and code != 429 and not (200 <= code < 300))
+    d = {"n": len(res), "budget": budget, "served": len(served),
+         "rejected_429": rejected, "other_status": other, "face": face}
+    if rejected or other or len(served) < budget:
+        d["measurable"] = False
+        d["why"] = ("限流闸吞掉 %d/%d 发（有效桶 < 并发预算 %d）⇒ %s 这一档的 rps/p95 无读数"
+                   % (rejected + other, budget, budget, face))
+        return d
+    d["measurable"] = True
+    d["rps"] = round(len(served) / wall, 1)
+    d["p95_ms"] = round(pct(served, 95), 1)
+    return d
+
+
+def guard_state_from_headers(headers, code):
+    """把「被测面这一发带回什么限流头」折成口径位。返回 (state, detail)。
+
+    为什么要这一格：r172 发现 CI 与本机的**被测配置可以不同**（perf workflow 起 jar 时没设
+    `XINYU_GUARD_*` ⇒ 默认 burst=20；私有 spare 可设 96），而台账里的 rps 从来不写它是**在不在闸后**
+    量出来的 —— 于是两份台账长得一样、量的却是两个对象。闸态由被测面自报（`ApiGuardFilter` 只在
+    放行路径与 `enabled=false` 时**不设** `X-RateLimit-*`），所以这不是猜，是读。
+    state：`guarded`=该发带限流头（闸开且这条路径受闸）／`unguarded`=2xx 且无该头（闸关或路径豁免）
+           ／`unknown`=这一发本身没取到（未验，不折算成前两种）。
+    """
+    if headers is None:
+        return "unknown", "探测发未取到响应头"
+    lim = headers.get("X-RateLimit-Limit")
+    if lim is not None:
+        return "guarded", "X-RateLimit-Limit=%s Remaining=%s" % (lim, headers.get("X-RateLimit-Remaining"))
+    if code is not None and 200 <= code < 300:
+        return "unguarded", "2xx 且无限流头（闸关或路径豁免）"
+    return "unknown", "无 headers 也无 2xx（code=%s）" % code
+
+
 def get(url, body=None):
     req = urllib.request.Request(url, data=body,
                                  headers={"Content-Type": "application/json",
                                           "User-Agent": "xinyu-perf"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return r.status, r.read()
+
+
+def probe_guard(base):
+    """打一发 `/api/emotion` **只为了读闸态**：不计入任何延迟/吞吐样本，成本 = 1 个令牌。
+    取不到 ⇒ `unknown`（不默认成 unguarded —— 那会把"没探到"读成"闸关着"，正是要防的假口径）。"""
+    body = json.dumps({"text": CRISIS_TEXT}, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(base + "/api/emotion", data=body,
+                                 headers={"Content-Type": "application/json",
+                                          "User-Agent": "xinyu-perf-guardprobe"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return guard_state_from_headers(r.headers, r.status)
+    except urllib.error.HTTPError as e:
+        return guard_state_from_headers(e.headers, e.code)
+    except Exception as e:
+        return "unknown", "%s: %s" % (type(e).__name__, str(e)[:60])
 
 
 def attach_crisis_guard(out, name, last):
@@ -228,6 +383,8 @@ def measure(base, reps):
          json.dumps({"text": CRISIS_TEXT}, ensure_ascii=False).encode("utf-8")),
     ]
     out, fatal = {}, []
+    g_state, g_detail = probe_guard(base)
+    out["guard_probe"] = {"state": g_state, "detail": g_detail}
     for name, url, body in targets:
         lat, last = [], None
         for _ in range(reps):
@@ -239,8 +396,8 @@ def measure(base, reps):
                 detail = getattr(e, "reason", None) or getattr(e, "strerror", None) \
                     or getattr(e, "msg", None) or "%s: %s" % (type(e).__name__, e)
                 if isinstance(e, urllib.error.HTTPError):
-                    detail = "HTTP %s (%s)｜%s" % (e.code, e.reason or "-", detail)
-                fatal.append("%s: %s" % (name, str(detail)[:120]))
+                    detail = "HTTP %s (%s)｜%s%s" % (e.code, e.reason or "-", detail, measured_hdr(e))
+                fatal.append("%s: %s" % (name, str(detail)[:170]))
                 break
             lat.append(ms)
             last = resp[1] if isinstance(resp, tuple) else resp
@@ -266,14 +423,15 @@ def measure(base, reps):
             if _ri is not None:
                 idle_cpu = max(0.0, _ri["cpu_ms"] - r0["cpu_ms"])
                 r0 = _ri                      # 空载窗口之后才是负载窗口的起点
+        budget = CONC["threads"] * CONC["per_thread"]
+
         def hit():
-            return timed(lambda: get(base + "/api/health"))[0]
+            return counted(lambda: get(base + "/api/health"))
         t0 = time.perf_counter()
         with ThreadPoolExecutor(max_workers=CONC["threads"]) as ex:
-            lats = list(ex.map(lambda _: hit(), range(CONC["threads"] * CONC["per_thread"])))
+            res1 = list(ex.map(lambda _: hit(), range(budget)))
         wall = time.perf_counter() - t0
-        out["throughput_health"] = {"rps": round(len(lats) / wall, 1),
-                                    "p95_ms": round(pct(lats, 95), 1), "n": len(lats)}
+        out["throughput_health"] = phase_verdict(res1, wall, budget, "/api/health")
         # r121：并发维补**真实计算路径**。立因是对标维度 4 问的是"并发处理能力"，
         # 而这里只有 /api/health 的吞吐 —— health 只做一次文件系统探针，
         # 量到的是"JVM 还活着"，不是"词典引擎在并发下扛不扛得住"。
@@ -281,16 +439,15 @@ def measure(base, reps):
         body = json.dumps({"text": CRISIS_TEXT}, ensure_ascii=False).encode("utf-8")
 
         def hit_emotion():
-            return timed(lambda: get(base + "/api/emotion", body))[0]
+            return counted(lambda: get(base + "/api/emotion", body))
         t1 = time.perf_counter()
         with ThreadPoolExecutor(max_workers=CONC["threads"]) as ex:
-            lat2 = list(ex.map(lambda _: hit_emotion(), range(CONC["threads"] * CONC["per_thread"])))
+            res2 = list(ex.map(lambda _: hit_emotion(), range(budget)))
         wall2 = time.perf_counter() - t1
-        out["throughput_emotion"] = {"rps": round(len(lat2) / wall2, 1),
-                                     "p95_ms": round(pct(lat2, 95), 1), "n": len(lat2)}
+        out["throughput_emotion"] = phase_verdict(res2, wall2, budget, "/api/emotion")
         r1 = proc_read(pid)
         if r0 and r1:
-            n_req = 2 * CONC["threads"] * CONC["per_thread"]     # health 与 emotion 两轮闭环
+            n_req = 2 * budget     # health 与 emotion 两轮闭环
             cpu_ms = max(0.0, r1["cpu_ms"] - r0["cpu_ms"])
             out["resource"] = {"pid": pid, "pid_how": pid_how,
                                "rss_mb": round(r1["rss_mb"], 1),
@@ -328,12 +485,17 @@ def judge(m):
             continue
         if got["p95_ms"] > b["p95_ms"]:
             bad.append("%s p95=%.0fms 超预算 %.0fms（%s）" % (name, got["p95_ms"], b["p95_ms"], b["note"]))
-    tp = m.get("throughput_health", {})
-    if tp.get("rps") is not None and tp["rps"] < MIN_RPS:
+    # 吞吐两面的三态必须可分：`measurable is False` = 被限流闸拦住、**这一档没有读数**（走 main 的
+    # UNVERIFIED 分支，rc=2）；缺键/缺 rps = 仪器没跑到那一块（判红，r121 口径）；有 rps 才比地板。
+    # 把"闸吞掉了"记成红是虚报缺陷，记成绿是虚报能力——两头都不许。
+    tp = m.get("throughput_health") or {}
+    if tp.get("measurable") is not False and tp.get("rps") is not None and tp["rps"] < MIN_RPS:
         bad.append("并发吞吐(health) %.0f rps < 地板 %.0f ⇒ 服务端塌方级退化" % (tp["rps"], MIN_RPS))
-    te = m.get("throughput_emotion", {})
+    te = m.get("throughput_emotion") or {}
     # r121：真实计算路径的并发读数。缺样本一律判红不判绿——"没量到"与"量到但塌了"必须可分。
-    if not te or te.get("rps") is None:
+    if te.get("measurable") is False:
+        pass
+    elif not te or te.get("rps") is None:
         bad.append("throughput_emotion 无样本 ⇒ 并发维（词典引擎路径）未验，不判绿")
     elif te["rps"] < MIN_RPS_EMOTION:
         bad.append("并发吞吐(emotion) %.0f rps < 地板 %.0f ⇒ 词典引擎在并发下塌方"
@@ -625,9 +787,77 @@ def selftest():
     if attach_crisis_guard(filled, "emotion_crisis", b'{"llm":null,"final":{}}') is not True \
             or filled["emotion_crisis"].get("llm_used") is not False:
         bad.append("㉒键在时守卫没挂上（llm_used 未落）⇒ 口径漂移重新隐身")
+    # ── r172 吞吐相的三态腿（20 发 2xx + 28 发 429 是本仓一手实测形状）────────────────
+    # 立因：原实现把 429 当异常往上抛，吞吐段整跑崩掉（BLIND-RED），而吞吐台账自那次起断更。
+    # 修好之后必须有腿盯着新语义：拒掉的发数**既不算延迟也不算吞吐**，且这一档必须落到"未验"。
+    def _boom():
+        raise urllib.error.HTTPError("http://x/api/emotion", 429, "Too Many Requests", {}, None)
+    try:
+        b_ms, b_code = counted(_boom)
+        b_raised = None
+    except Exception as e:
+        b_ms, b_code, b_raised = None, None, type(e).__name__
+    if b_raised or b_code != 429 or b_ms is not None:
+        bad.append("㉓a counted 没把 429 收成读数（raised=%s code=%s ms=%s）⇒ 吞吐段仍会被闸掀掉"
+                   % (b_raised, b_code, b_ms))
+    full = phase_verdict([(5.0, 200)] * 48, 0.024, 48, "/api/health")
+    if not full.get("measurable") or abs(full.get("rps", 0) - 2000.0) > 1.0 or full.get("p95_ms") != 5.0:
+        bad.append("㉓正向腿失效：48 发全 200 应得 rps=2000/p95=5.0，实得 %s ⇒ 有闸的面上连合规读数都给不出"
+                   % {k: full.get(k) for k in ("measurable", "rps", "p95_ms")})
+    mixed = phase_verdict([(5.0, 200)] * 20 + [(0.5, 429)] * 28, 0.02, 48, "/api/emotion")
+    if mixed.get("measurable") or "rps" in mixed or mixed.get("rejected_429") != 28:
+        bad.append("㉔变异体失效：28 发 429 仍被折进 rps ⇒ 拒得越快显得吞吐越高（本轮实测 446→573）")
+    all_no = phase_verdict([(0.5, 429)] * 48, 0.01, 48, "/api/emotion")
+    if all_no.get("measurable") or "rps" in all_no or all_no.get("served") != 0:
+        bad.append("㉕全拒档被判可测 ⇒ 台账会出现「没有 2xx 却有 rps」的自相矛盾行")
+    other = phase_verdict([(5.0, 200)] * 47 + [(9.0, 500)], 0.024, 48, "/api/emotion")
+    if other.get("measurable") or other.get("other_status") != 1:
+        bad.append("㉖非 429 的 5xx 被当成合规样本 ⇒ 服务端错误的延迟会进 p95、错误率隐身")
+    # 三态分得开：可测→比地板；无读数→交给 main 记未验（判红会造永红，判绿是虚报能力）
+    _thr = dict(full, measurable=False, served=20, rejected_429=28, face="/api/emotion")
+    _thr.pop("rps", None)
+    _thr.pop("p95_ms", None)
+    if judge(dict(_ok, throughput_emotion=_thr)):
+        bad.append("㉗限流导致的无读数被判红 ⇒ 环境状态冒充性能缺陷（同 r131 settle 的口径）")
+    if not judge(dict(_ok, throughput_health={"rps": 12.0, "measurable": True})):
+        bad.append("㉘health 面加了 measurable 分支后地板失效 ⇒ 服务端塌方漏报")
+    if not judge(dict(_ok, throughput_emotion={"measurable": None})):
+        bad.append("㉙measurable 缺失（旧形状/崩在半路）被判通过 ⇒ 未验被读成达标")
+    # ── r172 声明面容量 + 白等判定 + 配额头取证 三条腿 ──
+    cap = declared_burst()
+    if not isinstance(cap, int) or cap <= 0:
+        bad.append("㉚application.yml 的 xinyu.guard.burst 读不出正整数（实得 %r）⇒ "
+                   "「样本数 vs 桶容量」这格静默失效，下一轮又会白等 22s" % cap)
+    if not latency_reach(25, 20) or "25" not in latency_reach(25, 20) or "20" not in latency_reach(25, 20):
+        bad.append("㉛白等判定没点名算术（25 vs 20）⇒ 结论行读起来像环境坏了，不是配额硬顶")
+    if latency_reach(20, 20) is not None or latency_reach(25, None) is not None:
+        bad.append("㉜等号档或读不到容量时被判定拦下 ⇒ 声明面缺失时判据开始替被测面猜数")
+    _h = urllib.error.HTTPError("u", 429, "Too Many Requests",
+                                {"X-RateLimit-Remaining": "0", "Retry-After": "1"}, None)
+    if "Remaining=0" not in measured_hdr(_h) or "Retry-After=1" not in measured_hdr(_h):
+        bad.append("㉝被测面报的配额头没进结论（实得 %r）⇒ 归因少一格实证" % measured_hdr(_h))
+    if measured_hdr(urllib.error.HTTPError("u", 429, "x", {}, None)) != "":
+        bad.append("㉞无头时编出了读数 ⇒ 假配额头比没有更坏")
+    need = required_burst(25)
+    if need < 25 + CONC["threads"] * CONC["per_thread"]:
+        bad.append("㉟建议桶容量只覆盖触发那条消息的相位（实得 %d，本轮共需 ≥%d）⇒ 建议本身是错的"
+                   "（r172 一手：burst=64 时仍被拦 5/48）" % (need, 25 + 48))
+    if required_burst(26) != required_burst(25) + 1:
+        bad.append("㊱建议值不跟 --reps 走（写成常数了）⇒ 改了样本数没人改建议")
+    # ── r172 闸态口径位四腿：读数必须带上"量的是闸前还是闸后"，探不到不许当探到 ──
+    gs1, _ = guard_state_from_headers({"X-RateLimit-Limit": "60", "X-RateLimit-Remaining": "0"}, 429)
+    gs2, _ = guard_state_from_headers({}, 200)
+    gs3, _ = guard_state_from_headers(None, 200)
+    gs4, _ = guard_state_from_headers({}, 500)
+    if (gs1, gs2, gs3, gs4) != ("guarded", "unguarded", "unknown", "unknown"):
+        bad.append("㊲闸态四态折错（实得 %s）⇒ 台账会把「闸后」与「闸前」的 rps 混成同一格"
+                   % (gs1, gs2, gs3, gs4))
+
     print("SELFTEST-%s" % ("PASS: 百分位/空样本/恒慢/缺面/口径漂移 + 阶梯 正例/双地板/LLM偷换/NA不冒充绿"
                            " + 中位数 取中/带宽/LLM从严/冷启不掺/空样本/接线双证"
                            " + 资源 正常/超工作集/超单请求CPU/缺数不判绿/有数不误未验 + 净CPU 正常/缺读数/除零/负值不抹平"
+                           " + 吞吐三态 全2xx有数/掺429无读数/全429无读数/5xx不入合规/无读数不判红也不判绿/地板仍在位"
+                           " + 限流归因 声明桶读出/白等点名算术/等号与缺容量不猜/配额头取证/无头不编/建议桶随样本数走"
                            if not bad else "FAIL: " + "; ".join(bad)))
     return 1 if bad else 0
 
@@ -692,19 +922,39 @@ def main():
     throttled = [f for f in fatal if "429" in f]
     retried = 0
     if throttled and not a.no_settle:
+        cap = declared_burst()
+        # 结构性不可达：串行样本数 > 令牌桶上限时，等回满也没用（回满就停在 cap，第 cap+1 发必 429）。
+        # 这时再睡 22s 重跑一遍同样的形状是**白等**（r171 那条 settle 是为"上一判据的余温"设计的，
+        # 覆盖不了"本轮样本数本身就超配额"这一类），所以直接点名算术并退出，不装作重试过。
+        why = latency_reach(a.reps, cap)
+        if why:
+            partial_receipt(a.json, {"kind": "PERF-UNREACHABLE", "base": a.base, "reps": a.reps,
+                                     "declared_burst": cap, "why": why, "measured": throttled,
+                                     "machine": machine_state()})
+            print("PERF-ENV: 延迟面在带闸实例上结构性不可达 —— %s；实测面 %s"
+                  "。两条出路：空闲副本加 `--xinyu.guard.burst=%d`（整轮对 /api/emotion 共需 %d 发）起服务复跑，"
+                  "或把 --reps 收到 ≤%s（收样本档时结论行必须印档）%s"
+                  % (why, throttled[0][:80], required_burst(a.reps), required_burst(a.reps) - 16, cap,
+                     "；缺席理由已写 %s.partial" % a.json if a.json else ""))
+            return 2
         print("   限流重试：检出 %d 条 429 ⇒ 等 %ds 让令牌桶回满后重打一次（复算：--no-settle 可关）"
               % (len(throttled), GUARD_SETTLE_S))
         time.sleep(GUARD_SETTLE_S)
         retried = 1
         m, fatal = measure(a.base, a.reps)
     if fatal:
-        print("PERF-ENV: 取数失败 %s ⇒ 未验证（限流重试次数=%d）" % ("; ".join(fatal), retried))
+        partial_receipt(a.json, {"kind": "PERF-FETCH-FAILED", "base": a.base, "reps": a.reps,
+                                 "fatal": fatal, "retried": retried, "machine": machine_state()})
+        print("PERF-ENV: 取数失败 %s ⇒ 未验证（限流重试次数=%d）%s"
+              % ("; ".join(fatal), retried,
+                 ("；缺席理由已写 %s.partial" % a.json) if a.json else ""))
         return 2
     for name in ("static_index", "vendor_js", "health", "emotion_crisis",
                  "throughput_health", "throughput_emotion"):
         d = m[name]
         extra = ("｜llm_used=%s keys=%s" % (d.get("llm_used"), d.get("resp_keys"))) if "llm_used" in d else (
-            ("｜rps=%s" % d.get("rps")) if "rps" in d else "")
+            ("｜rps=%s" % d.get("rps")) if "rps" in d else
+            ("｜无读数：%s" % d.get("why")[:70] if d.get("measurable") is False else ""))
         print("  %-16s n=%-3s min=%-7s p50=%-7s p95=%-7s max=%-7s%s"
               % (name, d.get("n"), d.get("min_ms", "-"), d.get("p50_ms", "-"),
                  d.get("p95_ms", "-"), d.get("max_ms", "-"), extra))
@@ -730,12 +980,19 @@ def main():
              for f in ("health", "emotion")
              if isinstance(v.get(f), dict) and v[f].get("band_rps") is not None]
     worst_band = round(max(bands), 1) if bands else None
+    # r172：**降级读数不得覆盖基线**（同 r101 的 .partial 口径）。被限流闸吞掉的那一档没有 rps，
+    # 这一轮的台账只能是 `.partial`——把"没量到"写回基线，下一轮就再也分不清是环境坏了还是服务退了。
+    no_read = {k: d for k, d in m.items()
+               if k.startswith("throughput_") and isinstance(d, dict) and d.get("measurable") is False}
     if a.json:
-        Path(a.json).write_bytes(json.dumps({"base": a.base, "reps": a.reps, "samples": m,
+        Path(a.json + (".partial" if no_read else "")).write_bytes(
+            json.dumps({"base": a.base, "reps": a.reps, "samples": m,
                                              "machine": machine_state(),
                                              "budgets": {k: v["p95_ms"] for k, v in BUDGETS.items()},
                                              "concurrency": {"single_point_threads": CONC["threads"],
-                                                             "single_point_requests": CONC["threads"] * CONC["per_thread"]},
+                                                             "single_point_requests": CONC["threads"] * CONC["per_thread"],
+                                                             "throttled_faces": sorted(no_read),
+                                                             "guard_settle_s": GUARD_SETTLE_S},
                                              "ramp": ({"tiers": list(tiers), "work_per_thread": a.ramp_work,
                                                        "reps_per_tier": a.ramp_reps,
                                                        "warmup_per_tier": a.ramp_warmup,
@@ -752,6 +1009,24 @@ def main():
             print("  FAIL", x)
         print("PERF-BASELINE-FAIL: %d 项超预算/口径失效" % len(allbad))
         return 1
+    if no_read:
+        for k in sorted(no_read):
+            d = no_read[k]
+            print("  无读数 %-20s %s（2xx=%d/%d，429=%d，其他非 2xx=%d）"
+                  % (k, d.get("why"), d["served"], d["budget"],
+                     d["rejected_429"], d["other_status"]))
+        budget = CONC["threads"] * CONC["per_thread"]
+        print("PERF-BASELINE-UNVERIFIED: 并发维在带限流闸的被测面上无读数——单点档 %d 线程×%d=%d 发，"
+              "实测各面放行 %s ⇒ 有效桶容量小于并发预算，rps/p95 记未验；台账写 %s%s。"
+              "要拿容量真值：在**空闲副本**上加 `--xinyu.guard.burst=%d` 起服务后复跑"
+              "（整轮对 /api/emotion 共需 %d 发=延迟 %d + 吞吐 %d；正解是给被测面配够桶，"
+              "不是把并发预算调到桶以下去迎合闸）"
+              % (CONC["threads"], CONC["per_thread"], budget,
+                 " ".join("%s=%d/%d" % (no_read[k]["face"], no_read[k]["served"], no_read[k]["budget"])
+                          for k in sorted(no_read)),
+                 a.json or "(未指定 --json)", ".partial" if a.json else "",
+                 required_burst(a.reps), required_burst(a.reps) - 16, a.reps, budget))
+        return 2
     if ramp_na:
         print("PERF-RAMP-UNVERIFIED: 未跑全的档=%s ⇒ 阶梯这一半记未验（取数不全不得判绿）"
               % "; ".join(ramp_na))
@@ -785,9 +1060,12 @@ def main():
                    rs.get("idle_cpu_ms", "NA"), rs.get("idle_window_s", "NA"), rs.get("pid", "NA"))) if rs else "资源 未验"
     print("PERF-BASELINE-PASS（%d 个目标在预算内｜实测峰值 p95=%.1fms，最紧余量 %.0fms｜"
           "吞吐 并发%d线程×%d请求：health=%s rps／emotion=%s rps（词典引擎真实路径%s）｜%s｜"
+          "闸态=%s（%s）｜"
           "口径=本地无外网 + 危机路径不调 LLM；这是自身棘轮不是跨项目对比）"
           % (len(BUDGETS), peak, tightest, CONC["threads"], CONC["threads"] * CONC["per_thread"],
-             tp.get("rps", "取不到"), te.get("rps", "取不到"), tier_note, res_note))
+             tp.get("rps", "取不到"), te.get("rps", "取不到"), tier_note, res_note,
+             (m.get("guard_probe") or {}).get("state", "unknown"),
+             (m.get("guard_probe") or {}).get("detail", "未探测")))
     return 0
 
 
