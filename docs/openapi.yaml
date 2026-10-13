@@ -37,6 +37,25 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Health" }
+  /api/health/db:
+    get:
+      tags: [health]
+      summary: 数据库面自证（r169 另开一面，不并入 /api/health）
+      description: |
+        回答的是「服务起来了 ≠ 持久化活着」：`/api/health` 只看 `index.html` 与 `vendor` 目录，
+        库整面死掉时它仍回 `status=UP`，于是优雅降级缺了输入端。本端点真去连接池取一次连接。
+        **永不抛** —— 探测失败本身就是它要报告的内容（回 `status=DOWN` + `error`）。
+        另开一面的第二条理由：`/api/health` 被性能判据高频打，在那里加一次真连库往返会把
+        「服务本身」的读数变成「库」的读数。
+        鉴权边界与 `/api/health` **不同**：`ApiTokenFilter` 只对 `/api/health` 精确放行，
+        故配了 `xinyu.api-token` 时本端点需要带 token（它回吐库版本/字符集/表水位，属运维信息）。
+      x-live-check: { method: get, status: [200], required_keys: [service, status, acquireMs] }
+      responses:
+        "200":
+          description: 已探到（UP=拿到连接；DOWN=拿到异常）。状态码恒 200，结论在 body 里
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DbHealth" }
   /api/chat:
     post:
       tags: [chat]
@@ -374,6 +393,38 @@ components:
             这件事从指纹上完全看不出来，只能靠某个端点超时/404 去猜。
             摘要只取产物前 64 KiB 且只算一次（健康端点会被性能判据高频打，重算会把自己变成被测噪声）。
           example: "jar:soulisle-server.jar:9f2c1a7b3e44:20971520"
+    DbHealth:
+      type: object
+      required: [service, status, acquireMs]
+      properties:
+        service: { type: string, example: xinyu-soulisle }
+        status:
+          type: string
+          enum: [UP, DOWN]
+          description: UP=真的从池里拿到了连接；DOWN=连接/元数据探测抛了异常，本端点把它写成读数而不是写成 5xx
+        acquireMs:
+          type: number
+          description: 取连接（含失败路径）的耗时，毫秒。UP 时是从计时起点到拿到连接，DOWN 时到异常为止
+        product: { type: string, description: 仅 UP 时存在，JDBC 元数据 `getDatabaseProductName()`，如 H2 / MySQL }
+        productVersion: { type: string, description: 仅 UP 时存在 }
+        driver: { type: string, description: 仅 UP 时存在 }
+        tables:
+          type: object
+          description: 仅 UP 时存在；`expected`(应有张数) / `scanned`(实扫到的表名数) / `missing`(缺哪些) / `allPresent`
+          properties:
+            expected: { type: integer, example: 2 }
+            scanned: { type: integer, description: 大小写不敏感比对，H2 折大写而 MySQL 区分大小写 }
+            missing: { type: array, items: { type: string } }
+            allPresent: { type: boolean }
+        charset:
+          type: object
+          description: 仅 UP 时存在；列级字符集读数（r130 那条「建表没写 DEFAULT CHARSET」缺口的现场尺），非 MySQL 时 `applicable=false`
+        pool:
+          type: object
+          description: >-
+            HikariCP 池水位（active/idle/total/waiting）。取连接**之后**才读 —— 池是惰性的，先读会报成 unverified；
+            非 Hikari 实现回 `metrics=unavailable`，池未初始化回 `live=unverified(...)`，两者都不许读成「0 条连接、一切正常」。
+        error: { type: string, description: 仅 DOWN 时存在，异常类名（不吞消息也不外泄堆栈） }
     ChatRequest:
       type: object
       required: [messages]

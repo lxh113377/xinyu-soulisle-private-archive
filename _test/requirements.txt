@@ -7,5 +7,8 @@ playwright
 PyYAML
 pypdf           # 由 plan_pdf_coverage_check 引入（读交付 PDF 的页码与文本层）
 Pillow          # 由 pixel_dual / lightshow 两条像素级判据引入（CI 整跑电池后必装）
+requests        # r179 接线引入：`asr_sidecar_check.py` 在**模块顶层** import 它（第 19 行），
+                # 所以连 `--selftest` 腿也要装得上，否则 CI 里是 ImportError 而不是它设计的 rc=2 UNVERIFIED。
+                # G11 在本件入电池的当轮就报了红 —— 依赖是被「接线」这个动作暴露出来的，不是被「用不用 requests」暴露出来的。
 # 注：清单只覆盖「CI 真会执行的判据」的 import。如 demo_video_pipeline 需要 edge-tts，
 # 但它是本地重录工具、不在电池也不在 CI ⇒ 不进清单（否则 CI 白装依赖，G11 也会判幽灵依赖）。

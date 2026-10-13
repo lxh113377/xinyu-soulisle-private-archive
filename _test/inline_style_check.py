@@ -135,8 +135,12 @@ def gate(hits, n_files):
     # 读数行不得在基线已清空时仍写「未修，线上 CSP 仍拦」——那是判据替别人做的未成立判断
     debt_note = "%d 处（未修，线上 CSP 仍拦）" % len(known) if known else "0 处（已清偿，本判据现为纯网）"
     readout = ("扫描=%d 文件｜命中=%d（类型 %d 种：%s）｜欠账基线=%s"
-               "｜新增=%d｜本次清偿=%d" % (n_files, len(hits), len(kinds), ",".join(kinds) or "-",
-                                         debt_note, len(new), len(gone)))
+               "｜新增=%d｜本次清偿=%d"
+               "｜口径=欠账清单型棘轮（裁决看「新增=%d 必须为 0」，"
+               "基线本身是被点名欠账的条数，不是 N-现值 的额度 ⇒ 无余量位，"
+               "别按 r179 的余量口径给它补一个假数）" % (n_files, len(hits), len(kinds),
+                                          ",".join(kinds) or "-",
+                                          debt_note, len(new), len(gone), len(new)))
     if new:
         return "FAIL", readout
     return "PASS", readout

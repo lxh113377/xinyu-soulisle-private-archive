@@ -211,4 +211,6 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
 - **卷160** `07-next-steps.part166.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷161** `07-next-steps.part167.md` — 07-next-steps 分卷（R199 自动拆卷）
 - **卷162** `07-next-steps.part168.md` — 07-next-steps 分卷（R199 自动拆卷）
+- **卷163** `07-next-steps.part171.md` — r179 八维对标（产物面线）**S1-S4 已完成四条**及各自复算命令（volume_alloc 独占取号，非 R199 自动拆卷）
+- **卷164** `07-next-steps.part172.md` — r179 **未闭环挂账 R179-05/06/08/09/10**，每条带可复算前提（同上，独占取号）
 

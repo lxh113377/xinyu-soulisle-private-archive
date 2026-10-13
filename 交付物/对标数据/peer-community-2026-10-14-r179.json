@@ -1,0 +1,557 @@
+{
+ "repos": {
+  "__self__": {
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug.yml",
+    "pr_template": true,
+    "pr_template_sample": ".github/pull_request_template.md",
+    "dependabot": true,
+    "dependabot_sample": ".github/dependabot.yml",
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 71,
+    "files": [
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 8,
+    "merged": 3,
+    "titles": [
+     "chore(deps-maven): bump org.jacoco:jacoco-maven-plugin f",
+     "chore(deps-maven): bump org.springframework.boot:spring-",
+     "chore(deps-actions): bump actions/setup-java from 4 to 6"
+    ]
+   }
+  },
+  "lobehub/lobehub": {
+   "tier": "A",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": ".agents/skills/deep-review/references/dimensions/security.md",
+    "codeowners": true,
+    "codeowners_sample": ".github/CODEOWNERS",
+    "conduct": true,
+    "conduct_sample": "CODE_OF_CONDUCT.md",
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/1_bug_report.yml",
+    "pr_template": true,
+    "pr_template_sample": ".github/PULL_REQUEST_TEMPLATE.md",
+    "dependabot": false,
+    "support": true,
+    "support_sample": "src/libs/email/support.test.ts",
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 87,
+    "files": [
+     "code_of_conduct",
+     "code_of_conduct_file",
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "SillyTavern/SillyTavern": {
+   "tier": "A",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug-report.yml",
+    "pr_template": true,
+    "pr_template_sample": ".github/pull_request_template.md",
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 75,
+    "files": [
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "Open-LLM-VTuber/Open-LLM-VTuber": {
+   "tier": "B",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug---question---get-help---bug---提问---求助.md",
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 62,
+    "files": [
+     "contributing",
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 3,
+    "merged": 0,
+    "titles": [
+     "Bump the uv group across 1 directory with 2 updates",
+     "Bump the pip group across 1 directory with 2 updates",
+     "Bump the pip group across 1 directory with 7 updates"
+    ]
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "morettt/my-neuro": {
+   "tier": "B",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug_report.md",
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 71,
+    "files": [
+     "contributing",
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "letta-ai/letta-code": {
+   "tier": "D",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug_report.yml",
+    "pr_template": true,
+    "pr_template_sample": ".github/pull_request_template.md",
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 62,
+    "files": [
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "hello-diana/MASCOT": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 42,
+    "files": [
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "ddxfish/sapphire": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug_report.md",
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 57,
+    "files": [
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "v2rockets/Loyal-Elephie": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 42,
+    "files": [
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "Rogendo/Mental-health-Chatbot": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 28,
+    "files": [
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "Lum1104/MER-Factory": {
+   "tier": "D",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": ".github/CONTRIBUTING.md",
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug_report.md",
+    "pr_template": true,
+    "pr_template_sample": ".github/pull_request_template.md",
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 71,
+    "files": [
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "CheaperjamRen/leemo": {
+   "tier": "C",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug.yml",
+    "pr_template": true,
+    "pr_template_sample": ".github/pull_request_template.md",
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 85,
+    "files": [
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "NJX-njx/opensoul": {
+   "tier": "C",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": true,
+    "conduct_sample": "CODE_OF_CONDUCT.md",
+    "issue_template": true,
+    "issue_template_sample": ".github/ISSUE_TEMPLATE/bug_report.md",
+    "pr_template": true,
+    "pr_template_sample": ".github/PULL_REQUEST_TEMPLATE.md",
+    "dependabot": true,
+    "dependabot_sample": ".github/dependabot.yml",
+    "support": false,
+    "issue_dirs": 1
+   },
+   "profile": {
+    "health": 100,
+    "files": [
+     "code_of_conduct",
+     "code_of_conduct_file",
+     "contributing",
+     "license",
+     "pull_request_template",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 18,
+    "merged": 9,
+    "titles": [
+     "chore(deps): bump the npm_and_yarn group across 2 direct",
+     "chore(deps): bump the npm_and_yarn group across 4 direct",
+     "chore(deps): bump the npm_and_yarn group across 3 direct"
+    ]
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "s-nagaev/chibi": {
+   "tier": "C",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 57,
+    "files": [
+     "contributing",
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "29-Cu/succhia": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 42,
+    "files": [
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "zeroa234/ryza-ai-revive": {
+   "tier": "C",
+   "tree": {
+    "contributing": true,
+    "contributing_sample": "CONTRIBUTING.md",
+    "security": true,
+    "security_sample": "SECURITY.md",
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": true,
+    "support_sample": "web/assets/icons/support.svg",
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 71,
+    "files": [
+     "contributing",
+     "license",
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  },
+  "Bwcx-songyu/MoodChat": {
+   "tier": "C",
+   "tree": {
+    "contributing": false,
+    "security": false,
+    "codeowners": false,
+    "conduct": false,
+    "issue_template": false,
+    "pr_template": false,
+    "dependabot": false,
+    "support": false,
+    "issue_dirs": 0
+   },
+   "profile": {
+    "health": 28,
+    "files": [
+     "readme"
+    ]
+   },
+   "behavior": {
+    "opened": 0,
+    "merged": 0,
+    "titles": []
+   },
+   "truncated": false,
+   "err": ""
+  }
+ },
+ "na": [],
+ "denominator": 16,
+ "blind": 0,
+ "usable": 16,
+ "behavior_endpoint": "GET /repos/{owner}/{repo}/pulls?state=all（core 限流；search 端点受 secondary rate limit 影响实测不可用，已弃用）",
+ "note": "声明面(tree)与平台面(profile)与行为面(dependabot PR)三路独立取数，任一缺失记 NA，禁与 0 混同；漏洞告警开关仅对本仓可查(需管理权)，peers 侧不可见",
+ "ts": "2026-10-13T21:33:03Z"
+}

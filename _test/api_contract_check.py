@@ -77,6 +77,19 @@ def norm(path):
     return re.sub(r"\{[^}]+\}", "{}", path)
 
 
+# 探测顺序名单（**只决定先后，不决定成员资格**，见 probe_order 的 r179 记因）。
+# 先写后查再删是语义约束：export/import 会落数据，必须排在清理腿之前（r130 一手）。
+PROBE_ORDER = [("/api/health", "get"), ("/api/emotion/lexicon", "get"), ("/api/emotion/eval", "get"),
+               ("/api/emotion", "post"), ("/api/chat", "post"),
+               ("/api/memory/emotion", "post"), ("/api/memory/message", "post"),
+               ("/api/memory/stats", "get"), ("/api/memory/emotions", "get"),
+               ("/api/memory/messages", "get"), ("/api/memory/search", "get"),
+               ("/api/memory/export", "get"), ("/api/memory/import", "post"), ("/api/usage", "get"),
+               ("/api/memory/{sessionId}", "delete")]
+# 清理腿永远压到最后：它 DELETE 的是上面各腿写进 `contract-probe` 会话的数据。
+CLEANUP_LAST = ("/api/memory/{sessionId}", "delete")
+
+
 def frontend_calls():
     out = set()
     for p in list((ROOT / "src" / "js").glob("*.js")) + list((ROOT / "src" / "functions").rglob("*.js")):
@@ -142,27 +155,41 @@ def annotated_ops(spec):
     return out
 
 
+def probe_order(live_keys):
+    """手抄名册只决定**先后**，成员资格由 spec 决定。纯函数（可在 selftest 里合成投喂）。
+
+    立此条的一手代价（r179）：`/api/health/db` 补进契约并标了 `x-live-check`，C4 却一条都没打它，
+    C6 当场报「探测 15 + 豁免 0 == 操作 16」。根因不是文档写漏，而是这里的 `order` 是一份
+    **手抄名单** —— 「接口面」这件事在仓里被写了两遍（spec 的标注 + 名单），加一条接口必须同步两处，
+    而漏改只在运行态才暴露（AGENTS.md 决策 #5 / AC-OBS-09 的旧值漂移是同一族）。
+    顺序本身是语义，不能改成按 spec 书写顺序：先写后查再删，清理腿必须压到最后
+    （r130 把 export/import 插在 delete 之前就是为这个）。所以：名单里有它的按名单位次排，
+    名单没有而 spec 标注了的排在全部已知项之后、清理腿之前 —— 新接口默认被真打，不再静默隐身。
+    """
+    prio = {(norm(p), v.upper()): i for i, (p, v) in enumerate(PROBE_ORDER)}
+    cleanup = (norm(CLEANUP_LAST[0]), CLEANUP_LAST[1].upper())
+
+    def rank(k):
+        return (1 if k == cleanup else 0, prio.get(k, len(PROBE_ORDER)), k)
+
+    return sorted(live_keys, key=rank)
+
+
 def live_probes(spec, ann=None):
     """C4：按固定顺序跑（先写后查再删），不依赖 spec 里的书写顺序。返回 (探测数, 豁免集合)。"""
     # 顺序即语义：先写后查再删。r130 在 delete 之前插入 export/import（导入会落数据，
     # 必须排在清理之前，否则探测自己写的条目会被下一轮的清理假设打乱）。
-    order = [("/api/health", "get"), ("/api/emotion/lexicon", "get"), ("/api/emotion/eval", "get"),
-             ("/api/emotion", "post"), ("/api/chat", "post"),
-             ("/api/memory/emotion", "post"), ("/api/memory/message", "post"),
-             ("/api/memory/stats", "get"), ("/api/memory/emotions", "get"),
-             ("/api/memory/messages", "get"), ("/api/memory/search", "get"),
-             ("/api/memory/export", "get"), ("/api/memory/import", "post"), ("/api/usage", "get"),
-             ("/api/memory/{sessionId}", "delete")]
+    # 名单 PROBE_ORDER 只承担排序；**要不要打**由下面的 live 决定（见 probe_order 的 r179 记因）。
     ann = ann if ann is not None else annotated_ops(spec)
     skipped = {k: v[1] for k, v in ann.items() if isinstance(v, tuple)}
-    live = {(norm(p), v.upper()): op.get("x-live-check") or {}
-            for p, it in (spec.get("paths") or {}).items() for v, op in (it or {}).items()
-            if v in ("get", "post", "put", "delete", "patch") and isinstance(op, dict) and op.get("x-live-check")}
+    live = {}
+    for p, it in (spec.get("paths") or {}).items():
+        for v, op in (it or {}).items():
+            if v in ("get", "post", "put", "delete", "patch") and isinstance(op, dict) and op.get("x-live-check"):
+                live[(norm(p), v.upper())] = (p, v, op.get("x-live-check") or {})
     done = 0
-    for path, verb in order:
-        cfg = live.get((norm(path), verb.upper()))
-        if not cfg:
-            continue
+    for key in probe_order(live):
+        path, verb, cfg = live[key]
         url = BASE + (cfg.get("path") or (path if "{sessionId}" not in path else path.replace("{sessionId}", "contract-probe")))
         st, bodytxt = http(verb, url, cfg.get("body"), cfg.get("query"))
         if st == 429:
@@ -258,6 +285,23 @@ def selftest():
     a_full, a_strip = annotated_ops(spec), annotated_ops(stripped)
     if len(a_strip) >= len(a_full):
         bad.append("篡改⑤（抹掉一条 x-live-check 标注）未被 C6 抓到 ⇒ 覆盖判据恒真")
+    # probe_order（r179 新增）：成员资格由 spec 决定，名单只管先后。五条腿各钉一个失效形态。
+    known = [(norm(p), v.upper()) for p, v in PROBE_ORDER]
+    fresh = (norm("/api/health/db"), "GET")
+    cleanup_key = (norm(CLEANUP_LAST[0]), CLEANUP_LAST[1].upper())
+    seq = probe_order(known + [fresh])
+    if fresh not in seq:
+        bad.append("probe_order 腿①：spec 新增而名单未写的接口被丢掉 ⇒ 新接口静默不探测，"
+                   "这正是 r179 现场（/api/health/db 标了 x-live-check 而 C4 一条没打）")
+    if probe_order([fresh]) != [fresh]:
+        bad.append("probe_order 腿②：只投一件却排出别件 ⇒ 序列由名单决定而非由入参决定，"
+                   "等于回到手抄名册（腿① 会被这条掩护成假绿）")
+    if seq[-1] != cleanup_key:
+        bad.append("probe_order 腿③：清理腿没压到最后（实=%s）⇒ 探测自己写进 contract-probe 的数据会被提前删走" % (seq[-1],))
+    if [k for k in seq if k in known] != known:
+        bad.append("probe_order 腿④：已知项相对次序改变 ⇒「先写后查再删」的语义不再成立")
+    if probe_order([]) != []:
+        bad.append("probe_order 腿⑤：空入参凭空造出探测项 ⇒ 无标注的接口也被打，成员资格失控")
     # C7 三态：原样必须过，三类合成篡改必须各报红
     sp = set(spec.get("paths") or {})
     mdp = ROOT / "docs" / "API.md"

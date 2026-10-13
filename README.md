@@ -198,10 +198,11 @@ CloudBase 注意事项（实测得来）：
 
 > **现状（与机器逐条对账，别手抄）**：GitHub Actions 四条门禁（`.github/workflows/ci.yml` 的 job 数；
 > 另有独立的性能基线工作流 `.github/workflows/perf-baseline.yml`，周常复跑）｜
-> ★ 全量电池（210 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
+> ★ 全量电池（212 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
 > （更正注 r111：旧值写 146；本轮按用户立规新增双核心能力基线棘轮 `core_capability_baseline` 与其 `--selftest` 两套件 ⇒ 146→148。旧值按本仓惯例保留于此，不删。）
 > （更正注 r116：语音通话层落地，新增 `voice_call` 与其 `--selftest` 两套件 ⇒ 148→150。判据 `_test/voice_call_check.py`，见 `docs/quality-gates.md` 同条目。）
 > （更正注 r117：BLIND-RED 常驻棘轮入电池，新增 `blindred_guard` 与其 `--selftest` 两套件 ⇒ 150→152（`run_all_suites.py` 实测 152）。判据 `_test/blindred_guard_check.py`，见 `docs/quality-gates.md` 同条目。）
+> （更正注 r179：孤儿判据接线，新增 `asr_sidecar_selftest` 与 `asr_eval_selftest` 两套件 ⇒ 210→**212**（`run_all_suites.py --list` 实测 212）。**取号跳空说明**：本行不是漏写 r118/r120/r124-r128 等号的套件注 —— 那些轮次各有自己的更正注散在别处，本块只在「套件总数变化」时追加，跳号会被人误读成「那条被删了」，故按 r155 在册口径显式记一句。本轮动因 = `repo_config_check` **G16 四面双向对账**抓到 `asr_eval_check.py`、`asr_sidecar_check.py` 早已入库却「电池与 CI 两头都不执行」⇒ 有仪器没人按开关；接线形态沿用 r130 `perf_api_check` 先例（只接 `--selftest` 腿，主流程要真打 SenseVoice sidecar、服务不在回 rc=2，接进去会把「本机没起 sidecar」常年刷成红项）。）
 > （更正注 r119：八维总览表派生化入电池，新增 `bench_eight_dims` 与其 `--selftest` 两套件 ⇒ 152→154。判据 `_test/bench_eight_dims_check.py`，见 `docs/quality-gates.md` 同条目；同轮另加 `_test/js/pages-function-chat.unit.test.mjs`，走 `js_unit` 的文件枚举面 ⇒ 套件数不变。）
 > （更正注 r121：peers 性能在册探针的离线桩入电池，新增 `perf_probe_selftest` 一套件 ⇒ 154→155。判据 `_test/peer_perf_probe.py`，见 `docs/quality-gates.md` 同条目；同轮 `_test/js/memory-store.unit.test.mjs` 走 js_unit 文件枚举面 ⇒ 套件数不变。）
 > （更正注 r122：peers 文档面探针的离线桩入电池，新增 `peer_docs_selftest` 一套件 ⇒ 155→156。判据 `_test/peer_docs_probe.py`，见 `docs/quality-gates.md` 同条目；同轮 `_test/js/face-engine.unit.test.mjs` 补 5 条运行时离线腿走 js_unit 文件枚举面 ⇒ 套件数不变。）

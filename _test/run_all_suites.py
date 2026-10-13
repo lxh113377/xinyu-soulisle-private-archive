@@ -345,6 +345,13 @@ SUITES = [
     # ⚠ 真面依赖 window.ASRNormalize（r174 起是生产依赖，缺件即 build 面缺件，脚本会如实回 UNVERIFIED rc=2）。
     ("asr_replay", [sys.executable, "_test/asr_replay_check.py", BASE]),
     ("asr_replay_selftest", [sys.executable, "_test/asr_replay_check.py", "--selftest"]),
+    # r179（G16 抓出的两条孤儿判据）：`asr_eval_check.py` / `asr_sidecar_check.py` 早已入库，
+    # 却既不在电池也不在 CI ⇒ 「有仪器但没人按开关」。按 r130 `perf_api_check` 的在册先例
+    # **只接 --selftest 腿**：两条主流程都要打真实 SenseVoice sidecar（127.0.0.1:8321），
+    # 服务不在时诚实回 rc=2（未验）——接进整跑等于把「本机没起 sidecar」常年刷成红项。
+    # 主流程带外复算命令见 `docs/quality-gates.md` 同条目。
+    ("asr_sidecar_selftest", [sys.executable, "_test/asr_sidecar_check.py", "--selftest"]),
+    ("asr_eval_selftest", [sys.executable, "_test/asr_eval_check.py", "--selftest"]),
     ("browser_check", [sys.executable, "_test/browser_check.py"]),
     ("pixel_dual", [sys.executable, "_test/pixel_dual_check.py"]),
     ("lightshow", [sys.executable, "_test/lightshow_check.py"]),

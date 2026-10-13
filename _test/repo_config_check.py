@@ -1381,8 +1381,22 @@ def _st_mut_b(bad):
         bad.append("篡改⑬a（job 不装清单）未被 G11 抓到 ⇒ 恒真")
     if ci_deps_audit(ci_full, req_full.replace("PyYAML", ""), imps)[0] == []:
         bad.append("篡改⑬b（清单漏一个真实依赖）未被 G11 抓到")
-    if ci_deps_audit(ci_full, req_full + "\nrequests\n", imps)[0] == []:
-        bad.append("篡改⑬c（清单里的幽灵依赖，没人 import）未被 G11 抓到")
+    # 篡改⑬c 的「幽灵件」名字**不能是任何真会被 import 的包名**（r179 一手代价）：
+    # 这条腿原样写死 `requests`，而 r179 把 `asr_sidecar_check.py` 接进电池时它顶层真 import 了
+    # requests ⇒ 清单里加 requests 不再是幽灵，腿当场判失败（57→这条）。夹具投的针撞上了真数据，
+    # 与本仓「桩不许读机器状态」是同一族。正解＝取一个**由 import 面自证不在其中**的名字，
+    # 并把「这个名字确实没人在清单里 import」写成前置断言，而不是等下一个依赖来撞。
+    _seen = {str(x).lower() for x in (imps or set())}
+    _cands = [g for g in ("zzx_ghost_pkg", "zq_ghost_pkg", "qv_ghost_pkg") if g.lower() not in _seen]
+    if not _cands:
+        # 取不到幽灵针 ⇒ 点名判失败，绝不"跳过这条腿"（跳过=把负测静默变成恒真）。
+        bad.append("篡改⑬c 无法取幽灵针：三个候选名都出现在 import 面 ⇒ 本条负测不可执行，须换名而不是删腿")
+    else:
+        ghost = _cands[0]
+        if ci_deps_audit(ci_full, req_full + "\n%s\n" % ghost, imps)[0] == []:
+            bad.append("篡改⑬c（清单里的幽灵依赖，没人 import）未被 G11 抓到｜幽灵针=%s" % ghost)
+        if ghost.lower() in _seen:
+            bad.append("篡改⑬c 前置失效：幽灵针 %s 其实有人 import ⇒ 这条负测在测别的东西" % ghost)
     if not r_run:
         bad.append("篡改⑬ 反例组失效：CI 里根本没解析到跑判据的 job（G11 在读空气）")
     # 篡改㉕a..c（r95）：G9 的取数面由「文本行」换成「AST 顶层语句」，两侧都要验。
@@ -1864,7 +1878,11 @@ def _cfg_body(a):
             (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace"),
             (ROOT / "_test" / "run_all_suites.py").read_text("utf-8", errors="replace"))))
     check("G11 依赖清单==判据实际 import，且跑判据的 job 都装了清单", not g11bad,
-          f"{n_runs} 个 job 跑判据 / {n_inst} 个装了 requirements.txt；清单={sorted(req_names(reqp.read_text('utf-8', errors='replace')) if reqp.exists() else [])}")
+          f"{n_runs} 个 job 跑判据 / {n_inst} 个装了 requirements.txt；清单={sorted(req_names(reqp.read_text('utf-8', errors='replace')) if reqp.exists() else [])}"
+          # r179：红因原先被这道门面行吞掉（只印计数不印 `g11bad`），要复现得把
+          # ci_deps_audit/ci_invoked_scripts/third_party_imports 三个内部函数手拼一遍。
+          # 「判据的处置建议也是输出」——不印出来就等于把取证成本转嫁给读红的人。
+          + (" ; " + " ; ".join(g11bad) if g11bad else ""))
 
     gbad, n_all, ex0 = ci_battery_audit(
         (ROOT / ".github" / "workflows" / "ci.yml").read_text("utf-8", errors="replace")

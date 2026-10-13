@@ -689,6 +689,17 @@ def tally(rows):
     return c
 
 
+def headroom(baseline, value):
+    """棘轮余量 = 基线 - 现值（纯函数，可在 --selftest 里合成投喂）。返回 (余量, 是否越限)。
+
+    为什么单独拆出来：本尺的门面行此前只印「基线=%d」，读者拿不到「还剩几格」这个数；
+    而**把负值折成 0** 会让「正好压线」和「越限 3 件」在展示层同形 —— r174 刚抓过一次
+    「两个面合成一个数」，这次是同一族往展示层里长。所以原样返回差值，越限单独给布尔位。
+    """
+    room = int(baseline) - int(value)
+    return room, room < 0
+
+
 def face_line(total_calls, files_with, hard, hard_bat, baseline, bucketed,
               guarded, poll, is_red, battery_known, ranked):
     """门面行生成器（纯函数，main 与 selftest 共用同一实现）。
@@ -954,6 +965,13 @@ def selftest():
     redline, _s2 = face_line(131, 29, 16, 13, 5, 131, 0, 25, True, True, RANKED)
     expect("红态门面行 %d 字符 ≤ 截断线" % len(redline), len(redline) <= FOLD_LIMIT)
 
+    # 余量位（r179 · R175-03）：四态各一，重点钉住「负值不得折成 0」这一条。
+    expect("余量 正例 基线20-现值19 = 1 且未越限", headroom(20, 19) == (1, False))
+    expect("余量 边界 正好压线 = 0 且未越限（0 是合规值，不许标红）", headroom(20, 20) == (0, False))
+    expect("余量 越限 基线20-现值23 = -3 且判越限；**折成 0 会与压线同形**", headroom(20, 23) == (-3, True))
+    expect("余量 反例 三态互不相同（压线/越限/有余量 若折叠成同形 ⇒ 这条腿白写）",
+           len({headroom(b, v) for b, v in ((20, 19), (20, 20), (20, 23))}) == 3)
+
     for x in bad:
         print("  不符: " + x)
     print("TIMING-COUPLING-SELFTEST-%s（%d/%d 条）" % ("FAIL" if bad else "PASS", n - len(bad), n))
@@ -1067,6 +1085,12 @@ def main():
     print("  - 棘轮比较面(r174): 提交面 C1=%d｜基线=%d｜现读工作树=%d（在途增量 %d，未入库新件 %d 个：%s）"
           % (hard_head, a.baseline, hard, hard - hard_head, len(head_new),
              "、".join(head_new[:3]) + ("…" if len(head_new) > 3 else "") or "无"))
+    # 余量自印（r179 · 兑现 R175-03）：棘轮只报「基线=N」时，读者分不清「还剩几格牙」和「已经顶穿」。
+    # 两面各出一个数，且**允许负值** —— 把负数折成 0 会让「越限 3 件」和「正好压线」同形，
+    # 那正是本仓 r174 抓过的「展示层把差异折叠掉」形态。
+    for _lbl, _val in (("提交面", hard_head), ("现读面", hard)):
+        _room, _over = headroom(a.baseline, _val)
+        print("  - 棘轮余量(r179) %s: 余量=%d%s" % (_lbl, _room, "｜已越限" if _over else ""))
     print("  - 现读换桶免检位(r173): moot=%d%s"
           % (len(mooted), ("｜" + "、".join("%s→%s" % (k.split("::")[0], REVIEW[k]["moot"])
                                            for k in mooted)) if mooted else "（无一条免检）"))
