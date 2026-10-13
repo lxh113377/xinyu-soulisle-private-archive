@@ -1,0 +1,18 @@
+PEER-PERF-PASS：在册 0/16 仓有基准行为（measured*），NA 0，truncated 面单列不折算成零
+  lobehub/lobehub                            files-only                 bench=8 ci=0 res=1 wf=31
+  SillyTavern/SillyTavern                    none                       bench=0 ci=0 res=0 wf=10
+  Open-LLM-VTuber/Open-LLM-VTuber            none                       bench=0 ci=0 res=0 wf=6
+  morettt/my-neuro                           none                       bench=0 ci=0 res=0 wf=3
+  letta-ai/letta-code                        none                       bench=0 ci=0 res=0 wf=17
+  hello-diana/MASCOT                         none                       bench=0 ci=0 res=0 wf=0
+  ddxfish/sapphire                           none                       bench=0 ci=0 res=0 wf=1
+  v2rockets/Loyal-Elephie                    none                       bench=0 ci=0 res=0 wf=0
+  Rogendo/Mental-health-Chatbot              none                       bench=0 ci=0 res=0 wf=0
+  Lum1104/MER-Factory                        none                       bench=0 ci=0 res=0 wf=1
+  CheaperjamRen/leemo                        none                       bench=0 ci=0 res=0 wf=1
+  NJX-njx/opensoul                           files-only                 bench=2 ci=0 res=0 wf=8
+  s-nagaev/chibi                             none                       bench=0 ci=0 res=0 wf=4
+  29-Cu/succhia                              none                       bench=0 ci=0 res=0 wf=0
+  zeroa234/ryza-ai-revive                    none                       bench=0 ci=0 res=0 wf=0
+  Bwcx-songyu/MoodChat                       none                       bench=0 ci=0 res=0 wf=0
+RC=0

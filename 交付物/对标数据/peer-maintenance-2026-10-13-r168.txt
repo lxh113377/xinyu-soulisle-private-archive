@@ -1,0 +1,21 @@
+[self 陪聊] 30d=534 (17.8/日) 历史跨度=21天 窗口满=否（窗口不足，暂不横比） tags=13
+lobehub/lobehub                          30d=946     search=946     link-rel-last 率=31.53  verified
+SillyTavern/SillyTavern                  30d=4       search=4       link-rel-last 率=0.13   verified
+Open-LLM-VTuber/Open-LLM-VTuber          30d=0       search=0       single-page(len) 率=0.0    verified
+morettt/my-neuro                         30d=28      search=28      link-rel-last 率=0.93   verified
+letta-ai/letta-code                      30d=352     search=352     link-rel-last 率=11.73  verified
+hello-diana/MASCOT                       30d=0       search=0       single-page(len) 率=0.0    verified
+ddxfish/sapphire                         30d=24      search=24      link-rel-last 率=0.8    verified
+v2rockets/Loyal-Elephie                  30d=0       search=0       single-page(len) 率=0.0    verified
+Rogendo/Mental-health-Chatbot            30d=0       search=0       single-page(len) 率=0.0    verified
+Lum1104/MER-Factory                      30d=0       search=0       single-page(len) 率=0.0    verified
+CheaperjamRen/leemo                      30d=0       search=0       single-page(len) 率=0.0    verified
+NJX-njx/opensoul                         30d=0       search=0       single-page(len) 率=0.0    verified
+s-nagaev/chibi                           30d=23      search=23      link-rel-last 率=0.77   verified
+29-Cu/succhia                            30d=0       search=0       single-page(len) 率=0.0    verified
+zeroa234/ryza-ai-revive                  30d=59      search=59      link-rel-last 率=1.97   verified
+Bwcx-songyu/MoodChat                     30d=0       search=0       single-page(len) 率=0.0    verified
+--------------------------------------------------------------------------------------------------------------
+应测 16 仓 ｜ 两腿一致 16 ｜ 不可用 0 ｜ self 历史跨度 21 天（窗口满=否 ⇒ self 的 30d 读数**无横比资格**，只作自身趋势）
+PEER-MAINT-COMPLETE
+RC=0
