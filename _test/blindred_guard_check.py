@@ -170,6 +170,47 @@ def hook_state(src, filename="<src>"):
     return has_main_guard(tree), hooked
 
 
+def head_entries(files, reader=None):
+    """对**提交面**复算在册人口（r175，承 r174 的同型缺陷：尺读工作树、基线记提交面）。
+
+    一手实测：r174 开场那条 `111 > 基线 108` 的红里，超出部分是并行会话**未入库**的新脚本——
+    人口取自工作树，基线是"提交进仓的件数"，两面一混，别人新增文件就把本轮判红。
+    reader(rel) 返回该件在 HEAD 的源码文本，取不到返回 None（注入它是为了让桩不依赖真 git）。
+    返回 (entries, 仅工作树存在的新件, 失败原因)；失败原因非空 ⇒ 调用方必须判未验，**禁回落工作树数**。
+    """
+    import ast as _ast
+    import os as _os
+    import subprocess as _sp
+    if reader is None:
+        def reader(rel):
+            r = _sp.run(["git", "show", "HEAD:%s" % rel], capture_output=True,
+                        cwd=str(ROOT), timeout=30)
+            return None if r.returncode != 0 else r.stdout.decode("utf-8", "replace")
+    out, new_files, errs = [], [], []
+    for pp in files:
+        rel = _os.path.relpath(str(pp), str(ROOT)).replace("\\", "/")
+        try:
+            src = reader(rel)          # reader 自己也可能炸（git 超时/OSError）⇒ 失败路径不得能崩
+        except Exception as e:         # noqa: BLE001
+            errs.append("%s(read:%s)" % (rel, type(e).__name__))
+            continue
+        if src is None:
+            new_files.append(rel)            # HEAD 里确实没有这件：它不产生本轮义务
+            continue
+        try:
+            hits, hooked = scan_source(src, rel)
+            is_top = has_main_guard(_ast.parse(src))
+        except (_ast.AST64 if False else SyntaxError):
+            is_top = True
+        except Exception as e:               # noqa: BLE001
+            errs.append("%s(%s)" % (rel, type(e).__name__))
+            continue
+        out.append((rel, is_top, hooked))
+    if errs:
+        return None, new_files, "、".join(errs[:3])
+    return out, new_files, None
+
+
 def hook_census(entries, hook_baseline):
     """纯函数：[(rel, 顶层?, 兜底?)] → (问题列表, 顶层件数, 已兜底数, 库件数)。
 
@@ -255,11 +296,39 @@ def main(argv):
         print("SELFTEST：⑦咬合力 → 基线 0 出 %d 条问题／基线 1 出 %d 条（应 1/0），"
               "分母现读 顶层=%d 兜底=%d 库=%d（应 2/1/1）"
               % (len(probs_hi), len(probs_lo), top_n, prot_n, lib_n))
-        if ok and ok2 and ok3 and ok4 and ok5 and ok6 and ok7:
-            print("BLINDRED-GUARD-SELFTEST-PASS：七向变异均成立（裸 assert/裸 wait/try 内/装兜底/"
-                  "顶层未兜底/库件免义务/基线咬合力）⇒ 两根维度都非恒真")
+        # ⑧⑨⑩ r175 比较面腿：判红必须读**提交面**，且"取不到"与"工作树更多"都不许冒充成结论
+        _files = ["x.py", "y.py", "z.py"]
+        _src_top = TOP_SRC
+        _src_hooked = HOOKED_SRC
+        _BAD_SRC = "def f(:" + chr(10) + "    pass"   # 语法坏掉的件 ⇒ 必须落成失败原因，不许静默跳过
+        rd = {"x.py": _src_top, "y.py": _src_hooked, "z.py": None}
+        e8, new8, err8 = head_entries(_files, reader=lambda r: rd.get(r))
+        ok8 = (err8 is None and new8 == ["z.py"]
+               and len([x for x in e8 if x[1] and not x[2]]) == 1)
+        # ⑨ 两条出口分开钉：语法坏掉的件必须**仍算义务**（不许静默跳过），
+        #    而 reader 抛异常必须**落成失败原因**（调用方判未验，禁回落工作树数）
+        e9, _n9, err9 = head_entries(["x.py"], reader=lambda r: _BAD_SRC)
+        ok9a = (err9 is None and len(e9 or []) == 1 and e9[0][1] and not e9[0][2])
+        def _boom(_r):
+            raise ValueError("读不动")
+        _e9b, _n9b, err9b = head_entries(["x.py"], reader=_boom)
+        ok9b = err9b is not None
+        ok9 = ok9a and ok9b
+        e9, _n9, err9 = _e9b, [], err9b
+        p10, _t10, _p10, _l10 = hook_census(e8 if e8 else [], 0)
+        p11, _t11, _p11, _l11 = hook_census(e8 if e8 else [], 1)
+        ok10 = bool(p10) and not p11
+        print("SELFTEST：⑧提交面复算 → 计入 %d 件／仅工作树 %s（应 2/['z.py']），未兜底 1 件"
+              % (len(e8 or []), new8))
+        print("SELFTEST：⑨语法坏件仍算义务=%s／reader 抛异常 → 失败原因=%s（应 True/非空）"
+              % (ok9a, err9b is not None))
+        print("SELFTEST：⑩提交面人口喂基线 → 基线 0 出 %d 条／基线 1 出 %d 条（应 1/0）"
+              % (len(p10), len(p11)))
+        if ok and ok2 and ok3 and ok4 and ok5 and ok6 and ok7 and ok8 and ok9 and ok10:
+            print("BLINDRED-GUARD-SELFTEST-PASS：十向变异均成立（裸 assert/裸 wait/try 内/装兜底/"
+                  "顶层未兜底/库件免义务/基线咬合力/提交面复算/读不动判未验/提交面人口喂基线）⇒ 两根维度都非恒真")
             return 0
-        print("BLINDRED-GUARD-SELFTEST-RED：变异腿不成立 ⇒ 本件自身失效（腿③④⑤⑥⑦任一）")
+        print("BLINDRED-GUARD-SELFTEST-RED：变异腿不成立 ⇒ 本件自身失效（腿③④⑤⑥⑦⑧⑨⑩任一）")
         return 1
 
     files, err = roster()
@@ -293,14 +362,33 @@ def main(argv):
             for kind, ln, snip in hits[:4]:
                 offenders.append("%s:%d (%s) %s" % (rel, ln, kind, snip[:60]))
 
-    hprobs, top_n, prot_n, lib_n = hook_census(entries, hook_baseline)
-    unhooked_n = top_n - prot_n
+    # 工作树面（现读）与提交面（可归因的那一面）**各出一行分母**，红因只取后者
+    hprobs_wt, top_wt, prot_wt, lib_wt = hook_census(entries, hook_baseline)
+    dentries, dnew, derr = head_entries(files)
+    hook_unverified = False
+    if derr:
+        hook_unverified = True
+        hprobs, top_n, prot_n, lib_n = [], 0, 0, 0
+        unhooked_n = -1
+    else:
+        hprobs, top_n, prot_n, lib_n = hook_census(dentries, hook_baseline)
+        unhooked_n = top_n - prot_n
     points_red = total > baseline
     # 第二维度先出**读数行**（判定与读数分开印：判定行只有一条，聚合器折叠时不会丢具名）
-    print("BLINDRED-HOOK-%s 顶层脚本=%d 已兜底=%d 未兜底=%d 库件(无此义务)=%d ｜ 基线=%d%s"
-          % ("RED" if hprobs else "PASS", top_n, prot_n, unhooked_n, lib_n, hook_baseline,
+    _vt = "UNVERIFIED" if hook_unverified else ("RED" if hprobs else "PASS")
+    print("BLINDRED-HOOK-%s 顶层脚本=%d 已兜底=%d 未兜底=%d 库件(无此义务)=%d ｜ 基线=%d 余量=%d%s"
+          % (_vt, top_n, prot_n, unhooked_n, lib_n, hook_baseline,
+             hook_baseline - unhooked_n if not hook_unverified else -1,
              "" if unhooked_n >= hook_baseline
-             else "（未兜底已低于基线 ⇒ 请把 HOOK_BASELINE_DEFAULT 下调到 %d，棘轮只降不升）" % unhooked_n))
+             else "（未兜底已低于基线 ⇒ 可下调 HOOK_BASELINE_DEFAULT 到 %d，但**保留 ≥3 件在途余量**——"
+                  "零余量地板会把并行会话新增一件直接变成本轮红，r174 的 111>108 即此形态）" % unhooked_n))
+    if hook_unverified:
+        print("   · 提交面取不到：%s ⇒ 兜底维度记未验（rc=2），**不拿工作树数冒充提交面数**" % derr)
+    print("   · 比较面(r175)：提交面 未兜底=%d｜现读工作树 未兜底=%d（在途增量 %d，未入库新件 %d 个：%s）"
+          % (unhooked_n, top_wt - prot_wt, (top_wt - prot_wt) - unhooked_n, len(dnew),
+             ("、".join(dnew[:3]) + ("…" if len(dnew) > 3 else "")) or "无"))
+    if hprobs_wt and (top_wt - prot_wt) > (top_n - prot_n):
+        print("   · 在途未兜底(r175，不判红)：工作树比提交面多出的顶层件缺兜底，属他方 WIP ⇒ 只单列")
     for msg in hprobs:
         print("   · %s" % msg)
     if machine:
@@ -308,6 +396,10 @@ def main(argv):
             if t and not h:
                 print("     - 未装兜底：%s" % rel)
 
+    if hook_unverified and not points_red:
+        print("BLINDRED-GUARD-UNVERIFIED 维度②兜底取不到提交面 ⇒ 本维度未验（维度①现读=%d/基线=%d 照常报数）"
+              % (total, baseline))
+        return 2
     if not points_red and not hprobs:
         tail = ""
         if total < baseline:
