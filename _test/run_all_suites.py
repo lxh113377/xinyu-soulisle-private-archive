@@ -371,6 +371,10 @@ SUITES = [
     # 真函数模块 —— 6 条出口（含 stream=true 但上游报错的折返腿）离线可重跑，摘头即翻红。
     ("api_egress_headers", [sys.executable, "_test/api_egress_headers_check.py"]),
     ("api_egress_headers_selftest", [sys.executable, "_test/api_egress_headers_check.py", "--selftest"]),
+    # r168 S4：公网 v1 线（Pages Function）此前只有「密钥不落前端」一层，Java 侧的限流/总量闸
+    # 都够不着它（r130 §9 一手登记）。零密钥、零公网、零部署面改动，node 里用假 fetch+假时钟驱动真函数。
+    ("v1_cost_guard", [sys.executable, "_test/v1_cost_guard_check.py"]),
+    ("v1_cost_guard_selftest", [sys.executable, "_test/v1_cost_guard_check.py", "--selftest"]),
     # r60 持久层异常面：memory-store 8 处 try/catch 从没被走过一遍（47 条判据零覆盖）。
     # 五种存储故障 × 四条断言，F4 那条当场抓出"清除后界面计数不刷新"的真缺陷。
     # r67：JS 语法面从"没人量"变成有守卫。加它不是因为 peers 有 lint（实测仅 2/16），

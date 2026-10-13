@@ -53,6 +53,56 @@ function corsHeaders(request) {
   };
 }
 
+/* r168 成本面（对标 r128/r130 Java 侧的 ApiGuardFilter + QuotaFilter）：按 IP 的次数上限。
+ *
+ * 为什么要补这一道：`/api/chat` 是本仓唯一真花钱的端点，而公网 v1 线此前只剩「密钥不落前端」
+ * 一层 —— r130 §9 实测登记：Java 侧有令牌桶 + 按日闸，Pages Function 侧两者都没有。
+ *
+ * ⚠️ 能力边界必须如实写在这儿，不许把它读成「和 Java 侧一样」：
+ *   · 本 isolate 内存计数，**无持久层** ⇒ 冷启动/换 isolate 即归零；
+ *   · 只认 `cf-connecting-ip` ⇒ 同一 NAT 出口会互相挤占，换 IP 即绕开；
+ *   · 没有按日累计（那要 KV/D1 绑定，属对外发布动作，本轮不做）。
+ *   ⇒ 它压得住「同一个 IP 在一个 isolate 活着时猛打」，压不住慢速长期白嫖。
+ *   中期方案（r130 §9 选项①：KV 按日累计）待公网流量真正上来再上。
+ *
+ * 默认 30 次/分/IP 刻意宽松：宁可在极端滥用下多花一点，也不能打断评委与判据夹具的正常调用
+ * （与 `application.yml` 里 r128 那条同口径）。`LLM_MAX_PER_MIN=0` = 整闸关闭。
+ * 计数只发生在**真要打上游客**的那一次；被拒的那次不计数，否则越重试越早锁死（r130 S2 同族）。*/
+const RL_WINDOW_MS = 60000;
+const rlBuckets = new Map();
+
+function costGuard(request, env) {
+  const limit = Math.floor(Number(env.LLM_MAX_PER_MIN));
+  const rpm = Number.isFinite(limit) && limit >= 0 ? limit : 30;
+  if (rpm <= 0) return null;
+  const ip = (request && request.headers ? request.headers.get("cf-connecting-ip") : "") || "unknown";
+  const now = Date.now();
+  let rec = rlBuckets.get(ip);
+  if (!rec || now - rec.t0 >= RL_WINDOW_MS) {
+    // isolate 可以活很久：不清过期桶就会让这个 Map 无界增长（换来的是省掉一个定时器）。
+    if (rlBuckets.size > 512) {
+      for (const [k, v] of rlBuckets) if (now - v.t0 >= RL_WINDOW_MS) rlBuckets.delete(k);
+    }
+    rec = { t0: now, n: 0 };
+    rlBuckets.set(ip, rec);
+  }
+  if (rec.n >= rpm) {
+    return { limited: true, limit: rpm, left: 0, wait: Math.max(1, Math.ceil((rec.t0 + RL_WINDOW_MS - now) / 1000)) };
+  }
+  rec.n += 1;
+  return { limited: false, limit: rpm, left: rpm - rec.n, wait: 0 };
+}
+
+/** 配额可观测头：让人（和 `_test/v1_cost_guard_check.py`）能在响应上直接读出剩余额度。 */
+function rlHeaders(g) {
+  if (!g) return {};
+  return {
+    "X-RateLimit-Limit": String(g.limit),
+    "X-RateLimit-Remaining": String(g.left),
+    "X-RateLimit-Window": String(RL_WINDOW_MS / 1000)
+  };
+}
+
 export async function onRequestOptions({ request }) {
   const h = corsHeaders(request);
   if (!h["Access-Control-Allow-Origin"]) return new Response(null, { status: 403 });
@@ -80,6 +130,15 @@ export async function onRequestPost(context) {
   };
   if (wantStream) upstreamBody.stream = true;
 
+  // 成本闸放在「真要打上游」之前：no-key / bad-json 那两条出口不花钱，也就不占额度。
+  const rl = costGuard(request, env);
+  if (rl && rl.limited) {
+    return Response.json({ error: "rate-limited" }, {
+      status: 429,
+      headers: { ...SEC_JSON, ...cors, ...rlHeaders(rl), "Retry-After": String(rl.wait) }
+    });
+  }
+
   const upstream = await fetch(base.replace(/\/$/, "") + "/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
@@ -95,6 +154,7 @@ export async function onRequestPost(context) {
       headers: {
         ...SEC_HEADERS,
         ...cors,
+        ...rlHeaders(rl),
         "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         "Connection": "keep-alive",
@@ -104,5 +164,5 @@ export async function onRequestPost(context) {
   }
 
   const data = await upstream.json().catch(() => ({ error: "upstream-nonjson" }));
-  return Response.json(data, { status: upstream.status, headers: { ...SEC_JSON, ...cors } });
+  return Response.json(data, { status: upstream.status, headers: { ...SEC_JSON, ...cors, ...rlHeaders(rl) } });
 }

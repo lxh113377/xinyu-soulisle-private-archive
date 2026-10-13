@@ -16,6 +16,11 @@ r57 把 `/api/chat`（Pages Function）的 5 条安全头补上了，取证是**
 
 四条出口 = 该模块的全部 return 点（`src/functions/api/chat.js` 实测 4 处 Response）。
 漏一条就等于回到 r57 修之前那种「只修看得见的出口」（[[fix-the-producer-covers-all-egress]]）。
+
+r168 更正本行：模块现有 **5 处** return（新增 429 成本闸出口，见 `src/functions/api/chat.js` 的
+`costGuard`），驱具的出口名册同步扩到 7 条（含 upstream-error / stream-fallback 两条同出口不同状态码）。
+上面那句「四条 / 4 处 Response」是 r59 当日值，按当日为真保留不改写；
+新增出口不是「加一条就算完」——反向腿⑧ 专门摘掉 429 那条的 nosniff，证明它真在这把尺的射程内。
 """
 from __future__ import annotations
 
@@ -44,9 +49,10 @@ JSON_MUST = {"cache-control": "no-store"}
 HARNESS = r"""
 import(%(fnurl)s).then(async (mod) => {
   const out = [];
-  const req = (body, ctype) => new Request("https://x/api/chat", {
+  const req = (body, ctype, ip) => new Request("https://x/api/chat", {
     method: "POST",
-    headers: { "content-type": ctype || "application/json" },
+    headers: { "content-type": ctype || "application/json",
+               "cf-connecting-ip": ip || "203.0.113.10" },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
   const hdrs = (r) => { const o = {}; for (const [k, v] of r.headers.entries()) o[k] = v; return o; };
@@ -67,13 +73,23 @@ import(%(fnurl)s).then(async (mod) => {
     status: 200, headers: { "content-type": "text/event-stream" } });
   const upErr = () => async () => new Response(JSON.stringify({ error: { message: "Insufficient Balance" } }), {
     status: 402, headers: { "content-type": "application/json" } });
-  await call("no-key", {}, req({ messages: [] }), null);
+  await call("no-key", {}, req({ messages: [] }, null, "203.0.113.1"), null);
   await call("bad-json", { DEEPSEEK_KEY: "stub-key" }, "{not json", upJSON());
-  await call("sse", { DEEPSEEK_KEY: "stub-key" }, req({ messages: [], stream: true }), upSSE());
-  await call("passthrough", { DEEPSEEK_KEY: "stub-key" }, req({ messages: [] }), upJSON());
-  await call("upstream-error", { DEEPSEEK_KEY: "stub-key" }, req({ messages: [] }), upErr());
+  await call("sse", { DEEPSEEK_KEY: "stub-key" }, req({ messages: [], stream: true }, null, "203.0.113.2"), upSSE());
+  await call("passthrough", { DEEPSEEK_KEY: "stub-key" }, req({ messages: [] }, null, "203.0.113.3"), upJSON());
+  await call("upstream-error", { DEEPSEEK_KEY: "stub-key" }, req({ messages: [] }, null, "203.0.113.4"), upErr());
   await call("stream-fallback", { DEEPSEEK_KEY: "stub-key" },
-             req({ messages: [], stream: true }), upErr());
+             req({ messages: [], stream: true }, null, "203.0.113.5"), upErr());
+  // r168 第五条出口：按 IP 次数上限命中 ⇒ 429。先用 limit=1 放行一次把额度占掉
+  // （那条放行不记进出口名册 —— 它测的是额度而不是响应形状，形状由 passthrough 与 v1_cost_guard 各盯一半），
+  // 被抓下来的那条才是本腿要测的响应。
+  // ⚠️ 两条各用自己的 Request：本仓判据自己就先踩了一次 —— 复用同一个 Request 时
+  // 第二次 request.json() 会因 body 已消费而抛错，把 429 出口测成 400（bad-json）。
+  const burnEnv = { DEEPSEEK_KEY: "stub-key", LLM_MAX_PER_MIN: 1 };
+  globalThis.fetch = upJSON();
+  await mod.onRequestPost({ request: req({ messages: [] }, null, "203.0.113.99"),
+    env: burnEnv, params: {}, waitUntil() {}, ctx: {}, cf: {}, next() {} });
+  await call("rate-limited", burnEnv, req({ messages: [] }, null, "203.0.113.99"), upJSON());
   console.log(JSON.stringify(out));
 });
 """
@@ -110,12 +126,13 @@ def assess(exits, strip=None):
     """纯判定：逐出口断言安全头 + 契约形状。`strip` 供反向腿摘掉头。"""
     bad = []
     names = {e["name"] for e in exits}
-    want_names = {"no-key", "bad-json", "sse", "passthrough", "upstream-error", "stream-fallback"}
+    want_names = {"no-key", "bad-json", "sse", "passthrough", "upstream-error",
+                  "stream-fallback", "rate-limited"}
     if want_names - names:
         return ["出口枚举不全：缺 %s（该模块的 return 点必须逐个测，r57 G3）"
                 % sorted(want_names - names)]
     expect = {"no-key": 500, "bad-json": 400, "sse": 200, "passthrough": 200,
-              "upstream-error": 402, "stream-fallback": 402}
+              "upstream-error": 402, "stream-fallback": 402, "rate-limited": 429}
     for e in exits:
         h = {k.lower(): v for k, v in (e.get("headers") or {}).items()}
         if strip and e["name"] == strip.split(":", 1)[0]:
@@ -175,7 +192,8 @@ def selftest() -> int:
         "cache-control": "no-cache, no-transform" if n == "sse" else "no-store"},
         "body": '{"error":"no-key"}' if n == "no-key" else "{}", "err": None}
         for n, s in [("no-key", 500), ("bad-json", 400), ("sse", 200),
-                     ("passthrough", 200), ("upstream-error", 402), ("stream-fallback", 402)]]
+                     ("passthrough", 200), ("upstream-error", 402),
+                     ("stream-fallback", 402), ("rate-limited", 429)]]
     bad = []
     if assess(good):
         bad.append("①正例被判红 ⇒ 判据有假阳性：%s" % assess(good))
@@ -198,7 +216,12 @@ def selftest() -> int:
                 + [e for e in good if e["name"] != "sse"])
     if not any("no-transform" in x for x in m6):
         bad.append("⑦SSE 出口给成 no-store 未被抓到（流被中间层重编码这条路要单独钉）")
-    print("APIEGRESS-SELFTEST-%s（7 腿：正例 + 摘头×2 + 缺出口 + 状态码 + 错误体 + SSE 语义）"
+    # ⑧ r168：新增的 429 出口也必须真的被这把尺覆盖 —— 只把它加进名册而不摘头试过，
+    #    等于给第五条出口发了一张「在册但没人量」的空头证明（本仓 M5⑫ 同族）。
+    m8 = assess(good, strip="rate-limited:x-content-type-options")
+    if not any("rate-limited 缺 x-content-type-options" in x for x in m8):
+        bad.append("⑧摘掉 429 出口的 nosniff 未翻红 ⇒ 新出口在这把尺上是装饰")
+    print("APIEGRESS-SELFTEST-%s（8 腿：正例 + 摘头×3 + 缺出口 + 状态码 + 错误体 + SSE 语义）"
           % ("PASS" if not bad else "FAIL: " + "; ".join(bad)))
     for x in bad:
         print("  ✗ " + x)

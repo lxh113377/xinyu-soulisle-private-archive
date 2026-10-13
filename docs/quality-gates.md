@@ -133,8 +133,10 @@ python _test/backup_online_check.py                        # r86 备用线真实
 python _test/run_logged.py --selftest                      # r84 后台测量退出码回执桩：8 腿（转发真 rc／stderr 落盘／零输入与落点坏都判未验）
 python _test/run_logged.py --name peers -- python _test/benchmark_metrics.py --cap-channel   # 用法：把测量丢后台时的唯一合法包装，日志尾行 NAME_RC 才是结论
 python _test/hook_wiring_check.py --drill                  # 真注入演习：删一件「已入库但未写进声明面」的交付件 ⇒ 钩子必须 rc=1 且点名它，随后按字节复原并复验 rc=0
-python _test/api_egress_headers_check.py                  # r59 函数出口面：node 假 fetch 驱动真 chat.js，6 条 return 出口各断 5 类安全头 + 状态码 + 错误体形状
-python _test/api_egress_headers_check.py --selftest       # r59 判据桩：7 腿（正例／摘 CSP／摘 no-store／缺出口／状态码漂移／错误体漂移／SSE 语义被换）；首跑即抓到"没发 stream:true 导致 SSE 腿空转"
+python _test/api_egress_headers_check.py                  # r59 函数出口面：node 假 fetch 驱动真 chat.js，逐条 return 出口各断 5 类安全头 + 状态码 + 错误体形状 ｜ 更正注 r168：出口名册 6→**7 条**（新增 429 成本闸那条 return；upstream-error / stream-fallback 是同出口不同状态码）。⚠️ 本判据今天就抓到我一个真错：两条腿复用同一个 Request ⇒ 第二次 body 已消费 → 429 被测成 400
+python _test/api_egress_headers_check.py --selftest       # r59 判据桩：8 腿（正例／摘 CSP／摘 no-store／缺出口／状态码漂移／错误体漂移／SSE 语义被换／**摘 429 出口的 nosniff**——新出口必须真在射程内，只加名册不算量过）；首跑即抓到"没发 stream:true 导致 SSE 腿空转"
+python _test/v1_cost_guard_check.py                       # r168 公网 v1 线成本闸行为判据：node 假 fetch + **假时钟**驱动真 chat.js，8 场景 61 条读数（额度递减 2/1/0／到顶即拒 429+Retry-After／被拒不计数／窗口滚过恢复／按 IP 分桶／LLM_MAX_PER_MIN=0 关闸后 50 次全放行／缺 cf-connecting-ip 不崩／默认上限≥20 且可观测）。存在动因：Java 侧 r128/r130 两道闸都够不着 Pages Function，公网线此前只剩「密钥不落前端」一层（r130 §9 登记后顺延未销账）
+python _test/v1_cost_guard_check.py --selftest            # r168 变异腿：5 类源码变异（摘掉到顶即拒／放行不计数／窗口改成一小时／默认值改成 3／额度头不回写）各自必须翻红并点名应红场景；2 条反向腿（未改动副本必须全绿 + 函数权威源必须未被写过）——变异全在临时副本，不在 src/
 python _test/storage_resilience_check.py                 # r60 持久层异常面：真开浏览器注 storage 禁用/内容损坏/配额写满/删不掉 四类故障 + 对照组，断"零未捕获异常／界面计数==数据源／星雾仍点亮／清空回执如实"
 python _test/storage_resilience_check.py --selftest      # r60 判据桩：10 腿（合规正例不假红 + 六形必红 + 坏页端到端真崩 + 零读数不判绿）
 python _test/js_syntax_check.py                     # r67 JS 语法面：src/js 与 deploy/xinyu/js 双份逐文件 node --check（覆盖面=可解析性；不覆盖面=风格/未定义变量/lint 规则）
