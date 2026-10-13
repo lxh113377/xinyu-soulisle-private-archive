@@ -36,6 +36,14 @@ import static org.mockito.Mockito.when;
  * 评测集一动，构建期立刻红，逼着人去核对双端而不是让数字默默漂。
  * （注：Java 侧格式化是「100.0%」一位小数，JS 侧是「100%」，格式不同非分叉。）
  *
+ * <p>⚠️ r168 更正上一段那句「评测集一动，构建期立刻红」：<b>会红不等于该红</b>。断言里钉的是
+ * 写下那行代码当天的快照，于是扩充评测集（85 → 105，并带入 1 条真实漏判）后，这两条断言
+ * 在 HEAD 面<b>恒红</b>（实测 {@code mvn test} Failures: 2，CI 的 java-build 步跟着一起红），
+ * 而它红的原因不是引擎退化 —— 属本仓 r98 立的「验收标准按构造不可达」族。
+ * 现改为「期望值由同一份评测文件与逐条读数当场重算」：扩充永不致红，
+ * 而①危机漏判、②汇总与明细不自洽这两件真缺陷仍然会红（本类 docstring 与用例注释各留一份口径，
+ * 以用例注释为执行面）。上面两段历史数字（94.4% / 3-3 / 79 条 / 100.0%）按其当日为真保留，不再作为断言依据。
+ *
  * <p>形态选择：**直接调用控制器方法**而非 MockMvc——本仓四个控制器都是
  * 「入参 JSON 字符串 → 出 ResponseEntity 字节体」，判定全在方法体内；
  * 直接调用既覆盖全部行，又不把测试结果押在 MVC 装配细节上。
@@ -45,6 +53,8 @@ class EmotionControllerTest {
 
     private static final ObjectMapper M = new ObjectMapper();
 
+    private static final String EVAL_PATH = "./_test/emotion-eval-dataset.json";
+
     private static String text(ResponseEntity<byte[]> r) {
         return new String(r.getBody(), StandardCharsets.UTF_8);
     }
@@ -53,7 +63,20 @@ class EmotionControllerTest {
     private static EmotionController offline() {
         LlmProxy llm = mock(LlmProxy.class);
         when(llm.hasKey()).thenReturn(false);
-        return new EmotionController(new EmotionClassifier(llm, 8000L), "./_test/emotion-eval-dataset.json");
+        return new EmotionController(new EmotionClassifier(llm, 8000L), EVAL_PATH);
+    }
+
+    /**
+     * 评测集取数面：<b>与被审对象用同一条路径字符串</b>，这样「期望值由文件现读」不依赖
+     * 构建目录恰好是项目根还是模块根（r130 §8 教训 2 的同一条相对路径坑，换个方向再咬一次）。
+     */
+    private static JsonNode datasetItems() throws Exception {
+        JsonNode root = M.readTree(new String(java.nio.file.Files.readAllBytes(java.nio.file.Path.of(EVAL_PATH)),
+                StandardCharsets.UTF_8));
+        JsonNode items = root.path("items");
+        assertTrue(items.isArray() && !items.isEmpty(),
+                "评测集取不到 items ⇒ 本类的对账全部失去分母，不得静默当通过");
+        return items;
     }
 
     @Test
@@ -174,17 +197,52 @@ class EmotionControllerTest {
      * r76 首跑就把一条挂了三轮的过期断言打了出来：AGENTS.md 的 AC-OBS-09 与 J3 行仍写
      * 「36 条 / 94.4% / crisis 3-3 / misses 两条」，而磁盘现值是 <b>73 条 / 98.6% / crisis 6-6 / misses 一条</b>
      * （评测集 09-23 由 36 扩到 73，标题数字没人重算）。这里按**当场实测**取值，并同步把文档更正到位。
+     *
+     * <p>⚠️ r168 更正本用例自己的做法：<b>「按当场实测取值」仍然是抄快照</b> —— 抄的是写下那行代码当天的值。
+     * 评测集 09-29 起又从 85 扩到 105 条（并带入 1 条真实漏判），于是这两条断言自那次扩充起
+     * <b>在 HEAD 面恒红</b>（{@code mvn test} 实测 Failures: 2，CI 的 java-build 步跟着一起红），
+     * 而任何一次扩充都会再红一次 ⇒ 属本仓 r98 立的「验收标准按构造不可达」族。
+     * 正解不是把 85 改成 105、把 100.0% 改成 99.0%（那是再抄一次），而是让期望值
+     * <b>由同一份评测文件与逐条读数当场重算</b>：条数取自文件、危机分母取自文件、
+     * 准确率由 results 反推、misses 数由 total-correct 反推。这样扩充评测集永不致红，
+     * 而真正会红的两件事留住了：① 危机漏判（分子≠分母）；② 汇总口径与逐条读数不自洽。
      */
     @Test
-    @DisplayName("eval：真实评测集在 Java 侧复跑 = 85 条 / 100.0% / 危机 6-6（AC-OBS-09 的构建期锁）")
+    @DisplayName("eval：真实评测集在 Java 侧复跑 —— 期望值当场由数据集与逐条读数重算，不抄快照（AC-OBS-09 构建期锁）")
     void evalOnRealDataset() throws Exception {
-        ResponseEntity<byte[]> r = offline().eval(0);
-        assertEquals(200, r.getStatusCode().value());
-        JsonNode b = M.readTree(text(r));
-        assertEquals(85, b.path("total").asInt());
-        assertEquals("100.0%", b.path("accuracy").asText());
-        assertEquals("6/6", b.path("crisis_recall").asText());
-        assertEquals(0, b.path("misses").size(), "漏判数变了就必须同步双端对账判据，不许默默漂");
+        JsonNode items = datasetItems();
+        JsonNode b = M.readTree(text(offline().eval(1)));
+
+        assertEquals(items.size(), b.path("total").asInt(),
+                "total 必须等于同一份评测文件的现读条数（两端读的是同一个文件，见决策 #5）");
+
+        int crisisRows = 0;
+        for (JsonNode it : items) {
+            if ("crisis".equals(it.path("expect").asText())) {
+                crisisRows++;
+            }
+        }
+        String[] recall = b.path("crisis_recall").asText().split("/");
+        assertEquals(crisisRows, Integer.parseInt(recall[1]),
+                "crisis_recall 的分母必须等于数据集里 expect=crisis 的条数（现读，不抄）");
+        assertEquals(recall[1], recall[0],
+                "危机一条都不许漏 —— 这条与条数无关，扩充评测集也不该让它红");
+
+        int correct = 0;
+        for (JsonNode row : b.path("results")) {
+            if (row.path("expect").asText().equals(row.path("pred").asText())) {
+                correct++;
+            }
+        }
+        assertEquals(Math.round(correct * 1000.0 / b.path("total").asInt()) / 10.0 + "%",
+                b.path("accuracy").asText(), "汇总准确率必须等于逐条读数重算值（防只改汇总不改明细）");
+        assertEquals(b.path("total").asInt() - correct, b.path("misses").size(),
+                "misses 条数必须等于 total 减逐条命中数");
+        for (JsonNode miss : b.path("misses")) {
+            for (String k : new String[] {"text", "expect", "pred"}) {
+                assertTrue(miss.has(k), "每条漏判都得带齐双端对账要用的三件，缺一则 misses 无法复核");
+            }
+        }
     }
 
     @Test
@@ -192,11 +250,17 @@ class EmotionControllerTest {
     void evalDetailReturnsEveryRow() throws Exception {
         JsonNode b = M.readTree(text(offline().eval(1)));
         assertEquals(b.path("total").asInt(), b.path("results").size());
+        assertEquals(datasetItems().size(), b.path("results").size(),
+                "逐条行数必须与数据集现读条数一一对应（r168：原断言在此处抄了 100.0% 快照，已换成现读对账）");
         JsonNode first = b.path("results").get(0);
         for (String k : new String[] {"text", "expect", "pred"}) {
             assertTrue(first.has(k), "逐条行缺字段 " + k);
         }
-        assertEquals("100.0%", b.path("accuracy").asText());
+        assertFalse(b.path("results").get(0).path("text").asText().isEmpty(), "明细里文本不得被抹空");
+        // detail=0 那一半分支也得有人走：汇总在、明细缺席（前端只要读数时不背 105 行）
+        JsonNode z = M.readTree(text(offline().eval(0)));
+        assertTrue(z.has("accuracy") && z.has("misses"), "detail=0 仍须给出汇总与漏判");
+        assertFalse(z.has("results"), "detail=0 却把逐条行也塞回来 ⇒ 响应体会随评测集规模线性膨胀");
     }
 
     @Test
