@@ -200,17 +200,17 @@ def selftest():
         fails.append("E5 阈值腿失效：4% 的下降竟被判过 5% 阈值")
 
     # E7/E8 块被掏空检测：写了常量却没填腿 = 判据空跑（本仓名册自证传统，防下一轮悄悄删腿）
-    for nm, blk in (("E7", E7_JS), ("E8", E8_JS)):
+    for nm, blk, floor in (("E7", E7_JS, 8), ("E8", E8_JS, 8), ("E9", E9_JS, 8), ("E9B", E9B_JS, 5)):
         n = blk.count('ck("')
-        if n < 8:
-            fails.append("%s 判据块腿数 %d < 8（块被掏空就等于没判）" % (nm, n))
+        if n < floor:
+            fails.append("%s 判据块腿数 %d < %d（块被掏空就等于没判）" % (nm, n, floor))
 
     if fails:
         for x in fails:
             print("  -", x)
         print("ASR-REPLAY-SELFTEST-FAIL %d 条" % len(fails))
         return 1
-    print("ASR-REPLAY-SELFTEST-PASS 12 腿（CER4+归一化1+前提自证1+选择1+改写1+清洗1+E5阈值2+判据块2）"
+    print("ASR-REPLAY-SELFTEST-PASS 15 腿（CER4+归一化1+前提自证1+选择1+改写1+清洗1+E5阈值2+判据块4）"
           "；fixture %d 条完整" % len(cases))
     return 0
 
@@ -299,6 +299,68 @@ E8_JS = """() => {
 }"""
 
 
+# E9 方言形态层（r176/A4）：红线七~十的门禁，另含一条**静态体检**
+E9_JS = """() => {
+  const U = window.ASRNormalize._unit; const o = [];
+  const ck = (n, got, want) => o.push([n, String(got) === String(want), got, want]);
+  // 红线八 + 静态体检：每条方言映射的【目标词】必须真在 SSOT 词表里。
+  // 这条最要紧：目标词写错（或写了个单字词）时 dialectHits 会**静默返回 0**，
+  // 没有任何报错，方言表就这么变成一张废表而所有功能腿仍全绿 —— 只能靠静态体检现形。
+  const lex = U.lexSet();
+  const bad = U.DIALECT.filter(p => !(lex && lex.has(p[1]))).map(p => p[0] + "->" + p[1]);
+  ck("静态体检 映射目标全在词表", bad.length, 0);
+  // 表不得被掏空（删到个位数就等于方言层名存实亡）
+  ck("方言表规模>=20条", U.DIALECT.length >= 20, true);
+  // 红线七：方言命中只发生在【含方言形态】的文本上
+  ck("粤语 攰 命中", U.dialectHits("我好攰") > 0, true);
+  ck("川话 不巴适 命中", U.dialectHits("我不巴适") > 0, true);
+  ck("东北 闹心 命中", U.dialectHits("我闹心") > 0, true);
+  ck("上海 触气 命中", U.dialectHits("我触气") > 0, true);
+  ck("闽南 艱苦 命中", U.dialectHits("我足艱苦") > 0, true);
+  ck("一句两形态 命中2", U.dialectHits("我嬲到瞓唔着"), 2);
+  // 普通话干净句不得被加分（否则方言表就是给所有句子乱加分的噪声源）
+  ck("普通话 我今天很烦躁 不加分", U.dialectHits("我今天很烦躁"), 0);
+  ck("普通话 我喊他来帮忙 不加分", U.dialectHits("我喊他来帮忙"), 0);
+  ck("普通话 我回去了 不加分", U.dialectHits("我回去了"), 0);
+  // 🔴 红线十 防双计：目标词已直接出现在文本里 ⇒ 方言层不计（词表层已经给过一次分）
+  ck("红线十 已含烦躁 不再计方言分", U.dialectHits("我很烦躁闹心"), 0);
+  ck("红线十 我难受不巴适 不再计", U.dialectHits("我难受不巴适"), 0);
+  // 🔴 红线十一 否定式：语义反转让「巴适」在「不巴适」里**不得**加成「舒服」——
+  //    这条是被本判据当场抓出来的真缺陷（初版把否定句加成正面情绪，比漏识别更糟）
+  ck("红线十一 不闹心 不计分", U.dialectHits("我不闹心"), 0);
+  ck("红线十一 不艱苦 不计分", U.dialectHits("我不艱苦"), 0);
+  ck("红线十一 不巴适 只算难受1条", U.dialectHits("我不巴适"), 1);
+  ck("红线十一 好巴适 仍算舒服", U.dialectHits("好巴适"), 1);
+  ck("空串 不加分", U.dialectHits(""), 0);
+  return o;
+}"""
+
+# 方言表里"噪声候选"的分数对照：证明方言加分确实是这批样本翻盘的原因（不是碰巧置信度够）
+E9B_JS = """() => {
+  const U = window.VoiceCall._unit; const o = [];
+  // 浮点一律容差比较：0.2*1.5 在 JS 里是 0.30000000000000004，用严格相等会把「算术正确」
+  // 误报成缺陷（与 r173 把 cer 的分母写错是同族坑：先怀疑判据写法，再怀疑实现）
+  const ck = (n, got, want) => o.push([n, typeof want === "number"
+    ? Math.abs(got - want) < 1e-6 : got === want, got, want]);
+  const sc = (t, c) => U.altScore({ transcript: t, confidence: c }, t);
+  // 红线九 序关系：方言形态加分 **必须小于** 词表直接命中
+  const dia = sc("我闹心", 0) - sc("我闹啥", 0);          // 方言层的净贡献
+  const lex = sc("我很烦躁", 0) - sc("我狠烦早", 0);        // 词表层的净贡献
+  ck("红线九 方言权重<词表权重", dia > 0 && dia < lex, true);
+  ck("红线九 方言净贡献=1.0", Math.round(dia * 100) / 100, 1);
+  ck("红线九 词表净贡献=1.5", Math.round(lex * 100) / 100, 1.5);
+  // 模块缺失时的降级：与改动前逐字同分（dialectHits 抛异常也要走这条路）
+  const keep = window.ASRNormalize.dialectHits;
+  window.ASRNormalize.dialectHits = undefined;
+  ck("降级 dial 缺失时按旧口径", sc("我闹心", 0.2), 0.3);
+  window.ASRNormalize.dialectHits = () => { throw new Error("boom"); };
+  ck("降级 dial 抛异常时按旧口径", sc("我闹心", 0.2), 0.3);
+  window.ASRNormalize.dialectHits = keep;
+  ck("恢复后 仍按新口径", sc("我闹心", 0.2) > 0.3, true);
+  return o;
+}"""
+
+
 def run(page, cases):
     """逐条回放：把候选喂进浏览器内真实的 pickBest + ASRNormalize.normalize，拿回选中条/清洗后/各候选得分
 
@@ -375,14 +437,19 @@ def main():
             # r175/A3：E7 断句合并 + E8 自适应噪声门 —— 与 E6 同为「带病不许接线」的门禁
             e7 = page.evaluate(E7_JS)
             e8 = page.evaluate(E8_JS)
-            for tag, what, rows in (("E7", "断句碎片合并", e7), ("E8", "自适应噪声门+采集链", e8)):
+            e9 = page.evaluate(E9_JS)
+            e9b = page.evaluate(E9B_JS)
+            for tag, what, rows in (("E7", "断句碎片合并", e7), ("E8", "自适应噪声门+采集链", e8),
+                                    ("E9", "方言形态层", e9), ("E9B", "方言权重序与降级", e9b)):
                 bad = [r for r in rows if not r[1]]
                 if bad:
                     browser.close()
                     for r in bad:
                         print("  - %s %s: got %r want %r" % (tag, r[0], r[2], r[3]))
-                    print("ASR-REPLAY-FAIL %s %s %d/%d 条不符（A3 前置预处理是需求③的落地，不能带病接线）"
-                          % (tag, what, len(bad), len(rows)))
+                    print("ASR-REPLAY-FAIL %s %s %d/%d 条不符（%s，不能带病接线）"
+                          % (tag, what, len(bad), len(rows),
+                             "A3 前置预处理是需求③的落地" if tag in ("E7", "E8")
+                             else "A4 方言形态层是需求②在本仓架构下唯一的落地面"))
                     return 1
             lex = set(page.evaluate(LEX_JS))
             if not lex:
@@ -407,12 +474,18 @@ def main():
     npass = nfail = nunv = ngap = 0
     gaps = []
     before, after = [], []
+    miss_src = []        # 需求①：判红样本的误差归因（error_source）
+    groups = {}          # 需求①：方言 × 场景二维基线矩阵（挑对率 + 清洗后 CER）
     for case, row in zip(cases, rows):
         st, note = check_case(case, row["got"], lex, row["norm"])
+        g = groups.setdefault((row["scenario"], row["scene"]), {"n": 0, "ok": 0, "cer": []})
+        g["n"] += 1
         if st == "PASS":
             npass += 1
+            g["ok"] += 1
         elif st == "FAIL":
             nfail += 1
+            miss_src.append("%s: %s" % (row["id"], case.get("error_source") or "未标注"))
         elif st == "GAP":
             ngap += 1
             gaps.append(row["id"])
@@ -422,6 +495,7 @@ def main():
         if row["ref"] and row["got"]:
             before.append(cer(row["got"], row["ref"]))
             after.append(cer(row["norm"], row["ref"]))
+            g["cer"].append(cer(row["norm"], row["ref"]))
         tag = "E1a/E1b/E1n" if st == "PASS" else st
         pretty = [("skip" if x is None else round(x, 2)) for x in row["scores"]]
         shown = row["norm"] if (row["norm"] and row["norm"] != row["got"]) else row["got"]
@@ -433,11 +507,22 @@ def main():
     mb = sum(before) / len(before) if before else 0.0
     ma = sum(after) / len(after) if after else 0.0
     drop = (mb - ma) / mb if mb > 0 else 0.0
-    print("引擎=%s  词表词数=%d  样本=%d  E6清洗=%d/%d  E7断句=%d/%d  E8噪声门=%d/%d  分布=%s"
-          % (face, len(lex), len(cases), len(e6) - len(e6bad), len(e6),
-             len(e7) - len([r for r in e7 if not r[1]]), len(e7),
-             len(e8) - len([r for r in e8 if not r[1]]), len(e8),
-             ", ".join(sorted({r["scenario"] for r in rows}))))
+    blocks = (("E6", "清洗", e6), ("E7", "断句", e7), ("E8", "噪声门", e8),
+              ("E9", "方言层", e9), ("E9B", "方言权重", e9b))
+    tally = "  ".join("%s%s=%d/%d" % (t, w, len(r) - len([x for x in r if not x[1]]), len(r))
+                      for t, w, r in blocks)
+    print("引擎=%s  词表词数=%d  样本=%d  %s  分布=%s"
+          % (face, len(lex), len(cases), tally, ", ".join(sorted({r["scenario"] for r in rows}))))
+    # 需求①的基线矩阵：方言 × 场景二维读数（挑对率 + 清洗后 CER）
+    print("— 场景基线矩阵（构造样本，非引擎真实准确率）—")
+    for k in sorted(groups, key=lambda x: (x[0] not in ("普通话",), x[0], x[1])):
+        g = groups[k]
+        cs = g["cer"]
+        m = ("%.3f" % (sum(cs) / len(cs))) if cs else "  -  "
+        print("  %-8s %-10s 样本=%2d  挑对=%2d/%2d (%3.0f%%)  清洗后CER=%s"
+              % (k[0], k[1], g["n"], g["ok"], g["n"], 100.0 * g["ok"] / g["n"], m))
+    if miss_src:
+        print("  误差归因（判红样本的 error_source）：%s" % "；".join(sorted(set(miss_src))))
     print("E5 归一化增益：构造样本 CER 均值 %.4f → %.4f，相对下降 %.1f%%（阈值 ≥5%%）"
           % (mb, ma, drop * 100))
     print("⚠ CER 是【构造样本上的编排层读数】，不是引擎准确率；不代表方言真实识别率")
@@ -451,9 +536,8 @@ def main():
     if drop < 0.05:
         print("ASR-REPLAY-FAIL E5 归一化相对下降仅 %.1f%%（阈值 5%%）—— 清洗没产生可测增益" % (drop * 100))
         return 1
-    print("ASR-REPLAY-PASS 样本=%d 全过 E6=%d/%d E7=%d E8=%d 缺口=%d%s E5下降=%.1f%%"
-          % (len(cases), len(e6) - len(e6bad), len(e6), len(e7), len(e8), ngap,
-             ("（%s）" % ",".join(gaps)) if gaps else "", drop * 100))
+    print("ASR-REPLAY-PASS 样本=%d 全过 %s 缺口=%d%s E5下降=%.1f%%"
+          % (len(cases), tally, ngap, ("（%s）" % ",".join(gaps)) if gaps else "", drop * 100))
     return 0
 
 

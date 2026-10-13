@@ -175,7 +175,15 @@ window.VoiceCall = (function () {
         for (const w of ws) if (w && w.length >= 2 && t.indexOf(w) >= 0 && hit < 4) hit++;
       }
     }
-    s += hit * 1.5;
+    /* 方言形态加分（r176 / A4）：只影响【选哪条候选】，绝不改写文本（asr-normalize.js 红线七）。
+       权重 **+1.0 < 词表直接命中 +1.5**（红线九）：方言映射是人工表的间接证据，不得压过强证据。
+       模块缺失/抛异常 ⇒ dia=0 ⇒ 与本轮改动前**逐字同分**（沿用约束 2：任何异常吞掉）。 */
+    let dia = 0;
+    try {
+      const N = window.ASRNormalize;
+      if (N && typeof N.dialectHits === "function") dia = N.dialectHits(t) || 0;
+    } catch (e) { dia = 0; }
+    s += hit * 1.5 + dia * 1.0;
     return CRISIS_HINT.test(t) ? s + 3 : s;
   }
   /** n-best 里挑最好的一条。入参 [{transcript, confidence}]，取不到返 ""。 */

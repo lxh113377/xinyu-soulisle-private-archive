@@ -8,7 +8,9 @@
     "how_expectations_are_derived": "期望值来自 pickBest 的【设计意图】（见 src/js/voice-call.js:129-157 头注释：词表命中的那条赢、危机词额外加权、同量级权重），不是抄实现算出来的 ⇒ 期望与实现不一致时，报红的是真缺陷，不是样本写错。",
     "prefix_rule": "谐音/噪声错字候选必须【不含任何词表词】（长度≥2），否则它自己也得分，样本就测不出重排收益。",
     "probe_word_rule": "带 probe_word 的样本，跑前先用浏览器内真实 EmotionEngine.LEX 核该词真在词表里；不在 ⇒ 该样本前提不成立，记 UNVERIFIED 并点名，不记 FAIL、也不静默跳过。",
-    "tie_rule": "altScore 同分时 pickBest 用严格 > 比较 ⇒ 同分取【靠前】那条。本集用 tie-order 样本把这个边界钉住。"
+    "tie_rule": "altScore 同分时 pickBest 用严格 > 比较 ⇒ 同分取【靠前】那条。本集用 tie-order 样本把这个边界钉住。",
+    "r176_verdict_change": "⚠ 口径变更（r176 A4 方言形态层）：yue-01 / sc-01 / db-01 三条的【期望被改了】，改的不是数字而是裁定 —— 旧口径把「方言候选」当成「待剔除的错字」（期望普通话正字赢），那是 A1 阶段「方言=噪声」假设下的产物，与「支持方言」的目标**正面冲突**。r176 裁定：**方言候选只要能识别出情绪语义就该赢**，因为 n-best 里置信度最高的那条往往正是用户真说的方言原话，挑「普通话意译版」等于替用户改写他说的话（与 asr-normalize.js 红线七同族）。裁定发生在实现之前，不是拿实现反推期望。防洗绿的对照：每种方言都配了一条 -03 样本（方言 vs 普通话正字，**正字必须赢**），两组互为制衡 —— 只改权重能把一组调绿，不可能同时满足两组。",
+    "error_source_tagging": "需求①要求「定位核心误差来源」：每条样本用 scenario（方言/普通话）× scene（安静-近场/嘈杂/远场）二维定位，脚本按此分组出挑对率与 CER；样本级归因写进 desc（词表未命中 / 置信度压过 / 方言形态未覆盖 / 同形歧义误收）。"
   },
   "cases": [
     {
@@ -71,31 +73,151 @@
       "id": "yue-01-homophone",
       "scenario": "粤语",
       "scene": "嘈杂",
-      "desc": "粤语同音错字（忟）被低置信正字（焦虑）盖过",
+      "desc": "r176 改判：粤语「我好忟」是用户真说的话且方言层认得出（忟→烦躁）⇒ 它赢，不再让普通话意译版盖过",
       "candidates": [{ "t": "我好忟", "c": 0.9 }, { "t": "我好焦虑", "c": 0.25 }],
-      "expect": { "type": "exact", "value": "我好焦虑" },
-      "ref": "我好焦虑",
-      "probe_word": "焦虑"
+      "expect": { "type": "exact", "value": "我好忟" },
+      "ref": "我好忟",
+      "error_source": "方言形态未覆盖 ⇒ 旧口径把方言当错字剔除"
+    },
+    {
+      "id": "yue-02-dialect-beats-homophone",
+      "scenario": "粤语",
+      "scene": "安静-近场",
+      "desc": "核心增益：方言「攰」被认出（→疲惫），低置信原话胜过高置信谐音错字「我好贵」",
+      "candidates": [{ "t": "我好攰", "c": 0.25 }, { "t": "我好贵", "c": 0.9 }],
+      "expect": { "type": "exact", "value": "我好攰" },
+      "ref": "我好攰",
+      "error_source": "方言形态未覆盖 ⇒ 置信度压过"
+    },
+    {
+      "id": "yue-03-std-beats-dialect",
+      "scenario": "粤语",
+      "scene": "安静-近场",
+      "desc": "🔴 红线九序关系（对照腿）：同置信度下普通话正字「疲惫」（词表直命中 +1.5）必须胜过方言「攰」（+1.0）",
+      "candidates": [{ "t": "我好攰", "c": 0.3 }, { "t": "我好疲惫", "c": 0.3 }],
+      "expect": { "type": "exact", "value": "我好疲惫" },
+      "ref": "我好疲惫",
+      "probe_word": "疲惫"
+    },
+    {
+      "id": "yue-04-noise",
+      "scenario": "粤语",
+      "scene": "嘈杂",
+      "desc": "嘈杂环境：方言「心噏」（→难受）胜过高置信谐音「我心疼」（「心疼」不在词表）",
+      "candidates": [{ "t": "我心噏", "c": 0.2 }, { "t": "我心疼", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我心噏" },
+      "ref": "我心噏",
+      "error_source": "同音错字 + 词表未收录「心疼」"
+    },
+    {
+      "id": "yue-05-far",
+      "scenario": "粤语",
+      "scene": "远场",
+      "desc": "远场：一句里两条方言形态（嬲→生气、瞓唔着→睡不着）叠加命中，压过远场高置信错字",
+      "candidates": [{ "t": "我嬲到瞓唔着", "c": 0.25 }, { "t": "我料到水不着", "c": 0.9 }],
+      "expect": { "type": "exact", "value": "我嬲到瞓唔着" },
+      "ref": "我嬲到瞓唔着",
+      "error_source": "远场信噪比低 ⇒ 置信度压过"
     },
     {
       "id": "sc-01-homophone",
       "scenario": "四川话",
       "scene": "嘈杂",
-      "desc": "四川话俚语错字候选 vs 正字候选（难过）",
+      "desc": "r176 改判：四川话「我不巴适」是用户原话且方言层认得出（不巴适→难受）⇒ 它赢",
       "candidates": [{ "t": "我不巴适", "c": 0.9 }, { "t": "我难过得很", "c": 0.25 }],
-      "expect": { "type": "exact", "value": "我难过得很" },
-      "ref": "我难过得很",
-      "probe_word": "难过"
+      "expect": { "type": "exact", "value": "我不巴适" },
+      "ref": "我不巴适",
+      "error_source": "方言形态未覆盖 ⇒ 旧口径把方言当错字剔除"
+    },
+    {
+      "id": "sc-02-dialect-beats-homophone",
+      "scenario": "四川话",
+      "scene": "安静-近场",
+      "desc": "核心增益：「不巴适」（→难受）胜过高置信谐音错字「我不八十」",
+      "candidates": [{ "t": "我不巴适", "c": 0.25 }, { "t": "我不八十", "c": 0.85 }],
+      "expect": { "type": "exact", "value": "我不巴适" },
+      "ref": "我不巴适",
+      "error_source": "置信度压过"
+    },
+    {
+      "id": "sc-03-std-beats-dialect",
+      "scenario": "四川话",
+      "scene": "安静-近场",
+      "desc": "🔴 红线九序关系（对照腿）：同置信度下「我难受得很」（直命中）胜过「我不巴适」",
+      "candidates": [{ "t": "我不巴适", "c": 0.3 }, { "t": "我难受得很", "c": 0.3 }],
+      "expect": { "type": "exact", "value": "我难受得很" },
+      "ref": "我难受得很",
+      "probe_word": "难受"
+    },
+    {
+      "id": "sc-04-noise",
+      "scenario": "四川话",
+      "scene": "嘈杂",
+      "desc": "嘈杂：「心焦」（→焦虑）胜过高置信谐音「心交」",
+      "candidates": [{ "t": "我心焦", "c": 0.2 }, { "t": "我心交", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我心焦" },
+      "ref": "我心焦",
+      "error_source": "同音错字"
+    },
+    {
+      "id": "sc-05-far",
+      "scenario": "四川话",
+      "scene": "远场",
+      "desc": "远场：「造孽」（→难受）胜过高置信谐音「早些」",
+      "candidates": [{ "t": "我造孽得很", "c": 0.25 }, { "t": "我早些得很", "c": 0.85 }],
+      "expect": { "type": "exact", "value": "我造孽得很" },
+      "ref": "我造孽得很",
+      "error_source": "远场信噪比低"
     },
     {
       "id": "db-01-homophone",
       "scenario": "东北话",
       "scene": "嘈杂",
-      "desc": "东北话口语候选 vs 正字候选（焦虑）",
+      "desc": "r176 改判：东北话「我可闹心了」是用户原话且方言层认得出（闹心→烦躁）⇒ 它赢",
       "candidates": [{ "t": "我可闹心了", "c": 0.9 }, { "t": "我焦虑老久了", "c": 0.25 }],
-      "expect": { "type": "exact", "value": "我焦虑老久了" },
-      "ref": "我焦虑老久了",
-      "probe_word": "焦虑"
+      "expect": { "type": "exact", "value": "我可闹心了" },
+      "ref": "我可闹心了",
+      "error_source": "方言形态未覆盖 ⇒ 旧口径把方言当错字剔除"
+    },
+    {
+      "id": "db-02-dialect-beats-homophone",
+      "scenario": "东北话",
+      "scene": "安静-近场",
+      "desc": "核心增益：「闹心」（→烦躁）胜过高置信谐音「脑心」",
+      "candidates": [{ "t": "我闹心", "c": 0.25 }, { "t": "我脑心", "c": 0.85 }],
+      "expect": { "type": "exact", "value": "我闹心" },
+      "ref": "我闹心",
+      "error_source": "置信度压过"
+    },
+    {
+      "id": "db-03-std-beats-dialect",
+      "scenario": "东北话",
+      "scene": "安静-近场",
+      "desc": "🔴 红线九序关系（对照腿）：同置信度下「我很烦躁」（直命中）胜过「我闹心」",
+      "candidates": [{ "t": "我闹心", "c": 0.3 }, { "t": "我很烦躁", "c": 0.3 }],
+      "expect": { "type": "exact", "value": "我很烦躁" },
+      "ref": "我很烦躁",
+      "probe_word": "烦躁"
+    },
+    {
+      "id": "db-04-noise",
+      "scenario": "东北话",
+      "scene": "嘈杂",
+      "desc": "嘈杂：「不得劲」（→难受）胜过高置信谐音「不得进」",
+      "candidates": [{ "t": "我不得劲", "c": 0.2 }, { "t": "我不得进", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我不得劲" },
+      "ref": "我不得劲",
+      "error_source": "同音错字"
+    },
+    {
+      "id": "db-05-far",
+      "scenario": "东北话",
+      "scene": "远场",
+      "desc": "远场：「憋屈」（→难受）胜过高置信谐音「别去」",
+      "candidates": [{ "t": "我憋屈得很", "c": 0.25 }, { "t": "我别去的很", "c": 0.85 }],
+      "expect": { "type": "exact", "value": "我憋屈得很" },
+      "ref": "我憋屈得很",
+      "error_source": "远场信噪比低"
     },
     {
       "id": "sh-01-homophone",
@@ -105,7 +227,48 @@
       "candidates": [{ "t": "蛮 tired 的", "c": 0.9 }, { "t": "我疲惫到不行", "c": 0.25 }],
       "expect": { "type": "exact", "value": "我疲惫到不行" },
       "ref": "我疲惫到不行",
-      "probe_word": "疲惫"
+      "probe_word": "疲惫",
+      "error_source": "中英混说候选无词表命中 ⇒ 靠置信度让位"
+    },
+    {
+      "id": "sh-02-dialect-beats-homophone",
+      "scenario": "上海话",
+      "scene": "安静-近场",
+      "desc": "核心增益：「触气」（→生气）胜过高置信谐音「出气」。⚠ 不用「勿开心」做这条：它字面含词表词「开心」会被词表层先命中，测不出方言层的独立贡献（这是样本设计陷阱，不是实现缺陷）",
+      "candidates": [{ "t": "我触气", "c": 0.25 }, { "t": "我出气", "c": 0.85 }],
+      "expect": { "type": "exact", "value": "我触气" },
+      "ref": "我触气",
+      "error_source": "置信度压过"
+    },
+    {
+      "id": "sh-03-std-beats-dialect",
+      "scenario": "上海话",
+      "scene": "安静-近场",
+      "desc": "🔴 红线九序关系（对照腿）：同置信度下「我很生气」（直命中）胜过「我触气」",
+      "candidates": [{ "t": "我触气", "c": 0.3 }, { "t": "我很生气", "c": 0.3 }],
+      "expect": { "type": "exact", "value": "我很生气" },
+      "ref": "我很生气",
+      "probe_word": "生气"
+    },
+    {
+      "id": "sh-04-noise",
+      "scenario": "上海话",
+      "scene": "嘈杂",
+      "desc": "嘈杂：「懊糟」（→烦躁）胜过高置信谐音「奥糟」",
+      "candidates": [{ "t": "我老懊糟", "c": 0.2 }, { "t": "我老奥糟", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我老懊糟" },
+      "ref": "我老懊糟",
+      "error_source": "同音错字"
+    },
+    {
+      "id": "sh-05-far",
+      "scenario": "上海话",
+      "scene": "远场",
+      "desc": "远场：「勿适意」（→难受）胜过高置信谐音「不适宜」",
+      "candidates": [{ "t": "我勿适意", "c": 0.25 }, { "t": "我不适宜", "c": 0.85 }],
+      "expect": { "type": "exact", "value": "我勿适意" },
+      "ref": "我勿适意",
+      "error_source": "远场信噪比低"
     },
     {
       "id": "mn-01-homophone",
@@ -115,7 +278,69 @@
       "candidates": [{ "t": "我有夠煩", "c": 0.9 }, { "t": "我压力有夠大", "c": 0.25 }],
       "expect": { "type": "exact", "value": "我压力有夠大" },
       "ref": "我压力有夠大",
-      "probe_word": "压力"
+      "probe_word": "压力",
+      "error_source": "繁体单字「煩」不在词表（词表收「烦躁」）⇒ 只能靠方言形态补"
+    },
+    {
+      "id": "mn-02-dialect-beats-homophone",
+      "scenario": "闽南语",
+      "scene": "安静-近场",
+      "desc": "核心增益：繁体方言「艱苦」（→难受）胜过高置信谐音「間古」",
+      "candidates": [{ "t": "我足艱苦", "c": 0.25 }, { "t": "我足間古", "c": 0.85 }],
+      "expect": { "type": "exact", "value": "我足艱苦" },
+      "ref": "我足艱苦",
+      "error_source": "繁体形态未覆盖 + 置信度压过"
+    },
+    {
+      "id": "mn-03-std-beats-dialect",
+      "scenario": "闽南语",
+      "scene": "安静-近场",
+      "desc": "🔴 红线九序关系（对照腿）：同置信度下「我很难受」（直命中）胜过「我足艱苦」",
+      "candidates": [{ "t": "我足艱苦", "c": 0.3 }, { "t": "我很难受", "c": 0.3 }],
+      "expect": { "type": "exact", "value": "我很难受" },
+      "ref": "我很难受",
+      "probe_word": "难受"
+    },
+    {
+      "id": "mn-04-noise",
+      "scenario": "闽南语",
+      "scene": "嘈杂",
+      "desc": "嘈杂：「鬱卒」（→抑郁）胜过高置信谐音「玉卒」",
+      "candidates": [{ "t": "我鬱卒", "c": 0.2 }, { "t": "我玉卒", "c": 0.8 }],
+      "expect": { "type": "exact", "value": "我鬱卒" },
+      "ref": "我鬱卒",
+      "error_source": "同音错字"
+    },
+    {
+      "id": "mn-05-far",
+      "scenario": "闽南语",
+      "scene": "远场",
+      "desc": "远场：「毋甘」（→舍不得）胜过高置信谐音「唔敢」",
+      "candidates": [{ "t": "我毋甘", "c": 0.25 }, { "t": "我唔敢", "c": 0.85 }],
+      "expect": { "type": "exact", "value": "我毋甘" },
+      "ref": "我毋甘",
+      "error_source": "远场信噪比低"
+    },
+    {
+      "id": "dial-safe-01-no-false-boost",
+      "scenario": "普通话",
+      "scene": "安静-近场",
+      "desc": "🔴 反向对照：加了方言层之后，词表层仍必须正常工作 —— 低置信直命中「烦躁」（1.95）照旧压过高置信错字（1.35）。⚠ 本条初版我把期望写成「0.9 那条赢」，是**我手算错了**（漏算词表 +1.5）：实跑 1.95>1.35 ⇒ 判据判红，改的是我算错的期望不是实现。它真正守住的是「方言层不得喧宾夺主」",
+      "candidates": [{ "t": "我今天很烦躁", "c": 0.3 }, { "t": "我今天很烦早", "c": 0.9 }],
+      "expect": { "type": "exact", "value": "我今天很烦躁" },
+      "ref": "我今天很烦躁",
+      "probe_word": "烦躁",
+      "error_source": "对照组：若方言层给错字候选也加了分，0.9 那条会翻盘 ⇒ 这条红就是误加分的证据"
+    },
+    {
+      "id": "dial-safe-02-homograph",
+      "scenario": "普通话",
+      "scene": "安静-近场",
+      "desc": "🔴 同形歧义防误收：「喊」在粤语是哭、在普通话是叫 —— 本表**不收**它，故普通话句不得被加分",
+      "candidates": [{ "t": "我喊他来帮忙", "c": 0.3 }, { "t": "我含他来帮忙", "c": 0.6 }],
+      "expect": { "type": "exact", "value": "我含他来帮忙" },
+      "ref": "我含他来帮忙",
+      "error_source": "对照组：若「喊」被误收进方言表，0.3 那条会翻盘 ⇒ 这条红就是误收的证据"
     },
     {
       "id": "scene-noise-mixed",
