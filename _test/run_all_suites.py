@@ -173,6 +173,12 @@ SUITES = [
     #   语料库与知识库同族：构建器不跑，源卡与注入数据件的漂移就会像 psych_kb 那次活 3 轮零告警。
     ("wit_quotes_build", [sys.executable, "_test/wit_quotes_build.py", "--check"]),
     ("wit_quotes_build_selftest", [sys.executable, "_test/wit_quotes_build.py", "--selftest"]),
+    # r171：表达盲评量尺（quote_eval）的主流程要打真实上游（60 例 = 上千次调用）⇒ 照 perf_api 的先例
+    #   **只接 --selftest 腿进整跑**：配对差值/分层分母/符号检验边界/效果门四类逻辑的 14 条纯函数腿
+    #   （含 7 条反例腿）零网络零浏览器。这把尺一旦被改坏（比如把让位层算进承载面、或按 pair 级
+    #   固定取臂），读数会**看起来更好**而不是更红，所以必须常驻而不是等下次跑批肉眼抓。
+    #   带外复算命令见 docs/quality-gates.md 与 _test/quote_eval.py 的用法行。
+    ("quote_eval_selftest", [sys.executable, "_test/quote_eval.py", "--selftest"]),
     # r129：引用关联 ⇄ 取证 ⇄ 索引 三面一致性（悬空/自指/孤岛/缺来源/索引漂移各自判红，
     # 取数面取不到 ⇒ rc=2 UNVERIFIED 不判绿）。这三件事此前只有人工核对轮用眼过，机器面为零。
     ("psych_kb_integrity", [sys.executable, "_test/psych_kb_integrity_check.py"]),
@@ -546,6 +552,14 @@ SUITES = [
     #   ⇒「utf8mb4 服务端全绿」不足以支撑「MySQL 支持」，故这腿是区分力所在，不是装饰。
     ("mysql_db", [sys.executable, "_test/mysql_db_check.py"]),
     ("mysql_db_selftest", [sys.executable, "_test/mysql_db_check.py", "--selftest"]),
+    # r169：备份**载回**演练。立因＝objective 里「保证数据一致性与完整性」这一条，此前仓内
+    #   只有一份规程性描述，没有任何一次真恢复发生过 —— 而没被载回断言过的备份等于「希望」。
+    #   四条腿：mysqldump(--single-transaction) → DROP DATABASE → 灌回 → HEX 逐字节对账 + 索引在位。
+    #   安全闸：只允许打在本件自起的一次性实例（13307/13308 + 库 xinyu_check），
+    #   打到开发态 3306 那种「别人在用的库」上会直接判 UNVERIFIED，不判绿也不判红。
+    #   取不到 mysqldump/起不来实例 ⇒ rc=2 未验（不是通过）。selftest 腿离线可常驻整跑。
+    ("mysql_backup_drill", [sys.executable, "_test/mysql_backup_drill.py"]),
+    ("mysql_backup_drill_selftest", [sys.executable, "_test/mysql_backup_drill.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），
