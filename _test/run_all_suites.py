@@ -174,9 +174,12 @@ SUITES = [
     ("wit_quotes_build", [sys.executable, "_test/wit_quotes_build.py", "--check"]),
     ("wit_quotes_build_selftest", [sys.executable, "_test/wit_quotes_build.py", "--selftest"]),
     # r171：表达盲评量尺（quote_eval）的主流程要打真实上游（60 例 = 上千次调用）⇒ 照 perf_api 的先例
-    #   **只接 --selftest 腿进整跑**：配对差值/分层分母/符号检验边界/效果门四类逻辑的 14 条纯函数腿
-    #   （含 7 条反例腿）零网络零浏览器。这把尺一旦被改坏（比如把让位层算进承载面、或按 pair 级
-    #   固定取臂），读数会**看起来更好**而不是更红，所以必须常驻而不是等下次跑批肉眼抓。
+    #   **只接 --selftest 腿进整跑**：配对差值/分层分母/符号检验边界/效果门/上游预检的纯函数腿
+    #   （腿数与反例数由脚本自印，此处不抄数）。零网络零浏览器。这把尺一旦被改坏（比如把让位层算进
+    #   承载面、或按 pair 级固定取臂），读数会**看起来更好**而不是更红，所以必须常驻而不是等下次跑批肉眼抓。
+    #   一手代价（r171）：DeepSeek 余额耗尽回 HTTP 402 时旧版**没有任何上游探针** ⇒ 四臂静默落到同一句
+    #   离线模板、225 次判分全失败、38 分钟的生成结果一条没留下才回 rc=2。现补三条：开工前预检、
+    #   回复带 mode（非 model 即未验）、生成无条件入账。实测上游坏时 17 秒点名退出（此前 38 分钟）。
     #   带外复算命令见 docs/quality-gates.md 与 _test/quote_eval.py 的用法行。
     ("quote_eval_selftest", [sys.executable, "_test/quote_eval.py", "--selftest"]),
     # r129：引用关联 ⇄ 取证 ⇄ 索引 三面一致性（悬空/自指/孤岛/缺来源/索引漂移各自判红，

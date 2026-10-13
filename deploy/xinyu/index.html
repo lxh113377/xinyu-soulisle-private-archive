@@ -292,7 +292,9 @@
 <script src="data/emotion-lexicon.js"></script>
 <script src="data/emotion-strategy.js"></script>
 <script src="data/face-smile-rules.js"></script>
-<script src="data/psych-kb.js"></script>
+<!-- r134：psych-kb.js **不在首屏加载清单内** —— 它由 chat-agent.js 的 ensureKb() 按需拉
+     （知识只在「求解释轮」用得上，不该让每个访客替它付 127KB 首屏字节；
+     体积改记在 _test/size_budget_check.py 的 LAZY_FILES）。 -->
 <script src="data/wit-quotes.js"></script>
 <script src="js/emotion-engine.js"></script>
 <script src="js/emotion-remote.js"></script>

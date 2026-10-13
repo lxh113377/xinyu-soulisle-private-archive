@@ -155,6 +155,34 @@ window.ChatAgent = (function () {
    * 供回复面核对模型标的〔依据:编号〕（见 verifyCitations）。知识面干净（E 级构建期排除）
    * 不等于输出面干净：模型仍可能凭空标一个 PSY-XX-999·A，这一层就是堵它的。 */
   const EMPTY_KB = { block: "", used: [] };
+
+  /* r134：数据件改**按需加载** —— 它原同步挂在 index.html 参与首屏解析，而知识只在「求解释轮」
+   * 注入（纯倾诉轮不注入）⇒ 每个访客都在替用不上的资源付首屏字节，且每扩一轮库这笔钱就涨一次
+   * （第7轮后 129,791B，把 size_budget 的 TOTAL 顶穿）。现在开局空闲预热、用前再 await 一次；
+   * 超时/失败静默 ⇒ EMPTY_KB 兜底（零注入、不挤占 X3 的 1600 字符预算）；断网仍由 sw.js
+   * PRECACHE 供给，可用性不变。 */
+  let kbLoad = null;
+  function ensureKb(waitMs) {
+    if (window.__XINYU_PSYCH_KB__) return Promise.resolve(true);
+    if (!kbLoad) kbLoad = new Promise(function (resolve) {
+      const el = document.createElement("script");
+      el.src = "data/psych-kb.js";
+      el.async = true;
+      el.onload = function () { resolve(!!window.__XINYU_PSYCH_KB__); };
+      el.onerror = function () { resolve(false); };
+      document.head.appendChild(el);
+    });
+    const ms = waitMs == null ? 1500 : waitMs;
+    let timer = 0;
+    return Promise.race([kbLoad, new Promise(function (r) { timer = setTimeout(function () { r(false); }, ms); })])
+      .then(function (ok) { clearTimeout(timer); return ok; });
+  }
+  /* 预热：不抢首屏，等空闲（不支持 requestIdleCallback 的环境用定时器兜住）。 */
+  (function warmKb() {
+    if (window.requestIdleCallback) window.requestIdleCallback(function () { ensureKb(0); }, { timeout: 3000 });
+    else setTimeout(function () { ensureKb(0); }, 1200);
+  })();
+
   function kbBlockFor(emo, userText, budget) {
     const KB = window.__XINYU_PSYCH_KB__;
     if (!KB || !KB.entries || !KB.entries.length || budget < 220) return EMPTY_KB;
@@ -237,7 +265,12 @@ window.ChatAgent = (function () {
     for (const e of (Q.rulesOnly === true ? [] : Q.entries)) {
       const emoHit = e.emo.indexOf("all") >= 0 || e.emo.indexOf(emo) >= 0;
       let hits = 0;
-      grams.forEach((g) => { if (e.quote.indexOf(g) >= 0) hits++; });
+      /* r134：重合度算在「句面 + 适配条件」上。只算句面会选错：素材句多是书面语，
+       * 与用户口语几乎不重合，于是入池全靠情绪（emotion hit 给 2 分、零话题分也放行），
+       * 模型收到的是「情绪对、处境不明」的五条裸句——它没有判据说这条贴不贴得上，
+       * 只能硬贴（生硬引用）或全不用（r117 首轮 30 轮零引用）。fit 写的正是处境。 */
+      const topic = e.quote + (e.fit || "");
+      grams.forEach((g) => { if (topic.indexOf(g) >= 0) hits++; });
       if (!emoHit && hits < 2) continue;   // 情感不匹配且话题不沾边：不进候选
       scored.push({ e: e, s: (emoHit ? 2 : 0) + hits });
     }
@@ -247,10 +280,20 @@ window.ChatAgent = (function () {
     // 因此 head 明确"可化用半句/取其意"（低门槛形态）与"不必强用"（边界）。
     const head = "可化用的表达素材（恰好契合时可化用半句或取其意，给回复添一点余味；不必强用。规则：" + rules + "）：";
     let block = "", used = head.length, n = 0;
-    for (const p of scored) {
-      if (n >= 5) break;
-      const item = "\n[" + p.e.id + "·" + p.e.level + "]" + p.e.quote;
-      if (used + item.length > budget) break;
+    /* r171 注入预算：head 约 241 字，候选每条带 fit（约 30 字）后体积翻倍，而这块与知识库块
+     * 共享 X3 的 1600 上限（kbBlockFor 需要 remain 里 ≥220 才注入）⇒ **上限不动**，
+     * 只给排名前 FIT_TOP 条带适配条件（每轮至多融入一句 ⇒ 模型真正要判的是头名那条）。
+     * 实测候选条数与 system 字符数由 _test/quote_wiring_check.py Q1/Q4 打印，不在此猜。 */
+    const FIT_TOP = 2;
+    for (let i = 0; i < scored.length && n < 5; i++) {
+      const e = scored[i].e;
+      // noFitOnly 为评测专用旗标（_test/quote_eval.py 的归因臂注入，生产数据件永不设置）：
+      // true ⇒ 候选退回 r134 的裸句形态，用来把「fit 有没有用」从「注入有没有用」里摘出来。
+      const hint = (i < FIT_TOP && e.fit && Q.noFitOnly !== true) ? "（用：" + e.fit + "）" : "";
+      const item = "\n[" + e.id + "·" + e.level + "]" + e.quote + hint;
+      // r134：装不下就**跳过这条**（不是中断）——句面最长 260 字，一条超长候选曾把整轮
+      // 候选池清零（anger/love 两情绪实测 Q1 红）；跳过才能让装得下的短候选补位。
+      if (used + item.length > budget) continue;
       block += item; used += item.length; n++;
     }
     return (n || Q.rulesOnly === true) ? head + block : "";
@@ -264,10 +307,13 @@ window.ChatAgent = (function () {
     const base = STR.persona + "用户刚说的话被识别为主要情绪「" + window.EmotionEngine.labelOf(emo) + "」。" +
       "当前共情要点：" + s.lead + "。要求：" + STR.rules.map((r, i) => (i + 1) + ")" + r).join("；") + "。" +
       (mem ? mem : "") + summaryOfDropped();
-    /* r117 预算切分：quote 保底优先（「每轮给候选」要成立），kb 用剩余（<220 自动让位）。 */
+    /* r117 预算切分：quote 保底优先（「每轮给候选」要成立），kb 用剩余（<220 自动让位）。
+     * r134 重平衡：quoteRules 4→6 条后 head（含规则文案）约 241 字符，旧上限 280 只容 0-1 条
+     * 候选（anger/love 两情绪实测归零，quote_wiring Q1 红）⇒ 上限 280→420、下限 180→300
+     * （≥head+1 条候选）、门限同步 180→300（保证 quoteBudget ≤ remain，不顶穿 X3 的 1600）。 */
     const remain = 1600 - base.length - 40;
-    const quoteBudget = Math.min(280, Math.max(180, Math.floor(remain * 0.45)));
-    const qb = remain >= 180 ? quoteBlockFor(emo, userText, quoteBudget) : "";
+    const quoteBudget = Math.min(420, Math.max(300, Math.floor(remain * 0.45)));
+    const qb = remain >= 300 ? quoteBlockFor(emo, userText, quoteBudget) : "";
     const kb = kbBlockFor(emo, userText, remain - (qb ? qb.length : 0));
     return { text: base + qb + kb.block, kbUsed: kb.used };
   };
@@ -304,6 +350,7 @@ window.ChatAgent = (function () {
   }
 
   async function onlineReply(text, emo, onDelta) {
+    await ensureKb();   /* r134：数据件按需加载，取不到就本轮零注入（见 EMPTY_KB 兜底） */
     const sys = SYSTEM(emo, text);
     const messages = [{ role: "system", content: sys.text }];
     for (const h of history.slice(-HISTORY_MAX)) messages.push(h);
