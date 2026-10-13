@@ -131,6 +131,25 @@
     const extra = s.masking ? " · 伴紧张线索，可能是强颜欢笑" : "";
     return `<span class="face-smile-badge ${one[1]}">${one[0]}${extra}</span>`;
   }
+  /* ── 细分子维度展示（r173）────────────────────────────────────────────────
+   * 身份类（愉悦/低落/…）是互斥的一维答案；下面这些属性与它**并存**，以前只活在引擎里
+   * 没露过面 ⇒ 界面看不到 = 用户感知不到，等于没做。故在此渲染，上限 3 个标签
+   * （再多就开始像噪声，而不是信息）。
+   * ⚠️ 只渲染 subs 里为 true 的项，一个都不为 true 就整体不显示 —— 不摆空壳占位。 */
+  const FACE_SUB_LABELS = {
+    neutral: "中性", duchenne: "真笑", social: "社交性微笑", masked: "强颜欢笑",
+    worry: "担忧", tense: "紧绷", micro: "微表情线索", asymmetric: "单侧不对称"
+  };
+  function faceSubsText(v) {
+    const s = v && v.subs;
+    if (!s) return "";
+    const tags = [];
+    for (const k in FACE_SUB_LABELS) if (s[k]) tags.push(FACE_SUB_LABELS[k]);
+    if (!tags.length) return "";
+    const shown = tags.slice(0, 3);
+    return "细分：" + shown.join(" · ")
+      + (tags.length > shown.length ? " +" + (tags.length - shown.length) : "");
+  }
   function faceChipHtml(v) {
     const hex = rgbHex(v.color);
     const pct = Math.round((v.intensity || 0) * 100);
@@ -139,8 +158,11 @@
       ? `<span class="face-wobble" title="信号够真但不够强，这一帧的读数仅供参考">读数仅供参考</span>`
       : (v.confident === false
         ? `<span class="face-wobble" title="主情绪与次情绪分数接近，这一帧的读数仅供参考">读数不稳</span>` : "");
+    const subs = faceSubsText(v);
     return `<span class="emotion-chip"><i class="dot" data-bg="${hex}"></i>表情：${v.weak ? "轻微" : ""}${window.FaceEngine.labelOf(v.emotion)}${wobble}`
-      + `<span class="intensity-bar"><i data-w="${pct}" data-bg="${hex}"></i></span></span>` + smileBadgeHtml(v.smile);
+      + `<span class="intensity-bar"><i data-w="${pct}" data-bg="${hex}"></i></span></span>`
+      + (subs ? `<span class="face-subs" title="细分子维度：与主情绪并存的表情属性，不是另一个结论">${subs}</span>` : "")
+      + smileBadgeHtml(v.smile);
   }
   function divergenceHtml(view) {
     const E = window.EmotionEngine, f = view.face;
@@ -299,8 +321,12 @@
   addEventListener("keydown", (e) => {
     if (e.key === "Escape" && dockFull() && !document.querySelector("dialog[open]")) setFull(false);
   });
-  // r109：全屏态滚轮/触摸 → 星雾进度（0..1 端点停）。对话日志自己还能滚：
-  // 只有日志滚到头（或滚动的目标不在日志里）才把滚动量交给镜头，两层滚动不打架。
+  // r109：全屏态滚轮/触摸 → 星雾进度（0..1 端点停）。
+  // r172b 修复（老大报障，本地/线上双复现）：旧规则「日志先滚、到头才交镜头」把滚轮驱动的
+  // 星雾打没了——全屏态 chat-log 占满坞内大半高且默认停底，向上滚想飞回去时滚轮整段被日志
+  // 吃掉、星雾毫无响应（实测 t 恒 1、logScrollTop 狂转）。新规则：滚轮优先给星雾，没到端点
+  // 这一下永远归镜头；只有星雾在端点（0/1）且日志该方向还滚得动，才让给日志 ⇒ 滚轮驱动
+  // 无中断、无丢失，读历史的活路也不丢。
   function fullScrollDrive(d) {
     virtT = Math.min(1, Math.max(0, virtT + d));
     window.__XINYU_SCROLL_T__ = virtT;
@@ -313,9 +339,16 @@
     return !((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom));
   }
   addEventListener("wheel", (e) => {
-    if (!dockFull() || logWantsIt(e)) return;
-    e.preventDefault();
-    fullScrollDrive(e.deltaY * 0.0011);
+    if (!dockFull() || e.deltaY === 0) return;
+    const dir = e.deltaY > 0 ? 1 : -1;
+    const fogAtEnd = (dir > 0 && virtT >= 1) || (dir < 0 && virtT <= 0);
+    if (!fogAtEnd) {           // 星雾还走得到这一侧 ⇒ 滚轮归镜头，日志不许抢
+      e.preventDefault();
+      fullScrollDrive(e.deltaY * 0.0011);
+    } else if (!logWantsIt(e)) {
+      e.preventDefault();      // 星雾到端点、日志也接不住 ⇒ 拦掉这回默认滚动，防空转
+    }
+    // 其余（星雾到端点 + 日志该方向还能滚）：不拦，让 chat-log 原生滚——读历史的出口
   }, { passive: false });
   addEventListener("touchstart", (e) => { touchLastY = e.touches[0] ? e.touches[0].clientY : 0; }, { passive: true });
   addEventListener("touchmove", (e) => {
@@ -383,9 +416,18 @@
       // r87：表情是**并列第三路**——只标注，不覆盖文本/LLM 的裁决（保住文本链路准确率不回退）
       const faceLabel = r.divergence === "disagree" ? " · 表情与文字不一致（可能是强颜欢笑）"
         : r.divergence === "agree" ? " · 表情与文字一致" : "";
+      /* r172 C1：基调来自表情时必须说出来 —— 这轮你没说情绪，回复底色取自摄像头读数。
+       * 不标注就等于让用户以为 AI 听懂了他说的话。 */
+      const faceToneLabel = r.faceTone ? " · 本轮基调参考了表情（" +
+        window.EmotionEngine.labelOf(r.faceTone) + "），非你说出的话" : "";
       const aiMsg = CW.push("ai", cite.text,
-        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${memLabel}${dropLabel}${citeLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}${faceLabel}`);
+        `${modeLabel}${r.streamed ? " · 逐字流式" : ""}${r.path ? " · 情绪双路：" + r.path : ""}${emoSrcLabel}${memLabel}${dropLabel}${citeLabel}${faceToneLabel}${r.latency ? " · " + r.latency + "ms" : ""} · 情绪：${window.EmotionEngine.labelOf(r.emotion)}${faceLabel}`);
       aiMsg.dataset.emotion = r.emotion;
+      /* r172：把本气泡里的〔依据:编号·级〕变成可点，点开显示卡片正文与来源 URL。
+       * 未挂载时静默跳过（旧缓存不得把主链路带崩，与既有 verifyCitations 兜底同纪律）。 */
+      try {
+        if (window.KbSourcePanel && aiMsg) window.KbSourcePanel.enhance(aiMsg);
+      } catch (e) { /* 面板是增强层，失败不得影响本轮回复与渲染 */ }
       // 朗读开关打开时同步播出；通话中改由通话层按句出声，这里不重复念（失败静默，绝不影响主链路）
       if (!(window.VoiceCall && window.VoiceCall.isCalling())) window.Voice.speak(cite.text);
       // 记住这条情绪 → 点亮一簇星（一个瞬间 = 1~8 颗，强度越高越多）
@@ -573,10 +615,35 @@ function initFaceHud(deps) {
     if (view.weak) tails.push("读数仅供参考");
     if (qReason) tails.push(qReason + "，仅供参考");
     else if (view.confident === false && !view.weak) tails.push("读数不稳");
+    /* r173：细分子维度（真笑/社交笑/担忧/紧绷/中性/微表情线索…）随主读数一起出。
+       放 tails 里而不是另起一行：HUD 空间极小，多一行就会把主读数挤没。 */
+    const subs = faceSubsText(view);
+    if (subs) tails.push(subs);
     $("#face-hud-emo").textContent = (view.weak ? "轻微" : "") + base
       + (tails.length ? "（" + tails.join("；") + "）" : "");
     $("#face-hud-bar").dataset.w = Math.round((view.intensity || 0) * 100);
     $("#face-hud-bar").dataset.bg = hex;
+    /* r172 C2：摄像头证据的逐次同意开关。默认关；每次点击都重新读 localStorage，
+     * 不把状态缓存进内存 ⇒ 关掉后下一次询问立即生效，不存在「关不掉」的缓存态。 */
+    const evBtn = $("#face-evidence");
+    if (evBtn) {
+      const paintEv = () => {
+        const on = !!(window.ChatAgent && window.ChatAgent.faceEvidenceOn && window.ChatAgent.faceEvidenceOn());
+        evBtn.setAttribute("aria-checked", on ? "true" : "false");
+        const w = $("#face-evidence-word");
+        if (w) w.textContent = on ? "本轮参考表情" : "不参考表情";
+      };
+      evBtn.addEventListener("click", () => {
+        const on = !!(window.ChatAgent && window.ChatAgent.faceEvidenceOn && window.ChatAgent.faceEvidenceOn());
+        if (on) {
+          try { window.localStorage.removeItem("xinyu.faceEvidence.v1"); } catch (e) { /* 无痕模式本就存不住 */ }
+        } else if (window.ChatAgent && window.ChatAgent.grantFaceEvidenceOnce) {
+          window.ChatAgent.grantFaceEvidenceOnce();
+        }
+        paintEv();
+      });
+      paintEv();
+    }
     const badge = $("#face-hud-smile");
     badge.hidden = false;
     badge.className = "face-smile-badge " + (view.smile ? "is-" + view.smile.kind : "is-none");
