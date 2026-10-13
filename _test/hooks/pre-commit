@@ -49,6 +49,26 @@ if [ "$RC" -eq 1 ]; then
     exit 1
 fi
 
+# r170 S2：tracked 件「还在盘上但被写成 0 字节」这一态交付面看不见（它按存在性判）。
+# 2026-10-13 单日实测：两份权威 CSS 同时 0 字节 + 一枚 24.7MB 入库 zip 两次消失。
+# 分母是 HEAD 的 blob 字节（被检对象写不进去的量），合法 0 字节的 tracked 件（12 个 .err.log）不产生义务。
+# ⚠️ 这一段刻意放在「交付面 UNVERIFIED 就 exit 0」**之前**：否则交付判据一取不到数，
+#    字节守卫就被一起跳过 —— 一把闸因另一把闸失明而静默，正是本仓一路在防的形状。
+ZOUT=$("$PY" _test/tracked_zero_guard.py 2>&1)
+ZRC=$?
+if [ "$ZRC" -eq 1 ]; then
+    echo "$ZOUT"
+    echo "pre-commit: 拦下本次提交。上面点名的文件在 HEAD 里有字节、在工作树里却是空的或没了。" >&2
+    echo "  单路径复原（禁 git checkout . —— 会连别人的在途改动一起吞）：" >&2
+    echo "  git checkout HEAD -- <上面点名的路径>" >&2
+    echo "  复原后复算：python _test/tracked_zero_guard.py" >&2
+    exit 1
+fi
+if [ "$ZRC" -eq 2 ]; then
+    echo "$ZOUT" | tail -3
+    echo "pre-commit: 字节守卫取不到 HEAD 面 ⇒ 不拦提交，但这一面本轮没被量到（别当成通过）" >&2
+fi
+
 if [ "$RC" -eq 2 ]; then
     echo "$OUT" | tail -3
     echo "pre-commit: 判据回 UNVERIFIED ⇒ 不拦提交，但这一面本轮没被量到（别当成通过）" >&2

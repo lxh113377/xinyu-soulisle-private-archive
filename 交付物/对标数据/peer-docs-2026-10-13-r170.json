@@ -1,0 +1,211 @@
+{
+ "generated_by": "_test/peer_docs_probe.py",
+ "denominator": 16,
+ "rows": [
+  {
+   "repo": "lobehub/lobehub",
+   "api_spec": 2,
+   "guide": 2,
+   "contributing": 1,
+   "docs_site": 1,
+   "readme_bytes": 39200,
+   "docs_md_files": 12,
+   "path_count": 19306,
+   "class": "4/4"
+  },
+  {
+   "repo": "SillyTavern/SillyTavern",
+   "api_spec": 0,
+   "guide": 0,
+   "contributing": 1,
+   "docs_site": 0,
+   "readme_bytes": 267,
+   "docs_md_files": 0,
+   "path_count": 1010,
+   "class": "1/4"
+  },
+  {
+   "repo": "Open-LLM-VTuber/Open-LLM-VTuber",
+   "api_spec": 0,
+   "guide": 0,
+   "contributing": 1,
+   "docs_site": 1,
+   "readme_bytes": 11536,
+   "docs_md_files": 1,
+   "path_count": 253,
+   "class": "2/4"
+  },
+  {
+   "repo": "morettt/my-neuro",
+   "api_spec": 0,
+   "guide": 2,
+   "contributing": 1,
+   "docs_site": 1,
+   "readme_bytes": 7284,
+   "docs_md_files": 40,
+   "path_count": 646,
+   "class": "3/4"
+  },
+  {
+   "repo": "letta-ai/letta-code",
+   "api_spec": 0,
+   "guide": 2,
+   "contributing": 1,
+   "docs_site": 1,
+   "readme_bytes": 9696,
+   "docs_md_files": 4,
+   "path_count": 2594,
+   "class": "3/4"
+  },
+  {
+   "repo": "hello-diana/MASCOT",
+   "api_spec": 0,
+   "guide": 0,
+   "contributing": 0,
+   "docs_site": 0,
+   "readme_bytes": 18609,
+   "docs_md_files": 0,
+   "path_count": 81,
+   "class": "0/4"
+  },
+  {
+   "repo": "ddxfish/sapphire",
+   "api_spec": 0,
+   "guide": 1,
+   "contributing": 0,
+   "docs_site": 1,
+   "readme_bytes": 15361,
+   "docs_md_files": 61,
+   "path_count": 1230,
+   "class": "2/4"
+  },
+  {
+   "repo": "v2rockets/Loyal-Elephie",
+   "api_spec": 0,
+   "guide": 0,
+   "contributing": 0,
+   "docs_site": 0,
+   "readme_bytes": 4458,
+   "docs_md_files": 0,
+   "path_count": 124,
+   "class": "0/4"
+  },
+  {
+   "repo": "Rogendo/Mental-health-Chatbot",
+   "api_spec": 0,
+   "guide": 0,
+   "contributing": 0,
+   "docs_site": 0,
+   "readme_bytes": 1429,
+   "docs_md_files": 0,
+   "path_count": 10,
+   "class": "0/4"
+  },
+  {
+   "repo": "Lum1104/MER-Factory",
+   "api_spec": 0,
+   "guide": 4,
+   "contributing": 1,
+   "docs_site": 1,
+   "readme_bytes": 21720,
+   "docs_md_files": 13,
+   "path_count": 158,
+   "class": "3/4"
+  },
+  {
+   "repo": "CheaperjamRen/leemo",
+   "api_spec": 0,
+   "guide": 2,
+   "contributing": 1,
+   "docs_site": 1,
+   "readme_bytes": 13497,
+   "docs_md_files": 27,
+   "path_count": 1518,
+   "class": "3/4"
+  },
+  {
+   "repo": "NJX-njx/opensoul",
+   "api_spec": 0,
+   "guide": 8,
+   "contributing": 1,
+   "docs_site": 1,
+   "readme_bytes": 9664,
+   "docs_md_files": 638,
+   "path_count": 6141,
+   "class": "3/4"
+  },
+  {
+   "repo": "s-nagaev/chibi",
+   "api_spec": 0,
+   "guide": 0,
+   "contributing": 1,
+   "docs_site": 1,
+   "readme_bytes": 21885,
+   "docs_md_files": 11,
+   "path_count": 305,
+   "class": "2/4"
+  },
+  {
+   "repo": "29-Cu/succhia",
+   "api_spec": 0,
+   "guide": 0,
+   "contributing": 0,
+   "docs_site": 0,
+   "readme_bytes": 9000,
+   "docs_md_files": 0,
+   "path_count": 7,
+   "class": "0/4"
+  },
+  {
+   "repo": "zeroa234/ryza-ai-revive",
+   "api_spec": 0,
+   "guide": 0,
+   "contributing": 1,
+   "docs_site": 1,
+   "readme_bytes": 4643,
+   "docs_md_files": 9,
+   "path_count": 1764,
+   "class": "2/4"
+  },
+  {
+   "repo": "Bwcx-songyu/MoodChat",
+   "api_spec": 0,
+   "guide": 0,
+   "contributing": 0,
+   "docs_site": 0,
+   "readme_bytes": 955,
+   "docs_md_files": 0,
+   "path_count": 54,
+   "class": "0/4"
+  },
+  {
+   "api_spec": 1,
+   "guide": 7,
+   "contributing": 1,
+   "docs_site": 1,
+   "readme_bytes": 22632,
+   "docs_md_files": 14,
+   "repo": "self（心屿 MindIsle 本仓）",
+   "class": "4/4",
+   "face": "HEAD 面 git ls-tree -r HEAD（与 peers 同面）"
+  }
+ ],
+ "na": [],
+ "class_dist": {
+  "4/4": 1,
+  "1/4": 1,
+  "2/4": 4,
+  "3/4": 5,
+  "0/4": 5
+ },
+ "scope": "class_dist/bit_counts/na 只数 peers 行；self 单列 self_class",
+ "self_class": "4/4",
+ "bit_counts": {
+  "api_spec": 1,
+  "guide": 7,
+  "contributing": 10,
+  "docs_site": 10
+ },
+ "note": "四类位＝API 规范 / 教程 / 贡献指南 / 独立文档区；0/4 只在取数面完整时成立，失明一律单列 unverified 不折算成零",
+ "ts": "2026-10-13T02:20:36Z"
+}

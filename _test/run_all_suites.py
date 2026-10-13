@@ -373,6 +373,10 @@ SUITES = [
     # 清单本体、渲染脚本 —— 09-28 00:19 实测 7 个被跟踪交付件从工作树消失且零告警。
     ("deliverable_inventory", [sys.executable, "_test/deliverable_inventory_check.py"]),
     ("deliverable_inventory_selftest", [sys.executable, "_test/deliverable_inventory_check.py", "--selftest"]),
+    # r170 S2：交付面在位闸只看「存在性」，看不见「还在盘上但被写成 0 字节」这一态 ——
+    # 2026-10-13 单日实测两份权威 CSS 同时 0 字节。本件按 HEAD 的 blob 字节做分母，同时进 pre-commit。
+    ("tracked_zero_guard", [sys.executable, "_test/tracked_zero_guard.py"]),
+    ("tracked_zero_guard_selftest", [sys.executable, "_test/tracked_zero_guard.py", "--selftest"]),
     # r59 函数出口面：r57 用一次手工 curl 证的「四条出口都回头」，本轮换成 node 假 fetch 驱动
     # 真函数模块 —— 6 条出口（含 stream=true 但上游报错的折返腿）离线可重跑，摘头即翻红。
     ("api_egress_headers", [sys.executable, "_test/api_egress_headers_check.py"]),

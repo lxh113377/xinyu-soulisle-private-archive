@@ -36,6 +36,9 @@ CONTRIB_RX = re.compile(r"(^|/)(CONTRIBUTING|\u8d21\u732e|developer[-_]?guide|de
                         r"development)(\.[A-Za-z]+)?$", re.I)
 DOCS_DIR_RX = re.compile(r"^(docs|documentation|doc|book|wiki|manual|guides)/", re.I)
 README_RX = re.compile(r"^README(\.[A-Za-z]+)?$", re.I)
+# r170：教程位只认**文档扩展名**。原来靠「排除图片扩展名」的 deny-list，
+# 于是 `UsageController.java` 这类源码文件名也被算成一篇教程（子串当词元 + 文件名当文档，r70 同族）。
+DOC_EXT = (".md", ".mdx", ".rst", ".adoc", ".txt")
 
 
 def classify_docs(paths_sizes):
@@ -57,7 +60,14 @@ def classify_docs(paths_sizes):
         # 口径边界（在册）：教程位按**文件名**判，self 与 peers 同一把尺。
         # 本仓的入门内容在 docs/README.md 的章节里、文件名不含 quickstart ⇒ 教程位如实为 0，
         # 这是真差距（没有独立 quickstart 文件），不给它开例外（开了就是口径特例撑出来的 4/4）。
-        if GUIDE_RX.search(base) and not base.lower().endswith((".png", ".jpg", ".svg", ".gif")):
+        # ⚠️ r170 更正上面这段的时效：入门件自 r126 起已有独立的 `docs/QUICKSTART.md`，
+        #    那句「本仓教程位为 0」是 r122 当时的实况，现已不成立（留痕不改写原文）。
+        # r170 修：原来用「图片 deny-list」，于是 `UsageController.java` 这类**源码文件名**也被
+        # 算成一篇教程 —— 本仓 self 的 guide 位实测 12，其中只有 7 个是文档，另 5 个是
+        # `_test/docs_tutorial_check.py`（判据自己）与四个 `Usage*.java`。
+        # 与 r70 那次 `rag` 裸子串命中 `_test/*_check.py` 文件名同族：拿子串当词元、拿文件名当文档。
+        # 正解是只认**文档扩展名**，self 与 peers 同一把尺（不给任何一方开例外）。
+        if GUIDE_RX.search(base) and base.lower().endswith(DOC_EXT):
             out["guide"] += 1
         if CONTRIB_RX.search(base):
             out["contributing"] = 1
@@ -189,6 +199,18 @@ def run_selftest():
     pic = classify_docs([("docs/tutorial.png", 900)])
     if pic["guide"]:
         bad.append("教程截图被判成教程文档")
+    # 反例③b（r170 一手实发）：源码文件名里带 usage/tutorial 字样的**不是文档**。
+    # 本仓 self 的 guide 位此前就是被四个 `Usage*.java` + 判据自己撑到 12（真文档只有 7）。
+    code = classify_docs([("server/src/main/java/com/x/api/UsageController.java", 4000),
+                          ("src/usage.ts", 4000), ("docs/tutorial.png", 900),
+                          ("_test/docs_tutorial_check.py", 4000)])
+    if code["guide"]:
+        bad.append("源码/判据/图片文件被判成教程文档（guide=%s）⇒ 教程位虚高" % code["guide"])
+    # 正向腿：同一把尺必须仍然数得清真文档（只反不正是恒假实现的藏身处）
+    docs_ok = classify_docs([("docs/usage.md", 4000), ("docs/QUICKSTART.md", 4000),
+                             ("docs/how-to-run.md", 4000)])
+    if docs_ok["guide"] != 3:
+        bad.append("真文档三篇只数到 %s ⇒ 修完 deny-list 又把文档本身挡了" % docs_ok["guide"])
     # 反例④：失明面不得给结论
     c = finalize({"api_spec": 0, "guide": 0, "contributing": 0, "docs_site": 0}, "truncated-tree")
     if not str(c).startswith("unverified"):

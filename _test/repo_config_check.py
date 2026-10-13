@@ -1019,6 +1019,19 @@ def battery_rc_facade_problems(src):
             bad.append("G18 摘要行的 rc 不是插值（%s）⇒ 无法证明它跟着 return 走" % ln[:64])
     if not re.search(r'return\s+(bat_rc|rc)\b', src):
         bad.append("G18 没找到「退出码由同一变量返回」的形状 ⇒ 打印与返回可能两处各算各的")
+    # r170 修：上面那条**宽松到等于没判**。一手实发：selftest 的 篡改㉓d 把 `return bat_rc` 改成
+    # `return 0`，本函数却照样返回「无问题」——因为聚合器第 99 行有个**不相干的**
+    # `return rc, out, err, timed_out`，`return\s+(bat_rc|rc)\b` 被它喂饱了 ⇒ 这条自证腿恒绿，
+    # 而它声称要防的正是「打印的 rc 与进程返回的 rc 两处各算各的」（r74 那次的原貌）。
+    # 正解：把检查**钉在摘要行真正插值的那个变量名**上，别名与巧合都不算。
+    printed_vars = set()
+    for ln in lines:
+        printed_vars |= set(re.findall(r'rc=\{\s*([A-Za-z_]\w*)', ln))
+    if printed_vars:
+        for v in sorted(printed_vars):
+            if not re.search(r'\breturn\s+%s\s*(?:$|[,)])' % re.escape(v), src, re.M):
+                bad.append("G18 摘要行插的是 rc=%s，但正文里没有「原样 return %s」的形状 ⇒ "
+                           "打印与返回不同源（r74 形状：本地 rc=1 而印 rc=0）" % (v, v))
     return bad
 
 
@@ -1269,9 +1282,21 @@ def _st_mut_a(bad):
         bad.append(f"原样评测集登记被判失败：{eval_scope(seg0, files0, eval_counts(seg0))}")
     if not eval_scope(seg0.replace("emotion-eval-dataset.json", "zzz.json"), files0, eval_counts(seg0)):
         bad.append("篡改⑦（抹掉评测集登记行）未被抓到 ⇒ G8 恒真")
-    shrunk = seg0.replace("**73 条**", "**9 条**")
-    if not eval_scope(shrunk, files0, eval_counts(shrunk)):
-        bad.append("篡改⑧（把声称条数改小）未被抓到 ⇒ G8 条数判据恒真")
+    # 篡改⑧：锚点**必须由登记面上现读的声称条数派生**，不许写死历史值。
+    # 一手腐烂实发（r170）：这条原本写死 `**73 条**`，而评测集在 r117 就扩到 105 条 ⇒
+    # `.replace()` 当场成空操作，SELFTEST 报「G8 条数判据恒真」——**冤枉了判据，真相是自证腿早已脱靶**。
+    # 同文件的 篡改⑤e 早就带了「锚点不匹配即判夹具失效」的守卫，这一条漏了。
+    # 正解不是把 73 补成 105（那只会第三次腐烂），是让它自己从面上取号 + 断言命中数==1。
+    claimed = eval_counts(seg0).get("emotion-eval-dataset.json")
+    anchor = "**%d 条**" % claimed if claimed else None
+    hit = seg0.count(anchor) if anchor else 0
+    if hit != 1:
+        bad.append("篡改⑧夹具失效：现读声称值 %r 在登记面上命中 %d 次（须恰好 1）"
+                   "⇒ 本腿未取证，不得当作 G8 已验（锚点腐烂≠判据恒真，红因要归对）" % (claimed, hit))
+    else:
+        shrunk = seg0.replace(anchor, "**9 条**")
+        if not eval_scope(shrunk, files0, eval_counts(shrunk)):
+            bad.append("篡改⑧（把声称条数由 %d 改成 9）未被抓到 ⇒ G8 条数判据恒真" % claimed)
     if not eval_scope(eval_section(ct.replace("评测集隔离", "zzz节")), files0, eval_counts(seg0)):
         bad.append("篡改⑨（删掉整节标题）未被抓到 ⇒ G8 恒真")
     back = seg0.replace("- 测试专用文件清单（r23", "- 测试专用文件清单：（如 eval/x.json / blindset / frozen）\n  - 备注（r23")
@@ -1441,8 +1466,19 @@ def _st_g16_git_face(bad, real_scripts, real_doc, real_disk):
     """
     if not gate_doc_audit(real_scripts, real_doc, real_disk, set()):
         bad.append("篡改㉑e（真电池配空 git index）未被抓到 ⇒ 「在盘未入库」这一态仍隐形（r98 两把尺的原事故）")
-    if gate_doc_audit(real_scripts, real_doc, real_disk, real_scripts):
-        bad.append("篡改㉑f（git 面 ⊇ 电池全集）被判红 ⇒ 第三腿过严，第一次接真面就误伤")
+    if not [l for l in gate_doc_audit(real_scripts, real_doc, real_disk, set())
+            if "git 未跟踪" in l]:
+        # r170 修：原来只要求「返回非空」，而把 git 面清空时**文档缺登**那条红也会混进来喂饱它 ⇒
+        # 这条腿可能在「在盘未入库」那一态完全隐形的情况下照样记绿（红必须是它，②的红因点名前置）。
+        bad.append("篡改㉑e 没给出 git 面的红 ⇒ 「在盘未入库」这一态仍未取证（别的维替它通过不算）")
+    # r170 修：原来写成「git 面 ⊇ 电池全集 ⇒ 必须零问题」，可 `gate_doc_audit` 一次返回**四个维**的红。
+    # 于是只要 quality-gates 里有任何一处缺登（本轮实况：并行 r169 轮的 mysql_backup_drill.py 没进文档），
+    # 这条腿就红，而它的红因写的是「第三腿过严」——**把别人的维的缺登算成自己这条腿失效**。
+    # 正解：只断言「属于 git 面那一维的红必须没有」，其他维的照实保留为读数但不归本腿。
+    f_all = gate_doc_audit(real_scripts, real_doc, real_disk, real_scripts)
+    f_git = [l for l in f_all if "git 未跟踪" in l or "孤儿判据" in l]
+    if f_git:
+        bad.append("篡改㉑f（git 面 ⊇ 电池全集）仍报 git 面的红 ⇒ 第三腿过严：%s" % f_git[:1])
     real_tracked = git_index_scripts()
     if not real_tracked:
         bad.append("㉑g git index 面取不到或为空 ⇒ 第三腿本轮未验，不得把「没报红」当「验过」")
