@@ -1,0 +1,9 @@
+  fetched model.int8.onnx         239233841 B
+  fetched tokens.txt                 315894 B
+  fetched test_wavs/yue.wav          164780 B
+  fetched README.md                     104 B
+MODEL-FETCH-PASS 目标目录 D:/xinyu-ml/asr/sensevoice-int8-2024-07-17
+  OK model.int8.onnx         239233841 B  sha256=c71f0ce00bec95b0
+  OK tokens.txt                 315894 B  sha256=f449eb28dc567533
+  OK test_wavs/yue.wav          164780 B  sha256=0960b2db54ae2020
+  OK README.md                     104 B  sha256=763991a00edaea53

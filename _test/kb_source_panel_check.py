@@ -93,10 +93,35 @@ def selftest():
     # 反向：若有人把「加载失败/超时」改成静默 continue，判据必须抓得到
     if re.search(r"if\s*\(\s*ok\s*\)\s*;?\s*$", panel, re.M):
         fails.append("N2 变异体：面板里出现了静默 ok 分支，失败被吞")
+    # 变异腿（r173）：把浏览器引擎打成「不可用」，判据必须转 UNVERIFIED，
+    # 而不是把空白页上的内容缺失判成产品红（N1 修的就是这个：FAIL/PASS/PASS 抖动）。
+    import types
+    be = types.ModuleType("browser_engine")
+
+    def _boom(p, label=None):
+        raise RuntimeError("probe: engine unavailable")
+
+    be.launch = _boom
+    real = sys.modules.get("browser_engine")
+    sys.modules["browser_engine"] = be
+    try:
+        bad, notes = [], []
+        unver = browser_legs("http://127.0.0.1:9", bad, notes)
+        if not unver:
+            fails.append("环境变异腿：引擎不可用时没有转 UNVERIFIED（会把假红当产品红）")
+        if bad:
+            fails.append("环境变异腿：引擎不可用时仍产生了 %d 条判红" % len(bad))
+    except Exception as e:
+        fails.append("环境变异腿执行异常：%s" % type(e).__name__)
+    finally:
+        if real is None:
+            sys.modules.pop("browser_engine", None)
+        else:
+            sys.modules["browser_engine"] = real
     if fails:
         print("KB-SOURCE-PANEL-SELFTEST-FAIL: " + "；".join(fails))
         return 1
-    print("KB-SOURCE-PANEL-SELFTEST-PASS: 2 正例 / 1 变异体（静默吞错分支检测）")
+    print("KB-SOURCE-PANEL-SELFTEST-PASS: 2 正例 / 2 变异体（静默吞错分支 + 引擎不可用转 UNVERIFIED）")
     return 0
 
 
@@ -123,18 +148,29 @@ def browser_legs(base, bad, notes):
         bad.append("P3 无任何条目带 http 来源链接（点开只能看到纯题录，无法核对）")
         return
     target = withurl[0]
+    mark = len(bad)          # 环境未证实时产生的判红，事后整体作废（r173）
     try:
         from playwright.sync_api import sync_playwright
         from browser_engine import launch as be_launch      # 统一入口，禁裸 launch（本机无 bundled chromium）
     except Exception as e:
-        bad.append("P3 浏览器环境不可达：%s" % e)
-        return
+        return ["P3 浏览器环境不可达（playwright/browser_engine 导入失败）：%s" % e]
+    env_ok = False
     try:
         with sync_playwright() as p:
             b, face = be_launch(p, label="kb-source-panel")
+            # 环境预检（r173 立）：本机 edge 缺位时 launch **不抛错**，只返回一个什么都不能做的
+            # browser（face 里带 managed->Error:Executable doesn't exist）。没有这一步，
+            # 后面的内容腿会把「空白页」判成产品缺陷——实测同一份产物连跑 FAIL/PASS/PASS。
+            probe = b.new_page()
+            probe.goto("about:blank", timeout=10000)
+            probe.evaluate("() => 1 + 1")
+            probe.close()
+            env_ok = True
+            notes.append("P3 环境预检通过（引擎=%s）" % face)
             pg = b.new_page()
             pg.goto(base + "/index.html", wait_until="domcontentloaded")
             pg.wait_for_function("() => !!window.KbSourcePanel", timeout=15000)
+            env_ok = True
             # 直接喂一条含真实依据标记的气泡（不依赖上游），验面板本身
             pg.evaluate(
                 """(id) => {
@@ -193,7 +229,15 @@ def browser_legs(base, bad, notes):
             b.close()
             notes.append("P3 浏览器腿真跑过（引擎=%s）" % face)
     except Exception as e:
-        bad.append("P3 浏览器腿异常：%s: %s" % (type(e).__name__, e))
+        if not env_ok:
+            # 环境从未被证明可用 ⇒ 本次调用里产生的判红全部作废，转 UNVERIFIED。
+            # 这是「尺取不到读数」与「产品真红」的分界，混在一起就会拿假红去改产品。
+            del bad[mark:]
+            return ["P3 浏览器腿环境不可达（%s: %s）——内容腿未证成，不判绿也不判红"
+                    % (type(e).__name__, str(e)[:180])]
+        bad.append("P3 浏览器腿执行中异常（环境已预检通过，算真红）：%s: %s"
+                   % (type(e).__name__, str(e)[:180]))
+    return []
 
 
 def main():
@@ -205,15 +249,21 @@ def main():
         return selftest()
     global face
     bad, notes = static_legs()
+    unver = []
     if not bad:
-        browser_legs(args.base, bad, notes)
+        unver = browser_legs(args.base, bad, notes)
     for n in notes:
         print("  · " + n)
+    for u in unver:
+        print("  · " + u)
     if bad:
         print("KB-SOURCE-PANEL-FAIL: %d 项判红" % len(bad))
         for f in bad:
             print("  🔴 " + f)
         return 1
+    if unver:
+        print("KB-SOURCE-PANEL-UNVERIFIED: 环境不可达，P3 内容腿未验证 ⇒ rc=2（不得读成通过）")
+        return 2
     print("KB-SOURCE-PANEL-PASS: P1-P3 全过 / N1-N2 变异腿咬合（标记可点、面板有可核对来源、"
           "未知编号不编内容、来源件故障不冒充无来源；浏览器引擎见上方 notes 行）")
     return 0

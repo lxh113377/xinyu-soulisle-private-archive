@@ -11,10 +11,10 @@
         "BRANCH": 0.9
       },
       "check_scripts_in_test": 0,
-      "src_code_files": 27,
+      "src_code_files": 29,
       "first_screen_budget": {
-        "files": 28,
-        "total_bytes": 1173759
+        "files": 30,
+        "total_bytes": 1208064
       },
       "build_config_files": [
         "deploy/cloudbase/functions/chat/package.json"
@@ -58,10 +58,10 @@
         "BRANCH": 0.9
       },
       "check_scripts_in_test": 0,
-      "src_code_files": 27,
+      "src_code_files": 29,
       "first_screen_budget": {
-        "files": 28,
-        "total_bytes": 1173759
+        "files": 30,
+        "total_bytes": 1208064
       },
       "build_config_files": [
         "deploy/cloudbase/functions/chat/package.json"

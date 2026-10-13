@@ -1,0 +1,5 @@
+model_config.validate(): True
+load_ms: 1447.0
+sample_rate: 16000
+decode_ms: 239.7
+TEXT: '呢几个字都表达唔到我想讲嘅意思。'
