@@ -28,6 +28,13 @@ TO_RC = 124
 # 不许用默认调参掩盖一个慢仪器，抬 cap 是要署名的动作。
 SUITE_TIMEOUT = int(os.environ.get("XINYU_SUITE_TIMEOUT") or 600)
 
+# r181 心跳线（一手代价：r180 整跑停在第 58 条前 19 分钟零输出，事后**无法归因**——
+# 只知道"卡住了"，不知道卡在哪个套件、等了多久、谁攥着不放。r105 那次的答案是"孙进程攥管道"，
+# 这次却未必是同一件事，而我连"当时是不是同一形态"都拿不出证据，只能写「归因未定」。
+# 缺的不是超时帽（600s 在），是**等待期间的可见性**：帽只在到点时说话，而到点前那 19 分钟是静默的。）
+WATCHDOG_FRACTION = 0.25
+WATCHDOG_MIN_S = 120
+
 
 def _kill_tree(pr):
     """杀掉我起的这棵进程树。归属确定：PID 由本次 Popen 创建，不是"按端口/按名字找人"。
@@ -58,7 +65,63 @@ def _kill_tree(pr):
         return None
 
 
-def run_suite_cmd(cmd, cap, env_extra=None):
+def watchdog_at(cap):
+    """第一次心跳的等待线 = `cap 的比例` 与 `绝对下限` 取大者（纯函数，可在 selftest 合成投喂）。
+
+    为什么两条都要：只看比例 ⇒ 自证桩里 cap=3s 时 0.75s 就心跳，正常慢套件也会被念一遍（噪声到没人看）；
+    只看绝对下限 ⇒ cap 被显式抬高（在册纪律：抬 cap 要署名）时，心跳线不会跟着走，
+    而恰恰是抬高的那些套件最容易真卡。取大者 ⇒ 抬高 cap 时心跳线按比例走，压低时不被噪声淹。
+    """
+    return max(int(cap * WATCHDOG_FRACTION), WATCHDOG_MIN_S)
+
+
+def descendant_tree(pid, limit=8):
+    """pid 的子孙进程 [(pid, 命令摘要)]。取不到 ⇒ 返回 [(None, 原因)]，**绝不返回空列表冒充「没有子进程」**。
+
+    失明与零是两件事：这条腿正是为了回答"卡住时到底谁攥着东西"，
+    如果 PowerShell 挂了却回一个空列表，收口面就会印成「无子孙进程」，把唯一有价值的线索抹掉。
+    """
+    ps = ("$ErrorActionPreference='SilentlyContinue'; "
+          "$all=Get-CimInstance Win32_Process; "
+          "$want=@(%s); "
+          "for($i=0;$i -lt 6;$i++){ $kids=$all | Where-Object { $want -contains $_.ParentProcessId }; "
+          "if(-not $kids){break}; $want += ($kids | ForEach-Object { $_.ProcessId }) }; "
+          "$all | Where-Object { $want -contains $_.ProcessId } | "
+          "ForEach-Object { \"$($_.ProcessId)`t$($_.Name)\" }" % ("1," * 0 + str(pid)))
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=25)
+    except Exception as e:                                    # noqa: BLE001
+        return [(None, "取不到子孙进程树(%s)⇒ 失明，不得读成「无子进程」" % type(e).__name__)]
+    rows = []
+    for line in (r.stdout or "").splitlines():
+        parts = line.split("\t", 1)
+        if parts[0].strip().isdigit():
+            rows.append((parts[0].strip(), (parts[1] if len(parts) > 1 else "").strip()[:80]))
+    if not rows:
+        if r.returncode != 0:
+            return [(None, "取不到子孙进程树(rc=%s)⇒ 失明" % r.returncode)]
+        return []                     # 真·无子孙：查询成功且确实一条没有，才许这么写
+    return rows[:limit]
+
+
+def watchdog_lines(name, waited, cap, procs, at):
+    """卡住时唯一能归因的输出（纯函数）：套件名 + 已等多久 + 等待线 + 子/孙进程树。"""
+    head = ("  · WATCHDOG: 套件=%s 已等 %.0fs（心跳线 %ds／硬顶 %ds）⇒ 还没到点，但已经慢到值得记一笔"
+            % (name or "?", waited, at, cap))
+    if not procs:
+        return [head, "  · WATCHDOG 进程树: 查询成功且**确实无子孙进程**（卡点在套件自身进程内）"]
+    out = [head]
+    for pid, info in procs:
+        if pid is None:
+            out.append("  · WATCHDOG 进程树: %s" % info)      # 失明也要点名，不静默
+        else:
+            out.append("  · WATCHDOG 进程树: pid=%s %s" % (pid, info))
+    return out
+
+
+def run_suite_cmd(cmd, cap, env_extra=None, watch_at=None, name=""):
     """跑一个套件并**保证在 cap 附近返回**，即使它留下了还活着的孙进程（r105 修）。
 
     一手代价（r105 终验整跑）：原先这里是 `subprocess.run(capture_output=True, timeout=600)`。
@@ -83,11 +146,26 @@ def run_suite_cmd(cmd, cap, env_extra=None):
     try:
         with fo, fe:
             pr = subprocess.Popen(cmd, cwd=ROOT, stdout=fo, stderr=fe, env=env)
-            try:
-                rc = pr.wait(timeout=cap)
-            except subprocess.TimeoutExpired:
-                timed_out = True
-                rc = _kill_tree(pr)
+            # r181：原先是 `pr.wait(timeout=cap)` —— 到点才说话，到点前整段静默，
+            # 于是"卡住 19 分钟"这件事事后只剩一句「归因未定」。改成轮询 + 心跳：
+            # 过 `watch_at` 就先印一行「套件名 / 已等多久 / 子与孙进程树」，硬顶仍在 cap。
+            started = time.time()
+            warned = False
+            while True:
+                code = pr.poll()
+                if code is not None:
+                    rc = code
+                    break
+                waited = time.time() - started
+                if waited >= cap:
+                    timed_out = True
+                    rc = _kill_tree(pr)
+                    break
+                if watch_at is not None and not warned and waited >= watch_at:
+                    warned = True
+                    for ln in watchdog_lines(name, waited, cap, descendant_tree(pr.pid), watch_at):
+                        print(ln, flush=True)
+                time.sleep(0.5)
     finally:
         out = _read_tmp(out_path)
         err = _read_tmp(err_path)
@@ -1193,9 +1271,43 @@ def exec_selftest():
                 os.remove(x)
             except OSError:
                 pass
+    # ── r181 心跳腿（一手代价见 SUITE_TIMEOUT 下方注释：卡住 19 分钟只能写「归因未定」）──
+    n_leg += 1
+    if watchdog_at(600) != 150:
+        fails.append("watchdog_at(600) 应按 cap 的 1/4 给 150s，实=%s ⇒ 比例面失效" % watchdog_at(600))
+    n_leg += 1
+    if watchdog_at(3) != 120:
+        fails.append("watchdog_at(3) 应被绝对下限兜住（否则自证桩里每条正常套件都被念一遍），实=%s" % watchdog_at(3))
+    n_leg += 1
+    if watchdog_at(1000) <= watchdog_at(600):
+        fails.append("cap 抬到 1000s 而心跳线没跟着走 ⇒ 恰好转慢的那批最需要它（抬 cap 是要署名的动作）")
+    n_leg += 1
+    blind = "\n".join(watchdog_lines("wd_demo", 130.0, 600, [(None, "取不到(rc=1)⇒ 失明")], 150))
+    if "套件=wd_demo" not in blind or "失明" not in blind:
+        fails.append("失明形态没被点名：%r ⇒ 卡住时最值钱的那条线索会被印成「无子进程」" % blind[:80])
+    n_leg += 1
+    truly_empty = "\n".join(watchdog_lines("wd_demo", 130.0, 600, [], 150))
+    if "确实无子孙" not in truly_empty:
+        fails.append("真·无子孙与失明必须**不同形**：%r" % truly_empty[:80])
+    n_leg += 1
+    # 端到端腿：慢套件必须**真的印出**心跳，而且只印一次（每次轮询都印会把收口面淹掉）。
+    buf = io.StringIO()
+    real_out = sys.stdout
+    try:
+        sys.stdout = buf
+        rcs, _o, _e, tos = run_suite_cmd([sys.executable, "-c", "import time; time.sleep(2); print('WD-DONE')"],
+                                         30, watch_at=1, name="wd_e2e")
+    finally:
+        sys.stdout = real_out
+    got = buf.getvalue()
+    n_fire = got.count("WATCHDOG: 套件=wd_e2e")
+    if tos or rcs != 0:
+        fails.append("端到端腿前置不成立：套件应正常跑完（rc=%s timed_out=%s）⇒ 这条腿在测别的东西" % (rcs, tos))
+    elif n_fire != 1:
+        fails.append("心跳应恰好印 1 次，实=%d ⇒ 要么没接上（0），要么每轮都印把收口面淹了(>1)" % n_fire)
     for f in fails:
         print("  · EXEC-SELFTEST-FAIL " + f)
-    print("EXEC-SELFTEST-%s（%d 腿：正例 rc 透传／挂起例保证返回＋部分输出可读／旧机制对照拿不到结论）"
+    print("EXEC-SELFTEST-%s（%d 腿：正例 rc 透传／挂起例保证返回＋部分输出可读／旧机制对照拿不到结论／心跳面 6 条）"
           % ("PASS" if not fails else "FAIL", n_leg))
     return 1 if fails else 0
 
@@ -1236,7 +1348,8 @@ def run_suites(suites):
         t0 = time.monotonic()
         # r105：执行面从 `subprocess.run(capture_output=True, timeout=600)` 换成 `run_suite_cmd`
         # —— 不是换写法，是换**能不能保证返回**（详见该函数头注的 r105 一手现场）。
-        rc, out, err, timed_out = run_suite_cmd(cmd, SUITE_TIMEOUT)
+        rc, out, err, timed_out = run_suite_cmd(cmd, SUITE_TIMEOUT, watch_at=watchdog_at(SUITE_TIMEOUT),
+                                                name=name)
         if timed_out:
             # r102：套件超时**不许把整跑炸掉**。改造前的一手事故：eol_parity 实跑 >600s，
             # TimeoutExpired 一路抛到 main() 之外 ⇒ 电池 rc=1、既没有 BATTERY 收口行、
