@@ -587,6 +587,17 @@ SUITES = [
     #   「降级」，本件测的是连接建立之后失效这一类。缺 jar/起不来实例 ⇒ rc=2 未验，不是绿。
     ("mysql_degradation", [sys.executable, "_test/mysql_degradation_check.py"]),
     ("mysql_degradation_selftest", [sys.executable, "_test/mysql_degradation_check.py", "--selftest"]),
+    # r169：索引设计与并发吞吐的**测量**回执。立因＝objective 里「索引设计」+「优化性能以应对
+    #   高并发与大数据量场景」两条，此前只有**读代码得出的论证**（V1 有 KEY (session_id,id)、
+    #   查询按 session 前缀 + id 倒序），本机一次都没量过 —— 不量就没资格说"够"。
+    #   六腿：真计划(type=ref/key=idx_*/无 filesort) → 对照面(机械摘掉那行 KEY，真计划必须
+    #   possible_keys=NULL) → information_schema 的 INDEX_LENGTH 走第二通道 → 单查询**净**耗时
+    #   (两点求斜率消掉 ~27ms 客户端启动常数；直接拿墙钟比就是拿启动开销比) → 两侧结果集
+    #   逐字节相等(索引只改访问路径不许改语义) → 12 客户端×15 次并发 0 错且各客户端行数一致。
+    #   一手读数（本机 MySQL 8.4.9 / 6 万行×2 表）：0.759 ms vs 12.4 ms，qps 222，0 错误。
+    #   夹具源 = 迁移产物本身（改名执行），不手抄理想表。取不到实例 ⇒ rc=2 未验，不判绿。
+    ("mysql_load_probe", [sys.executable, "_test/mysql_load_probe.py"]),
+    ("mysql_load_probe_selftest", [sys.executable, "_test/mysql_load_probe.py", "--selftest"]),
 ]
 
 # 需要真实上游密钥的套件：本地默认跑（回归环境契约要求 DEEPSEEK_KEY 在进程环境里），
