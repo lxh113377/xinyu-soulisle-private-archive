@@ -121,6 +121,11 @@ J1–J3 已落地，前端零改动；背景块/选型假设/JDK17 与 Maven3.9.
       **追加实测（同轮补腿）**：F14 加 `--delegate CPU` 腿后量到最差情况 —— GPU p95 10.7ms /
       CPU p95 15.5ms 均远在 100ms 内，但 **CPU 单帧 max 114.2ms 偶发越线** ⇒ 「≤100ms」只在
       p95 口径成立；若需求是"每帧必达"，取舍是降 fps（牺牲跟手度）或锁 GPU delegate（牺牲设备面）。
+      **同轮再闭两项**：① 8 个细分子维度**已接进界面**（表情 chip + 悬浮 HUD，上限 3 标签、
+      刻意不加色点；`src/js/app.js` + `src/css/style.css`）② 新建 `_test/face_subs_check.py`（F15）
+      9 用例亮/灭双向断言 + **5 条针对性变异腿**（第一版"抽掉 rules.subs 整块"的变异实测**无效**——
+      subsOf 对 R.subs 有硬编码兜底；改为按维度逐条打，其中 weak.on 方向、tense 的 OR 结构、
+      ratioOn 该盯哪个维度，各错过一次，已把错法写进注释）。
 
 ## 分卷目录
 
