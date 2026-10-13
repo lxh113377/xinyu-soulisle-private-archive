@@ -222,7 +222,9 @@ def main():
         print("  %-10s p50 %6.2f ms ｜ p95 %6.2f ms ｜ max %6.2f ms"
               % (key, d["p50"], d["p95"], d["max"]))
 
-    dst = Path(args.json) if args.json else (
+    # `--json` 收相对路径时按仓根解析（r177 接线轮实测：电池传相对名 ⇒ `relative_to(ROOT)`
+    # 当场抛 "is not in the subpath of ..." 把一次正常测量打成 rc=2 未验 —— 是仪器崩，不是产品红）。
+    dst = (ROOT / args.json) if args.json else (
         TEST_DIR / ("face-latency-%s.json" % _stamp()))
     dst.write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")
     print("  机器件：" + str(dst.relative_to(ROOT)))

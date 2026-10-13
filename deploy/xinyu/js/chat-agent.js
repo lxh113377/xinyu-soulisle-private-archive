@@ -156,11 +156,8 @@ window.ChatAgent = (function () {
    * 不等于输出面干净：模型仍可能凭空标一个 PSY-XX-999·A，这一层就是堵它的。 */
   const EMPTY_KB = { block: "", used: [] };
 
-  /* r134：数据件改**按需加载** —— 它原同步挂在 index.html 参与首屏解析，而知识只在「求解释轮」
-   * 注入（纯倾诉轮不注入）⇒ 每个访客都在替用不上的资源付首屏字节，且每扩一轮库这笔钱就涨一次
-   * （第7轮后 129,791B，把 size_budget 的 TOTAL 顶穿）。现在开局空闲预热、用前再 await 一次；
-   * 超时/失败静默 ⇒ EMPTY_KB 兜底（零注入、不挤占 X3 的 1600 字符预算）；断网仍由 sw.js
-   * PRECACHE 供给，可用性不变。 */
+  /* r134：数据件改**按需加载** —— 原同步挂 index.html 参与首屏解析，而知识只在「求解释轮」用得上。
+   * 超时/失败静默 ⇒ EMPTY_KB 兜底（零注入、不挤占 X3 的 1600 字符预算）。 */
   let kbLoad = null;
   function ensureKb(waitMs) {
     if (window.__XINYU_PSYCH_KB__) return Promise.resolve(true);
@@ -217,10 +214,9 @@ window.ChatAgent = (function () {
   }
 
   /* r132 引用核对面：把模型句末标的〔依据:编号·级〕与**本轮真实注入**的 used 集合比对。
-   * 三种结局，一律**只改标记、不删原文**：
-   *   命中且级一致 → 原样保留；命中但级不符 → 按库里真实级更正并写明「模型标X，已更正」（挡 E 冒充 A）；
-   *   未命中 → 〔依据:<原编号>·未查证〕（编号原样保留，不擅自改写模型写的东西）。
-   * used 为空（未注入/离线/降级）时任何标记都算未命中——那条回复根本没见过知识库。 */
+   * 三种结局，一律**只改标记、不删原文**：命中且级一致 → 原样；级不符 → 按库里真实级更正
+   * （挡 E 冒充 A）；未命中 → 〔依据:<原编号>·未查证〕。used 为空（未注入/离线/降级）时
+   * 任何标记都算未命中——那条回复根本没见过知识库。 */
   const CITE_RE = /〔依据[:：]\s*([^〕·]+?)\s*(?:·\s*([A-Ea-e])\s*)?〕/g;
   function verifyCitations(reply, used) {
     const src = String(reply == null ? "" : reply);
@@ -299,14 +295,16 @@ window.ChatAgent = (function () {
     return (n || Q.rulesOnly === true) ? head + block : "";
   }
 
-  const SYSTEM = (emo, userText) => {   /* r132：返回 {text, kbUsed}，供回复面核对面取用本轮真实注入集 */
+  const SYSTEM = (emo, userText, face) => {   /* r132：返回 {text, kbUsed}；r172 起第三参为摄像头读数（仅 C2 注入用） */
     const s = strategyOf(emo);
+    /* r172 C2：注入文本在算预算**之前**并入 base —— 事后追加会顶穿 X3 的 1600（K5 判红）。 */
+    const fev = faceEvidenceLine(face);
     // 长期记忆注入（r52）：MemoryStore 原本**只写不读**，"跨设备记住你"只成立在展示层。
     // 只注入聚合摘要，不注入原话。
     const mem = (window.MemoryStore && window.MemoryStore.recall) ? window.MemoryStore.recall() : "";
     const base = STR.persona + "用户刚说的话被识别为主要情绪「" + window.EmotionEngine.labelOf(emo) + "」。" +
       "当前共情要点：" + s.lead + "。要求：" + STR.rules.map((r, i) => (i + 1) + ")" + r).join("；") + "。" +
-      (mem ? mem : "") + summaryOfDropped();
+      (mem ? mem : "") + summaryOfDropped() + fev;
     /* r117 预算切分：quote 保底优先（「每轮给候选」要成立），kb 用剩余（<220 自动让位）。
      * r134 重平衡：quoteRules 4→6 条后 head（含规则文案）约 241 字符，旧上限 280 只容 0-1 条
      * 候选（anger/love 两情绪实测归零，quote_wiring Q1 红）⇒ 上限 280→420、下限 180→300
@@ -344,14 +342,29 @@ window.ChatAgent = (function () {
   /** 本轮被概要替代的条数（供界面标注，与 SYSTEM 内同一次计算口径一致） */
   function droppedCount() { return Math.max(0, history.length - HISTORY_MAX); }
 
-  function offlineReply(emo) {
-    const pool = strategyOf(emo).templates;
+  /* r172 C1：toneFrom 为空 ⇒ 与旧版逐字节等价；仅有值时改用该情绪的模板池。 */
+  function offlineReply(emo, toneFrom) {
+    const pool = strategyOf(toneFrom || emo).templates;
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  async function onlineReply(text, emo, onDelta) {
+  /* r172 · C2 摄像头证据注入。红线：默认关、只认 localStorage 当次同意、不跨会话、
+   * 永不进 verifyCitations 的依据集合；存储不可用（无痕）一律视为未同意。 */
+  const FACE_EV_KEY = "xinyu.faceEvidence.v1";
+  function faceEvidenceOn() {
+    try { return window.localStorage.getItem(FACE_EV_KEY) === "grant-once"; }
+    catch (e) { return false; }
+  }
+  function faceEvidenceLine(face) {
+    if (!faceEvidenceOn() || !face || !face.confident || face.weak) return "";
+    return ("【摄像头补充（弱证据）】系统读到用户此刻面部表情接近「" + face.emotion +
+      "」（置信度 " + Math.round((face.confidence || 0) * 100) +
+      "%）。这是摄像头推断、不是用户自述；与用户文字冲突时**一律以文字为准**。\n");
+  }
+
+  async function onlineReply(text, emo, onDelta, face) {
     await ensureKb();   /* r134：数据件按需加载，取不到就本轮零注入（见 EMPTY_KB 兜底） */
-    const sys = SYSTEM(emo, text);
+    const sys = SYSTEM(emo, text, face);
     const messages = [{ role: "system", content: sys.text }];
     for (const h of history.slice(-HISTORY_MAX)) messages.push(h);
     messages.push({ role: "user", content: text });
@@ -427,6 +440,12 @@ window.ChatAgent = (function () {
      * love 心动表情侧判不出来（见 face-smile-rules 的 undetectable）⇒ 记 n/a 而不是"不一致"。 */
     const face = (window.FaceEngine && window.FaceEngine.last) ? window.FaceEngine.last() : null;
     const divergence = !face ? "unknown" : (emo === "love" ? "n/a" : (face.emotion === emo ? "agree" : "disagree"));
+    /* r172 C1（2026-10-14 拍板，允许但硬限）：仅当 ①lex.all 空（文本零命中）②face.confident 且非 weak
+     * ③face.emotion 非 calm，才允许表情参与「回复基调」，且**只**用于离线模板池：
+     * emo 不改（不进判定）、kbUsed 不含它（不进证据链）、SYSTEM 仍传文本侧 emo（在线框架不受影响）。 */
+    const lexZero = !lex.all || !lex.all.length;
+    const faceTone = (lexZero && face && face.confident === true && face.weak !== true
+                      && face.emotion && face.emotion !== "calm") ? face.emotion : null;
     // 次情绪一并入库：星图重放要能复现「主色 n 颗 + 次色 n/2 颗」的原始点亮形态
     const secondary = window.EmotionEngine.secondaryOf(lex.all, emo);
     if (emo === "crisis") {
@@ -442,7 +461,7 @@ window.ChatAgent = (function () {
     const dropBefore = droppedCount();   // 同理：概要替代掉的条数要在 remember 之前取
     if (isOnline()) {
       try {
-        const o = await onlineReply(text, emo, onDelta);
+        const o = await onlineReply(text, emo, onDelta, face);   /* r172 C2：仅在已逐次同意时才会真注入 */
         reply = o.reply;
         kbUsed = o.kbUsed || [];
         citeChecked = o.citeChecked || 0; citeMatched = o.citeMatched || 0;
@@ -450,16 +469,17 @@ window.ChatAgent = (function () {
         mode = "model";
         llmBad = false;
         streamed = !!onDelta;
-      } catch { reply = offlineReply(emo); mode = "fallback"; llmBad = true; }
+      } catch { reply = offlineReply(emo, faceTone); mode = "fallback"; llmBad = true; }
     } else {
-      reply = offlineReply(emo); mode = "offline";
+      reply = offlineReply(emo, faceTone); mode = "offline";
     }
     const latency = Math.round(performance.now() - t0);
     remember(text, reply);
     window.MemoryStore.record({ emotion: emo, intensity, secondary, text: text.slice(0, 60) });
     // memory/dropped 只在**真的带着它们发给了模型**时才非零：降级/离线模板没走 LLM，标了就是说谎
     return { reply, emotion: emo, intensity, mode, path, latency, secondary, lexAll: lex.all, streamed,
-             emoSrc, face, divergence, memory: mode === "model" ? memBefore : 0,
+             emoSrc, face, divergence, faceTone,
+             memory: mode === "model" ? memBefore : 0,
              dropped: mode === "model" ? dropBefore : 0,
              /* r132：只有真走 LLM 的那一轮才谈得上「依据」——降级/离线模板没注入知识库，
               * 此时标依据就是说谎（与 memory/dropped 同口径）。 */
@@ -496,6 +516,12 @@ window.ChatAgent = (function () {
   }
 
   return { respond, classifyEmotion, isOnline, setCfg, getCfg, getHistory, droppedCount, strategyInfo,
-           verifyCitations,   // r132：回复面核对面（_test/kb_citation_check.py 取它做判定）
+           verifyCitations,
+    /* r172 C2：只暴露只读状态 + 一次性同意入口；注入判据不外露，界面改不了判据。 */
+    faceEvidenceOn: faceEvidenceOn,
+    grantFaceEvidenceOnce: function () {
+      try { window.localStorage.setItem(FACE_EV_KEY, "grant-once"); return true; }
+      catch (e) { return false; }
+    },   // r132：回复面核对面（_test/kb_citation_check.py 取它做判定）
            llmBad: () => llmBad };   // r51：徽章要能反映"配了在线但刚降级过"，否则会说谎
 })();

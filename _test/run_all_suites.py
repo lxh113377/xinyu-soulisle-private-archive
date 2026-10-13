@@ -384,6 +384,14 @@ SUITES = [
     #   F11/F12 那两把尺一条腿都碰不到它们 ⇒ 不常驻执行，退化时其它尺全绿依旧。
     #   零依赖（纯 node 探针），不占浏览器预算。
     ("face_subs", [sys.executable, "_test/face_subs_check.py"]),
+    # r173 F14 单帧延迟尺（本轮接线）。r173 建了它却没给执行位 ⇒ G16 第五腿判为孤儿判据
+    #   （「文档写了 = 有人在跑」是 r101 立此腿时点名的错觉）。常驻腿取 `--delegate CPU`＝最差情况
+    #   路径（GPU 腿为好情况，人工轮次两腿都量，口径见 docs/quality-gates.md 同条目）。
+    #   浏览器/假摄像头/模型任一不可用 ⇒ 它自回 rc=2，落进电池的 ENV-UNVERIFIED 而非判红。
+    #   机器件走 `/_tmp_*`（R269 例外通道）：默认名 face-latency-<stamp>.json 会在 _test/ 里
+    #   每轮积一份未跟踪件，噪声归零门把每次电池运行都变成"脏面"。
+    ("face_latency", [sys.executable, "_test/face_latency_check.py",
+                      "--delegate", "CPU", "--json", "_tmp_face_latency.json"]),
     # r58 质量工程面：JS 侧从"0 个单元测试"变成有常驻执行位（node --test + 跨 realm 归一）
     ("js_unit", [sys.executable, "_test/js_unit_check.py"]),
     ("js_unit_selftest", [sys.executable, "_test/js_unit_check.py", "--selftest"]),
