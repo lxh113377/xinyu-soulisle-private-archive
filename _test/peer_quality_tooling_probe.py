@@ -358,6 +358,11 @@ def main():
              "OK" if len(okp) + len(blind) == len(peers) else "不成立⇒分母可疑"))
     if a.json and a.json != "-":   # '-' 必须在写之前拦住，否则会落出个名叫 - 的文件（r66 实踩过）
         payload = {"generated_by": "peer_quality_tooling_probe.py",
+                   # r180：本探针此前是四族 peers 台账里**唯一不写采集时刻**的那一个 ——
+                   # 一旦文件名带轮次号（`-2026-10-14-r179`），`ledger_age_check` 两侧都取不到日期，
+                   # 就把「有读数」的台账判成「无日期」红（一手：r179 提交后该尺由 PASS 转 FAIL）。
+                   # 键名跟 maintenance 台账一致用 `taken_at`（龄期尺的 TS_KEYS 认它），不另造名。
+                   "taken_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                    "ceiling": "只出结构化在册证据；不得据此比较代码质量/缺陷率（覆盖率不在取数面内）",
                    "noise_note": "本件 NOISE 故意不滤 tests 目录，否则会把被测对象滤掉",
                    "peers_expected": len(peers), "counted": len(okp), "na": blind,

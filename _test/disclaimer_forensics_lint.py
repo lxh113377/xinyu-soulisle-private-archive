@@ -43,6 +43,40 @@ DECLARED_GAP = re.compile(r"(未实测|待实测|❌|未取|待补|待办)")
 # 「未实测」和「不可测」时，那句仍是"这维做不到"，不得借 未实测 洗白。
 HARD_ASSERT = re.compile(r"(受限于|仅保证|无法做到|做不到|只能保证|物理限制|不可测|测不了|无法测量|无从测量)")
 
+# 元引用豁免（r180）。本判据拦的是"把没测包装成做不了"，不是"提到这个词"。
+# 一手：现报的 3 处里两处（`对标分析报告-2026-10-12-r128.md:64`、`...-r130.md:50`）
+# 是报告在**引用**「不可测」这三个字并声明自己不再这么写 —— 拦这种句子，奖励的是
+# 「把诚实的自我说明删掉求绿」，正是 R263 禁止的方向（改数据凑绿），所以这里改的是尺。
+# 豁免要两条同时成立，缺一仍红：
+#   ① 命中词整体落在引号对里（「」／“”／反引号／直角引号）；
+#   ② 同行有归属动词，说明这句在谈"这个词被怎么用"，不是在下结论。
+QUOTES = (("「", "」"), ("“", "”"), ("`", "`"))
+META_VERB = re.compile(r"(写|说|称|标为|标注|不再|不用|拒绝|冒充|引用|原话)")
+
+
+def _quoted_spans(line):
+    out = []
+    for op, cl in QUOTES:
+        start = -1
+        i = 0
+        while i < len(line):
+            if start < 0 and line.startswith(op, i):
+                start = i
+                i += len(op)
+                continue
+            if start >= 0 and line.startswith(cl, i):
+                out.append((start + len(op), i))
+                start = -1
+            i += 1
+    return out
+
+
+def is_meta_reference(line, m):
+    """命中词是否只是在**被引用**（词在引号内 且 同行有归属动词）。纯函数，可合成投喂。"""
+    if not META_VERB.search(line):
+        return False
+    return any(s <= m.start() and m.end() <= e for s, e in _quoted_spans(line))
+
 
 def lint_lines(lines):
     """返回 [(行号, 命中词, 该行文本)]。零输入不在此判，交调用方处理（防把空当绿）。"""
@@ -51,6 +85,8 @@ def lint_lines(lines):
         m = BOUNDARY.search(ln)
         if not m:
             continue
+        if is_meta_reference(ln, m):
+            continue                    # 元引用：谈的是这个词，不是在下"做不到"的结论
         if FORENSIC.search(ln):
             continue                    # 带取证 ⇒ 合法边界结论
         if DECLARED_GAP.search(ln) and not HARD_ASSERT.search(ln):
@@ -103,6 +139,13 @@ STUBS = [
     ("漏报侧 不可测 借「未实测」洗白 ⇒ 仍须红", ["- 该维未实测，也判不可测。"], 1),
     ("不误伤 不可测但同句给了取证",
      ["- 原判不可测，本轮 _test/peer_issue_response_probe.py 实测 16 仓后改判有读数。"], 0),
+    # r180 元引用一族（两条互相咬住：只加豁免不加反例，豁免就成了洗白通道）
+    ("不误伤 元引用「不可测」且声明不再这么写",
+     ["### 第 4 维（性能）—— 历轮都写「不可测」，本轮把 self 侧做成可复算，但**明确不横比**。"], 0),
+    ("漏报侧 词在引号内但同行没有归属动词 ⇒ 仍红",
+     ["- 本维「不可测」，无人补测。"], 1),
+    ("漏报侧 词在引号外，归属动词救不了（防豁免扩成整行豁免）",
+     ["- 我们说了，这维不可测。"], 1),
 ]
 
 

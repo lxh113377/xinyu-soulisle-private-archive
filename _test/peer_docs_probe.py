@@ -138,8 +138,49 @@ def self_only():
     return rec
 
 
-def build_payload(rows, blind):
+def merge_rows(old_rows, new_rows, roster):
+    """纯函数：本次采到的行盖回存量行集，其余原样留着。返回 (merged, problems)。
+
+    一手代价（r180）：上一轮我把「补法」写进报告 ——
+    `peer_docs_probe.py --repo A,B --json <当日台账>`，实测跑完那份台账从 **17 行塌成 3 行**，
+    而顶层 `denominator` 照旧印 16。下一轮把「16 仓在册」抄进八维表时，盘上其实只剩两只仓的读数。
+    根因不是合并写坏了，是**本探针从来没有合并这一步**：`--json` 无条件整份重写。
+    所以这里守三条（problems 非空 ⇒ 调用方拒绝落盘，绝不"先写了再说"）：
+      ① 存量行读不出形状 ⇒ 不合并（半面子盖全量＝造假，与 peer_community_probe 同口径）；
+      ② 合并后 peers 行数 < 名册在册数 ⇒ 分母在说谎，点名缺哪些；
+      ③ 行集里混进名册外的仓 ⇒ 分母两侧不同源，直接拒。
+    """
+    problems = []
+    by_repo = {}
+    for r in old_rows or []:
+        slug = r.get("repo")
+        if not slug:
+            problems.append("存量行缺 repo 键（形状不符，不敢当台账读）")
+            continue
+        by_repo[slug] = r
+    if old_rows is not None and not by_repo:
+        problems.append("存量台账里没有一行带 repo ⇒ 视作读不动，不合并")
+    fresh_slugs = {r.get("repo") for r in new_rows or [] if r.get("repo")}
+    for r in new_rows or []:
+        if r.get("repo"):
+            by_repo[r["repo"]] = r
+    for slug in list(by_repo):
+        if not slug.startswith("self") and slug not in roster:
+            problems.append("行集里混进名册外的仓 %s ⇒ 分母两侧不同源" % slug)
+    merged = [by_repo[s] for s in sorted(by_repo)]
+    peers_in_merged = {s for s in by_repo if not s.startswith("self")}
+    if len(peers_in_merged) < len(roster):
+        problems.append("合并后 peers 只有 %d 行，名册在册 %d 仓 ⇒ 缺 %s"
+                        % (len(peers_in_merged), len(roster),
+                           ",".join(sorted(set(roster) - peers_in_merged))[:180]))
+    return merged, problems
+
+
+def build_payload(rows, blind, extra=None):
     """台账本体的**唯一构造点**（main 与契约腿共用）：抄两份就等于给形状坑留第二条路。
+
+    `extra`（r180）只允许经本函数并入，不在 main 里就地 `payload[k]=...`——
+    构造点分裂一处，下一轮的形状对账就少一面。
 
     声明位用 `na`（不是 blind_or_na）——`ledger_age_check.declared_na()` 只认顶层键
     ("blind","na","unverified")，认不出形状 ⇒ 整把龄期尺判 NA-UNKNOWN、rc=2 未验。
@@ -152,13 +193,15 @@ def build_payload(rows, blind):
         dist[str(r.get("class"))] = dist.get(str(r.get("class")), 0) + 1
     bits = {k: sum(1 for r in peers_rows if r.get(k))
             for k in ("api_spec", "guide", "contributing", "docs_site")}
-    return {"generated_by": "_test/peer_docs_probe.py", "denominator": len(PEERS),
-            "rows": rows, "na": blind, "class_dist": dist,
-            "scope": "class_dist/bit_counts/na 只数 peers 行；self 单列 self_class",
-            "self_class": self_row.get("class"), "bit_counts": bits,
-            "note": "四类位＝API 规范 / 教程 / 贡献指南 / 独立文档区；"
-                    "0/4 只在取数面完整时成立，失明一律单列 unverified 不折算成零",
-            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    payload = {"generated_by": "_test/peer_docs_probe.py", "denominator": len(PEERS),
+               "rows": rows, "na": blind, "class_dist": dist,
+               "scope": "class_dist/bit_counts/na 只数 peers 行；self 单列 self_class",
+               "self_class": self_row.get("class"), "bit_counts": bits,
+               "note": "四类位＝API 规范 / 教程 / 贡献指南 / 独立文档区；"
+                       "0/4 只在取数面完整时成立，失明一律单列 unverified 不折算成零",
+               "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    payload.update(extra or {})
+    return payload
 
 
 def shape_contract(payload):
@@ -231,8 +274,38 @@ def run_selftest():
     wrong = shape_contract({"denominator": 16, "rows": [], "blind_or_na": []})
     if wrong[1] != "unknown":
         bad.append("契约腿失效：错键名 blind_or_na 被判成 %s ⇒ 这条腿抓不到自己要吃的那个坑" % (wrong,))
-    print("PEER-DOCS-SELFTEST-%s（正向 1 + 反例 4 + 恒真守卫 + 跨判据形状契约 3 条，分母名册 %d 仓）"
-          % ("PASS" if not bad else "FAIL: " + "; ".join(bad), len(PEERS)))
+    # 增量合并六条（r180 一手代价）：`--repo` 补采**不得**把台账写成子集。
+    n_legs = 0
+    ROS = {"a/b", "c/d", "e/f"}
+    SELF = "self（心屿 MindIsle 本仓）"
+    old_full = [{"repo": s, "class": "2/4"} for s in sorted(ROS)] + [{"repo": SELF, "class": "4/4"}]
+    m1, p1 = merge_rows(old_full, [{"repo": "a/b", "class": "3/4"}, {"repo": SELF, "class": "4/4"}], ROS)
+    n_legs += 1
+    if len(m1) != 4 or p1:
+        bad.append("合并腿① 补采 1 仓后端上应是 3 仓 + self（实=%d 行，问题=%s）⇒ 子集冒充全量" % (len(m1), p1))
+    n_legs += 1
+    if next(r for r in m1 if r["repo"] == "a/b")["class"] != "3/4":
+        bad.append("合并腿② 被补的那行没换新 ⇒ 合并没生效")
+    n_legs += 1
+    if next(r for r in m1 if r["repo"] == "c/d")["class"] != "2/4":
+        bad.append("合并腿③ 没被补的行被丢了 ⇒ 承数缺失，等于用半面子盖全量")
+    n_legs += 1
+    m2, p2 = merge_rows([{"repo": "a/b", "class": "2/4"}], [{"repo": "a/b", "class": "3/4"}], ROS)
+    if not p2:
+        bad.append("合并腿④ 存量不足名册却没点名（实=%d 行）⇒ 分母会说谎" % len(m2))
+    n_legs += 1
+    m3, p3 = merge_rows(old_full, [{"repo": "zzz/off-roster", "class": "0/4"}], ROS)
+    if not p3:
+        bad.append("合并腿⑤ 名册外仓混进行集没被点名 ⇒ 分母两侧不同源")
+    n_legs += 1
+    off = [x for x in ("a/b", "nope/not-in-roster") if x not in ROS]
+    if off != ["nope/not-in-roster"]:
+        bad.append("合并腿⑥ 名册外的 --repo 值取不出来 ⇒ main 里那条过滤会静默剩空目标集"
+                   "（旧写法 `if x in targets` 过滤后拼错一个 slug＝只采 self，再整份盖台账）")
+    print("PEER-DOCS-SELFTEST-%s（本轮新增的增量合并桩 %d 条，条数自印；"
+          "更早那批桩沿用 if/bad.append 原写法**未计数** ⇒ 总数不在正文抄，抄过就漂（r180 记）。"
+          "分母名册 %d 仓）"
+          % ("PASS" if not bad else "FAIL: " + "; ".join(bad), n_legs, len(PEERS)))
     return 1 if bad else 0
 
 
@@ -246,9 +319,18 @@ def main():
     a = ap.parse_args()
     if a.selftest:
         return run_selftest()
-    targets = [r["repo"] for r in PEERS]
+    roster = [r["repo"] for r in PEERS]
+    targets = list(roster)
     if a.repo:
-        targets = [x for x in a.repo.split(",") if x in targets] or targets[:0]
+        asked = [x.strip() for x in a.repo.split(",") if x.strip()]
+        off_roster = [x for x in asked if x not in roster]
+        if off_roster:
+            # 名册外仓混进来会改分母 ⇒ 拒采（旧写法 `if x in targets` 过滤后剩下空列表，
+            # 于是「拼错一个 slug」= 安静地只采 self 一行，再整份盖掉台账）。
+            print("PEER-DOCS-ENV: --repo 给了名册外的仓 %s（名册=PEERS %d 仓）⇒ 不采数也不落盘"
+                  % (",".join(off_roster), len(roster)))
+            return 2
+        targets = asked
     rows, blind = [], []
     if a.offline:
         rows = [{"repo": s, "class": "NA-DECLARED：--offline 未取数", "blind": "offline"} for s in targets]
@@ -262,6 +344,23 @@ def main():
             rows.append(r)
             time.sleep(1.2)                                 # 错峰：连打 rest 端点会被限流
     rows.append(self_only())
+    # 增量合并（r180）：补采两仓**不许**把台账写成两仓。见 merge_rows 的一手代价。
+    merged_from = ""
+    if a.repo and a.json and Path(a.json).exists():
+        try:
+            old = json.loads(Path(a.json).read_text("utf-8"))
+            old_rows, merged_from = old.get("rows"), old.get("ts", "无")
+        except Exception as e:                              # noqa: BLE001
+            old_rows = None
+            print("PEER-DOCS-ENV: 存量台账读不动（%s）⇒ 不合并" % type(e).__name__)
+        rows, problems = merge_rows(old_rows, rows, set(roster))
+        if problems:
+            print("PEER-DOCS-UNVERIFIED: 增量合并不可信 ⇒ **拒绝落盘**（把子集写成全量就是造假）")
+            for pb in problems:
+                print("   · " + pb)
+            return 2
+    # 失明/blind 从**最终行集**现算：合并模式下存量行也要过同一把尺，不能只报本轮新采的。
+    blind = []
     for r in rows:
         if str(r.get("class", "")).startswith(("unverified", "NA-DECLARED")):
             blind.append("%s(%s)" % (r["repo"], r.get("class")))
@@ -279,7 +378,8 @@ def main():
     # ("blind","na","unverified") 三个顶层键，认不出形状 ⇒ 整把龄期尺判 NA-UNKNOWN、rc=2 未验。
     # r122 我就是用了 blind_or_na 把那条**常驻判据**打成的未验（一手：declared_na() 直查返回 (None,"unknown")），
     # 所以这里把形状契约写成断言（见 _shape_contract），而不是靠人记得键名。
-    payload = build_payload(rows, blind)
+    payload = build_payload(rows, blind,
+                            {"merged_from_ts": merged_from} if merged_from else None)
     # 落盘前的形状自断（r126 把契约从 selftest 挪到**写路径**上）：认不出就不落盘，
     # 免得一份形状违规的台账先污染目录、再由下一轮的龄期尺把整尺打成未验。
     dec, kind = shape_contract(payload)

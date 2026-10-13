@@ -51,7 +51,12 @@ CONTRACT = ".ci/contract.json"
 # 文件名尾部的采集日期：`peer-a11y-2026-09-27.json` → 族名 `peer-a11y`、日期 2026-09-27。
 # 分隔符 `-` 与 `.` 都认（`benchmark-metrics-r95.2026-10-04.json` 用 `.`）；锚定 `.json` 之前，
 # 所以中间出现的数字段不会被误当日期。sub 时连同分隔符一起剥 ⇒ 族名干净。
-TRAIL_DATE_RE = re.compile(r"[-.](\d{4})-(\d{2})-(\d{2})(?=\.json$)")
+# r180：本仓台账名有两种尾巴 —— `-YYYY-MM-DD.json` 与 `-YYYY-MM-DD-rNNN.json`（带轮次的当日重采）。
+# 旧写法只认前者，于是每个带轮次号的件都：① 文件名日期读不出（退回正文键，正文没键就判「无日期」红），
+# ② 族名剥不掉日期而**自成一族** —— 正是本函数 docstring 里已经修过一次的那个毛病从侧门复发。
+# 一手：r179 把 `peer-quality-tooling-2026-10-14-r179.json`（探针没写 ts 键）提交入库后，
+# `ledger_age_check` 从 PASS 转 FAIL，红因写着「无候选时间戳键」，而日期就明摆在文件名里。
+TRAIL_DATE_RE = re.compile(r"[-.](\d{4})-(\d{2})-(\d{2})(?:-r\d+)?(?=\.json$)")
 TS_KEYS = ("taken_at", "ts", "generated_at", "as_of")
 
 
@@ -309,6 +314,14 @@ def selftest():
        "peer-quality-tooling")
     eq("族名不剥中间的 r 号段", stem_of("benchmark-metrics-r95.2026-10-04.json"),
        "benchmark-metrics-r95")
+    # r180 尾巴带轮次号的台账名（一手：r179 提交后本尺由 PASS 转 FAIL，红因写「无候选时间戳键」，
+    # 而日期就在文件名里 ⇒ 假缺口。三条腿各钉一个失效面，缺一就成了"改完没人能证明改对"）
+    eq("日期后面带轮次号的名字也读得出日期",
+       parse_named_date("peer-quality-tooling-2026-10-14-r179.json"), date(2026, 10, 14))
+    eq("轮次号尾巴一起剥掉 ⇒ 同一探针的件不再自成一族",
+       stem_of("peer-quality-tooling-2026-10-14-r179.json"), "peer-quality-tooling")
+    eq("轮次号必须是数字：`-rNNN` 这种尾巴不得被当成日期段",
+       parse_named_date("peer-x-2026-10-14-rNNN.json"), None)
     eq("ISO 带 Z 的时间戳能落成日期", parse_iso_ts("2026-10-05T02:11:09Z"), date(2026, 10, 5))
     eq("fuse 从本仓契约真读出来（是个 int，不是抄的）",
        isinstance(read_fuse(str(ROOT))[0], int), True)
@@ -339,6 +352,18 @@ def selftest():
     globals()["TRAIL_DATE_RE"] = keep
     eq("还原后重新取到日期（证明上面动的是尺、不是期望值）",
        parse_named_date("peer-a11y-2026-09-27.json"), date(2026, 9, 27))
+    # r180 变异体：把「轮次号可选尾巴」那一段摘回旧写法 ⇒ 带轮次号的名字必须读不出日期，
+    # 且族名必须重新被拆成一轮一族。这条腿证明"新面真的在咬"，也钉住旧形态复现时会立刻被看见。
+    globals()["TRAIL_DATE_RE"] = re.compile(r"[-.](\d{4})-(\d{2})-(\d{2})(?=\.json$)")
+    eq("变异体 旧正则下轮次号尾巴读不出日期（= r179 提交后那条假「无日期」红的成因）",
+       parse_named_date("peer-quality-tooling-2026-10-14-r179.json"), None)
+    eq("变异体 旧正则下轮次号件自成一族（一族拆多族从侧门复发）",
+       stem_of("peer-quality-tooling-2026-10-14-r179.json"), "peer-quality-tooling-2026-10-14-r179")
+    globals()["TRAIL_DATE_RE"] = keep
+    eq("还原后轮次号件重新读到日期且归回本族",
+       (parse_named_date("peer-quality-tooling-2026-10-14-r179.json"),
+        stem_of("peer-quality-tooling-2026-10-14-r179.json")),
+       (date(2026, 10, 14), "peer-quality-tooling"))
     eq("变异体 非法日期 2026-13-45 ⇒ None（不得回落到 1 月 1 日）",
        parse_named_date("peer-x-2026-13-45.json"), None)
     eq("变异体 非日期串 ⇒ None（不得读成 0 龄）", parse_iso_ts("not-a-date"), None)
