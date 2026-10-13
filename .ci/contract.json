@@ -114,7 +114,7 @@
       "cost_source": "measured",
       "priority": 1,
       "priority_source": "keyword",
-      "_why": "同步红线（src/ → deploy/xinyu/ SHA256 三类归零）。曾差点把带缺陷的引擎部署上线。"
+      "_why": "同步红线双面（r172 起默认 --face both）：工作树面 src/ → deploy/xinyu/ SHA256 三类归零 + 提交面 HEAD blob 双向对账。一手反例：data/emotion-lexicon.js 磁盘 cmp 相同而 HEAD 两侧 blob 不同（5068 vs 4976），只比工作树时这条永久隐形，而部署取的正是提交面。曾差点把带缺陷的引擎部署上线。"
     },
     {
       "name": "size-budget-firstscreen",
