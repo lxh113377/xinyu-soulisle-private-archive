@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""断点标尺棘轮（r129 新增 · F-R-1）：宽度断点必须落在唯一标尺内，且不得漂移
+"""断点标尺棘轮（r129 新增 · F-R-1 / r168 接线并修自噬）：宽度断点必须落在唯一标尺内，且不得漂移
 
 为什么做这条判据（F-R-1 体检红项的落点）：
 2026-10-12 Step 2.5 前端专项实测出——本仓零构建纯 CSS，宽度断点散落
@@ -25,9 +25,25 @@
 **不计入** —— 它们不是宽度标尺的成员，混进来会让分母失真。
 
 退出码：0=BREAKPOINT-SCALE-PASS 1=任一红 2=环境未验（读不到 CSS 面，不得声称已验）
+
+## r168 两处修（本件此前是 G16 点名的孤儿判据：已入库、已写文档，电池与 CI 两头零执行）
+
+1. **自噬面**：第一版 `--selftest` 用 `primary.read_text()` 取备份后**直接改写权威源**
+   `src/css/style.css` 做变异，靠 `finally` 写回。⇒ 变异与还原之间任何中断（Ctrl-C / 崩溃 /
+   并发写）都会把全站样式表留在残缺态。2026-10-13 08:36 实测该面确实处于被清空态
+   （`src/css/style.css` 与 `voice-call.css` 同时 0 字节，wt oid=空块 e69de29），
+   当时 `--selftest` 读到空面后把空串写回，只是没造成新损失。**风险不靠运气承担**：
+   现在变异全部在 `tempfile` 副本上进行，并在收尾**逐文件比对权威源字节是否被改过**，
+   改过即 SELFTEST-FAIL（这条腿就是本修的牙）。
+2. **空面判据失真**：style.css 为 0 字节时 B1 恒假、B3 因 `counts={}` 恒真，
+   于是「权威源被清空」这一环境事实被读成「产品违规 + 一项 vacuous PASS」。
+   现在 `face_problem()` 先行，空面/零分母一律 rc=2 未验并点名，不自相矛盾。
+   配反向腿：把副本清空必须得 rc=2 而不是 rc=1。
 """
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -50,10 +66,11 @@ def check(name, ok, detail=""):
     print(f"  {'PASS' if ok else 'FAIL'}  {name}" + (f"  -> {detail}" if detail else ""))
 
 
-def css_files():
-    if not CSS_DIR.is_dir():
+def css_files(css_dir=CSS_DIR):
+    d = Path(css_dir)
+    if not d.is_dir():
         return None
-    return sorted(p for p in CSS_DIR.glob("*.css"))
+    return sorted(p for p in d.glob("*.css"))
 
 
 def declared_scale(text):
@@ -73,17 +90,30 @@ def width_counts(files):
     return out
 
 
-def run_checks():
+def face_problem(files, primary):
+    """被检面对不对得起这把尺 ⇒ 不对得起就返回原因（判据不得据空面出结论）。"""
+    if files is None:
+        return "src/css 不在预期位置"
+    if not files:
+        return "src/css 下零个 .css 文件 ⇒ 分母为空，不得读成「没有断点」"
+    if not primary.exists():
+        return f"读不到 {primary}"
+    if primary.stat().st_size == 0:
+        return (f"{primary.name} 为 0 字节 ⇒ 权威样式表被清空（在途写入或事故），"
+                "此时 B1 恒假、B3 因计数为空而恒真，任何结论都是假的")
+    if sum(p.stat().st_size for p in files) == 0:
+        return "src/css 全部为 0 字节 ⇒ 整个被检面为空"
+    return None
+
+
+def run_checks(files, primary):
+    """前提：face_problem() 已判过（面可信）。返回本次独立快照的 results。"""
     # ⚠️ results 必须在这里清空。第一版把它当模块级累加器、check() 只追加不重置，
     # 于是「变异 → 还原 → 复跑原样」里的**最后那次复跑读到的是历次运行的累积结果**，
     # 把早已撤销的变异红项又数了一遍 ⇒ 自测误报「还原后仍判红」。
     # 同族：api_contract_check 篡改⑧ 硬编码旧计数串导致变异腿空操作。
     # 正解：每次 run_checks() 都是一次独立快照。
     del results[:]
-    files = css_files()
-    primary = CSS_DIR / "style.css"
-    if not primary.exists():
-        return None
     text = primary.read_text(encoding="utf-8", errors="replace")
 
     # B1 唯一标尺已声明
@@ -117,65 +147,107 @@ def run_checks():
     return results
 
 
+def judge(css_dir=CSS_DIR):
+    """一把尺的三个出口：(rc, 红项名单)。rc=2 表示被检面对不起这把尺。"""
+    files = css_files(css_dir)
+    primary = Path(css_dir) / "style.css"
+    problem = face_problem(files, primary)
+    if problem:
+        return 2, [f"ENV: {problem}"]
+    res = run_checks(files, primary)
+    red = [n for n, ok, _ in res if not ok]
+    return (1 if red else 0), red
+
+
+def _snapshot(css_dir):
+    """被检面的逐文件字节指纹（副本作业前后各取一次，证权威源没被碰）。"""
+    out = {}
+    for p in css_files(css_dir) or []:
+        out[p.name] = p.stat().st_size
+    return out
+
+
 def selftest():
-    """变异腿：三条判据各自必须能被打翻。"""
-    files = css_files()
-    primary = CSS_DIR / "style.css"
-    if not primary.exists():
-        print("SELFTEST-FAIL: 读不到 src/css/style.css，无法证伪")
+    """变异腿：三条判据各自必须能被打翻，且**全程不碰权威源**。"""
+    pristine = _snapshot(CSS_DIR)
+    if not pristine:
+        print("SELFTEST-FAIL: src/css 无可读面，无法证伪（不得据此声称变异腿已过）")
         return 2
-    backup = primary.read_text(encoding="utf-8")
-    other = [p for p in files if p != primary]
-    other_backup = {p: p.read_text(encoding="utf-8") for p in other}
+    tmp = Path(tempfile.mkdtemp(prefix="breakpoint_scale_"))
     bad = []
-
-    def mutate(path, old, new):
-        t = path.read_text(encoding="utf-8")
-        if old not in t:
-            raise AssertionError(f"变异腿空操作：{path.name} 里找不到 {old!r}")
-        path.write_text(t.replace(old, new, 1), encoding="utf-8")
-
     try:
-        # B1：抹掉标尺声明
-        m = SCALE_RE.search(backup)
-        if not m:
-            raise AssertionError("变异腿空操作：原文件里本就找不到标尺声明 ⇒ B1 恒真")
-        # ⚠️ 必须锚定**整行声明**，不能只锚 @breakpoint-scale 这四个字母：
-        # 它在文件里出现两次（正文说明里也提了一次），replace(...,1) 会打到说明那处，
-        # 真声明纹丝不动 ⇒ 变异没打中却以为自己打中了。
-        decl_line = next(l for l in backup.splitlines() if SCALE_RE.search(l))
-        primary.write_text(backup.replace(decl_line, "/* @breakpoint-scale REMOVED */"), encoding="utf-8")
-        r = run_checks()
-        if all(ok for _, ok, _ in r):
-            bad.append("B1 变异腿：抹掉标尺声明后仍全绿 ⇒ B1 恒真")
-    except AssertionError as e:
-        bad.append(str(e))
+        for name in pristine:
+            shutil.copyfile(CSS_DIR / name, tmp / name)
+        primary = tmp / "style.css"
+        others = [p for p in css_files(tmp) if p != primary]
+        backup = {p: p.read_bytes() for p in css_files(tmp)}
+
+        def restore():
+            for p, b in backup.items():
+                p.write_bytes(b)
+
+        def mutate(path, old, new, label):
+            t = path.read_text(encoding="utf-8")
+            if old not in t:
+                raise AssertionError(f"变异腿空操作：{path.name} 里找不到 {old!r}（{label}）")
+            path.write_text(t.replace(old, new, 1), encoding="utf-8")
+
+        # 腿 1 · B1：抹掉标尺声明 ⇒ 必须判红
+        try:
+            text = primary.read_text(encoding="utf-8")
+            m = SCALE_RE.search(text)
+            if not m:
+                raise AssertionError("变异腿空操作：style.css 里本就找不到标尺声明 ⇒ B1 恒真")
+            # ⚠️ 必须锚定**整行声明**，不能只锚 @breakpoint-scale 这四个字母：
+            # 它在文件里出现两次（正文说明里也提了一次），replace(...,1) 会打到说明那处，
+            # 真声明纹丝不动 ⇒ 变异没打中却以为自己打中了。
+            decl_line = next(l for l in text.splitlines() if SCALE_RE.search(l))
+            primary.write_text(text.replace(decl_line, "/* @breakpoint-scale REMOVED */"),
+                               encoding="utf-8")
+            rc, red = judge(tmp)
+            if rc != 1 or not any(n.startswith("B1") for n in red):
+                bad.append(f"B1 变异腿失效：抹掉标尺声明后 rc={rc} 红项={red}（期望 rc=1 且点名 B1）")
+        except AssertionError as e:
+            bad.append(str(e))
+        finally:
+            restore()
+
+        # 腿 2 · B2/B3：在 voice-call.css 里私造一个 850px 断点 ⇒ 必须判红
+        if others:
+            try:
+                mutate(others[0], "}", "}\n@media(max-width:850px){.x{color:red}}", "B2/B3")
+                rc, red = judge(tmp)
+                if rc != 1:
+                    bad.append(f"B2/B3 变异腿失效：私造 850px 断点后 rc={rc} 红项={red}（期望 rc=1）")
+            except AssertionError as e:
+                bad.append(str(e))
+            finally:
+                restore()
+        else:
+            bad.append("腿 2 未执行：src/css 除 style.css 外没有第二个 CSS 文件（分母异常）")
+
+        # 腿 3 · 空面反向腿（r168 新增）：把副本清空 ⇒ 必须是 rc=2 未验，不得判红
+        try:
+            primary.write_bytes(b"")
+            rc, red = judge(tmp)
+            if rc != 2:
+                bad.append(f"空面门失效：style.css 清空后 rc={rc}（期望 2 未验；判红会把环境事故"
+                           "写成产品违规，同时 B3 因计数为空而 vacuous PASS）")
+        finally:
+            restore()
+
+        # 腿 4 · 还原后原样必须全绿
+        rc, red = judge(tmp)
+        if rc != 0:
+            bad.append(f"还原后仍非绿：rc={rc} 红项={red}（变异没撤销干净）")
     finally:
-        primary.write_text(backup, encoding="utf-8")
-        for p, t in other_backup.items():
-            p.write_text(t, encoding="utf-8")
+        shutil.rmtree(tmp, ignore_errors=True)
+        after = _snapshot(CSS_DIR)
+        if after != pristine:
+            bad.append(f"自噬腿：--selftest 改动了权威源 src/css（前={pristine} 后={after}）")
 
-    # B2/B3：在 voice-call.css 里私造一个 850px 断点
-    try:
-        target = other[0]
-        mutate(target, "}", "}\n@media(max-width:850px){.x{color:red}}", )
-        r = run_checks()
-        names = {n: ok for n, ok, _ in r}
-        if all(names.values()):
-            bad.append("B2/B3 变异腿：私造 850px 断点后仍全绿 ⇒ B2/B3 恒真")
-    except AssertionError as e:
-        bad.append(str(e))
-    finally:
-        for p, t in other_backup.items():
-            p.write_text(t, encoding="utf-8")
-
-    # 还原后原样必须全绿
-    r = run_checks()
-    red = [n for n, ok, _ in r if not ok]
-    if red:
-        bad.append(f"还原后仍判红（变异没撤销干净）：{red}")
-
-    print("SELFTEST-PASS: B1 抹标尺、B2/B3 私造新断点 两类变异腿均被打翻、还原后原样零红"
+    print("SELFTEST-PASS: B1 抹标尺、B2/B3 私造新断点、空面必落未验 三类变异腿各自打翻，"
+          "还原后原样零红，且权威源 src/css 逐文件字节数未变"
           if not bad else "SELFTEST-FAIL: " + "; ".join(bad))
     return 1 if bad else 0
 
@@ -183,15 +255,12 @@ def selftest():
 def main():
     if "--selftest" in sys.argv:
         sys.exit(selftest())
-    if css_files() is None:
-        print("BREAKPOINT-SCALE-ENV-UNVERIFIED: src/css 不在预期位置，不得声称已验")
+    rc, red = judge()
+    if rc == 2:
+        print(f"BREAKPOINT-SCALE-ENV-UNVERIFIED: {red[0]}，不得声称已验")
         return 2
-    if run_checks() is None:
-        print("BREAKPOINT-SCALE-ENV-UNVERIFIED: 读不到 style.css，不得声称已验")
-        return 2
-    red = [n for n, ok, _ in results if not ok]
     counts = width_counts(css_files())
-    if red:
+    if rc == 1:
         print(f"合计 {len(results)} 项，红 {len(red)}")
         for n in red:
             print(f"  🔴 {n}")

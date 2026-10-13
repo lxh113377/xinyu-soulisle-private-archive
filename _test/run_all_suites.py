@@ -377,6 +377,10 @@ SUITES = [
     # 而是因为此前 src/js 的 parse 错只能被浏览器判据间接发现，报出来是"断言超时"而不是文件名。
     ("js_syntax", [sys.executable, "_test/js_syntax_check.py"]),
     ("js_syntax_selftest", [sys.executable, "_test/js_syntax_check.py", "--selftest"]),
+    # r129 写了这条判据也写了文档，却没接进电池 ⇒ r168 入场时 G16 点名它是孤儿判据
+    # （已入库、文档在册，电池与 CI 两头零执行 = 写进文档也不算接线）。
+    ("breakpoint_scale", [sys.executable, "_test/breakpoint_scale_check.py"]),
+    ("breakpoint_scale_selftest", [sys.executable, "_test/breakpoint_scale_check.py", "--selftest"]),
     ("storage_resilience", [sys.executable, "_test/storage_resilience_check.py"]),
     ("storage_resilience_selftest", [sys.executable, "_test/storage_resilience_check.py", "--selftest"]),
     # r70 资源普查：把"该按什么分桶并行"从报告里的一句话变成有分母有恒等式的在册读数。
