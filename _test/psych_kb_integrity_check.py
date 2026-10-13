@@ -586,7 +586,8 @@ def main():
               % (len(problems), stats["cards"], stats["index_rows"]))
         return 1
     print("PSYCH-KB-INTEGRITY-PASS: 卡 %d 条零悬空零孤岛｜索引双向差集 0｜非 E 级全部带来源与入库行"
-          "｜关联边 %d｜D 级 %d 条人工抽查提示位待跑" % (stats["cards"], stats["edges"], stats["d_total"]))
+          "｜关联边 %d｜D 级 %d 条（D 级人工抽查已于 2026-10-13 跑完 40/40 台账见 索引.md 变更记录末三条；"
+          "新增 D 级卡或改 D 级定级时须重跑）" % (stats["cards"], stats["edges"], stats["d_total"]))
     return 0
 
 

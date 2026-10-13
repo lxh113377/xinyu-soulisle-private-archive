@@ -11,7 +11,7 @@
 
 E 级（未查证）条目不入产品件 —— 库规 README §2：E 级禁作事实依据。重建时排除并计数。
 --check：重建并与磁盘现有产物逐字节比对（不带时间戳，输出确定性的原因）。
---selftest：判据非恒真的取证（11 腿，含 1 条真面变异腿）。夹具全部建在系统临时目录，
+--selftest：判据非恒真的取证（13 腿，含 2 条真面变异腿）。夹具全部建在系统临时目录，
             绝不读写仓库面；正例腿另附「真面 --check 必须 PASS」+「真产物改一个字符必须判不一致」。
 用法：python _test/psych_kb_build.py [--check|--selftest]
 退出码：0=PASS 1=FAIL 2=输入面缺失
@@ -27,11 +27,24 @@ ROOT = Path(__file__).resolve().parents[1]
 KB_DIR = ROOT / "交付物" / "心理学知识库"
 OUT = ROOT / "src" / "data" / "psych-kb.js"
 KB_VERSION = "v2.0"          # 与 README 版本行同步；规范本体改动时人工 bump
-BUILT_TAG = "r167-KB11"
+BUILT_TAG = "r167-KB11b"       # b = 截断保全免责短语（r167-KB11b 立）
 LEVELS = ("A", "B", "C", "D", "E")
 SHIP_LEVELS = ("A", "B", "C", "D")   # E 级不入产品件
 CONTENT_MAX = 320            # 注入用内容截断（句界截断，超长条目保前几句即可撑起 60-120 字回复）
+BOUNDARY_MAX = 60            # 免责短语自身的长度上限（超此值判为正则咬多了 -> fail-fast，不静默灌长段）
 MAX_RELATED = 4              # 每条目自动提取的情绪关联上限
+
+# README §7：治疗类实证条目内须带「不构成医疗/诊断建议」边界句（知识免责，非产品禁令）。
+# 该句在卡面多写在内容末尾 => 会被 CONTENT_MAX 截断静默丢弃，注入 LLM 时就只剩研究结论、
+# 少了免责信号。故截断前先把它摘出来，截断后若不在正文里则前置到句首（r167-KB11b 立）。
+# 收紧条件（两道，缺一即误抓）：
+#  ①必须同时出现免责动词与医疗/诊断类名词 —— 否则「preprint 单独不作依据」这类证据状态声明
+#    会被误当医疗免责句带进提示词；
+#  ②免责名词（建议/依据/判断/结论）**必填** —— 否则「机制与延伸（供话术底、不作诊断）：睡眠剥夺后
+#    杏仁核对负性刺激反应增强」会整句被当成免责句前置，而它前半段是机制陈述、不是免责。
+BOUNDARY_RE = re.compile(
+    r"(?:不构成|非诊断|不作)[^。；\n]{0,16}(?:治疗|医疗|诊断|处方|心理干预|临床)[^。；\n]{0,6}?(?:建议|依据|判断|结论)"
+)
 
 ENTRY_RE = re.compile(r"^### 条目 (PSY-[A-Z]+-\d{3})｜(.+?)\s*$")
 FIELD_RE = re.compile(r"^[-\s]*(可信度|一句话|内容)：(.*)$")
@@ -64,6 +77,41 @@ def trim_sentence(text, limit):
     cut = text[:limit]
     best = max(cut.rfind(p) for p in ("。", "！", "？", "；"))
     return cut[: best + 1] if best >= int(limit * 0.4) else cut
+
+
+def extract_boundary(text, eid=""):
+    """摘出卡内的医疗免责短语（README §7）。找不到返回 None。
+
+    只取免责短语本身，不连后面解释性的逗句一起搬（否则「本卡不构成治疗建议，所有措辞须以…
+    为唯一 A/B 判据」会把半段工程说明灌进提示词）。长度超 BOUNDARY_MAX 判为正则咬多了 -> fail-fast。
+    """
+    for seg in re.split(r"(?<=。)|(?<=；)", text):
+        m = BOUNDARY_RE.search(seg)
+        if not m:
+            continue
+        head = seg[: m.end()]
+        tail = seg[m.end():]
+        stop = re.search(r"[。，、/（(]", tail)
+        clause = (head + (tail[: stop.start()] if stop else tail)).strip(" ；")
+        if len(clause) > BOUNDARY_MAX:
+            fail("条目 %s 的免责短语长 %d 字（> %d）：正则咬多了，请修 BOUNDARY_RE 或该卡措辞"
+                 % (eid or "?", len(clause), BOUNDARY_MAX))
+        return clause + "。"
+    return None
+
+
+def keep_boundary(raw_content, eid=""):
+    """截断 + 免责短语保全。返回注入用 content。
+
+    语义：先在**未截断**原文里摘免责短语，再做句界截断；若摘出的短语在截断后已不存在，
+    则前置到句首。前置而非后置，是因为后置会被下一次长度变化再次截掉，前置则位置恒定、
+    且提示词里免责信号出现在研究结论之前。
+    """
+    bnd = extract_boundary(raw_content, eid)
+    body = trim_sentence(raw_content, CONTENT_MAX)
+    if not bnd or bnd in body:
+        return body
+    return bnd + body
 
 
 def parse_entries(kb_dir=KB_DIR):
@@ -112,7 +160,7 @@ def parse_entries(kb_dir=KB_DIR):
         if not e["summary"] or not e["content"]:
             fail("条目 %s 缺一句话或内容字段" % e["id"])
         counts[e["level"]] += 1
-        e["content"] = trim_sentence(e["content"], CONTENT_MAX)
+        e["content"] = keep_boundary(e["content"], e["id"])
         hay = e["title"] + "，" + e["summary"] + e["content"]
         e["rel"] = [emo for emo, kws in EMO_KW.items()
                     if any(k in hay for k in kws)][:MAX_RELATED]
@@ -181,7 +229,7 @@ def payload_of(text):
 
 
 def selftest():
-    """判据非恒真的取证：正例 5 条 + 该红的 6 条（含真面变异腿）= 11 腿。夹具只落系统临时目录。
+    """判据非恒真的取证：正例 6 条 + 该红的 7 条（含 2 条真面变异腿）= 13 腿。夹具只落系统临时目录。
 
     临时件不做删除：本仓禁用磁盘直删（lessons-p0「Windows 删除必须走回收站」），
     系统临时目录由 OS 回收，脚本内 rmtree 反而会撞那条机械护栏。
@@ -221,6 +269,36 @@ def selftest():
         c = entries[0]["content"]
         if len(c) > CONTENT_MAX or c[-1] not in "。！？；":
             return False, "截断后 len=%d 末字符=%r" % (len(c), c[-1:])
+        return True, ""
+
+    def ok_boundary_kept():
+        """免责短语在内容末尾时，必须被摘出并前置到句首（r167-KB11b 立）。"""
+        filler = "这是一段足够长的中文内容用来把免责短语挤到截断线之外。" * 20
+        raw = filler + "边界句：本条为证据综述，不构成治疗建议。"
+        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-014", "带免责", "B", "摘要", raw)})
+        entries, counts, n_files = parse_entries(d)
+        c = entries[0]["content"]
+        # 对照：未截断原文里免责短语确实在很靠后的位置
+        if raw.index("不构成治疗建议") < len(raw) - 40:
+            return False, "夹具前提不成立：免责短语本就在末尾"
+        if "不构成治疗建议" not in c:
+            return False, "免责短语在产物里丢了：len=%d 头40=%r" % (len(c), c[:40])
+        if not c.startswith("边界句：本条为证据综述，不构成治疗建议。"):
+            return False, "免责短语未前置到句首：头40=%r" % c[:40]
+        return True, ""
+
+    def red_boundary_lost_without_gate():
+        """变异腿：摘掉 keep_boundary（即回到本轮修复前的行为），免责短语必须复现丢失。
+
+        腿非恒真的证据 —— 若这步也「不丢」，说明夹具根本不触发截断，正例腿是装饰。
+        """
+        filler = "这是一段足够长的中文内容用来把免责短语挤到截断线之外。" * 20
+        raw = filler + "边界句：本条为证据综述，不构成治疗建议。"
+        legacy = trim_sentence(raw, CONTENT_MAX)          # 修复前行为：只截断，不保全
+        if "不构成治疗建议" in legacy:
+            return False, "变异腿失效：旧行为下免责短语竟然没丢，正例腿可能是装饰"
+        if "不构成治疗建议" not in keep_boundary(raw, "PSY-ZZ-015"):
+            return False, "keep_boundary 也没保住（变异腿通过但正例腿是假的）"
         return True, ""
 
     def ok_ship_zero_guard():
@@ -271,6 +349,8 @@ def selftest():
     leg("正例·单卡解析+情绪关联", ok_parse_one)
     leg("E 级构建期排除并计数", ok_e_excluded)
     leg("内容句界截断", ok_truncate)
+    leg("免责短语截断后仍前置到句首", ok_boundary_kept)
+    leg("摘掉保全逻辑免责句必丢（变异腿）", red_boundary_lost_without_gate)
     leg("全 E 面产物为空库（供 main 的红腿判定）", ok_ship_zero_guard)
     leg("缺可信度字段即停", red_missing_level)
     leg("条目撞号即停", red_dup_id)
@@ -290,7 +370,7 @@ def selftest():
                  "、".join(n for n, _ in failed)))
         sys.exit(1)
     entries, counts, _n = parse_entries()
-    print("PSYCH-KB-SELFTEST-PASS: %d/%d 腿（真面 %d 条 A%d B%d C%d D%d E排除%d｜变异腿咬合 1 处）"
+    print("PSYCH-KB-SELFTEST-PASS: %d/%d 腿（真面 %d 条 A%d B%d C%d D%d E排除%d｜变异腿咬合 2 处）"
           % (len(passed), len(results), len(entries), counts["A"], counts["B"], counts["C"],
              counts["D"], counts["E"]))
 
