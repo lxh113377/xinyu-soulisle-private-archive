@@ -133,6 +133,139 @@ class ChatControllerTest {
         verify(p3, never()).openStream(any(), any(), any());
     }
 
+    /**
+     * r168 新增：流式的**时序**行为（此前只验过「帧内容逐字不变 + 头在场」，没验过「边生成边下发」）。
+     *
+     * <p>为什么这条必须单独存在：摘掉 {@code ChatController} 里的 {@code out.flush()} 之后，
+     * 上面那条用例照绿（{@code render()} 把整条流读到底再比字符串），Tomcat 的 8 KiB 输出缓冲
+     * 会把几十字节的 SSE 帧攒着不发 ⇒ 界面表现为「等很久然后整段蹦出来」，
+     * 而对外叙事里那句「逐字流式」变成空头主张。构建期没有任何一把尺会为此变红。
+     *
+     * <p>做法：喂一个**只有被再次 read() 才产出下一块**的假上游（模拟模型边生成），
+     * 同时把写侧记成事件序列（W=一次 write、F=一次 flush）。真流式的充要形状是 W,F,W,F…；
+     * 并且断言「取第二块之前，客户端已经被 flush 过一次」——这句把顺序钉死，
+     * 防的是先攒完再一把 flush 的写法（那种写法事件序列是 W,W,F，也会被前一条断言抓到）。
+     */
+    @Test
+    @DisplayName("r168 流式必须逐块下发：每次 write 紧跟 flush，且第二块产出前第一块已下发（摘掉 out.flush() 必红）")
+    void streamFlushesPerChunk() throws Exception {
+        String c1 = "data: {\"choices\":[{\"delta\":{\"content\":\"我\"}}]}\n\n";
+        String c2 = "data: {\"choices\":[{\"delta\":{\"content\":\"在\"}}]}\n\n";
+        String c3 = "data: [DONE]\n\n";
+
+        Recorder sink = new Recorder();
+        Trickler up = new Trickler(new String[] {c1, c2, c3}, sink);
+        LlmProxy p = withKey();
+        when(p.openStream(any(), any(), any())).thenReturn(new LlmProxy.StreamResult(
+                200, "text/event-stream", up, null));
+
+        ResponseEntity<StreamingResponseBody> e = new ChatController(p)
+                .chat("{\"messages\":[{\"role\":\"user\",\"content\":\"讲个短故事\"}],\"stream\":true}");
+        e.getBody().writeTo(sink);
+
+        // ① 每写一块必紧跟一次 flush：W,F,W,F,W,F（少一个 F 就是攒着不发）
+        String seq = String.join("/", sink.events);
+        for (int i = 0; i < sink.events.size(); i++) {
+            String want = (i % 2 == 0) ? "W" : "F";
+            assertTrue(sink.events.get(i).startsWith(want),
+                    "第 " + i + " 个事件应为 " + want + " 开头，实际序列=" + seq
+                            + "（写与 flush 必须严格交替，否则 SSE 会被输出缓冲攒住）");
+        }
+        assertEquals(3, sink.writes, "上游给了 3 块，就该有 3 次 write，实际序列=" + seq);
+        assertEquals(sink.writes, sink.flushes, "write 与 flush 次数必须相等");
+
+        // ② 取第二块之前，客户端至少已经被 flush 过一次（真流式，不是攒完再吐）
+        assertTrue(up.secondReadSeenFlushes >= 1,
+                "上游产出第二块时客户端还没被 flush 过 ⇒ 首块被憋在缓冲区里，实际="
+                        + up.secondReadSeenFlushes);
+
+        // ③ 时序钉死之后，内容仍要逐字不变（与 streamAndFallback 同一口径，防只改形状不改内容）
+        assertEquals(c1 + c2 + c3, sink.body(), "SSE 帧必须一块不丢、一字不改");
+    }
+
+    /** 写侧记录仪：把 write/flush 记成事件序列，供时序断言使用。 */
+    private static final class Recorder extends java.io.OutputStream {
+        final java.util.List<String> events = new java.util.ArrayList<>();
+        final StringBuilder text = new StringBuilder();
+        int writes;
+        int flushes;
+        int lastFlushAt = -1;
+
+        @Override
+        public void write(int b) {
+            write(new byte[] {(byte) b}, 0, 1);
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) {
+            writes++;
+            events.add("W" + len);
+            text.append(new String(b, off, len, StandardCharsets.UTF_8));
+        }
+
+        @Override
+        public void flush() {
+            flushes++;
+            lastFlushAt = events.size();
+            events.add("F");
+        }
+
+        String body() {
+            return text.toString();
+        }
+    }
+
+    /** 只在被再次 read 时才产出下一块的假上游 —— 用它把「先下发、后取下一块」的时序逼出来。 */
+    private static final class Trickler extends java.io.InputStream {
+        private final String[] chunks;
+        private final Recorder sink;
+        private int index;
+        private int pos;
+        int secondReadSeenFlushes = -1;
+
+        Trickler(String[] chunks, Recorder sink) {
+            this.chunks = chunks;
+            this.sink = sink;
+        }
+
+        @Override
+        public int read() {
+            byte[] one = currentChunk();
+            if (one == null || pos >= one.length) {
+                return -1;
+            }
+            return one[pos++] & 0xff;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) {
+            if (index == 1 && pos == 0) {
+                secondReadSeenFlushes = sink.flushes;
+            }
+            byte[] src = currentChunk();
+            if (src == null) {
+                return -1;
+            }
+            int n = Math.min(src.length - pos, len);
+            System.arraycopy(src, pos, b, off, n);
+            pos += n;
+            if (pos >= src.length && index + 1 < chunks.length) {
+                index++;
+                pos = 0;
+            } else if (pos >= src.length) {
+                index = chunks.length;
+            }
+            return n;
+        }
+
+        private byte[] currentChunk() {
+            if (index >= chunks.length) {
+                return null;
+            }
+            return chunks[index].getBytes(StandardCharsets.UTF_8);
+        }
+    }
+
     @Test
     @DisplayName("r38 护栏：注入句被点名并在上行 messages 追加系统重申，正常句零改动；响应体两侧都逐字透传")
     void guardrailRewritesUpstreamOnly() throws Exception {
