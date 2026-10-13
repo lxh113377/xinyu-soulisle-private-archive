@@ -612,6 +612,43 @@ def blocks_next(blk, idx):
     return blk[idx + 1] if blk is not None and idx + 1 < len(blk) else None
 
 
+def head_rows(dir_path):
+    """对**提交面**复算 C1_HARD（逐件 `git show HEAD:_test/<名>` 再喂同一个 classify）。
+
+    立因（r174 一手）：本尺原来只读工作树，而基线是"提交进仓的形状数"——两者不同面。
+    实测：`dock_auto_check.py` 工作树有 8 处 500/600ms，HEAD 里只有 3 处 ⇒ 现读 C1=22 超基线 20，
+    红因其实是"**别人正在打字**"，不是任何一次提交让耦合变差。棘轮必须量它能归因的那一面。
+    返回 (提交面条数, 仅工作树存在的新件名列表, 失败原因)；取不到 ⇒ 由调用方判未验，**不得回落成工作树数**。
+    """
+    import subprocess
+    rows_head, new_files, errs = [], [], []
+    bat_head = battery_face()
+    for f in sorted(dir_path.glob("*.py")):
+        if f.name in SELF_NAMES:
+            continue
+        r = subprocess.run(["git", "show", "HEAD:_test/%s" % f.name],
+                           capture_output=True, cwd=str(ROOT), timeout=30)
+        if r.returncode != 0:
+            new_files.append(f.name)            # 未入库的新件：提交面上确实不存在
+            continue
+        try:
+            text = r.stdout.decode("utf-8", "replace")
+        except Exception as e:                   # noqa: BLE001
+            errs.append("%s(%s)" % (f.name, type(e).__name__))
+            continue
+        recs, _tot, err = classify(text, f.name)
+        if err:
+            errs.append("%s:%s" % (f.name, err))
+            continue
+        for x in recs:
+            x["face"] = "HEAD"
+            x["in_battery"] = (None if bat_head is None else f.name in bat_head)
+        rows_head.extend(recs)
+    if errs:
+        return None, new_files, "、".join(errs[:3])
+    return rows_head, new_files, None
+
+
 def battery_face():
     """哪些 `_test/*.py` 在电池里有执行位。取不到 ⇒ 返回 None，由调用方标未验（**不得**读成空集）。"""
     try:
@@ -888,9 +925,16 @@ def selftest():
     expect("指纹腿 行号变了键不变（评审账不锚行号）", review_gap(moved, {okk: {"sites": 1}})[0] == 1)
     # 真面自证：拿现读面跑一遍，账必须既无未评审也无陈旧（这条红了就是本轮台账没跟上树）
     rrows, _rt, _rb, _ru, _ri = scan_dir(TEST_DIR)
-    rcov, rmis, rstale, rmoot = review_gap(rrows)
+    hrows_st, hnew_st, herr_st = head_rows(TEST_DIR)
+    rcov, rmis, rstale, rmoot = review_gap(hrows_st if hrows_st is not None else rrows)
     expect("真面 现读 C1_HARD %d 件全部有评审结论（缺 %s）" % (rcov, rmis[:2]), not rmis)
     expect("真面 评审账与现读逐键等值（对不上 %s）" % (rstale[:2],), not rstale)
+    _hcov, _hmis, _hs, _hm = review_gap(rrows)
+    expect("两面条款腿 提交面未登记必须是工作树未登记的子集，且工作树多出的部分只能进单列位"
+           "（实测差集=%s）" % (sorted(set(_hmis) - set(rmis))[:2],),
+           set(rmis) <= set(_hmis))
+    expect("面自证腿 head_rows 取不到 ⇒ 返回 None/原因，调用方判未验（禁回落工作树数）",
+           (hrows_st is None) == bool(herr_st))
 
     RANKED = [("ux_guards_check.py", 7), ("rescan_shots_check.py", 3), ("data_rights_check.py", 2),
               ("clean_clone_check.py", 1), ("memory_recall_check.py", 1),
@@ -953,15 +997,27 @@ def main():
         return 2
     hard = c["C1_HARD"]
     hard_bat = sum(1 for r in rows if r["bucket"] == "C1_HARD" and r.get("in_battery"))
+    # r174：棘轮的比较面必须是**写不进去的那一面**（提交面），否则别人未入库的 hunk 能把本轮顶红。
+    hrows, head_new, head_err = head_rows(TEST_DIR)
+    hard_head = None if hrows is None else sum(1 for r in hrows if r["bucket"] == "C1_HARD")
     # 评审账合并进记录（写进 --json 台账），判据本身仍不猜意图：这里只是把**人工结论**挂在形状上。
     for r in rows:
         if r["bucket"] == "C1_HARD":
             ent = REVIEW.get("%s::%s" % (r["file"], r.get("stmt") or ""))
             r["verdict"] = ent["verdict"] if ent else None
-    covered, unreviewed, stale, mooted = review_gap(rows)
+    # r174：评审账也按提交面判——"未登记"是**已入库形状**的债；只在别人未入库 hunk 里出现的形状
+    # 记为"在途未登记"，出声但不判红（我方不能替别人 certify 他的代码，也不得把它算进本轮归因）。
+    if head_err:
+        print("TIMING-COUPLING-UNVERIFIED: 提交面复算取不到（%s）⇒ 无法判定棘轮是否被顶穿，"
+              "不判绿也不判红（禁拿工作树数冒充提交面数）" % head_err)
+        return 2
+    covered, unreviewed, stale, mooted = review_gap(hrows)
+    _cw, unrev_wt, _sw, _mw = review_gap(rows)
+    inflight_unreg = sorted(set(unrev_wt) - set(unreviewed))
     red = []
-    if hard > a.baseline:
-        red.append("C1_HARD %d > 基线 %d" % (hard, a.baseline))
+    if hard_head > a.baseline:
+        red.append("C1_HARD 提交面 %d > 基线 %d（现读工作树 %d，其中在途增量 %d 不计入归因）"
+                   % (hard_head, a.baseline, hard, hard - hard_head))
     # 评审账完整性也是红（r99 新挂）：形状普查只报数，评审结论若没有责任方，
     # 下一轮就无法区分「已评审并判定保留」与「没人看过」。两类红因分开点名。
     if unreviewed:
@@ -981,12 +1037,17 @@ def main():
 
     # 门面行由 `face_line` 生成（与 selftest 同一实现，杜绝两处拼装分叉）。
     # 红因走 `- ` 续行，由 `run_all_suites.py:408-414` 的 fold_detail 在 rc≠0 时带出。
-    line, spill = face_line(total_calls, files_with, hard, hard_bat, a.baseline, bucketed,
+    hard_bat_head = sum(1 for r in hrows if r["bucket"] == "C1_HARD" and r.get("in_battery"))
+    line, spill = face_line(total_calls, files_with, hard_head, hard_bat_head, a.baseline, bucketed,
                             c["C_GUARDED"], c["POLL"], bool(red), in_battery is not None, ranked)
     if len(line) > FOLD_LIMIT:
         print("TIMING-COUPLING-NOTE: 门面行 %d 字符 > 电池截断线 %d ⇒ 尾部读数在受理面上不存在"
               % (len(line), FOLD_LIMIT))
     print(line)
+    if inflight_unreg:                        # 单列位必须排在门面行之后（结论先行）
+        print("  - 在途未登记(r174，不判红): %d 处只存在于未入库 hunk：%s"
+              % (len(inflight_unreg), "、".join(inflight_unreg[:3])
+                 + ("…" if len(inflight_unreg) > 3 else "")))
     # 续行一律排在门面行**之后**：fold_detail 取的是「命中行之后 5 行内的 `-` 开头者」，
     # 印在门面行前面它看不见，红因就只剩半句。
     for b in broken[:8]:
@@ -1002,6 +1063,10 @@ def main():
     print("  - 逐件评审账(r99): 覆盖 %d/%d 件（%s）"
           % (covered, hard, "，".join("%s=%d" % kv for kv in sorted(vd.items())) or "空"))
     # 免检位必须自己报数（r173）：moot 是"按现读换桶重锚"的声明，不印出来就等于悄悄豁免
+    # r174：两个面各出一行分母（合成一个数就分不清"谁顶穿了棘轮"）
+    print("  - 棘轮比较面(r174): 提交面 C1=%d｜基线=%d｜现读工作树=%d（在途增量 %d，未入库新件 %d 个：%s）"
+          % (hard_head, a.baseline, hard, hard - hard_head, len(head_new),
+             "、".join(head_new[:3]) + ("…" if len(head_new) > 3 else "") or "无"))
     print("  - 现读换桶免检位(r173): moot=%d%s"
           % (len(mooted), ("｜" + "、".join("%s→%s" % (k.split("::")[0], REVIEW[k]["moot"])
                                            for k in mooted)) if mooted else "（无一条免检）"))
