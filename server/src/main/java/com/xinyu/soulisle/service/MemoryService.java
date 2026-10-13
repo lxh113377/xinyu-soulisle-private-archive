@@ -6,6 +6,7 @@ import com.xinyu.soulisle.entity.EmotionRecord;
 import com.xinyu.soulisle.mapper.ChatMessageMapper;
 import com.xinyu.soulisle.mapper.EmotionRecordMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -81,7 +82,14 @@ public class MemoryService {
                         .last("LIMIT " + normLimit(limit)));
     }
 
-    /** 一键清除（对应前端「清除我的数据」） */
+    /**
+     * 一键清除（对应前端「清除我的数据」）。
+     *
+     * <p>两张表必须**同生同死**：这一句是用户点下的「把我的数据删干净」，中途失败
+     * （MySQL 1213 死锁、1205 锁等待超时、连接被回收）若只删掉一半，剩下的那一半就是
+     * 「用户以为删了但其实还在」的隐私债。r169 前这里零事务边界，两表 delete 各自 autocommit。
+     */
+    @Transactional(rollbackFor = Exception.class)
     public int clear(String sessionId) {
         int a = emotionMapper.delete(Wrappers.<EmotionRecord>lambdaQuery().eq(EmotionRecord::getSessionId, sessionId));
         int b = messageMapper.delete(Wrappers.<ChatMessage>lambdaQuery().eq(ChatMessage::getSessionId, sessionId));
@@ -105,7 +113,19 @@ public class MemoryService {
         return Math.min(limit, MAX_LIMIT);
     }
 
+    /**
+     * 按**码点**截断，不按 UTF-16 code unit。
+     *
+     * <p>动因（r169）：星雾文案里 emoji 是常态（🌧️ 在 Java 里是两个 code unit 的代理对）。
+     * 旧写法 {@code s.substring(0, max)} 落在代理对正中间时切出一个**孤立代理项**，
+     * 字符串在内存里不报错，进 utf8mb4 列时才炸 —— 与字符集缺陷同一个出口，只是触发条件
+     * 更挑（要恰好卡在边界那一个 emoji 上），所以更难在事后归因。
+     */
     private String clamp(String s, int max) {
-        return s.length() <= max ? s : s.substring(0, max);
+        if (s.length() <= max) {
+            return s;
+        }
+        int cut = s.offsetByCodePoints(0, Math.min(max, s.codePointCount(0, s.length())));
+        return s.substring(0, cut);
     }
 }

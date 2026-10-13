@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -111,6 +112,49 @@ class MemoryServiceTest {
         verify(mm, org.mockito.Mockito.times(2)).insert(cap2.capture());
         assertEquals("", cap2.getAllValues().get(1).getContent());
         assertNotNull(cap2.getAllValues().get(1).getCreatedAt());
+    }
+
+    /**
+     * 截断必须按**码点**下刀（r169）。
+     *
+     * <p>反例夹具是精心挑的：199 个 BMP 字符 + 一个 emoji（🌧 占两个 UTF-16 code unit）。
+     * 旧实现 {@code substring(0, 200)} 正好落在代理对**中间**，切出一个孤立高代理项 ——
+     * 内存里不报错、长度也"对"，直到写进 utf8mb4 列才以 1366/1406 的形态炸出来，
+     * 且只在「边界那一个字恰好是 emoji」时发生，事后极难归因。
+     *
+     * <p>MySQL 的 {@code VARCHAR(200)} 数的是**字符**（码点），不是 code unit ⇒
+     * 按码点截到 200 个码点既是无损的，也是唯一与列宽同口径的截法。
+     */
+    @Test
+    @DisplayName("截断切在 emoji 代理对中间时不得留下孤立代理项（旧 substring(0,200) 必红）")
+    void clampNeverSplitsSurrogatePair() {
+        // 走**情绪**那条腿（列宽 200）而不是消息（2000）：刀口要正好落在代理对上，
+        // 200 宽的夹具比 2000 宽的夹具小一个数量级，红了也能一眼核对是哪个字切歪了。
+        EmotionRecordMapper em = mock(EmotionRecordMapper.class);
+        MemoryService svc = new MemoryService(em, mock(ChatMessageMapper.class));
+
+        String text = "a".repeat(199) + "\uD83C\uDF27" + "b".repeat(50);
+        assertEquals(251, text.length(), "夹具形状：199 BMP + 代理对(2) + 50 BMP");
+        svc.addEmotion("s1", "joy", 0.5, null, text);
+        ArgumentCaptor<EmotionRecord> cap = ArgumentCaptor.forClass(EmotionRecord.class);
+        verify(em).insert(cap.capture());
+        String saved = cap.getValue().getText();
+
+        assertEquals(200, saved.codePointCount(0, saved.length()),
+                "列宽 200 个字符=200 个码点；按 code unit 数会把 emoji 记成 2");
+        assertEquals(201, saved.length(), "代理对整体保留 ⇒ 单位数比码点数多 1");
+        assertTrue(saved.startsWith("a".repeat(199)), "前缀必须原样");
+
+        // 良构判据：遍历**码点**，任何一个落在代理区间（U+D800..U+DFFF）的值都是孤立代理项 ——
+        // String.codePointAt 对成对的代理返回的是完整码点，只有串真的切歪了才会返回半对。
+        // ⚠️ 别写成「末位是不是代理项」：合法代理对的末位**本来就是**低位代理 U+DF27，
+        // 那样判会把正确产物读成缺陷（本条首跑就是这么红的，实测 r169）。
+        for (int i = 0, offset = 0; i < 200; i++) {
+            int cp = saved.codePointAt(offset);
+            assertFalse(Character.isSurrogate((char) cp),
+                    "第 %d 个码点是孤立代理项 U+%04X".formatted(i, cp));
+            offset += Character.charCount(cp);
+        }
     }
 
     @Test

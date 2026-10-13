@@ -42,13 +42,26 @@ RES_IN_JAR = "BOOT-INF/classes/"
 
 
 def tracked_resources(root=ROOT):
-    """git 跟踪的 `server/src/main/resources/*` 文件名。取不到 git ⇒ 返回 None（未验，不判红）。"""
+    """git 跟踪的 `server/src/main/resources/**` **相对资源根的包内路径**。取不到 git ⇒ None（未验，不判红）。
+
+    ⚠️ r169 修：这里曾取 `split("/")[-1]`（只要文件名）。DDL 从 `resources/schema.sql` 迁进
+    `resources/db/migration/V1__j4_baseline_schema.sql` 之后，扁平文件名会让新鲜度腿拼出
+    `BOOT-INF/classes/V1__j4_baseline_schema.sql` 这种**根本不存在**的条目 ⇒ 报「jar 内无此件」，
+    把「产物其实一模一样」判成红。资源在 jar 里的位置是由**目录结构**决定的，取数面就必须带结构。
+    """
     r = subprocess.run(["git", "-C", str(root), "ls-files", "--", RES_DIR],
                        capture_output=True, timeout=60)
     if r.returncode != 0:
         return None
-    names = [l.strip().split("/")[-1] for l in
-             (r.stdout or b"").decode("utf-8", "replace").splitlines() if l.strip()]
+    prefix = RES_DIR + "/"
+    names = []
+    for line in (r.stdout or b"").decode("utf-8", "replace").splitlines():
+        line = line.strip().lstrip("\ufeff")
+        if not line:
+            continue
+        rel = line[len(prefix):] if line.startswith(prefix) else line.split("/")[-1]
+        if rel:
+            names.append(rel)
     return sorted(names)
 
 
@@ -246,7 +259,7 @@ def selftest_result():
             "<artifactId>soulisle-server</artifactId><version>1.8.1</version></project>",
             encoding="utf-8")
 
-        def mkjar(name, res=SCHEMA, ver="1.8.1"):
+        def mkjar(name, res=SCHEMA, ver="1.8.1", entry=None):
             p = t / name
             with zipfile.ZipFile(p, "w") as z:
                 z.writestr("META-INF/MANIFEST.MF",
@@ -256,7 +269,7 @@ def selftest_result():
                            "Start-Class: com.xinyu.soulisle.SoulIsleApplication\r\n" % ver)
                 z.writestr("BOOT-INF/lib/dep0.jar", "x" * 40)
                 if res is not None:
-                    z.writestr(RES_IN_JAR + "schema.sql", res)
+                    z.writestr(entry or (RES_IN_JAR + "schema.sql"), res)
             return p
 
         def check(label, cond):
@@ -282,6 +295,27 @@ def selftest_result():
         r = inspect(mkjar("nores.jar", res=None), 0.0, min_bytes=10, root=fake,
                     rels=["schema.sql"])
         check("反例 jar 内缺该资源件 ⇒ FAIL 并标「jar 内无此件」（不许读成没东西要核）（%s）" % r,
+              r["verdict"] == "FAIL" and "jar 内无此件" in r["reason"])
+        # ── r169：资源**嵌在子目录**里也必须核得动（DDL 从 resources/schema.sql 迁到
+        #    resources/db/migration/V1__j4_baseline_schema.sql）。旧实现按 `split("/")[-1]`
+        #    只取文件名，拼出的 jar 条目根本不存在 ⇒ 把「产物字节一模一样」判成红。
+        #    这两条腿锁的是**取数面**，不是某个具体文件。──
+        NESTED = b"CREATE TABLE IF NOT EXISTS chat_message (id BIGINT);\n"
+        (fake / RES_DIR / "db" / "migration").mkdir(parents=True)
+        (fake / RES_DIR / "db" / "migration" / "V1__x.sql").write_bytes(NESTED)
+        nest_rel = "db/migration/V1__x.sql"
+        r = inspect(mkjar("nested-fresh.jar", res=NESTED, entry=RES_IN_JAR + nest_rel),
+                    0.0, min_bytes=10, root=fake, rels=[nest_rel])
+        check("正例 嵌套资源件（db/migration/V1__x.sql）字节等值 ⇒ PASS（%s）" % r,
+              r["verdict"] == "PASS" and r["fresh"] == "ok")
+        r = inspect(mkjar("nested-stale.jar", res=b"-- stale --\n", entry=RES_IN_JAR + nest_rel),
+                    0.0, min_bytes=10, root=fake, rels=[nest_rel])
+        check("反例 嵌套资源比产物新 ⇒ FAIL 且点名**整条相对路径**（不许只报文件名）（%s）" % r,
+              r["verdict"] == "FAIL" and nest_rel in r["reason"])
+        # 取数面自己也要有反例：把嵌套件按旧写法折成文件名，必须核不到（证明这条腿真有区分力）
+        r = inspect(mkjar("nested-flatlookup.jar", res=NESTED, entry=RES_IN_JAR + nest_rel),
+                    0.0, min_bytes=10, root=fake, rels=["V1__x.sql"])
+        check("变异对照 取数面退化成「只取文件名」时必判红（%s）" % r,
               r["verdict"] == "FAIL" and "jar 内无此件" in r["reason"])
         stale = mkjar("mtime-stale.jar")
         os.utime(stale, (time.time() - 3600, time.time() - 3600))

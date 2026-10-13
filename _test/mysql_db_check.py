@@ -9,12 +9,17 @@
 建表 → 写入 → 读回 → 计数 → 重启不丢 → 清除 → 会话隔离 六腿，
 并把中文/emoji/引号/反斜杠/制表做**逐字节**往返对账（字符集是不是 utf8mb4，只有这一腿能证）。
 
-用法（三种取库方式，优先级从上到下）：
+用法（四种取库方式，优先级从上到下）：
   1. 显式指定：`XINYU_MYSQL_JDBC=jdbc:mysql://host:3306/db` XINYU_MYSQL_USER= XINYU_MYSQL_PASSWORD=
   2. `--docker`：起一个**一次性** mysql:8 容器（默认 127.0.0.1:13306，库名 xinyu_check），
      跑完自动删除；`--keep` 可留容器供复算。口令是每次现生成的一次性口令，不落仓、不落盘。
-  3. `--portability`：同上但**故意把服务器默认字符集设成 latin1**（反例腿）。
-     它存在的理由：`schema.sql` 若不自带 `DEFAULT CHARSET=utf8mb4`，表就跟随服务器默认字符集，
+  3. `--local`：用**本机 MySQL 8.4 二进制**（`XINYU_MYSQL_BASEDIR`，默认
+     C:\\Program Files\\MySQL\\MySQL Server 8.4）起一次性实例：独立 datadir 在 %TEMP% 下、
+     只绑 127.0.0.1、root 空口令、固定端口 13307（utf8mb4）/13308（latin1），跑完 shutdown 进程。
+     立此通道的原因：Docker Desktop 守护进程没启动时，第 2 条整条不可用 ⇒「MySQL 面」在
+     装了 MySQL 的机器上反而无人能复算。不点名时先试 docker、失败自动回落本条。
+  4. `--portability`：同上但**故意把服务器默认字符集设成 latin1**（反例腿）。
+     它存在的理由：迁移脚本若不自带 `DEFAULT CHARSET=utf8mb4`，表就跟随服务器默认字符集，
      在 latin1 服务器上中文**直接写不进去**（实测 ERROR 1366 Incorrect string value）。
      没有这条腿，「MySQL 支持」就只在一个恰好是 utf8mb4 的服务器上成立过。
 
@@ -101,15 +106,32 @@ def http(method, url, body=None, timeout=20):
 
 
 class Target:
-    """一个可连的 MySQL 目标。两种来源：环境变量 / 本脚本起的一次性容器。"""
+    """一个可连的 MySQL 目标。三种来源：环境变量 / 本脚本起的一次性容器 / 本机 mysqld 一次性实例。
 
-    def __init__(self, jdbc, user, password, db, owns_container, docker=None):
+    `teardown` 按**所有权**分派：环境变量的库不归本件，绝不关；容器与本机实例是本件起的，
+    跑完必须关掉（端口留着不释放会把下一次复算变成「连不上」，而那条红会被读成字符集问题）。
+    """
+
+    def __init__(self, jdbc, user, password, db, owns_container, docker=None,
+                 proc=None, shutdown_cmd=None):
         self.jdbc, self.user, self.password, self.db = jdbc, user, password, db
         self.owns_container, self.docker = owns_container, docker
+        self.proc, self.shutdown_cmd = proc, shutdown_cmd
 
     def teardown(self):
         if self.owns_container and self.docker:
             run([self.docker, "rm", "-f", CONTAINER])
+        if self.shutdown_cmd:
+            # 先优雅 shutdown（InnoDB 需要把 redo 落盘；直接 kill 会留下需要恢复的脏日志，
+            # 下一次 --initialize 复用同一 datadir 时就会以「数据目录损坏」的形态红）
+            rc, _ = run(self.shutdown_cmd, timeout=60)
+            if rc != 0 and self.proc and self.proc.poll() is None:
+                self.proc.terminate()
+            if self.proc:
+                try:
+                    self.proc.wait(timeout=60)
+                except subprocess.TimeoutExpired:
+                    self.proc.kill()
 
 
 def start_container(charset):
@@ -141,6 +163,128 @@ def start_container(charset):
         time.sleep(5)
     run([dk, "rm", "-f", CONTAINER])
     return None, "容器 180s 内没就绪（mysqladmin ping 一直非 0）"
+
+
+LOCAL_BASEDIR = os.environ.get(
+    "XINYU_MYSQL_BASEDIR", r"C:\Program Files\MySQL\MySQL Server 8.4")
+# 两种字符集各占一套端口与 datadir：反例腿（latin1）与正例腿（utf8mb4）**不得共用数据目录**，
+# 否则前一次留下的表会让后一次的「跟随服务器默认字符集」变成看不出来（表已经建好了）。
+LOCAL_PORTS = {"utf8mb4": 13307, "latin1": 13308}
+LOCAL_DB = "xinyu_check"
+
+
+def local_bin(name):
+    p = Path(LOCAL_BASEDIR) / "bin" / (name + ".exe")
+    return p if p.exists() else None
+
+
+def local_scratch(charset):
+    """本件的临时实例根（%TEMP% 下）。**不清删**：删数据目录要过回收站通道，
+    而 TEMP 由系统自己管；复算只靠「每次先 DROP/CREATE 库」保证起点干净。"""
+    root = Path(os.environ.get("TEMP") or "/tmp") / "xinyu-mysql-local" / charset
+    (root / "data").mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def port_free(port):
+    """True = 该端口上**没有**监听者可连（connect_ex 非 0 即连不上）。
+
+    命名刻意反着判据读法写：早先叫 port_open 而实现是「连不上才 True」，
+    读代码的人会把它当「端口开着」用，而调用点写的是 `if not port_free(...)` ⇒ 报错文本
+    与真因正好相反。这类名字比 bug 贵。
+    """
+    with socket.socket() as s:
+        s.settimeout(0.4)
+        return s.connect_ex(("127.0.0.1", port)) != 0
+
+
+def start_local(charset):
+    """用**本机 MySQL 8.4 二进制**起一个一次性实例（独立 datadir + 独立端口）。
+
+    为什么需要这一条通道：反例腿（latin1 服务器）此前只有 `--docker` 一种取库方式，
+    而 Docker Desktop 的守护进程没启动时本件直接判 UNVERIFIED ⇒「字符集修复真的生效了」
+    这件事在这台机器上没人能复算。本机既然装了 MySQL 8.4，就不该把判据的可用性押在
+    一个没在跑的守护进程上。
+
+    口径与 --docker 那条腿**逐字一致**：同一个库名、同一组 JDBC 参数、同样的「先建库再启动应用」，
+    差别只在 mysqld 是本机二进制起的、以及 root 空口令（--initialize-insecure，口令不落盘）。
+    """
+    mysqld, mysql, mysqladmin = local_bin("mysqld"), local_bin("mysql"), local_bin("mysqladmin")
+    if not (mysqld and mysql and mysqladmin):
+        return None, ("本机找不到 MySQL 8.4 二进制（%s\\bin\\mysqld.exe / mysql.exe / mysqladmin.exe）；"
+                      "可设 XINYU_MYSQL_BASEDIR 指到实际安装目录" % LOCAL_BASEDIR)
+    port = LOCAL_PORTS[charset]
+    if not port_free(port):
+        return None, "端口 %s 已被占用（本机实例用固定端口，避免与开发态 3306 抢面）" % port
+    root = local_scratch(charset)
+    data = os.path.normpath(str(root / "data"))
+    log_path = root / ("mysqld-%s.log" % port)
+
+    # 首次才初始化数据目录：--initialize-insecure 造出 root@localhost 空口令，
+    # 口令不落仓、不落盘（红线：密钥零落盘），且只绑 127.0.0.1。
+    if not (root / "data" / "mysql").exists():
+        rc, out = run([str(mysqld), "--no-defaults", "--initialize-insecure",
+                       "--datadir=%s" % data], timeout=300)
+        if rc != 0:
+            return None, "数据目录初始化失败 rc=%s：%s" % (rc, out.splitlines()[-1] if out else "-")
+
+    args = [str(mysqld), "--no-defaults", "--console",
+            "--datadir=%s" % data,
+            "--bind-address=127.0.0.1",
+            "--port=%d" % port,
+            "--max_connections=64"]
+    # ⚠️ 这里**不得带 --skip-name-resolve**（本机跑通的 `server/mysql-local.ps1` 也没带）：
+    # `--initialize-insecure` 只造出 root@**localhost**，关掉名字解析后 127.0.0.1 不再反解成
+    # localhost，于是每条客户端连接都以 `ERROR 1130 Host '127.0.0.1' is not allowed to connect`
+    # 收口（r169 首跑实测）。这个红看着像「权限没配」，真因是我自己多塞了一个参数。
+    if charset == "latin1":
+        args += ["--character-set-server=latin1", "--collation-server=latin1_swedish_ci"]
+    else:
+        args += ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    fh = open(log_path, "wb")
+    proc = subprocess.Popen(args, stdout=fh, stderr=subprocess.STDOUT)
+
+    deadline = time.time() + 150
+    ready = False
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            return None, ("mysqld 提前退出 rc=%s，日志 %s" % (proc.returncode, log_path))
+        rc, _ = run([str(mysqladmin), "--no-defaults", "-h127.0.0.1", "-P%d" % port,
+                     "-uroot", "ping"], timeout=30)
+        if rc == 0:
+            ready = True
+            break
+        time.sleep(2)
+    if not ready:
+        if proc.poll() is None:
+            proc.terminate()
+        return None, "150s 内 mysqld 没就绪（mysqladmin ping 一直非 0），日志 %s" % log_path
+
+    # 每次都要一个**新库**：库若留着，上一次的表结构（含上一次的字符集）会让这次的
+    # 「建表跟随服务器默认」这条判据失去区分力。
+    try:
+        rc, out = run([str(mysql), "--no-defaults", "-h127.0.0.1", "-P%d" % port, "-uroot", "-e",
+                       "DROP DATABASE IF EXISTS %s; CREATE DATABASE %s;" % (LOCAL_DB, LOCAL_DB)],
+                      timeout=60)
+    except Exception as e:
+        rc, out = 1, "客户端调用异常：%s" % e
+    if rc != 0:
+        # 建库失败也必须把**自己起的** mysqld 关掉：留着它，下一次复算会以
+        # 「端口已被占用」收口，而那条红看起来像环境问题、真因是上一次泄漏的进程。
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        return None, "建库失败 rc=%s：%s" % (rc, out.replace("\n", " ")[:200])
+
+    jdbc = ("jdbc:mysql://127.0.0.1:%d/%s?serverTimezone=Asia/Shanghai&connectTimeout=5000"
+            % (port, LOCAL_DB))
+    return Target(jdbc=jdbc, user="root", password="", db=LOCAL_DB, owns_container=False,
+                  proc=proc,
+                  shutdown_cmd=[str(mysqladmin), "--no-defaults", "-h127.0.0.1",
+                                "-P%d" % port, "-uroot", "shutdown"]), None
 
 
 def env_target():
@@ -306,6 +450,28 @@ def selftest():
     leg("L3 对照·空区间取不到端口须 None（不得回落到任意端口）", free_port(0, 0) is None,
         "free_port(0,0)")
 
+    # ── L4：本机 mysqld 取库通道（r169）。这几条全部离线可判，不进仓、不启进程 ──
+    ports = list(LOCAL_PORTS.values())
+    leg("L4 两种字符集各占一个端口，且端口互不相同（共用=两条腿抢同一个 mysqld）",
+        set(LOCAL_PORTS) == {"utf8mb4", "latin1"} and len(set(ports)) == len(ports) >= 2,
+        "LOCAL_PORTS=%s" % LOCAL_PORTS)
+    leg("L4 实例根必须落在受管仓库**之外**（临时数据目录进仓就是第三处副本）",
+        not str(local_scratch("utf8mb4")).startswith(str(ROOT)), str(local_scratch("utf8mb4")))
+    leg("L4 local_bin 认不出的名字返回 None（不得拼一个不存在的路径当「可用」）",
+        local_bin("xinyu-definitely-not-a-binary") is None)
+    # port_free 的方向性：真占住一个端口时必须判「不空闲」。这一条是反例腿——
+    # 方向判反的形态是「端口明明被占却照样起实例」，那时红会出现在应用侧而非这里。
+    held = socket.socket()
+    held.bind(("127.0.0.1", 0))
+    held.listen(1)
+    busy = held.getsockname()[1]
+    try:
+        leg("L4 port_free 方向·被占住的端口必须判 False", port_free(busy) is False, "busy=%s" % busy)
+    finally:
+        held.close()
+    leg("L4 本机实例与开发态 3306 不同面（不得复用老大在用的那个实例）",
+        3306 not in ports and LOCAL_DB == DB_NAME, "ports=%s db=%s" % (ports, LOCAL_DB))
+
     ok = all(x[1] for x in legs)
     for name, passed, detail in legs:
         log(f"  [{'ok' if passed else 'FAIL'}] {name}｜{detail}")
@@ -319,26 +485,38 @@ def main():
         return selftest()
     portability = "--portability" in args
     keep = "--keep" in args
-    want_docker = "--docker" in args or portability
+    charset = "latin1" if portability else "utf8mb4"
+    # 取库通道可点名：--docker / --local；都不点名时先试 docker、失败即回落本机 mysqld 实例。
+    # 回落不是偷懒：两条通道测的是**同一件事**（应用真连真库跑六腿），差别只在库怎么来的；
+    # 把「守护进程没启动」读成「MySQL 面未验」才是真损失。
+    force = "docker" if "--docker" in args else ("local" if "--local" in args else None)
 
     if not JAR.exists():
-        log(f"{VERDICT}-UNVERIFIED 未验：fat jar 不存在（{JAR.name}）｜先跑 `mvn -f server/pom.xml package -DskipTests`")
+        log(f"{VERDICT}-UNVERIFIED 未验：fat jar 不存在（{JAR.name}）｜先跑 `python _test/build_jar.py`")
         return 2
 
     target = env_target()
     note = "取库=环境变量 XINYU_MYSQL_JDBC"
     if target is None:
-        if args & {"--docker", "--portability"} or not os.environ.get("XINYU_MYSQL_JDBC"):
-            charset = "latin1" if portability else "utf8mb4"
-            target, err = start_container(charset)
-            if target is None:
-                log(f"{VERDICT}-UNVERIFIED 未验：{err}")
-                log("复算命令：python _test/mysql_db_check.py --docker"
-                    "（或设 XINYU_MYSQL_JDBC/XINYU_MYSQL_USER/XINYU_MYSQL_PASSWORD 指向你已有的库）")
-                return 2
-            note = ("取库=一次性容器（默认 utf8mb4）" if not portability
-                    else "取库=一次性容器（**反例腿**：服务器默认字符集 latin1）")
-    del want_docker
+        kinds = [force] if force else ["docker", "local"]
+        errs = []
+        for kind in kinds:
+            t, err = (start_container(charset) if kind == "docker" else start_local(charset))
+            if t is not None:
+                target = t
+                note = ("取库=%s 一次性实例（%s）"
+                        % ("docker 容器" if kind == "docker" else "本机 mysqld 二进制",
+                           "默认字符集 latin1，**反例腿**" if portability else "默认字符集 utf8mb4"))
+                break
+            errs.append("[%s] %s" % (kind, err))
+        if target is None:
+            for line in errs:
+                log("[mysql-db-check] 取库失败 %s" % line)
+            log(f"{VERDICT}-UNVERIFIED 未验：docker 与本机实例两条取库通道都没起来")
+            log("复算命令：python _test/mysql_db_check.py --docker"
+                "（或 --local 走本机 MySQL 8.4 二进制；或设 XINYU_MYSQL_JDBC/XINYU_MYSQL_USER/"
+                "XINYU_MYSQL_PASSWORD 指向你已有的库）")
+            return 2
 
     port = free_port()
     if not port:

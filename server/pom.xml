@@ -47,6 +47,18 @@
       <scope>runtime</scope>
     </dependency>
 
+    <!-- r169 版本化迁移（DDL 演进）：此前 schema 只靠 `spring.sql.init.mode=always` 跑
+         `CREATE TABLE IF NOT EXISTS` —— 那种形态**只能建表、不能改表**：加一列、改一个
+         COLLATE，对已存在的库永远不会生效，而这正是「数据迁移与一致性」这条要求要回答的
+         问题（演示库和新库会长期是两个结构）。Flyway 用 flyway_schema_history 记录已应用
+         版本，V1/V2… 顺序前滚。版本由 spring-boot-starter-parent 仲裁（实测 9.22.3），
+         不手写 <version> —— 避免与 Boot 的自动配置错位。MySQL 支持在 9.x 仍在 core 内
+         （10.x 才拆出 flyway-mysql），故不引额外件。 -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+
     <!-- r41 补齐决策 #1 第②条（"强类型 + 可单测"）：此前 server/src 下 JUnit 用例数实测为 0，
          那句话从 2026-09-20 挂到 2026-09-27 没有产物支撑。用 starter 而非手挑 junit/assertj，
          与既有"优先用现成件"口径一致；test scope 不进 fat jar（repackage 排除 test 域）。 -->

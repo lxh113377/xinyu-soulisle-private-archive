@@ -19,9 +19,42 @@ spring:
     driver-class-name: ${XINYU_DB_DRIVER:org.h2.Driver}
     username: ${XINYU_DB_USER:sa}
     password: ${XINYU_DB_PASSWORD:}
+    # r169 连接池。此前整节零配置 ⇒ 全部吃 HikariCP 默认值：最多 10 条连接、借不到就等 30s、
+    # 无泄漏检测、连接不按时长轮换。两个后果在本项目里是可观测的缺陷而非理论风险：
+    #   ① 库挂掉时每个请求要挂满 30s 才失败 —— 与「不可达要快速回落」这条要求正好相反；
+    #   ② MySQL 侧 wait_timeout 默认 8h，而连接池里的空闲连接可能被中间层（NAT/LB/代理）
+    #      静默掐断，下一次借出就是一句 Communications link failure。
+    # 处理方式：把连接生命周期主动收回来（max-lifetime 29min < 8h），并把借连接预算压到 5s。
+    # 每项都可被环境变量覆盖，演示形态（零配置）仍然一行不用改。
+    hikari:
+      pool-name: XinyuPool
+      maximum-pool-size: ${XINYU_DB_POOL_MAX:16}
+      minimum-idle: ${XINYU_DB_POOL_MIN:2}
+      connection-timeout: ${XINYU_DB_CONNECTION_TIMEOUT_MS:5000}
+      validation-timeout: ${XINYU_DB_VALIDATION_TIMEOUT_MS:2500}
+      max-lifetime: ${XINYU_DB_MAX_LIFETIME_MS:1740000}
+      leak-detection-threshold: ${XINYU_DB_LEAK_DETECT_MS:20000}
   sql:
     init:
-      mode: always
+      # r169：DDL 归 Flyway（见下方 spring.flyway）。这一行留着并置 never，是为了让
+      # 「临时绕开 Flyway、回到旧的每轮全量跑脚本」仍然是一个环境变量能表达的状态
+      # （XINYU_SQL_INIT_MODE=always）——逃生门要看得见，不能靠改代码回来。
+      # 注意 never 只关「跑脚本」，不关「表已存在」：两侧库都由 Flyway 建。
+      mode: ${XINYU_SQL_INIT_MODE:never}
+  flyway:
+    enabled: ${XINYU_FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    table: flyway_schema_history
+    # 存量库（已有 chat_message/emotion_record 而无 flyway_schema_history）第一次接 Flyway
+    # 时会因「非空库没有历史表」直接报错 —— baseline-on-migrate 把它基线化后再前滚。
+    # baseline-version 取 0 而不是默认的 1：默认值会让 V1 被当成「基线已含」而跳过，
+    # 于是 V1 在存量库上永不执行；取 0 则 V1 照常跑，靠脚本自身的 IF NOT EXISTS 保持幂等。
+    baseline-on-migrate: true
+    baseline-version: 0
+    baseline-description: pre-flyway J4 schema
+    validate-on-migrate: true
+    # 硬闸：clean 会整库 DROP。演示机上随手一个 flyway.clean 就把别人的数据清了。
+    clean-disabled: true
 
 mybatis-plus:
   configuration:
