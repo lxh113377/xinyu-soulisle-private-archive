@@ -235,6 +235,20 @@ def main():
             pool = body.get("pool") or {}
             if pool.get("kind") != "hikari" or "active" not in pool:
                 fails.append("FAIL-D1: 池水位应可读到活值，实测 %r" % pool)
+            # 这两格是「连接配置」这条要求唯一的**运行时**证据：application.yml 里写了
+            # maximum-pool-size/connection-timeout，只有从**跑起来的应用**里读回来，
+            # 才证明 yml 的默认值与环境变量覆盖这两条通道都真的接上了池。
+            # （只 grep 配置文件 = 测文本，不测接线；本仓既有教训「配置需行为回执」。）
+            if pool.get("max") != 16:
+                fails.append("FAIL-D1: yml 默认 maximum-pool-size=16 未落到运行时池，实测 %r"
+                             % pool.get("max"))
+            if pool.get("connectionTimeoutMs") != 1500:
+                fails.append("FAIL-D1: 本件注入的 XINYU_DB_CONNECTION_TIMEOUT_MS=1500 未生效，实测 %r"
+                             " ⇒ 环境变量到池这条链断了，故障时的快速回落也就不成立"
+                             % pool.get("connectionTimeoutMs"))
+            if pool.get("leakDetectionThresholdMs") != 20000:
+                fails.append("FAIL-D1: yml 默认 leak-detection-threshold=20000 未落到运行时池，实测 %r"
+                             % pool.get("leakDetectionThresholdMs"))
 
         # 先写一条数据，确认这条链本来可用（否则后面的 503 可能只是「本来就坏了」）
         sid = "degradation-%d" % int(time.time())
