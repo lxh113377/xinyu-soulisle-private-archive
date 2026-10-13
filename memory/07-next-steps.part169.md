@@ -14,7 +14,7 @@
 1. 🔴 **KB 新内容上线**：受「先清存量红再上线」约束（r131 口径：三面入库 → deploy_sync 归零 → 整跑电池 → live/public）。
 2. 🔴 **`deploy_sync_check` 红 1 项**：`css/style.css` DIFF（src 40,041 / deploy 40,563 B），两侧同为 `94e623b`（10-12 r129）落盘 ⇒ **存量且已提交，非本轮**，归 r129 轮。
 3. 🟠 **`size_budget` 3 项 OVER 均为他轮存量**（face-engine / face-smile-rules / chat-agent，后者属 r171-表达第3轮在途）。本轮 `psych-kb.js` 已按「实测+5%」重登记 157,186→**178,085**（实测 170,202）归零。
-4. 🟠 **`_test/size_budget_check.py` 未纳入本轮提交**：含 r171-表达第3轮在途改动（wit-quotes 86,960 / voice-call 38,100），按 R236 留工作树给该轮自行提交；本轮只改 psych-kb 一行。
+4. 🟠 **`_test/size_budget_check.py` 未纳入本轮提交**：含 r171-表达第3轮在途改动，按 R236 留工作树给该轮自行提交；本轮只改 psych-kb 一行。
 5. 🟠 **D 级 40 条人工抽查未跑**（integrity 判据已提示待跑）；`--links` 联网复探未跑（README §7 定其为人工轮工具、不进 CI，本轮是人工轮可补）。
 6. 🟡 **加固建议未改架构**：域归属门禁现按**域码**做，而域码是归档标记、不该承担安全门禁；建议下游注入管线改按**内容标记**（须匹配「不构成医疗/诊断建议」句）过滤。**仅登记，本轮未动。**
 7. 🟡 **待验证点存量**：188 卡绝大多数仍带未闭合项（本轮只清 5 条）。队列用 `python _test/psych_kb_integrity_check.py --backlog`。
