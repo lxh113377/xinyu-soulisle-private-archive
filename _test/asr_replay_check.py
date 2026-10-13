@@ -384,6 +384,51 @@ def run(page, cases):
     return rows
 
 
+def run_gates(page):
+    """E6~E9B 五道「带病不许接线」门禁。全过返回 (True, blocks)，任一不符返回 (False, None)
+
+    抽成独立函数的直接原因：loc_guard 的「函数长 ≤150」门（本仓对标 opensoul check:loc）
+    在 r176 把 main 顶到 157 行 —— 门禁判红的是我自己，先拆再谈别的。
+    """
+    e6 = page.evaluate(E6_JS)
+    e6bad = [r for r in e6 if not r[1]]
+    if e6bad:
+        for r in e6bad:
+            print("  - E6 %s: got %r want %r" % (r[0], r[2], r[3]))
+        print("ASR-REPLAY-FAIL E6 清洗纯函数 %d/%d 条不符（归一化是 A2 的核心，不能带病接线）"
+              % (len(e6bad), len(e6)))
+        return False, None
+    spec = (("E7", "断句碎片合并", E7_JS, "A3 前置预处理是需求③的落地"),
+            ("E8", "自适应噪声门+采集链", E8_JS, "A3 前置预处理是需求③的落地"),
+            ("E9", "方言形态层", E9_JS, "A4 方言形态层是需求②在本仓架构下唯一的落地面"),
+            ("E9B", "方言权重序与降级", E9B_JS, "A4 方言形态层是需求②在本仓架构下唯一的落地面"))
+    blocks = [("E6", "清洗", e6)]
+    for tag, what, js, why in spec:
+        rows = page.evaluate(js)
+        blocks.append((tag, what, rows))
+        bad = [r for r in rows if not r[1]]
+        if bad:
+            for r in bad:
+                print("  - %s %s: got %r want %r" % (tag, r[0], r[2], r[3]))
+            print("ASR-REPLAY-FAIL %s %s %d/%d 条不符（%s，不能带病接线）"
+                  % (tag, what, len(bad), len(rows), why))
+            return False, None
+    return True, blocks
+
+
+def print_matrix(groups, miss_src):
+    """需求①的基线矩阵：方言 × 场景二维读数（挑对率 + 清洗后 CER）"""
+    print("— 场景基线矩阵（构造样本，非引擎真实准确率）—")
+    for k in sorted(groups, key=lambda x: (x[0] not in ("普通话",), x[0], x[1])):
+        g = groups[k]
+        cs = g["cer"]
+        m = ("%.3f" % (sum(cs) / len(cs))) if cs else "  -  "
+        print("  %-8s %-10s 样本=%2d  挑对=%2d/%2d (%3.0f%%)  清洗后CER=%s"
+              % (k[0], k[1], g["n"], g["ok"], g["n"], 100.0 * g["ok"] / g["n"], m))
+    if miss_src:
+        print("  误差归因（判红样本的 error_source）：%s" % "；".join(sorted(set(miss_src))))
+
+
 def main():
     if "--selftest" in sys.argv[1:]:
         return selftest()
@@ -425,32 +470,10 @@ def main():
                 print("ASR-REPLAY-UNVERIFIED 取不到 ASRNormalize（r174 起它是生产依赖，缺件=build 面缺件）"
                       "—— 没测到不得判绿")
                 return 2
-            e6 = page.evaluate(E6_JS)
-            e6bad = [r for r in e6 if not r[1]]
-            if e6bad:
+            ok, blocks = run_gates(page)
+            if not ok:
                 browser.close()
-                for r in e6bad:
-                    print("  - E6 %s: got %r want %r" % (r[0], r[2], r[3]))
-                print("ASR-REPLAY-FAIL E6 清洗纯函数 %d/%d 条不符（归一化是 A2 的核心，不能带病接线）"
-                      % (len(e6bad), len(e6)))
                 return 1
-            # r175/A3：E7 断句合并 + E8 自适应噪声门 —— 与 E6 同为「带病不许接线」的门禁
-            e7 = page.evaluate(E7_JS)
-            e8 = page.evaluate(E8_JS)
-            e9 = page.evaluate(E9_JS)
-            e9b = page.evaluate(E9B_JS)
-            for tag, what, rows in (("E7", "断句碎片合并", e7), ("E8", "自适应噪声门+采集链", e8),
-                                    ("E9", "方言形态层", e9), ("E9B", "方言权重序与降级", e9b)):
-                bad = [r for r in rows if not r[1]]
-                if bad:
-                    browser.close()
-                    for r in bad:
-                        print("  - %s %s: got %r want %r" % (tag, r[0], r[2], r[3]))
-                    print("ASR-REPLAY-FAIL %s %s %d/%d 条不符（%s，不能带病接线）"
-                          % (tag, what, len(bad), len(rows),
-                             "A3 前置预处理是需求③的落地" if tag in ("E7", "E8")
-                             else "A4 方言形态层是需求②在本仓架构下唯一的落地面"))
-                    return 1
             lex = set(page.evaluate(LEX_JS))
             if not lex:
                 browser.close()
@@ -507,22 +530,11 @@ def main():
     mb = sum(before) / len(before) if before else 0.0
     ma = sum(after) / len(after) if after else 0.0
     drop = (mb - ma) / mb if mb > 0 else 0.0
-    blocks = (("E6", "清洗", e6), ("E7", "断句", e7), ("E8", "噪声门", e8),
-              ("E9", "方言层", e9), ("E9B", "方言权重", e9b))
     tally = "  ".join("%s%s=%d/%d" % (t, w, len(r) - len([x for x in r if not x[1]]), len(r))
                       for t, w, r in blocks)
     print("引擎=%s  词表词数=%d  样本=%d  %s  分布=%s"
           % (face, len(lex), len(cases), tally, ", ".join(sorted({r["scenario"] for r in rows}))))
-    # 需求①的基线矩阵：方言 × 场景二维读数（挑对率 + 清洗后 CER）
-    print("— 场景基线矩阵（构造样本，非引擎真实准确率）—")
-    for k in sorted(groups, key=lambda x: (x[0] not in ("普通话",), x[0], x[1])):
-        g = groups[k]
-        cs = g["cer"]
-        m = ("%.3f" % (sum(cs) / len(cs))) if cs else "  -  "
-        print("  %-8s %-10s 样本=%2d  挑对=%2d/%2d (%3.0f%%)  清洗后CER=%s"
-              % (k[0], k[1], g["n"], g["ok"], g["n"], 100.0 * g["ok"] / g["n"], m))
-    if miss_src:
-        print("  误差归因（判红样本的 error_source）：%s" % "；".join(sorted(set(miss_src))))
+    print_matrix(groups, miss_src)
     print("E5 归一化增益：构造样本 CER 均值 %.4f → %.4f，相对下降 %.1f%%（阈值 ≥5%%）"
           % (mb, ma, drop * 100))
     print("⚠ CER 是【构造样本上的编排层读数】，不是引擎准确率；不代表方言真实识别率")
