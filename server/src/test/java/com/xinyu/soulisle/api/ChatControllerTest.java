@@ -153,8 +153,8 @@ class ChatControllerTest {
         String c2 = "data: {\"choices\":[{\"delta\":{\"content\":\"在\"}}]}\n\n";
         String c3 = "data: [DONE]\n\n";
 
-        Recorder sink = new Recorder();
-        Trickler up = new Trickler(new String[] {c1, c2, c3}, sink);
+        StreamProbes.Recorder sink = new StreamProbes.Recorder();
+        StreamProbes.Trickler up = new StreamProbes.Trickler(new String[] {c1, c2, c3}, sink);
         LlmProxy p = withKey();
         when(p.openStream(any(), any(), any())).thenReturn(new LlmProxy.StreamResult(
                 200, "text/event-stream", up, null));
@@ -183,88 +183,6 @@ class ChatControllerTest {
         assertEquals(c1 + c2 + c3, sink.body(), "SSE 帧必须一块不丢、一字不改");
     }
 
-    /** 写侧记录仪：把 write/flush 记成事件序列，供时序断言使用。 */
-    private static final class Recorder extends java.io.OutputStream {
-        final java.util.List<String> events = new java.util.ArrayList<>();
-        final StringBuilder text = new StringBuilder();
-        int writes;
-        int flushes;
-        int lastFlushAt = -1;
-
-        @Override
-        public void write(int b) {
-            write(new byte[] {(byte) b}, 0, 1);
-        }
-
-        @Override
-        public void write(byte[] b, int off, int len) {
-            writes++;
-            events.add("W" + len);
-            text.append(new String(b, off, len, StandardCharsets.UTF_8));
-        }
-
-        @Override
-        public void flush() {
-            flushes++;
-            lastFlushAt = events.size();
-            events.add("F");
-        }
-
-        String body() {
-            return text.toString();
-        }
-    }
-
-    /** 只在被再次 read 时才产出下一块的假上游 —— 用它把「先下发、后取下一块」的时序逼出来。 */
-    private static final class Trickler extends java.io.InputStream {
-        private final String[] chunks;
-        private final Recorder sink;
-        private int index;
-        private int pos;
-        int secondReadSeenFlushes = -1;
-
-        Trickler(String[] chunks, Recorder sink) {
-            this.chunks = chunks;
-            this.sink = sink;
-        }
-
-        @Override
-        public int read() {
-            byte[] one = currentChunk();
-            if (one == null || pos >= one.length) {
-                return -1;
-            }
-            return one[pos++] & 0xff;
-        }
-
-        @Override
-        public int read(byte[] b, int off, int len) {
-            if (index == 1 && pos == 0) {
-                secondReadSeenFlushes = sink.flushes;
-            }
-            byte[] src = currentChunk();
-            if (src == null) {
-                return -1;
-            }
-            int n = Math.min(src.length - pos, len);
-            System.arraycopy(src, pos, b, off, n);
-            pos += n;
-            if (pos >= src.length && index + 1 < chunks.length) {
-                index++;
-                pos = 0;
-            } else if (pos >= src.length) {
-                index = chunks.length;
-            }
-            return n;
-        }
-
-        private byte[] currentChunk() {
-            if (index >= chunks.length) {
-                return null;
-            }
-            return chunks[index].getBytes(StandardCharsets.UTF_8);
-        }
-    }
 
     @Test
     @DisplayName("r38 护栏：注入句被点名并在上行 messages 追加系统重申，正常句零改动；响应体两侧都逐字透传")
