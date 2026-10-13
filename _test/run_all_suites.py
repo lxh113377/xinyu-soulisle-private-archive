@@ -377,6 +377,9 @@ SUITES = [
     # 2026-10-13 单日实测两份权威 CSS 同时 0 字节。本件按 HEAD 的 blob 字节做分母，同时进 pre-commit。
     ("tracked_zero_guard", [sys.executable, "_test/tracked_zero_guard.py"]),
     ("tracked_zero_guard_selftest", [sys.executable, "_test/tracked_zero_guard.py", "--selftest"]),
+    # r170 S4：这台仪器的「环境/产品/仪器」三分是全体浏览器判据共用的归因层，
+    # 它自己坏了会让一批套件把「服务没起」报成「产品红」⇒ 归因层必须有常驻回执。
+    ("check_instrument_selftest", [sys.executable, "_test/check_instrument.py"]),
     # r59 函数出口面：r57 用一次手工 curl 证的「四条出口都回头」，本轮换成 node 假 fetch 驱动
     # 真函数模块 —— 6 条出口（含 stream=true 但上游报错的折返腿）离线可重跑，摘头即翻红。
     ("api_egress_headers", [sys.executable, "_test/api_egress_headers_check.py"]),
