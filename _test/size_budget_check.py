@@ -208,7 +208,7 @@ BUDGETS = {
     # r54 新增：CSP 要求把 index.html 里唯一那个内联 <script>（离线壳注册）外提，
     #    基线 = 实测 1,078B +5%。它同时进了 SW 预缓存清单（r45 踩过"外提件没进预缓存"）。
     "src/js/sw-register.js": 1_132,
-    "src/js/scroll-story.js": 3_757,
+    "src/js/scroll-story.js": 4_722,   # r182 上调 3_757→实测 4,498 +5%（归属提交 7fcfe2b）：增量 = scrollForProgress() 正向映射——ScrollTrigger 量程挂在 #story 上（实测 st.start≈157≠0），按 0..maxScroll 折算的误差随 t 漂移，退出全屏时提交的滚动位置须与之精确闭合（app 0.9901 == ScrollTrigger 0.9901）
     "src/js/three-scene.js": 17_747,   # r87 上调 15,793→实测 16,902 +5%：新增表情雾底色 setMistTint()
     #    （只染**未点亮**的暗星，已点亮的星=被记住的那一瞬，绝不改写；null 时逐帧计算与 r87 前逐位相同）
     # r45 上调 4,844 -> 7214：clear() 改为带回执并读 /stats 复核归零 + 新增 exportAll()
