@@ -819,16 +819,13 @@ def _st_cross_face(expect, bucket_of):
            and classify(XFER, "f.py")[0][0]["bucket"] == "C1_HARD")
 
 
-def selftest():
-    """正例 / 四种「不得升格」反例 / 传递污点 / 恒等式 / 变异 / 盲区 / 截断，逐条有名字。"""
-    bad, n = [], 0
+def _st_fixtures():
+    """selftest 的合成源码夹具（每段都是一个「等待→取数→是否被决策消费」的形状样本）。
 
-    def expect(label, cond):
-        nonlocal n
-        n += 1
-        if not cond:
-            bad.append(label)
-
+    从 `selftest` 里搬出来单独成函数（r178）：它们是纯字面量、彼此无依赖，也不参与任何闭包，
+    留在 selftest 里只让这个桩函数为了「夹具」占掉 34 行 —— 而本仓 loc 门按**单函数** ≤150 行计。
+    搬动只改放置位置，一个字符的夹具内容都没变（改夹具＝改被审形状，那会连带动 C1_HARD 读数）。
+    """
     C1 = ("def run(pg):\n"
           "    pg.wait_for_timeout(8000)\n"
           "    n = pg.evaluate('() => 1')\n"
@@ -863,6 +860,20 @@ def selftest():
     TAIL = ("def run(pg):\n"
             "    pg.click('#x')\n"
             "    pg.wait_for_timeout(200)\n")
+    return C1, NOREAD, PRINT_ONLY, LOOP, GUARD, TRANSIT, VARLEN, TAIL
+
+
+def selftest():
+    """正例 / 四种「不得升格」反例 / 传递污点 / 恒等式 / 变异 / 盲区 / 截断，逐条有名字。"""
+    bad, n = [], 0
+
+    def expect(label, cond):
+        nonlocal n
+        n += 1
+        if not cond:
+            bad.append(label)
+
+    C1, NOREAD, PRINT_ONLY, LOOP, GUARD, TRANSIT, VARLEN, TAIL = _st_fixtures()
 
     def bucket_of(src):
         return classify(src, "f.py")[0][0]["bucket"]

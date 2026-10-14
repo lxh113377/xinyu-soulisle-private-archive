@@ -46,6 +46,42 @@ def is_open(pg):
     return pg.eval_on_selector("#chat-dock", "e => e.classList.contains('open')")
 
 
+def _legs_scroll_focus(pg):
+    """D1–D6：坞的默认展开、滚动收起、标题条展开、焦点保护、失焦后再收起。
+
+    从 `main` 里搬出来（r178）只为过 loc 的单函数 ≤150 行门 —— 断言文案、等待时长、判定表达式
+    一字未动。这一段共同的主题是「滚动/焦点会不会把坞挪走」，与后面的三态循环（D7+）不是一件事。
+    """
+    ck("D1 初始态对话坞展开（既有默认行为未变）", is_open(pg))
+
+    pg.evaluate("window.scrollBy(0, 240)")
+    pg.wait_for_timeout(700)
+    ck("D2 向下滚动后自动收起", not is_open(pg))
+    ck("D2b 收起后标题条文案与 aria-expanded 同步",
+       pg.inner_text("#btn-dock") == "展开 ▴"
+       and pg.get_attribute("#btn-dock", "aria-expanded") == "false",
+       "%s / aria-expanded=%s" % (pg.inner_text("#btn-dock"),
+                                  pg.get_attribute("#btn-dock", "aria-expanded")))
+
+    pg.evaluate("window.scrollTo(0, 0)")
+    pg.wait_for_timeout(700)
+    ck("D3 向上滚回顶部不自动展开（只收不放，防抖动）", not is_open(pg))
+
+    pg.click(".dock-title")           # 点标题条空白处（避开里面三个按钮）
+    pg.wait_for_timeout(500)
+    ck("D4 点标题条展开", is_open(pg))
+
+    pg.focus("#chat-input")
+    pg.evaluate("window.scrollBy(0, 240)")
+    pg.wait_for_timeout(700)
+    ck("D5 焦点在坞内时不自动收起（话没打完坞不能跑）", is_open(pg))
+
+    pg.evaluate("() => document.activeElement.blur()")
+    pg.evaluate("window.scrollBy(0, 240)")
+    pg.wait_for_timeout(700)
+    ck("D6 失焦后再向下滚仍会收起", not is_open(pg))
+
+
 def main():
     try:
         with sync_playwright() as p:
@@ -58,34 +94,7 @@ def main():
                                  timeout=25000)
             pg.wait_for_timeout(600)
 
-            ck("D1 初始态对话坞展开（既有默认行为未变）", is_open(pg))
-
-            pg.evaluate("window.scrollBy(0, 240)")
-            pg.wait_for_timeout(700)
-            ck("D2 向下滚动后自动收起", not is_open(pg))
-            ck("D2b 收起后标题条文案与 aria-expanded 同步",
-               pg.inner_text("#btn-dock") == "展开 ▴"
-               and pg.get_attribute("#btn-dock", "aria-expanded") == "false",
-               "%s / aria-expanded=%s" % (pg.inner_text("#btn-dock"),
-                                          pg.get_attribute("#btn-dock", "aria-expanded")))
-
-            pg.evaluate("window.scrollTo(0, 0)")
-            pg.wait_for_timeout(700)
-            ck("D3 向上滚回顶部不自动展开（只收不放，防抖动）", not is_open(pg))
-
-            pg.click(".dock-title")           # 点标题条空白处（避开里面三个按钮）
-            pg.wait_for_timeout(500)
-            ck("D4 点标题条展开", is_open(pg))
-
-            pg.focus("#chat-input")
-            pg.evaluate("window.scrollBy(0, 240)")
-            pg.wait_for_timeout(700)
-            ck("D5 焦点在坞内时不自动收起（话没打完坞不能跑）", is_open(pg))
-
-            pg.evaluate("() => document.activeElement.blur()")
-            pg.evaluate("window.scrollBy(0, 240)")
-            pg.wait_for_timeout(700)
-            ck("D6 失焦后再向下滚仍会收起", not is_open(pg))
+            _legs_scroll_focus(pg)
 
             pg.evaluate("window.scrollTo(0, 0)")
             pg.click(".dock-title")

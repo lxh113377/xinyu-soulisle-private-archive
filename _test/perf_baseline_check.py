@@ -645,9 +645,8 @@ def judge_ramp(ramp, tiers):
     return bad, na
 
 
-def selftest():
-    """自证判据自身不恒绿：慢样本必须超预算、空样本必须算未验、百分位不得插值造假数。"""
-    bad = []
+def _selftest_block4(bad):
+    """selftest 的连续区间 651-667（mid_split 原样搬运；判定/阈值/注释未改一字）。"""
     if pct([10.0, 20.0, 30.0], 50) != 20.0:
         bad.append("①p50 计算错（最近秩应取中位观测值）")
     if pct([1.0, 2.0], 95) != 2.0:
@@ -666,7 +665,8 @@ def selftest():
     if not judge(llm_on):
         bad.append("⑥危机路径走了 LLM 却没被抓到 ⇒ 口径被悄悄换掉")
 
-    # r121：并发维（词典引擎路径）的三条腿——缺样本 / 塌方 / 正常，三态必须可分。
+def _selftest_block3(bad):
+    """selftest 的连续区间 670-692（mid_split 原样搬运；判定/阈值/注释未改一字）。"""
     _ok = {k: {"p95_ms": 1.0} for k in BUDGETS}
     for k in BUDGETS:
         _ok[k] = dict(_ok[k], llm_used=False) if k == "emotion_crisis" else _ok[k]
@@ -690,10 +690,10 @@ def selftest():
         bad.append("⑦c 单请求 CPU 超上限仍判通过 ⇒ 每请求计算量退化无人管")
     if judge(dict(_ok, resource=None)) or resource_state({"resource": None})[0] != "na":
         bad.append("⑦d 资源取不到却走绿、或没被识别成未验 ⇒「没量到」会被读成达标")
-    # r123 净 CPU 四腿：正常／任一读数缺⇒None／除零⇒None／负值照实带出（噪声主导本身就是结论）
-    # 期望由被测函数自报后再核对算式：(300 − 120×(1.5/1.0))ms ×1000 ÷96 = 1250.0µs
-    # （第一版我把期望写成 1125.0 —— 手算错，被测对象反倒报 1250.0；按算式复核后是**我错**，
-    #   故改期望而不是改实现。这类"期望凭直觉写"的坑在册：变异/桩的期望必须被测对象自报或算式复核。）
+    return _ok, _res
+
+def _selftest_block2(_res, bad):
+    """selftest 的连续区间 697-707（mid_split 原样搬运；判定/阈值/注释未改一字）。"""
     if resource_net(300.0, 1.5, 120.0, 1.0, 96) != 1250.0:
         bad.append("⑧净 CPU 算错：%s（算式 (300−120×1.5)×1000÷96 应得 1250.0）"
                    % resource_net(300.0, 1.5, 120.0, 1.0, 96))
@@ -706,7 +706,8 @@ def selftest():
     if resource_state({"resource": _res})[0] != "ok":
         bad.append("⑦e 有读数时 resource_state 没判 ok ⇒ main 会把量到的资源误报成未验")
 
-    # ── r96 阶梯三腿（正例 / 变异 / 边界）：judge_ramp 是新写的，没自证就是没接线 ──
+def _selftest_block1(bad):
+    """selftest 的连续区间 710-737（mid_split 原样搬运；判定/阈值/注释未改一字）。"""
     def tier(n, rps, p95, llm=False):
         return {"state": "ok",
                 "health": {"rps": rps, "p95_ms": p95, "n": n * 4, "threads": n},
@@ -735,6 +736,24 @@ def selftest():
         bad.append("⑩预算耗尽不该算判红（它该走 UNVERIFIED 分支）：%s" % b4)
     if len(na4) != 3:
         bad.append("⑪未跑的档必须逐档点名（期望 3 条 NA，实得 %d）⇒ 缺档会被读成『没有缺档』" % len(na4))
+    return tiers
+
+
+def selftest():
+    """自证判据自身不恒绿：慢样本必须超预算、空样本必须算未验、百分位不得插值造假数。"""
+    bad = []
+    _selftest_block4(bad)
+
+    # r121：并发维（词典引擎路径）的三条腿——缺样本 / 塌方 / 正常，三态必须可分。
+    _ok, _res = _selftest_block3(bad)
+    # r123 净 CPU 四腿：正常／任一读数缺⇒None／除零⇒None／负值照实带出（噪声主导本身就是结论）
+    # 期望由被测函数自报后再核对算式：(300 − 120×(1.5/1.0))ms ×1000 ÷96 = 1250.0µs
+    # （第一版我把期望写成 1125.0 —— 手算错，被测对象反倒报 1250.0；按算式复核后是**我错**，
+    #   故改期望而不是改实现。这类"期望凭直觉写"的坑在册：变异/桩的期望必须被测对象自报或算式复核。）
+    _selftest_block2(_res, bad)
+
+    # ── r96 阶梯三腿（正例 / 变异 / 边界）：judge_ramp 是新写的，没自证就是没接线 ──
+    tiers = _selftest_block1(bad)
     # ── r100 中位数折叠腿：reduce_reps 是新写的纯函数，没自证就是没接线（R238 的层 a）──
     def rep(rps, p95, llm=False):
         return {"state": "ok",
