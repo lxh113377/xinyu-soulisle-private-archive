@@ -288,27 +288,36 @@
     b.setAttribute("aria-expanded", s.expanded);
     b.title = s.tip + "（三态循环）";
   }
+  /* r182：退出全屏时把虚拟行程**提交**回真实滚动，而不是丢弃。
+     旧语义（r109 D11）是"退出即回到进入前的真实值"——实测全屏里把星雾从 0.14 推到 1.00
+     再退出，进度立刻弹回 0.1436，整段行程蒸发。改成提交后两条轴合一，无弹跳、无丢失。
+     ⚠️ 调用位置有硬约束：必须在 body.dock-full 摘掉**之后**调，否则 scrollTo 被
+     overflow:hidden 吞成空操作；behavior:"instant" 也必须有——既有 html{scroll-behavior:smooth}
+     会把提交摊成一段补间，补间期间 ScrollTrigger 的中间值会把星雾拽着漂，等于把弹跳换成漂移。 */
+  function commitVirtToPage() {
+    // 正向映射交给 ScrollStory（量程挂在 #story 上，start≠0），这里不自己折算 0..maxScroll
+    const y = window.ScrollStory.scrollForProgress(virtT);
+    if (y >= 0) {
+      scrollTo({ top: y, behavior: "instant" });
+      lastRealT = virtT;          // ScrollTrigger 回调尚未跑时先同步，判据取数口不留空窗
+    }
+    if (gl) window.ThreeScene.setScrollProgress(virtT);
+    window.__XINYU_SCROLL_T__ = virtT;
+  }
   function setDock(open) {          // 既有入口：滚动自动收起 / 点叙事区 / 点标题条 / 全屏态点按钮
     const wasFull = dockFull();
     dockEl.classList.toggle("open", open);
-    if (!open) {
-      dockEl.classList.remove("full");
-      if (wasFull) {   // r109：从全屏退出的**任何**路径都把镜头还给真实滚动进度（D11 判据）
-        if (gl) window.ThreeScene.setScrollProgress(lastRealT);
-        window.__XINYU_SCROLL_T__ = lastRealT;
-      }
-    }
+    if (!open) dockEl.classList.remove("full");
     document.body.classList.toggle("dock-full", dockFull());
+    if (wasFull && !dockFull()) commitVirtToPage();   // 从全屏退出的**任何**路径都提交虚拟行程
     paintDock();
   }
   function setFull(on) {
     dockEl.classList.toggle("full", on);
     if (on) dockEl.classList.add("open");
     document.body.classList.toggle("dock-full", on);
-    // r109：进入全屏从真实进度出发继续推；退出时把镜头还给真实滚动进度
-    if (on) virtT = lastRealT;
-    else if (gl) window.ThreeScene.setScrollProgress(lastRealT);
-    window.__XINYU_SCROLL_T__ = on ? virtT : lastRealT;
+    if (on) virtT = lastRealT;      // 进入全屏：从真实进度出发继续推（页面滚动已被锁）
+    else commitVirtToPage();
     paintDock();
   }
   $("#btn-dock").addEventListener("click", () => {
@@ -321,44 +330,70 @@
   addEventListener("keydown", (e) => {
     if (e.key === "Escape" && dockFull() && !document.querySelector("dialog[open]")) setFull(false);
   });
-  // r109：全屏态滚轮/触摸 → 星雾进度（0..1 端点停）。
-  // r172b 修复（老大报障，本地/线上双复现）：旧规则「日志先滚、到头才交镜头」把滚轮驱动的
-  // 星雾打没了——全屏态 chat-log 占满坞内大半高且默认停底，向上滚想飞回去时滚轮整段被日志
-  // 吃掉、星雾毫无响应（实测 t 恒 1、logScrollTop 狂转）。新规则：滚轮优先给星雾，没到端点
-  // 这一下永远归镜头；只有星雾在端点（0/1）且日志该方向还滚得动，才让给日志 ⇒ 滚轮驱动
-  // 无中断、无丢失，读历史的活路也不丢。
+  /* r182 统一滚轮归属：全屏与非全屏共用**同一条**判据链（此前按 dockFull 分叉，正是分叉处丢的滚轮）。
+     顺序固定为 星雾 → 对话日志 → 拦掉防空转：星雾还走得到这一侧就把滚轮给它；到端点才让日志原生滚
+     （读历史的出口不丢）；日志也到底就拦掉，防空转。
+     非全屏的"星雾"就是页面滚动本身（ScrollTrigger 进度 = scrollY / maxScroll），
+     所以非全屏直接 scrollBy 真实滚动，不另开虚拟轴 —— 否则同一次滚轮会被记两遍。 */
   function fullScrollDrive(d) {
     virtT = Math.min(1, Math.max(0, virtT + d));
     window.__XINYU_SCROLL_T__ = virtT;
     if (gl) window.ThreeScene.setScrollProgress(virtT);
   }
-  function logWantsIt(e) {
-    const log = $("#chat-log");
-    if (!log || !log.contains(e.target) || log.scrollHeight <= log.clientHeight + 2) return false;
-    const atTop = log.scrollTop <= 1, atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 1;
-    return !((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom));
+  const maxScroll = () => Math.max(0, document.documentElement.scrollHeight - innerHeight);
+  // 归一 deltaMode：0=像素 1=行 2=页。旧代码把 deltaY 直接当像素用，
+  // 在按行/按页上报的设备上会整档失真（一个刻度走完一屏或几乎不动）。
+  function deltaPx(e) {
+    const d = e.deltaY;
+    if (!Number.isFinite(d) || d === 0) return 0;
+    if (e.deltaMode === 1) return d * 16;
+    if (e.deltaMode === 2) return d * innerHeight;
+    return d;
   }
+  function fogCanGo(dir) {
+    if (dockFull()) return dir > 0 ? virtT < 1 : virtT > 0;
+    const max = maxScroll();
+    return max > 0 && (dir > 0 ? scrollY < max : scrollY > 0);
+  }
+  function logCanGo(dir) {
+    const log = $("#chat-log");
+    if (!log || log.scrollHeight <= log.clientHeight + 2) return false;
+    return dir > 0
+      ? (log.scrollTop + log.clientHeight < log.scrollHeight - 1)
+      : (log.scrollTop > 1);
+  }
+  function driveFog(px) {
+    if (dockFull()) fullScrollDrive(px * 0.0011);
+    else scrollBy({ top: px, behavior: "instant" });
+  }
+  /* 捕获范围 = 「原生链路接不住滚轮」的那些像素，两种状态判据不同但同源：
+       全屏：body 被 overflow:hidden 锁死，坞外也没有可滚祖先 ⇒ 整屏都得接管；
+       非全屏：只有 #chat-log 这个嵌套滚动容器会截胡（指针停在它上面时页面收不到滚轮），
+               坞其余部位与页面照旧走原生 ⇒ 不捕获 = 既有行为零变更。 */
   addEventListener("wheel", (e) => {
-    if (!dockFull() || e.deltaY === 0) return;
-    const dir = e.deltaY > 0 ? 1 : -1;
-    const fogAtEnd = (dir > 0 && virtT >= 1) || (dir < 0 && virtT <= 0);
-    if (!fogAtEnd) {           // 星雾还走得到这一侧 ⇒ 滚轮归镜头，日志不许抢
-      e.preventDefault();
-      fullScrollDrive(e.deltaY * 0.0011);
-    } else if (!logWantsIt(e)) {
-      e.preventDefault();      // 星雾到端点、日志也接不住 ⇒ 拦掉这回默认滚动，防空转
-    }
+    const log = $("#chat-log");
+    if (!(dockFull() || (log && log.contains(e.target)))) return;
+    const px = deltaPx(e);
+    if (!px) return;
+    const dir = px > 0 ? 1 : -1;
+    if (fogCanGo(dir)) { e.preventDefault(); driveFog(px); }
+    else if (!logCanGo(dir)) e.preventDefault();
     // 其余（星雾到端点 + 日志该方向还能滚）：不拦，让 chat-log 原生滚——读历史的出口
   }, { passive: false });
   addEventListener("touchstart", (e) => { touchLastY = e.touches[0] ? e.touches[0].clientY : 0; }, { passive: true });
+  /* 触摸与滚轮同一条顺序（星雾优先）。r182 起统一为 passive:false：全屏态日志可滚时，
+     旧规则让日志先吃触摸、星雾全程不动，与本次报障同一类；非全屏不捕获，走原生，
+     性能敏感路径零额外成本。 */
   addEventListener("touchmove", (e) => {
-    if (!dockFull() || !e.touches.length) return;
+    if (!e.touches.length) return;
     const y = e.touches[0].clientY, d = touchLastY - y;
     touchLastY = y;
+    if (!dockFull() || !d) return;
     const log = $("#chat-log");
-    if (log && log.contains(e.target) && log.scrollHeight > log.clientHeight + 2) return;
-    fullScrollDrive(d * 0.0022);
-  }, { passive: true });
+    const dir = d > 0 ? 1 : -1;
+    if (fogCanGo(dir)) { e.preventDefault(); driveFog(d * 2); }
+    else if (!(log && log.contains(e.target) && logCanGo(dir))) e.preventDefault();
+  }, { passive: false });
   $("#story").addEventListener("click", (e) => { if (!e.target.closest("#chat-dock")) setDock(false); });
   // r104：点标题条展开（老大拍板）—— 补鼠标/触屏路径，键盘仍走带 aria-expanded 的 #btn-dock。
   //   刻意不给 #dock-bar 加 role=button：它内部套着真按钮，再套一层会撞嵌套交互规则。

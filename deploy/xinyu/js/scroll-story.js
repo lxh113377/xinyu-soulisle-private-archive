@@ -6,6 +6,20 @@
  *    回滚到 progress 0 时恢复的就是这个错误起点 → 滚到底再往上滚，文案消失回不来。
  */
 window.ScrollStory = (function () {
+  let progST = null;   // r182：进度主触发器，供 app.js 把 progress 反查回真实 scrollY
+
+  /* r182：progress → 真实 scrollY 的正向映射。
+     ⚠️ 不能用 t * (scrollHeight - innerHeight) 折算：ScrollTrigger 的量程挂在 #story 上
+        （start "top top" / end "bottom bottom"），start 并不等于 0 —— 实测本项目 st.start≈157、
+        st.end≈maxScroll。按 0..maxScroll 折算会把虚拟行程提交到偏掉的位置（实测偏移约 70px，
+        且误差随 t 变化），退出全屏时表现为"位置对了但进度对不上"。
+     无 GSAP 的降级路径里 progress 本来就是 scrollY/maxScroll，那条折算才是对的。 */
+  function scrollForProgress(t) {
+    const p = Math.min(1, Math.max(0, t));
+    if (progST) return progST.start + p * (progST.end - progST.start);
+    return p * Math.max(0, document.documentElement.scrollHeight - innerHeight);
+  }
+
   function init(onProgress, onAct) {
     const story = document.getElementById("story");
     const acts = [...document.querySelectorAll(".act")];
@@ -14,12 +28,12 @@ window.ScrollStory = (function () {
       gsap.registerPlugin(ScrollTrigger);
       // 字体/布局后到齐会改变幕高，load 后刷新一次触发器量程，避免淡入区间错位
       addEventListener("load", () => { if (window.ScrollTrigger) window.ScrollTrigger.refresh(); });
-      gsap.to({}, {
+      progST = gsap.to({}, {
         scrollTrigger: {
           trigger: story, start: "top top", end: "bottom bottom", scrub: true,
           onUpdate: (self) => onProgress(self.progress)
         }
-      });
+      }).scrollTrigger;
       acts.forEach((a, i) => {
         const copy = a.querySelector(".act-copy");
         // 一条 scrub 时间轴覆盖「淡入 → 满显 → 淡出」，天然双向可逆。
@@ -57,5 +71,5 @@ window.ScrollStory = (function () {
       acts.forEach(a => io.observe(a));
     }
   }
-  return { init };
+  return { init, scrollForProgress };
 })();
