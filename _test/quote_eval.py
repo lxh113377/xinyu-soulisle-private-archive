@@ -380,6 +380,50 @@ def gate_fails(main_psum):
     return out
 
 
+def _judge_and_report_tail(entries, fails, j, summary, v, w, warns):
+    """_judge_and_report 的尾部整段（tail_split 原样搬运，判定/阈值/注释未改一字）。"""
+    main = summary["pairs"]["%s-vs-%s" % MAIN_PAIR]
+    # ── ① 效果门（纯函数 gate_fails，反例腿在 --selftest 里）──
+    fails.extend(gate_fails(main))
+    if entries and main["full_cite"] < 0.05:
+        warns.append("full 引用检出率 %.0f%% < 5%%（素材本体直接引用信号弱；WARN 计，不催引）"
+                     % (main["full_cite"] * 100))
+    if main.get("unanimous", 0) < 0.4:
+        warns.append("主对照评委 unanimous 一致率 %.0f%% < 40%%（三维读数按评委取均后解释；"
+                     "不设门——r133 教训：噪声大于信号时加硬门只制造假红）"
+                     % (main.get("unanimous", 0) * 100))
+    if main["win_pa"] < main["win_pb"]:   # 主对照 pa=full / pb=old
+        warns.append("主对照 full 胜票 %d < old 胜票 %d（报告级 WARN，容差门另判）"
+                     % (main["win_pa"], main["win_pb"]))
+
+    if smoke:
+        print("QUOTE-EVAL-SMOKE-PASS: 四臂生成/多评委判分/配对统计/明细落盘全通（--smoke 跳过效果门，仅验机制）")
+        for f in fails:
+            print("   · (smoke 不设门，仅记录) " + f)
+        for w in warns:
+            print("   ~ " + w)
+        return 0
+    # 门面行自带关键数字：整跑聚合只留含判据词的那一行（r40b/r130 立的折行纪律）
+    nf = summary["pairs"]["full-vs-nofit"]
+    print("QUOTE-EVAL-%s: cases=%d arms=%d judges=%d reps=%d 主对照 full-vs-old 配对均差 "
+          "全量[适%+.2f 自%+.2f 丰%+.2f] 承载面[适%+.2f 自%+.2f 丰%+.2f] "
+          "fit净贡献(承载面 full-vs-nofit)[适%+.2f 自%+.2f 丰%+.2f] "
+          "生硬引用full=%.0f%% 引用检出full=%.0f%%" % (
+              "FAIL" if fails else "PASS", len(rows), len(ARMS), len(judges), reps,
+              main["paired_all_适配度"], main["paired_all_自然度"], main["paired_all_丰富度"],
+              main["paired_heavy_适配度"], main["paired_heavy_自然度"], main["paired_heavy_丰富度"],
+              nf["paired_heavy_适配度"], nf["paired_heavy_自然度"], nf["paired_heavy_丰富度"],
+              main["full_hard"] * 100, main["full_cite"] * 100))
+    if "per_judge" in main:
+        print("  评委均分（full 臂，偏差检查）: " + " | ".join(
+            "%s[适%.2f 自%.2f 丰%.2f]" % (j, v["适配度"], v["自然度"], v["丰富度"])
+            for j, v in sorted(main["per_judge"].items())))
+    for f in fails:
+        print("   · " + f)
+    for w in warns:
+        print("   ~ " + w)
+    return 1 if fails else 0
+
 def _judge_and_report(seed, rows, bad, smoke, judges, reps,
                       detail_name="quotes_eval_detail_r171.json"):
     """汇总 + 判定 + 明细落盘（r171 四臂＋配对＋分层版）。三条线各管一件事，互不顶替：
@@ -515,47 +559,7 @@ def _judge_and_report(seed, rows, bad, smoke, judges, reps,
                 psum["paired_heavy_%s" % dim], psum["paired_n_heavy_%s" % dim],
                 psum["uplift_heavy_%s" % dim]))
 
-    main = summary["pairs"]["%s-vs-%s" % MAIN_PAIR]
-    # ── ① 效果门（纯函数 gate_fails，反例腿在 --selftest 里）──
-    fails.extend(gate_fails(main))
-    if entries and main["full_cite"] < 0.05:
-        warns.append("full 引用检出率 %.0f%% < 5%%（素材本体直接引用信号弱；WARN 计，不催引）"
-                     % (main["full_cite"] * 100))
-    if main.get("unanimous", 0) < 0.4:
-        warns.append("主对照评委 unanimous 一致率 %.0f%% < 40%%（三维读数按评委取均后解释；"
-                     "不设门——r133 教训：噪声大于信号时加硬门只制造假红）"
-                     % (main.get("unanimous", 0) * 100))
-    if main["win_pa"] < main["win_pb"]:   # 主对照 pa=full / pb=old
-        warns.append("主对照 full 胜票 %d < old 胜票 %d（报告级 WARN，容差门另判）"
-                     % (main["win_pa"], main["win_pb"]))
-
-    if smoke:
-        print("QUOTE-EVAL-SMOKE-PASS: 四臂生成/多评委判分/配对统计/明细落盘全通（--smoke 跳过效果门，仅验机制）")
-        for f in fails:
-            print("   · (smoke 不设门，仅记录) " + f)
-        for w in warns:
-            print("   ~ " + w)
-        return 0
-    # 门面行自带关键数字：整跑聚合只留含判据词的那一行（r40b/r130 立的折行纪律）
-    nf = summary["pairs"]["full-vs-nofit"]
-    print("QUOTE-EVAL-%s: cases=%d arms=%d judges=%d reps=%d 主对照 full-vs-old 配对均差 "
-          "全量[适%+.2f 自%+.2f 丰%+.2f] 承载面[适%+.2f 自%+.2f 丰%+.2f] "
-          "fit净贡献(承载面 full-vs-nofit)[适%+.2f 自%+.2f 丰%+.2f] "
-          "生硬引用full=%.0f%% 引用检出full=%.0f%%" % (
-              "FAIL" if fails else "PASS", len(rows), len(ARMS), len(judges), reps,
-              main["paired_all_适配度"], main["paired_all_自然度"], main["paired_all_丰富度"],
-              main["paired_heavy_适配度"], main["paired_heavy_自然度"], main["paired_heavy_丰富度"],
-              nf["paired_heavy_适配度"], nf["paired_heavy_自然度"], nf["paired_heavy_丰富度"],
-              main["full_hard"] * 100, main["full_cite"] * 100))
-    if "per_judge" in main:
-        print("  评委均分（full 臂，偏差检查）: " + " | ".join(
-            "%s[适%.2f 自%.2f 丰%.2f]" % (j, v["适配度"], v["自然度"], v["丰富度"])
-            for j, v in sorted(main["per_judge"].items())))
-    for f in fails:
-        print("   · " + f)
-    for w in warns:
-        print("   ~ " + w)
-    return 1 if fails else 0
+    return _judge_and_report_tail(entries, fails, j, summary, v, w, warns)
 
 
 def _stub_row(case_no, stage, pa, pb, scores):

@@ -1209,85 +1209,8 @@ def guard_inventory(header_text, source_text):
     return bad
 
 
-def _st_mut_a(bad):
-    """r94：由 `selftest` 前段整体下移（selftest 原 291 行 > loc_guard 的 150 行门）。
-
-    切点由 AST 求得（段内 ≤140 行且跨越变量最少），不靠目测；本段产出 ex0/n_all/p 供后段用。
-    """
-    cfg = load_yaml(".github/dependabot.yml")
-    if validate_dependabot(cfg):
-        bad.append(f"原样配置被判失败：{validate_dependabot(cfg)}")
-    t1 = json.loads(json.dumps(cfg)); t1["updates"][0]["package-ecosystem"] = "mavenx"
-    if not validate_dependabot(t1):
-        bad.append("篡改①（ecosystem 拼错）未被抓到 ⇒ 恒真")
-    t2 = json.loads(json.dumps(cfg)); t2["updates"][0]["directory"] = "/no-such-dir"
-    if not validate_dependabot(t2):
-        bad.append("篡改②（directory 不存在）未被抓到 ⇒ 恒真")
-    t3 = json.loads(json.dumps(cfg)); t3["updates"][0]["schedule"]["interval"] = "hourly-ish"
-    if not validate_dependabot(t3):
-        bad.append("篡改③（interval 非法）未被抓到 ⇒ 恒真")
-    j, s = readme_claims()
-    if j == 999 or s == 9999:
-        bad.append("README 数字解析本身就是 999 ⇒ 判据读的是空气")
-    if validate_dependabot({"version": 2, "updates": []}) == []:
-        bad.append("篡改④（updates 清空）未被抓到 ⇒ 恒真")
-    db_ni = json.loads(json.dumps(cfg))
-    for _u in (db_ni.get("updates") or []):
-        if _u.get("package-ecosystem") == "maven":
-            _u.pop("ignore", None)
-    # 篡改④b（r50）：把 maven 的 ignore 摘掉 ⇒ 必须红。
-    # 反向还要证"不扩面"：actions 没有 ignore 也**不该**被判红（否则就是无据推广策略）。
-    if db_ni and not validate_dependabot(db_ni):
-        bad.append("篡改④b（摘掉 maven 的 ignore 大版本）未被抓到 ⇒ G1b 恒真")
-    acts_only = {"version": 2, "updates": [{"package-ecosystem": "github-actions", "directory": "/",
-                 "schedule": {"interval": "weekly"}}]}
-    if validate_dependabot(acts_only):
-        bad.append("篡改④c：actions 侧无 ignore 被判红 ⇒ 策略被无据扩面（实测 major 升级可正常合并）")
-    nt = (ROOT / NOTICES).read_text("utf-8") if (ROOT / NOTICES).exists() else ""
-    rt = (ROOT / "README.md").read_text("utf-8")
-    vf, vp = manifest_vendor_files()
-    vh = vendor_headers(vp)
-    if not vf:
-        bad.append("G6 分母取不到（vendor-manifest.json 缺失或 libs 为空）⇒ 判据无从判，记失败不记通过")
-    if license_scope(nt, rt, vf, vp, vh):
-        bad.append(f"原样授权声明被判失败：{license_scope(nt, rt, vf, vp, vh)}")
-    if not license_scope(nt.replace("gsap.min.js", "zzz"), rt, vf, vp, vh):
-        bad.append("篡改⑤（授权清单里抹掉 gsap.min.js）未被抓到 ⇒ G6 恒真")
-    if not license_scope(nt, rt.replace("THIRD-PARTY-NOTICES", "zzz"), vf, vp, vh):
-        bad.append("篡改⑥（README 去掉指向授权清单的口径行）未被抓到 ⇒ G7 恒真")
-    # 篡改⑤b：**整列抹掉授权信息** ⇒ 必须红。
-    # ⚠️ 第一版只替换 "**MPL-2.0**" 那几个字，而同一列里还留着 banner 原文
-    # `Mozilla Public License, v. 2.0` ⇒ 反例根本没造成缺陷却期望判红（无效反例，见 [[invalid-negative-control]]）。
-    cell_anchor = "**MPL-2.0**（banner 自证 `Copyright (c) 2015 - 2024 Deque Systems, Inc.` + `Mozilla Public License, v. 2.0`）"
-    bare = nt.replace(cell_anchor, "见上游")
-    if cell_anchor not in nt:
-        bad.append("篡改⑤b 的夹具失效：授权列原文与判据锚点不一致（文档被改过，测试要同步）")
-    elif bare == nt or not license_scope(bare, rt, vf, vp, vh):
-        bad.append("篡改⑤b（把 axe-core 的授权列整列改成「见上游」）未被抓到 ⇒ 登记判据可被洗白")
-    # 篡改⑤c：名册新增一个 vendored 件而归属表没动 ⇒ 必须红（分母来自名册，不来自目录扫描）
-    if not license_scope(nt, rt, vf + ["brand-new-lib.min.js"], vp + ["_test/vendor/brand-new-lib.min.js"], vh):
-        bad.append("篡改⑤c（名册多一个未登记的 vendored 文件）未被抓到 ⇒ 新库仍可隐形")
-    # 篡改⑤d：把归属文里 `_test/vendor` 这条边界交代抹掉 ⇒ 必须红（正向要求的对偶断言）
-    if not license_scope(nt.replace("_test/vendor", "_test/zzz"), rt, vf, vp, vh):
-        bad.append("篡改⑤d（抹掉 _test/vendor 边界交代）未被抓到 ⇒ 边界声明判据恒真")
-    # 篡改⑤e：**把授权列改成与文件 banner 不符的说法**（GSAP 实物是 GreenSock 标准许可，写成 MIT 必须翻红）
-    forged = nt.replace("**GreenSock Standard License**（非 MIT、非 OSI；免费用于非竞争性产品）", "**MIT**")
-    if forged == nt:
-        bad.append("篡改⑤e 的夹具失效：授权列原文与判据锚点不再一致（文档被改过，测试要同步）")
-    elif not license_scope(forged, rt, vf, vp, vh):
-        bad.append("篡改⑤e（把 GSAP 授权列伪写成 MIT）未被抓到 ⇒ 许可对账恒真")
-    ct = (ROOT / "memory" / "06-constraints.md").read_text("utf-8")
-    seg0, files0 = eval_section(ct), eval_data_files()
-    if eval_scope(seg0, files0, eval_counts(seg0)):
-        bad.append(f"原样评测集登记被判失败：{eval_scope(seg0, files0, eval_counts(seg0))}")
-    if not eval_scope(seg0.replace("emotion-eval-dataset.json", "zzz.json"), files0, eval_counts(seg0)):
-        bad.append("篡改⑦（抹掉评测集登记行）未被抓到 ⇒ G8 恒真")
-    # 篡改⑧：锚点**必须由登记面上现读的声称条数派生**，不许写死历史值。
-    # 一手腐烂实发（r170）：这条原本写死 `**73 条**`，而评测集在 r117 就扩到 105 条 ⇒
-    # `.replace()` 当场成空操作，SELFTEST 报「G8 条数判据恒真」——**冤枉了判据，真相是自证腿早已脱靶**。
-    # 同文件的 篡改⑤e 早就带了「锚点不匹配即判夹具失效」的守卫，这一条漏了。
-    # 正解不是把 73 补成 105（那只会第三次腐烂），是让它自己从面上取号 + 断言命中数==1。
-    claimed = eval_counts(seg0).get("emotion-eval-dataset.json")
+def _st_mut_a_tail(claimed, ct, files0, seg0):
+    """_st_mut_a 的尾部整段（tail_split 原样搬运，判定/阈值/注释未改一字）。"""
     anchor = "**%d 条**" % claimed if claimed else None
     hit = seg0.count(anchor) if anchor else 0
     if hit != 1:
@@ -1367,6 +1290,87 @@ def _st_mut_a(bad):
     # r94 注：AST 把 `p` 也报成跨越量，但它是**推导式局部变量**（`[p.name for p in ...]`），
     # py3 下不外泄 ⇒ 不进签名（照抄 AST 会拿到 NameError，实测踩到）。真正要交出去的是 n_all/ex0。
     return n_all, ex0
+
+def _st_mut_a(bad):
+    """r94：由 `selftest` 前段整体下移（selftest 原 291 行 > loc_guard 的 150 行门）。
+
+    切点由 AST 求得（段内 ≤140 行且跨越变量最少），不靠目测；本段产出 ex0/n_all/p 供后段用。
+    """
+    cfg = load_yaml(".github/dependabot.yml")
+    if validate_dependabot(cfg):
+        bad.append(f"原样配置被判失败：{validate_dependabot(cfg)}")
+    t1 = json.loads(json.dumps(cfg)); t1["updates"][0]["package-ecosystem"] = "mavenx"
+    if not validate_dependabot(t1):
+        bad.append("篡改①（ecosystem 拼错）未被抓到 ⇒ 恒真")
+    t2 = json.loads(json.dumps(cfg)); t2["updates"][0]["directory"] = "/no-such-dir"
+    if not validate_dependabot(t2):
+        bad.append("篡改②（directory 不存在）未被抓到 ⇒ 恒真")
+    t3 = json.loads(json.dumps(cfg)); t3["updates"][0]["schedule"]["interval"] = "hourly-ish"
+    if not validate_dependabot(t3):
+        bad.append("篡改③（interval 非法）未被抓到 ⇒ 恒真")
+    j, s = readme_claims()
+    if j == 999 or s == 9999:
+        bad.append("README 数字解析本身就是 999 ⇒ 判据读的是空气")
+    if validate_dependabot({"version": 2, "updates": []}) == []:
+        bad.append("篡改④（updates 清空）未被抓到 ⇒ 恒真")
+    db_ni = json.loads(json.dumps(cfg))
+    for _u in (db_ni.get("updates") or []):
+        if _u.get("package-ecosystem") == "maven":
+            _u.pop("ignore", None)
+    # 篡改④b（r50）：把 maven 的 ignore 摘掉 ⇒ 必须红。
+    # 反向还要证"不扩面"：actions 没有 ignore 也**不该**被判红（否则就是无据推广策略）。
+    if db_ni and not validate_dependabot(db_ni):
+        bad.append("篡改④b（摘掉 maven 的 ignore 大版本）未被抓到 ⇒ G1b 恒真")
+    acts_only = {"version": 2, "updates": [{"package-ecosystem": "github-actions", "directory": "/",
+                 "schedule": {"interval": "weekly"}}]}
+    if validate_dependabot(acts_only):
+        bad.append("篡改④c：actions 侧无 ignore 被判红 ⇒ 策略被无据扩面（实测 major 升级可正常合并）")
+    nt = (ROOT / NOTICES).read_text("utf-8") if (ROOT / NOTICES).exists() else ""
+    rt = (ROOT / "README.md").read_text("utf-8")
+    vf, vp = manifest_vendor_files()
+    vh = vendor_headers(vp)
+    if not vf:
+        bad.append("G6 分母取不到（vendor-manifest.json 缺失或 libs 为空）⇒ 判据无从判，记失败不记通过")
+    if license_scope(nt, rt, vf, vp, vh):
+        bad.append(f"原样授权声明被判失败：{license_scope(nt, rt, vf, vp, vh)}")
+    if not license_scope(nt.replace("gsap.min.js", "zzz"), rt, vf, vp, vh):
+        bad.append("篡改⑤（授权清单里抹掉 gsap.min.js）未被抓到 ⇒ G6 恒真")
+    if not license_scope(nt, rt.replace("THIRD-PARTY-NOTICES", "zzz"), vf, vp, vh):
+        bad.append("篡改⑥（README 去掉指向授权清单的口径行）未被抓到 ⇒ G7 恒真")
+    # 篡改⑤b：**整列抹掉授权信息** ⇒ 必须红。
+    # ⚠️ 第一版只替换 "**MPL-2.0**" 那几个字，而同一列里还留着 banner 原文
+    # `Mozilla Public License, v. 2.0` ⇒ 反例根本没造成缺陷却期望判红（无效反例，见 [[invalid-negative-control]]）。
+    cell_anchor = "**MPL-2.0**（banner 自证 `Copyright (c) 2015 - 2024 Deque Systems, Inc.` + `Mozilla Public License, v. 2.0`）"
+    bare = nt.replace(cell_anchor, "见上游")
+    if cell_anchor not in nt:
+        bad.append("篡改⑤b 的夹具失效：授权列原文与判据锚点不一致（文档被改过，测试要同步）")
+    elif bare == nt or not license_scope(bare, rt, vf, vp, vh):
+        bad.append("篡改⑤b（把 axe-core 的授权列整列改成「见上游」）未被抓到 ⇒ 登记判据可被洗白")
+    # 篡改⑤c：名册新增一个 vendored 件而归属表没动 ⇒ 必须红（分母来自名册，不来自目录扫描）
+    if not license_scope(nt, rt, vf + ["brand-new-lib.min.js"], vp + ["_test/vendor/brand-new-lib.min.js"], vh):
+        bad.append("篡改⑤c（名册多一个未登记的 vendored 文件）未被抓到 ⇒ 新库仍可隐形")
+    # 篡改⑤d：把归属文里 `_test/vendor` 这条边界交代抹掉 ⇒ 必须红（正向要求的对偶断言）
+    if not license_scope(nt.replace("_test/vendor", "_test/zzz"), rt, vf, vp, vh):
+        bad.append("篡改⑤d（抹掉 _test/vendor 边界交代）未被抓到 ⇒ 边界声明判据恒真")
+    # 篡改⑤e：**把授权列改成与文件 banner 不符的说法**（GSAP 实物是 GreenSock 标准许可，写成 MIT 必须翻红）
+    forged = nt.replace("**GreenSock Standard License**（非 MIT、非 OSI；免费用于非竞争性产品）", "**MIT**")
+    if forged == nt:
+        bad.append("篡改⑤e 的夹具失效：授权列原文与判据锚点不再一致（文档被改过，测试要同步）")
+    elif not license_scope(forged, rt, vf, vp, vh):
+        bad.append("篡改⑤e（把 GSAP 授权列伪写成 MIT）未被抓到 ⇒ 许可对账恒真")
+    ct = (ROOT / "memory" / "06-constraints.md").read_text("utf-8")
+    seg0, files0 = eval_section(ct), eval_data_files()
+    if eval_scope(seg0, files0, eval_counts(seg0)):
+        bad.append(f"原样评测集登记被判失败：{eval_scope(seg0, files0, eval_counts(seg0))}")
+    if not eval_scope(seg0.replace("emotion-eval-dataset.json", "zzz.json"), files0, eval_counts(seg0)):
+        bad.append("篡改⑦（抹掉评测集登记行）未被抓到 ⇒ G8 恒真")
+    # 篡改⑧：锚点**必须由登记面上现读的声称条数派生**，不许写死历史值。
+    # 一手腐烂实发（r170）：这条原本写死 `**73 条**`，而评测集在 r117 就扩到 105 条 ⇒
+    # `.replace()` 当场成空操作，SELFTEST 报「G8 条数判据恒真」——**冤枉了判据，真相是自证腿早已脱靶**。
+    # 同文件的 篡改⑤e 早就带了「锚点不匹配即判夹具失效」的守卫，这一条漏了。
+    # 正解不是把 73 补成 105（那只会第三次腐烂），是让它自己从面上取号 + 断言命中数==1。
+    claimed = eval_counts(seg0).get("emotion-eval-dataset.json")
+    return _st_mut_a_tail(claimed, ct, files0, seg0)
 
 
 def _st_mut_b(bad):

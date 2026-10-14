@@ -169,47 +169,8 @@ def seed_rows(mysql, port):
     return p.returncode, out
 
 
-def main():
-    if "--selftest" in sys.argv[1:]:
-        return selftest()
-
-    try:
-        # 同 selftest 里的坑：mysql_db_check 顶部也会换 sys.stdout，被替换掉的那个包装器
-        # 一旦被回收就会关掉共享 buffer ⇒ 本件后续 print 全部报 closed file。两个引用都上名单。
-        _keepalive.append(sys.stdout)
-        import mysql_db_check as m
-        _keepalive.append(sys.stdout)
-        sys.stdout = _keepalive[0]
-    except Exception as e:
-        print("%s-UNVERIFIED 未验：无法复用 mysql_db_check 的取库通道（%s: %s）"
-              % (VERDICT, e.__class__.__name__, e), flush=True)
-        return 2
-
-    dump_bin, mysql_bin = m.local_bin("mysqldump"), m.local_bin("mysql")
-    if not (dump_bin and mysql_bin):
-        print("%s-UNVERIFIED 未验：本机缺 mysqldump.exe 或 mysql.exe（basedir=%s，可设 XINYU_MYSQL_BASEDIR）"
-              % (VERDICT, m.LOCAL_BASEDIR), flush=True)
-        return 2
-
-    # 取库：只走一次性实例。环境变量目标必须带显式授权，否则宁可判未验。
-    env_jdbc = os.environ.get("XINYU_BACKUP_MYSQL_PORT", "").strip()
-    if env_jdbc:
-        port = int(env_jdbc)
-        if not is_destructive_allowed(port, SCRATCH_DB):
-            print("%s-UNVERIFIED 未验：目标端口 %s 不是本件的一次性实例，且未设 "
-                  "XINYU_BACKUP_ALLOW_DESTRUCTIVE=1 ⇒ 拒绝在其上 DROP DATABASE" % (VERDICT, port), flush=True)
-            return 2
-        target, note = None, "取库=显式指定端口 %s（已授权破坏性演练）" % port
-    else:
-        target, err = m.start_local("utf8mb4")
-        if target is None:
-            print("%s-UNVERIFIED 未验：一次性实例起不来（%s）" % (VERDICT, err), flush=True)
-            return 2
-        port = m.LOCAL_PORTS["utf8mb4"]
-        note = "取库=本机 mysqld 一次性实例（端口 %s，库 %s）" % (port, SCRATCH_DB)
-
-    stamp = DUMP_DIR / ("xinyu-backup-%d.sql" % port)
-    fails = []
+def _main_tail(dump_bin, fails, mysql_bin, note, port, stamp, target):
+    """main 的尾部整段（tail_split 原样搬运，判定/阈值/注释未改一字）。"""
     try:
         print("[backup-drill] %s｜产物 %s" % (note, stamp), flush=True)
 
@@ -327,6 +288,49 @@ def main():
     finally:
         if target is not None:
             target.teardown()
+
+def main():
+    if "--selftest" in sys.argv[1:]:
+        return selftest()
+
+    try:
+        # 同 selftest 里的坑：mysql_db_check 顶部也会换 sys.stdout，被替换掉的那个包装器
+        # 一旦被回收就会关掉共享 buffer ⇒ 本件后续 print 全部报 closed file。两个引用都上名单。
+        _keepalive.append(sys.stdout)
+        import mysql_db_check as m
+        _keepalive.append(sys.stdout)
+        sys.stdout = _keepalive[0]
+    except Exception as e:
+        print("%s-UNVERIFIED 未验：无法复用 mysql_db_check 的取库通道（%s: %s）"
+              % (VERDICT, e.__class__.__name__, e), flush=True)
+        return 2
+
+    dump_bin, mysql_bin = m.local_bin("mysqldump"), m.local_bin("mysql")
+    if not (dump_bin and mysql_bin):
+        print("%s-UNVERIFIED 未验：本机缺 mysqldump.exe 或 mysql.exe（basedir=%s，可设 XINYU_MYSQL_BASEDIR）"
+              % (VERDICT, m.LOCAL_BASEDIR), flush=True)
+        return 2
+
+    # 取库：只走一次性实例。环境变量目标必须带显式授权，否则宁可判未验。
+    env_jdbc = os.environ.get("XINYU_BACKUP_MYSQL_PORT", "").strip()
+    if env_jdbc:
+        port = int(env_jdbc)
+        if not is_destructive_allowed(port, SCRATCH_DB):
+            print("%s-UNVERIFIED 未验：目标端口 %s 不是本件的一次性实例，且未设 "
+                  "XINYU_BACKUP_ALLOW_DESTRUCTIVE=1 ⇒ 拒绝在其上 DROP DATABASE" % (VERDICT, port), flush=True)
+            return 2
+        target, note = None, "取库=显式指定端口 %s（已授权破坏性演练）" % port
+    else:
+        target, err = m.start_local("utf8mb4")
+        if target is None:
+            print("%s-UNVERIFIED 未验：一次性实例起不来（%s）" % (VERDICT, err), flush=True)
+            return 2
+        port = m.LOCAL_PORTS["utf8mb4"]
+        note = "取库=本机 mysqld 一次性实例（端口 %s，库 %s）" % (port, SCRATCH_DB)
+
+    stamp = DUMP_DIR / ("xinyu-backup-%d.sql" % port)
+    fails = []
+    return _main_tail(dump_bin, fails, mysql_bin, note, port, stamp, target)
 
 
 def out_counts(mysql_bin, port):
