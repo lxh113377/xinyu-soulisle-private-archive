@@ -117,6 +117,67 @@ def bucket(secs):
     return ">=6s"
 
 
+def _summarize(table):
+    """分维度聚合 → 三口径读数（严格 / 粤字归一 / 繁简归一）。按样本数降序，便于先看大头。"""
+    out = {}
+    for k, g in sorted(table.items(), key=lambda x: -x[1]["n"]):
+        out[k] = {"n": g["n"], "cer": round(g["dist"] / g["ref"], 4) if g["ref"] else None,
+                  "ser": round(g["ser_bad"] / g["n"], 4),
+                  "cer_canto": round(g["dist_c"] / g["ref"], 4) if g["ref"] else None,
+                  "ser_canto": round(g["ser_bad_c"] / g["n"], 4),
+                  "cer_simp": round(g["dist_s"] / g["ref"], 4) if g["ref"] else None,
+                  "ser_simp": round(g["ser_bad_s"] / g["n"], 4)}
+    return out
+
+
+def _print_faces(report, per_sample, cer, ser, cer_c, ser_c, cer_s, ser_s):
+    """门面行 + 三个分维度面 + 两组最差样本（严格口径与繁简归一口径各一排）。"""
+    print("ASR-EVAL 条数=%d 参考总字数=%d｜严格CER=%.2f%% SER=%.2f%%｜粤字归一CER=%.2f%% SER=%.2f%%"
+          "｜繁简归一CER=%.2f%% SER=%.2f%%｜耗时=%.1fs"
+          % (len(report["samples"]), report["total_ref_chars"], cer * 100, ser * 100,
+             cer_c * 100, ser_c * 100, cer_s * 100, ser_s * 100, report["secs"]))
+    if not _ZHHCONV:
+        print("  ⚠ zhconv 不可用，繁简归一口径退化为与粤字归一同值（读数不可当真）")
+    for name, table in (("domain", report["by_domain"]), ("时长", report["by_dur_bucket"]),
+                        ("性别", report["by_gender"])):
+        parts = ["%s n=%d cer=%.1f%%(粤%.1f%%/简%.1f%%)"
+                 % (k, v["n"], (v["cer"] or 0) * 100, (v["cer_canto"] or 0) * 100,
+                    (v["cer_simp"] or 0) * 100)
+                 for k, v in table.items()]
+        print("  %s: %s" % (name, " | ".join(parts)))
+    worst = sorted(per_sample, key=lambda r: -(r["dist"] / max(1, r["ref_len"])))[:5]
+    for w in worst:
+        print("  最差(严格): CER=%.0f%% ref=%r hyp=%r" % (100.0 * w["dist"] / max(1, w["ref_len"]),
+                                                        w["ref"], w["hyp"]))
+    worst_s = sorted(per_sample, key=lambda r: -(r["dist_simp"] / max(1, r["ref_len"])))[:5]
+    for w in worst_s:
+        print("  最差(繁简归一): CER=%.0f%% ref=%r hyp=%r" % (100.0 * w["dist_simp"] / max(1, w["ref_len"]),
+                                                            w["ref"], w["hyp"]))
+
+
+def _compare_baseline(path, per_sample, cer, ser, cer_c):
+    """与历史基线逐样本对账（只印读数，不改判据——判绿归 --gate 那一挡）。"""
+    if not os.path.isfile(path):
+        print("ASR-EVAL-FAIL 对比基线不存在 %s" % path)
+        return False
+    base = json.load(open(path, encoding="utf-8"))
+    d_cer = (cer - base["cer"]) * 100
+    d_ser = (ser - base["ser"]) * 100
+    d_ccer = (cer_c - base.get("cer_canto", cer_c)) * 100
+    print("  对比基线(%s, n=%d)：严格CER %+.2f / 严格SER %+.2f / 归一CER %+.2f 个百分点"
+          % (os.path.basename(path), base["n"], d_cer, d_ser, d_ccer))
+    bmap = {s["id"]: s for s in base.get("samples", [])}
+    worse = [(r["id"], r["ref"], r["hyp"], bmap[r["id"]]["hyp"])
+             for r in per_sample
+             if r["id"] in bmap and r["dist"] > bmap[r["id"]]["dist"]]
+    better = [r for r in per_sample
+              if r["id"] in bmap and r["dist"] < bmap[r["id"]]["dist"]]
+    print("  逐样本：变好 %d 条 / 变差 %d 条" % (len(better), len(worse)))
+    for w in worse[:5]:
+        print("    回退 %s ref=%r 基线=%r 现在=%r" % w)
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0, help="只跑前 N 条（0=全部）")
@@ -216,47 +277,16 @@ def main():
     cer_s = tot_dist_s / tot_ref if tot_ref else 0.0
     ser_s = ser_bad_s / len(results) if results else 0.0
 
-    def summarize(table):
-        out = {}
-        for k, g in sorted(table.items(), key=lambda x: -x[1]["n"]):
-            out[k] = {"n": g["n"], "cer": round(g["dist"] / g["ref"], 4) if g["ref"] else None,
-                      "ser": round(g["ser_bad"] / g["n"], 4),
-                      "cer_canto": round(g["dist_c"] / g["ref"], 4) if g["ref"] else None,
-                      "ser_canto": round(g["ser_bad_c"] / g["n"], 4),
-                      "cer_simp": round(g["dist_s"] / g["ref"], 4) if g["ref"] else None,
-                      "ser_simp": round(g["ser_bad_s"] / g["n"], 4)}
-        return out
-
     report = {"url": args.url, "n": len(results), "total_ref_chars": tot_ref,
               "total_dist": tot_dist, "cer": round(cer, 4), "ser": round(ser, 4),
               "cer_canto": round(cer_c, 4), "ser_canto": round(ser_c, 4),
               "cer_simp": round(cer_s, 4), "ser_simp": round(ser_s, 4),
               "zhconv_ok": bool(_ZHHCONV),
               "secs": round(time.time() - t0, 1),
-              "by_domain": summarize(by_domain), "by_dur_bucket": summarize(by_bucket),
-              "by_gender": summarize(by_gender), "samples": per_sample}
+              "by_domain": _summarize(by_domain), "by_dur_bucket": _summarize(by_bucket),
+              "by_gender": _summarize(by_gender), "samples": per_sample}
 
-    print("ASR-EVAL 条数=%d 参考总字数=%d｜严格CER=%.2f%% SER=%.2f%%｜粤字归一CER=%.2f%% SER=%.2f%%"
-          "｜繁简归一CER=%.2f%% SER=%.2f%%｜耗时=%.1fs"
-          % (len(results), tot_ref, cer * 100, ser * 100, cer_c * 100, ser_c * 100,
-             cer_s * 100, ser_s * 100, report["secs"]))
-    if not _ZHHCONV:
-        print("  ⚠ zhconv 不可用，繁简归一口径退化为与粤字归一同值（读数不可当真）")
-    for name, table in (("domain", report["by_domain"]), ("时长", report["by_dur_bucket"]),
-                        ("性别", report["by_gender"])):
-        parts = ["%s n=%d cer=%.1f%%(粤%.1f%%/简%.1f%%)"
-                 % (k, v["n"], (v["cer"] or 0) * 100, (v["cer_canto"] or 0) * 100,
-                    (v["cer_simp"] or 0) * 100)
-                 for k, v in table.items()]
-        print("  %s: %s" % (name, " | ".join(parts)))
-    worst = sorted(per_sample, key=lambda r: -(r["dist"] / max(1, r["ref_len"])))[:5]
-    for w in worst:
-        print("  最差(严格): CER=%.0f%% ref=%r hyp=%r" % (100.0 * w["dist"] / max(1, w["ref_len"]),
-                                                        w["ref"], w["hyp"]))
-    worst_s = sorted(per_sample, key=lambda r: -(r["dist_simp"] / max(1, r["ref_len"])))[:5]
-    for w in worst_s:
-        print("  最差(繁简归一): CER=%.0f%% ref=%r hyp=%r" % (100.0 * w["dist_simp"] / max(1, w["ref_len"]),
-                                                            w["ref"], w["hyp"]))
+    _print_faces(report, per_sample, cer, ser, cer_c, ser_c, cer_s, ser_s)
 
     if args.save:
         with open(args.save, "w", encoding="utf-8", newline="\n") as f:
@@ -264,25 +294,8 @@ def main():
             f.write("\n")
         print("  基线已存 %s" % args.save)
 
-    if args.compare:
-        if not os.path.isfile(args.compare):
-            print("ASR-EVAL-FAIL 对比基线不存在 %s" % args.compare)
-            return 1
-        base = json.load(open(args.compare, encoding="utf-8"))
-        d_cer = (cer - base["cer"]) * 100
-        d_ser = (ser - base["ser"]) * 100
-        d_ccer = (cer_c - base.get("cer_canto", cer_c)) * 100
-        print("  对比基线(%s, n=%d)：严格CER %+.2f / 严格SER %+.2f / 归一CER %+.2f 个百分点"
-              % (os.path.basename(args.compare), base["n"], d_cer, d_ser, d_ccer))
-        bmap = {s["id"]: s for s in base.get("samples", [])}
-        worse = [(r["id"], r["ref"], r["hyp"], bmap[r["id"]]["hyp"])
-                 for r in per_sample
-                 if r["id"] in bmap and r["dist"] > bmap[r["id"]]["dist"]]
-        better = [r for r in per_sample
-                  if r["id"] in bmap and r["dist"] < bmap[r["id"]]["dist"]]
-        print("  逐样本：变好 %d 条 / 变差 %d 条" % (len(better), len(worse)))
-        for w in worse[:5]:
-            print("    回退 %s ref=%r 基线=%r 现在=%r" % w)
+    if args.compare and not _compare_baseline(args.compare, per_sample, cer, ser, cer_c):
+        return 1
 
     if args.gate:
         try:

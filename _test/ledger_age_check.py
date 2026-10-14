@@ -298,13 +298,8 @@ def na_rollup(census, waived=None):
     return [f for f in diverge if f not in waived], unknown, reds, hits
 
 
-def selftest():
-    cases = []
-
-    def eq(label, got, want):
-        cases.append((label, got, want))
-
-    T = date(2026, 10, 5)
+def _st_legs_parse(eq, T):
+    "解析面正例腿（日期抽取／族名剥离／fuse 取数／同族聚合与龄期）"
 
     # 正例腿（只有正例能抓「尺恒假」）
     eq("文件名尾部日期取得对", parse_named_date("peer-a11y-2026-09-27.json"), date(2026, 9, 27))
@@ -342,6 +337,10 @@ def selftest():
     r3 = evaluate([("peer-a11y-2026-09-27.json", date(2026, 9, 27), "文件名", 50.0)], 7, T)
     eq("8 天 > fuse 7 ⇒ 超龄点名（这就是把 12 族抓出来的那一挡）", r3["state"], "OVER-FUSE")
 
+
+def _st_legs_mutants(eq):
+    "变异腿（把解析器摘掉后读数必须变，证明这条闸在咬而不是恒真）"
+
     # 变异腿（把解析器/判据摘掉后读数必须变，证明这条闸在咬而不是恒真）
     keep = TRAIL_DATE_RE
     globals()["TRAIL_DATE_RE"] = re.compile(r"[-.](9999)-(99)-(99)(?=\.json$)")
@@ -367,6 +366,11 @@ def selftest():
     eq("变异体 非法日期 2026-13-45 ⇒ None（不得回落到 1 月 1 日）",
        parse_named_date("peer-x-2026-13-45.json"), None)
     eq("变异体 非日期串 ⇒ None（不得读成 0 龄）", parse_iso_ts("not-a-date"), None)
+
+
+def _st_legs_mtime_cross(eq, T):
+    "mtime 交叉腿（记分歧／差一小时记未验／全族同值降档只降这一条）"
+
     # 把 mtime 换成与文件名不同的那份 ⇒ 分歧列必须出现（否则交叉腿是恒假的）。
     # r101 更正：夹具的 mtime 必须**跨过重采节奏**才叫信息——旧夹具写 1.0/999.0（差 998 秒），
     # 那正好是本轮 CI 假红的形态（checkout 只差亚秒），拿它当"有区分度"等于把缺陷编码进测试。
@@ -395,6 +399,10 @@ def selftest():
     eq("反例：mtime 有区分度时同输入必须仍判分歧（证明降档不是大赦）",
        "divergence" in div, True)
 
+
+def _st_legs_bounds(eq, T):
+    "边界腿（无日期／龄恰等 fuse／未来日期／契约不在／degraded 计数）"
+
     # 边界腿
     eq("边界 无日期可判 ⇒ UNDATEd 且 age 为 None（不得写成 0 天）",
        evaluate([("peer-y.json", None, "无候选时间戳键", 1.0)], 7, T)["age_days"], None)
@@ -411,6 +419,10 @@ def selftest():
        n_par == len(names), True)
     eq("排除面不得与「没有这个目录」同形：目录不在 ⇒ 0 且不报错",
        count_partials(ROOT / "_no_such_dir_")[0], 0)
+
+
+def _st_legs_na(eq):
+    "件内 NA 面（四态 + 豁免语义 + 形状自动识别，正反双向）"
 
     # ── r101 件内 NA 面（四态 + 豁免语义 + 形状自动识别，正反双向） ──
     eq("NA 四态 干净件（声明 0 且件内无 NA）⇒ CLEAR",
@@ -449,6 +461,23 @@ def selftest():
             continue
     eq("真面自证 在册豁免的每一项当前确实分叉（probe 修好后这条转红 ⇒ 提醒摘牌）",
        sorted(k for k in NA_DIVERGE_WAIVED if _real.get(k, ("",))[0] != "NA-DIVERGE"), [])
+
+def selftest():
+    cases = []
+
+    def eq(label, got, want):
+        cases.append((label, got, want))
+
+    T = date(2026, 10, 5)
+
+    _st_legs_parse(eq, T)
+
+    _st_legs_mutants(eq)
+    _st_legs_mtime_cross(eq, T)
+
+    _st_legs_bounds(eq, T)
+
+    _st_legs_na(eq)
 
     bad = [(n, g, w) for n, g, w in cases if g != w]
     for n, g, w in bad:
