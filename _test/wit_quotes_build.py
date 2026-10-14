@@ -256,9 +256,170 @@ def _expect_fail(tmp_dir, name, text, why, write=True):
     return False
 
 
+# --- selftest 的四族桩 + 收口（升模块级，按主题切：坏卡面 fail-fast 族／fit 派生族／真面变异腿族／直写位族）---
+# 拆出来的原因只是 loc_guard 的「单函数 ≤150 行」门；判定体、卡面字面量、legs.append 顺序均与拆前逐字同文。
+def _st_legs_bad_card_failfast(tmp, legs):
+    """腿 3-10：坏卡面必须 fail-fast（ID 重复／篇码错位／枚举非法／句面超长／缺字段／通用并列），外加 E 级排除计数。"""
+    # 3) 反例：ID 重复（卡面已写入 d2，不再经 _write_card 覆盖）
+    d2 = tmp / "dup"
+    _write_card(d2, "01-CL-test.md", CARD_TMPL.format(
+        level="A", emo="sadness", scene="共情", quote="第一句。")
+        + "\n\n" + CARD_TMPL.format(level="B", emo="sadness", scene="安抚", quote="第二句。"))
+    legs.append(("反例·ID 重复 fail-fast", _expect_fail(d2, "", "", "ID 重复", write=False)))
+    # 4) 反例：篇码与文件名不符（先 format 再 replace，防占位符漏填）
+    d3 = tmp / "chap"
+    _write_card(d3, "01-CL-test.md",
+                CARD_TMPL.format(**OK_CARD)
+                .replace("QTE-CL-901", "QTE-MS-901"))
+    legs.append(("反例·篇码与篇章文件不符", _expect_fail(d3, "", "", "篇码错位", write=False)))
+    # 5) 反例：情绪枚举非法
+    d4 = tmp / "emo"
+    _write_card(d4, "01-CL-test.md",
+                CARD_TMPL.format(**OK_CARD)
+                .replace("适用情绪：sadness", "适用情绪：狂喜"))
+    legs.append(("反例·情绪枚举非法", _expect_fail(d4, "", "", "情绪枚举", write=False)))
+    # 6) 反例：场景枚举非法
+    d5 = tmp / "scene"
+    _write_card(d5, "01-CL-test.md",
+                CARD_TMPL.format(**OK_CARD)
+                .replace("适用场景：共情", "适用场景：唠嗑"))
+    legs.append(("反例·场景枚举非法", _expect_fail(d5, "", "", "场景枚举", write=False)))
+    # 7) 反例：句面超长
+    d6 = tmp / "long"
+    _write_card(d6, "01-CL-test.md",
+                CARD_TMPL.format(level="A", emo="sadness", scene="共情",
+                                 quote="长" * (QUOTE_MAX + 1)))
+    legs.append(("反例·句面超长", _expect_fail(d6, "", "", "句面超长", write=False)))
+    # 8) 反例：缺字段
+    d7 = tmp / "miss"
+    _write_card(d7, "01-CL-test.md",
+                "\n".join(l for l in CARD_TMPL.format(**OK_CARD).splitlines()
+                          if not l.startswith("- 入库")))
+    legs.append(("反例·缺字段", _expect_fail(d7, "", "", "缺字段", write=False)))
+    # 9) E 级不入产品件
+    d8 = tmp / "elevel"
+    _write_card(d8, "01-CL-test.md",
+                CARD_TMPL.format(**OK_CARD).replace("可信度：A", "可信度：E"))
+    d8_data = parse_entries(d8)
+    legs.append(("E 级排除·不入产品件", d8_data["counts"]["excludedE"] == 1
+                 and d8_data["counts"]["total"] == 0))
+    # 10) 「通用」不得与具体情绪并列
+    d9 = tmp / "allmix"
+    _write_card(d9, "01-CL-test.md",
+                CARD_TMPL.format(**OK_CARD)
+                .replace("适用情绪：sadness", "适用情绪：sadness、通用"))
+    legs.append(("反例·「通用」并列具体情绪", _expect_fail(d9, "", "", "通用并列", write=False)))
+
+
+def _st_legs_fit_derive(tmp, legs):
+    """腿 11-15：fit 派生三档（触发子句／去括号／超长回落）+ 两条结构不变量（fit 恒在位、零死重量）。"""
+    # 11) fit 派生（r171）：「用法」里短触发子句 ⇒ 取到第一个「时」为止
+    d10 = tmp / "fitok"
+    _write_card(d10, "01-CL-test.md",
+                CARD_TMPL.format(**OK_CARD)
+                .replace("用法：测试用法句。", "用法：用户说撑不住了时，先接住再轻引半句。"))
+    d10_data = parse_entries(d10)
+    legs.append(("fit·触发子句派生（止于「时」）",
+                d10_data["entries"][0]["fit"] == "用户说撑不住了时"
+                and d10_data["counts"]["fitFallback"] == 0))
+    # 12) fit 二级降级（r171）：触发子句含（）补语、去括号后落回上限内 ⇒ 用去括号形态，不算回落
+    d11 = tmp / "fitparen"
+    _write_card(d11, "01-CL-test.md",
+                CARD_TMPL.format(**OK_CARD)
+                .replace("用法：测试用法句。",
+                         "用法：用户在经历长期照护压力与自我消耗、并且明确表示已经没有退路"
+                         "（如离职、休学、搬走）时，先接住他撑了很久这件事，忌给建议。"))
+    d11_data = parse_entries(d11)
+    legs.append(("fit·去括号后入上限",
+                d11_data["entries"][0]["fit"] == "用户在经历长期照护压力与自我消耗、并且明确表示已经没有退路时"
+                and d11_data["counts"]["fitFallback"] == 0))
+    # 13) fit 三级回落（r171）：去括号后仍超 FIT_MAX ⇒ 回落场景标签 + 计数，禁硬截半句
+    d12 = tmp / "fitfb"
+    _write_card(d12, "01-CL-test.md",
+                CARD_TMPL.format(**OK_CARD)
+                .replace("用法：测试用法句。",
+                         "用法：用户在经历长期的照护压力与自我消耗，并且已经在多个场合"
+                         "明确表示自己没有退路（如离职、休学、搬走）时，先接住，忌给建议。"))
+    d12_data = parse_entries(d12)
+    fb_fit = d12_data["entries"][0]["fit"]
+    legs.append(("fit·超长回落场景标签并计数",
+                fb_fit == "适合：共情" and len(fb_fit) <= FIT_MAX
+                and d12_data["counts"]["fitFallback"] == 1))
+    # 14) fit 恒在位且不越界（r171 结构不变量：注入面每条都读它，缺键即静默退化成裸句）
+    legs.append(("fit·每条必有且 ≤ 上限",
+                all(e.get("fit") and len(e["fit"]) <= FIT_MAX
+                    for d in (d10_data, d11_data, d12_data) for e in d["entries"])))
+    # 15) 零死重量（r171）：产物不得再携带 md 字段的截断副本 `usage`（全仓零消费者，实测占 44,094B）
+    legs.append(("产物无 usage 副本（只有 fit）",
+                all("usage" not in e for d in (d10_data, d11_data, d12_data) for e in d["entries"])))
+
+
+def _st_legs_real_face_mutation(tmp, legs):
+    """腿 16-17：真面产物变异腿 + 未篡改对照腿（缺对照腿则 16 恒真）。"""
+    # 16) 变异腿（r171 补齐 —— r134 清场重建时把这条丢了，docs/quality-gates.md 却一直在册，
+    #     属「登记了却没有的桶」）：真面产物**改一个字节**必须与重建结果不一致。
+    #     作业面 = Temp 副本，宿主文件字节前后同指纹（判据不得改写自己的宿主）。
+    host = OUT
+    host_before = host.read_bytes()
+    rebuilt = render(parse_entries(CORPUS_DIR))
+    cp = tmp / "artifact_mut.js"
+    cp.write_bytes(host_before)
+    t = cp.read_text("utf-8")
+    mid = len(t) // 2
+    tampered = t[:mid] + ("0" if t[mid] != "0" else "1") + t[mid + 1:]
+    cp.write_text(tampered, encoding="utf-8", newline="\n")
+    legs.append(("变异腿·真面产物改一字节必判不一致",
+                 len(tampered) == len(t) and tampered != rebuilt
+                 and cp.read_text("utf-8") != rebuilt
+                 and host.read_bytes() == host_before))
+    # 17) 对照腿（缺它则 16 是恒真）：未篡改的产物副本必须与重建结果**逐字节相等**
+    cp2 = tmp / "artifact_pristine.js"
+    cp2.write_bytes(host_before)
+    legs.append(("对照·未篡改产物与重建逐字节相等", cp2.read_text("utf-8") == rebuilt))
+
+
+def _st_legs_fit_card_direct(tmp, legs):
+    """腿 18-20：卡面直写「适配提示」列的三腿（直写优先／超长 fail-fast／空值 fail-fast）。"""
+    # 18) 卡面直写优先（r171 可选列「适配提示」）：人工写的触发子句必须盖过派生路径
+    d13 = tmp / "fitcard"
+    _write_card(d13, "01-CL-test.md",
+                CARD_TMPL.format(**OK_CARD)
+                .replace("用法：测试用法句。", "用法：这里先讲一大段概念与背景，触发条件写在后半句。")
+                + "- 适配提示：用户说熬不下去了时\n")
+    d13_data = parse_entries(d13)
+    legs.append(("适配提示·卡面直写优先",
+                d13_data["entries"][0]["fit"] == "用户说熬不下去了时"
+                and d13_data["counts"]["fitSrc"]["card"] == 1
+                and d13_data["counts"]["fitSrc"]["scene"] == 0))
+    # 19) 反例：直写超上限 ⇒ fail-fast（注入预算按条算，静默截断会咬掉半句）
+    d14 = tmp / "fitlong"
+    _write_card(d14, "01-CL-test.md",
+                CARD_TMPL.format(**OK_CARD) + "- 适配提示：" + "长" * (FIT_MAX + 1) + "\n")
+    legs.append(("反例·适配提示超长 fail-fast",
+                 _expect_fail(d14, "", "", "适配提示超长", write=False)))
+    # 20) 反例：列写了但值为空 ⇒ fail-fast（空值会把直写位静默让给派生，等于假装有人修过卡）
+    d15 = tmp / "fitempty"
+    _write_card(d15, "01-CL-test.md", CARD_TMPL.format(**OK_CARD) + "- 适配提示：\n")
+    legs.append(("反例·适配提示空值 fail-fast",
+                 _expect_fail(d15, "", "", "适配提示为空", write=False)))
+
+
+def _st_print_verdict(legs):
+    """收口印结论（拆自 selftest 的收尾段）：分母现读 len(legs)，红腿逐条点名，返回 rc。"""
+    bad = [name for name, ok in legs if not ok]
+    print("WIT-QUOTES-SELFTEST-%s: %d/%d 腿（r171 加 fit 派生四腿＋零死重量＋真面变异腿＋对照腿＋直写位三腿；r134 重建 10 腿；原 r133 15 腿随清场丢失，见 docstring）"
+          % ("PASS" if not bad else "FAIL", len(legs) - len(bad), len(legs)))
+    for b in bad:
+        print("   · 红腿: " + b)
+    return 0 if not bad else 1
+
+
 def selftest():
     """判据自证（r134 重建版 10 腿；原 r133 15 腿版随清场丢失，见 docstring 披露）。
-    全部用临时目录构造的卡面，零网络零浏览器；正例绿 + 反例红，防恒真。"""
+    全部用临时目录构造的卡面，零网络零浏览器；正例绿 + 反例红，防恒真。
+
+    本函数只留骨架（造夹具目录 → 按主题调四族桩 → 收口印结论）；桩体按主题边界升模块级
+    （loc_guard 的「单函数 ≤150 行」门），legs.append 的顺序与每族的判定体逐字未改。"""
     import shutil
     import tempfile
     legs = []
@@ -273,143 +434,12 @@ def selftest():
                      and d1_ok["entries"][0]["level"] == "A"))
         # 2) 确定性：同输入两次 render 逐字节相等
         legs.append(("确定性·两次渲染逐字节相等", render(d1_ok) == render(parse_entries(d1))))
-        # 3) 反例：ID 重复（卡面已写入 d2，不再经 _write_card 覆盖）
-        d2 = tmp / "dup"
-        _write_card(d2, "01-CL-test.md", CARD_TMPL.format(
-            level="A", emo="sadness", scene="共情", quote="第一句。")
-            + "\n\n" + CARD_TMPL.format(level="B", emo="sadness", scene="安抚", quote="第二句。"))
-        legs.append(("反例·ID 重复 fail-fast", _expect_fail(d2, "", "", "ID 重复", write=False)))
-        # 4) 反例：篇码与文件名不符（先 format 再 replace，防占位符漏填）
-        d3 = tmp / "chap"
-        _write_card(d3, "01-CL-test.md",
-                    CARD_TMPL.format(**OK_CARD)
-                    .replace("QTE-CL-901", "QTE-MS-901"))
-        legs.append(("反例·篇码与篇章文件不符", _expect_fail(d3, "", "", "篇码错位", write=False)))
-        # 5) 反例：情绪枚举非法
-        d4 = tmp / "emo"
-        _write_card(d4, "01-CL-test.md",
-                    CARD_TMPL.format(**OK_CARD)
-                    .replace("适用情绪：sadness", "适用情绪：狂喜"))
-        legs.append(("反例·情绪枚举非法", _expect_fail(d4, "", "", "情绪枚举", write=False)))
-        # 6) 反例：场景枚举非法
-        d5 = tmp / "scene"
-        _write_card(d5, "01-CL-test.md",
-                    CARD_TMPL.format(**OK_CARD)
-                    .replace("适用场景：共情", "适用场景：唠嗑"))
-        legs.append(("反例·场景枚举非法", _expect_fail(d5, "", "", "场景枚举", write=False)))
-        # 7) 反例：句面超长
-        d6 = tmp / "long"
-        _write_card(d6, "01-CL-test.md",
-                    CARD_TMPL.format(level="A", emo="sadness", scene="共情",
-                                     quote="长" * (QUOTE_MAX + 1)))
-        legs.append(("反例·句面超长", _expect_fail(d6, "", "", "句面超长", write=False)))
-        # 8) 反例：缺字段
-        d7 = tmp / "miss"
-        _write_card(d7, "01-CL-test.md",
-                    "\n".join(l for l in CARD_TMPL.format(**OK_CARD).splitlines()
-                              if not l.startswith("- 入库")))
-        legs.append(("反例·缺字段", _expect_fail(d7, "", "", "缺字段", write=False)))
-        # 9) E 级不入产品件
-        d8 = tmp / "elevel"
-        _write_card(d8, "01-CL-test.md",
-                    CARD_TMPL.format(**OK_CARD).replace("可信度：A", "可信度：E"))
-        d8_data = parse_entries(d8)
-        legs.append(("E 级排除·不入产品件", d8_data["counts"]["excludedE"] == 1
-                     and d8_data["counts"]["total"] == 0))
-        # 10) 「通用」不得与具体情绪并列
-        d9 = tmp / "allmix"
-        _write_card(d9, "01-CL-test.md",
-                    CARD_TMPL.format(**OK_CARD)
-                    .replace("适用情绪：sadness", "适用情绪：sadness、通用"))
-        legs.append(("反例·「通用」并列具体情绪", _expect_fail(d9, "", "", "通用并列", write=False)))
-        # 11) fit 派生（r171）：「用法」里短触发子句 ⇒ 取到第一个「时」为止
-        d10 = tmp / "fitok"
-        _write_card(d10, "01-CL-test.md",
-                    CARD_TMPL.format(**OK_CARD)
-                    .replace("用法：测试用法句。", "用法：用户说撑不住了时，先接住再轻引半句。"))
-        d10_data = parse_entries(d10)
-        legs.append(("fit·触发子句派生（止于「时」）",
-                    d10_data["entries"][0]["fit"] == "用户说撑不住了时"
-                    and d10_data["counts"]["fitFallback"] == 0))
-        # 12) fit 二级降级（r171）：触发子句含（）补语、去括号后落回上限内 ⇒ 用去括号形态，不算回落
-        d11 = tmp / "fitparen"
-        _write_card(d11, "01-CL-test.md",
-                    CARD_TMPL.format(**OK_CARD)
-                    .replace("用法：测试用法句。",
-                             "用法：用户在经历长期照护压力与自我消耗、并且明确表示已经没有退路"
-                             "（如离职、休学、搬走）时，先接住他撑了很久这件事，忌给建议。"))
-        d11_data = parse_entries(d11)
-        legs.append(("fit·去括号后入上限",
-                    d11_data["entries"][0]["fit"] == "用户在经历长期照护压力与自我消耗、并且明确表示已经没有退路时"
-                    and d11_data["counts"]["fitFallback"] == 0))
-        # 13) fit 三级回落（r171）：去括号后仍超 FIT_MAX ⇒ 回落场景标签 + 计数，禁硬截半句
-        d12 = tmp / "fitfb"
-        _write_card(d12, "01-CL-test.md",
-                    CARD_TMPL.format(**OK_CARD)
-                    .replace("用法：测试用法句。",
-                             "用法：用户在经历长期的照护压力与自我消耗，并且已经在多个场合"
-                             "明确表示自己没有退路（如离职、休学、搬走）时，先接住，忌给建议。"))
-        d12_data = parse_entries(d12)
-        fb_fit = d12_data["entries"][0]["fit"]
-        legs.append(("fit·超长回落场景标签并计数",
-                    fb_fit == "适合：共情" and len(fb_fit) <= FIT_MAX
-                    and d12_data["counts"]["fitFallback"] == 1))
-        # 14) fit 恒在位且不越界（r171 结构不变量：注入面每条都读它，缺键即静默退化成裸句）
-        legs.append(("fit·每条必有且 ≤ 上限",
-                    all(e.get("fit") and len(e["fit"]) <= FIT_MAX
-                        for d in (d10_data, d11_data, d12_data) for e in d["entries"])))
-        # 15) 零死重量（r171）：产物不得再携带 md 字段的截断副本 `usage`（全仓零消费者，实测占 44,094B）
-        legs.append(("产物无 usage 副本（只有 fit）",
-                    all("usage" not in e for d in (d10_data, d11_data, d12_data) for e in d["entries"])))
-        # 16) 变异腿（r171 补齐 —— r134 清场重建时把这条丢了，docs/quality-gates.md 却一直在册，
-        #     属「登记了却没有的桶」）：真面产物**改一个字节**必须与重建结果不一致。
-        #     作业面 = Temp 副本，宿主文件字节前后同指纹（判据不得改写自己的宿主）。
-        host = OUT
-        host_before = host.read_bytes()
-        rebuilt = render(parse_entries(CORPUS_DIR))
-        cp = tmp / "artifact_mut.js"
-        cp.write_bytes(host_before)
-        t = cp.read_text("utf-8")
-        mid = len(t) // 2
-        tampered = t[:mid] + ("0" if t[mid] != "0" else "1") + t[mid + 1:]
-        cp.write_text(tampered, encoding="utf-8", newline="\n")
-        legs.append(("变异腿·真面产物改一字节必判不一致",
-                     len(tampered) == len(t) and tampered != rebuilt
-                     and cp.read_text("utf-8") != rebuilt
-                     and host.read_bytes() == host_before))
-        # 17) 对照腿（缺它则 16 是恒真）：未篡改的产物副本必须与重建结果**逐字节相等**
-        cp2 = tmp / "artifact_pristine.js"
-        cp2.write_bytes(host_before)
-        legs.append(("对照·未篡改产物与重建逐字节相等", cp2.read_text("utf-8") == rebuilt))
-        # 18) 卡面直写优先（r171 可选列「适配提示」）：人工写的触发子句必须盖过派生路径
-        d13 = tmp / "fitcard"
-        _write_card(d13, "01-CL-test.md",
-                    CARD_TMPL.format(**OK_CARD)
-                    .replace("用法：测试用法句。", "用法：这里先讲一大段概念与背景，触发条件写在后半句。")
-                    + "- 适配提示：用户说熬不下去了时\n")
-        d13_data = parse_entries(d13)
-        legs.append(("适配提示·卡面直写优先",
-                    d13_data["entries"][0]["fit"] == "用户说熬不下去了时"
-                    and d13_data["counts"]["fitSrc"]["card"] == 1
-                    and d13_data["counts"]["fitSrc"]["scene"] == 0))
-        # 19) 反例：直写超上限 ⇒ fail-fast（注入预算按条算，静默截断会咬掉半句）
-        d14 = tmp / "fitlong"
-        _write_card(d14, "01-CL-test.md",
-                    CARD_TMPL.format(**OK_CARD) + "- 适配提示：" + "长" * (FIT_MAX + 1) + "\n")
-        legs.append(("反例·适配提示超长 fail-fast",
-                     _expect_fail(d14, "", "", "适配提示超长", write=False)))
-        # 20) 反例：列写了但值为空 ⇒ fail-fast（空值会把直写位静默让给派生，等于假装有人修过卡）
-        d15 = tmp / "fitempty"
-        _write_card(d15, "01-CL-test.md", CARD_TMPL.format(**OK_CARD) + "- 适配提示：\n")
-        legs.append(("反例·适配提示空值 fail-fast",
-                     _expect_fail(d15, "", "", "适配提示为空", write=False)))
+        _st_legs_bad_card_failfast(tmp, legs)
+        _st_legs_fit_derive(tmp, legs)
+        _st_legs_real_face_mutation(tmp, legs)
+        _st_legs_fit_card_direct(tmp, legs)
 
-        bad = [name for name, ok in legs if not ok]
-        print("WIT-QUOTES-SELFTEST-%s: %d/%d 腿（r171 加 fit 派生四腿＋零死重量＋真面变异腿＋对照腿＋直写位三腿；r134 重建 10 腿；原 r133 15 腿随清场丢失，见 docstring）"
-              % ("PASS" if not bad else "FAIL", len(legs) - len(bad), len(legs)))
-        for b in bad:
-            print("   · 红腿: " + b)
-        return 0 if not bad else 1
+        return _st_print_verdict(legs)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

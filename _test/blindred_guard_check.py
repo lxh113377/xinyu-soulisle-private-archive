@@ -235,7 +235,11 @@ def hook_census(entries, hook_baseline):
     return problems, top, protected, lib
 
 
-def main(argv):
+def _read_args(argv):
+    """参数面（拆自 main）：--machine / --selftest 两个开关 + 两根棘轮基线的可选覆盖。
+
+    非法数值按「不改默认值」处理（except ValueError: pass）—— 演习口写错了也不许把基线抬起来。
+    """
     machine = "--machine" in argv
     selftest = "--selftest" in argv
     baseline = BASELINE_DEFAULT
@@ -251,85 +255,99 @@ def main(argv):
                 hook_baseline = int(argv[i + 1])
             except ValueError:
                 pass
+    return machine, selftest, baseline, hook_baseline
 
-    if selftest:
-        got, hooked0 = scan_source(SELFTEST_SRC, "selftest")
-        kinds = {k for k, _, _ in got}
-        ok = ("assert" in kinds) and ("wait" in kinds) and (not hooked0)
-        # 变异 2：整段包进 try 后必须**抓不到**（证明取数面真认 try，不是无脑计数）
-        wrapped = "try:\n" + "\n".join("    " + l for l in SELFTEST_SRC.splitlines() if l.strip()) \
-                  + "\nexcept Exception:\n    pass\n"
-        got2, _ = scan_source(wrapped, "selftest-wrapped")
-        ok2 = not got2
-        # 变异 3：装了 install_excepthook 的脚本，裸点仍在但必须被判为「已兜底」（hooked=True）
-        _, hooked3 = scan_source("from check_instrument import install_excepthook\n"
-                                "install_excepthook('X')\n" + SELFTEST_SRC, "selftest-hooked")
-        ok3 = hooked3
-        print("SELFTEST：注入裸 assert/wait → 抓到 %d 处（%s）；hooked=%s（应为 False）"
-              % (len(got), sorted(kinds), hooked0))
-        print("SELFTEST：整体包 try 后 → 抓到 %d 处（应为 0）" % len(got2))
-        print("SELFTEST：装 install_excepthook 后 → hooked=%s（应为 True ⇒ 不计入判红）" % hooked3)
-        # ④⑤⑥ r171 第二维度（进程级兜底 census）的三向变异——全在合成源码面上跑，不碰真脚本：
-        #    ④ 顶层脚本没兜底 ⇒ 必须计成「未兜底」（这一腿不成立则整根维度是摆设）
-        #    ⑤ 同一件装上兜底 ⇒ 必须转成「已兜底」
-        #    ⑥ 库件（无 __main__ 守卫）⇒ **不产生义务**（否则造出一台永远还不清的恒红尺）
-        #    外加一条咬合力：未兜底数 > 传入基线 时必须出 problems（基线取小一级就翻红，
-        #    不是只在"真面恰好相等"时绿）。
-        TOP_SRC = SELFTEST_SRC + '\nif __name__ == "__main__":\n    sys.exit(1)\n'
-        HOOKED_SRC = ("from check_instrument import install_excepthook\n"
-                      'install_excepthook("X")\n' + TOP_SRC)
-        LIB_SRC = "import sys\ndef f():\n    assert False\n"
-        t4, h4 = hook_state(TOP_SRC, "t4")
-        t5, h5 = hook_state(HOOKED_SRC, "t5")
-        t6, h6 = hook_state(LIB_SRC, "t6")
-        ok4 = (t4 and not h4)
-        ok5 = (t5 and h5)
-        ok6 = (not t6)
-        probs_hi, top_n, prot_n, lib_n = hook_census(
-            [("a.py", True, False), ("b.py", True, True), ("c.py", False, False)], 0)
-        probs_lo, _, _, _ = hook_census(
-            [("a.py", True, False), ("b.py", True, True), ("c.py", False, False)], 1)
-        ok7 = bool(probs_hi) and not probs_lo and (top_n, prot_n, lib_n) == (2, 1, 1)
-        print("SELFTEST：④顶层未兜底 → is_top=%s hooked=%s（应 True/False）" % (t4, h4))
-        print("SELFTEST：⑤同一件装兜底后 → is_top=%s hooked=%s（应 True/True）" % (t5, h5))
-        print("SELFTEST：⑥库件（无 __main__）→ is_top=%s（应 False ⇒ 不计入义务）" % t6)
-        print("SELFTEST：⑦咬合力 → 基线 0 出 %d 条问题／基线 1 出 %d 条（应 1/0），"
-              "分母现读 顶层=%d 兜底=%d 库=%d（应 2/1/1）"
-              % (len(probs_hi), len(probs_lo), top_n, prot_n, lib_n))
-        # ⑧⑨⑩ r175 比较面腿：判红必须读**提交面**，且"取不到"与"工作树更多"都不许冒充成结论
-        _files = ["x.py", "y.py", "z.py"]
-        _src_top = TOP_SRC
-        _src_hooked = HOOKED_SRC
-        _BAD_SRC = "def f(:" + chr(10) + "    pass"   # 语法坏掉的件 ⇒ 必须落成失败原因，不许静默跳过
-        rd = {"x.py": _src_top, "y.py": _src_hooked, "z.py": None}
-        e8, new8, err8 = head_entries(_files, reader=lambda r: rd.get(r))
-        ok8 = (err8 is None and new8 == ["z.py"]
-               and len([x for x in e8 if x[1] and not x[2]]) == 1)
-        # ⑨ 两条出口分开钉：语法坏掉的件必须**仍算义务**（不许静默跳过），
-        #    而 reader 抛异常必须**落成失败原因**（调用方判未验，禁回落工作树数）
-        e9, _n9, err9 = head_entries(["x.py"], reader=lambda r: _BAD_SRC)
-        ok9a = (err9 is None and len(e9 or []) == 1 and e9[0][1] and not e9[0][2])
-        def _boom(_r):
-            raise ValueError("读不动")
-        _e9b, _n9b, err9b = head_entries(["x.py"], reader=_boom)
-        ok9b = err9b is not None
-        ok9 = ok9a and ok9b
-        e9, _n9, err9 = _e9b, [], err9b
-        p10, _t10, _p10, _l10 = hook_census(e8 if e8 else [], 0)
-        p11, _t11, _p11, _l11 = hook_census(e8 if e8 else [], 1)
-        ok10 = bool(p10) and not p11
-        print("SELFTEST：⑧提交面复算 → 计入 %d 件／仅工作树 %s（应 2/['z.py']），未兜底 1 件"
-              % (len(e8 or []), new8))
-        print("SELFTEST：⑨语法坏件仍算义务=%s／reader 抛异常 → 失败原因=%s（应 True/非空）"
-              % (ok9a, err9b is not None))
-        print("SELFTEST：⑩提交面人口喂基线 → 基线 0 出 %d 条／基线 1 出 %d 条（应 1/0）"
-              % (len(p10), len(p11)))
-        if ok and ok2 and ok3 and ok4 and ok5 and ok6 and ok7 and ok8 and ok9 and ok10:
-            print("BLINDRED-GUARD-SELFTEST-PASS：十向变异均成立（裸 assert/裸 wait/try 内/装兜底/"
-                  "顶层未兜底/库件免义务/基线咬合力/提交面复算/读不动判未验/提交面人口喂基线）⇒ 两根维度都非恒真")
-            return 0
-        print("BLINDRED-GUARD-SELFTEST-RED：变异腿不成立 ⇒ 本件自身失效（腿③④⑤⑥⑦⑧⑨⑩任一）")
-        return 1
+
+def _run_selftest():
+    """十向变异桩面（拆自 main 的 `if selftest:` 分支）：判定体与每一行 SELFTEST 打印逐字未改。
+
+    ①②③ 取数面形状（裸 assert / 裸 wait / try 内）；④⑤⑥⑦ 第二维度（进程级兜底 census）；
+    ⑧⑨⑩ 比较面（提交人口复算 / 两条出口分钉 / 提交面人口喂基线）。全在合成源码面上跑，不碰真脚本。
+    """
+    got, hooked0 = scan_source(SELFTEST_SRC, "selftest")
+    kinds = {k for k, _, _ in got}
+    ok = ("assert" in kinds) and ("wait" in kinds) and (not hooked0)
+    # 变异 2：整段包进 try 后必须**抓不到**（证明取数面真认 try，不是无脑计数）
+    wrapped = "try:\n" + "\n".join("    " + l for l in SELFTEST_SRC.splitlines() if l.strip()) \
+              + "\nexcept Exception:\n    pass\n"
+    got2, _ = scan_source(wrapped, "selftest-wrapped")
+    ok2 = not got2
+    # 变异 3：装了 install_excepthook 的脚本，裸点仍在但必须被判为「已兜底」（hooked=True）
+    _, hooked3 = scan_source("from check_instrument import install_excepthook\n"
+                            "install_excepthook('X')\n" + SELFTEST_SRC, "selftest-hooked")
+    ok3 = hooked3
+    print("SELFTEST：注入裸 assert/wait → 抓到 %d 处（%s）；hooked=%s（应为 False）"
+          % (len(got), sorted(kinds), hooked0))
+    print("SELFTEST：整体包 try 后 → 抓到 %d 处（应为 0）" % len(got2))
+    print("SELFTEST：装 install_excepthook 后 → hooked=%s（应为 True ⇒ 不计入判红）" % hooked3)
+    # ④⑤⑥ r171 第二维度（进程级兜底 census）的三向变异——全在合成源码面上跑，不碰真脚本：
+    #    ④ 顶层脚本没兜底 ⇒ 必须计成「未兜底」（这一腿不成立则整根维度是摆设）
+    #    ⑤ 同一件装上兜底 ⇒ 必须转成「已兜底」
+    #    ⑥ 库件（无 __main__ 守卫）⇒ **不产生义务**（否则造出一台永远还不清的恒红尺）
+    #    外加一条咬合力：未兜底数 > 传入基线 时必须出 problems（基线取小一级就翻红，
+    #    不是只在"真面恰好相等"时绿）。
+    TOP_SRC = SELFTEST_SRC + '\nif __name__ == "__main__":\n    sys.exit(1)\n'
+    HOOKED_SRC = ("from check_instrument import install_excepthook\n"
+                  'install_excepthook("X")\n' + TOP_SRC)
+    LIB_SRC = "import sys\ndef f():\n    assert False\n"
+    t4, h4 = hook_state(TOP_SRC, "t4")
+    t5, h5 = hook_state(HOOKED_SRC, "t5")
+    t6, h6 = hook_state(LIB_SRC, "t6")
+    ok4 = (t4 and not h4)
+    ok5 = (t5 and h5)
+    ok6 = (not t6)
+    probs_hi, top_n, prot_n, lib_n = hook_census(
+        [("a.py", True, False), ("b.py", True, True), ("c.py", False, False)], 0)
+    probs_lo, _, _, _ = hook_census(
+        [("a.py", True, False), ("b.py", True, True), ("c.py", False, False)], 1)
+    ok7 = bool(probs_hi) and not probs_lo and (top_n, prot_n, lib_n) == (2, 1, 1)
+    print("SELFTEST：④顶层未兜底 → is_top=%s hooked=%s（应 True/False）" % (t4, h4))
+    print("SELFTEST：⑤同一件装兜底后 → is_top=%s hooked=%s（应 True/True）" % (t5, h5))
+    print("SELFTEST：⑥库件（无 __main__）→ is_top=%s（应 False ⇒ 不计入义务）" % t6)
+    print("SELFTEST：⑦咬合力 → 基线 0 出 %d 条问题／基线 1 出 %d 条（应 1/0），"
+          "分母现读 顶层=%d 兜底=%d 库=%d（应 2/1/1）"
+          % (len(probs_hi), len(probs_lo), top_n, prot_n, lib_n))
+    # ⑧⑨⑩ r175 比较面腿：判红必须读**提交面**，且"取不到"与"工作树更多"都不许冒充成结论
+    _files = ["x.py", "y.py", "z.py"]
+    _src_top = TOP_SRC
+    _src_hooked = HOOKED_SRC
+    _BAD_SRC = "def f(:" + chr(10) + "    pass"   # 语法坏掉的件 ⇒ 必须落成失败原因，不许静默跳过
+    rd = {"x.py": _src_top, "y.py": _src_hooked, "z.py": None}
+    e8, new8, err8 = head_entries(_files, reader=lambda r: rd.get(r))
+    ok8 = (err8 is None and new8 == ["z.py"]
+           and len([x for x in e8 if x[1] and not x[2]]) == 1)
+    # ⑨ 两条出口分开钉：语法坏掉的件必须**仍算义务**（不许静默跳过），
+    #    而 reader 抛异常必须**落成失败原因**（调用方判未验，禁回落工作树数）
+    e9, _n9, err9 = head_entries(["x.py"], reader=lambda r: _BAD_SRC)
+    ok9a = (err9 is None and len(e9 or []) == 1 and e9[0][1] and not e9[0][2])
+    def _boom(_r):
+        raise ValueError("读不动")
+    _e9b, _n9b, err9b = head_entries(["x.py"], reader=_boom)
+    ok9b = err9b is not None
+    ok9 = ok9a and ok9b
+    e9, _n9, err9 = _e9b, [], err9b
+    p10, _t10, _p10, _l10 = hook_census(e8 if e8 else [], 0)
+    p11, _t11, _p11, _l11 = hook_census(e8 if e8 else [], 1)
+    ok10 = bool(p10) and not p11
+    print("SELFTEST：⑧提交面复算 → 计入 %d 件／仅工作树 %s（应 2/['z.py']），未兜底 1 件"
+          % (len(e8 or []), new8))
+    print("SELFTEST：⑨语法坏件仍算义务=%s／reader 抛异常 → 失败原因=%s（应 True/非空）"
+          % (ok9a, err9b is not None))
+    print("SELFTEST：⑩提交面人口喂基线 → 基线 0 出 %d 条／基线 1 出 %d 条（应 1/0）"
+          % (len(p10), len(p11)))
+    if ok and ok2 and ok3 and ok4 and ok5 and ok6 and ok7 and ok8 and ok9 and ok10:
+        print("BLINDRED-GUARD-SELFTEST-PASS：十向变异均成立（裸 assert/裸 wait/try 内/装兜底/"
+              "顶层未兜底/库件免义务/基线咬合力/提交面复算/读不动判未验/提交面人口喂基线）⇒ 两根维度都非恒真")
+        return 0
+    print("BLINDRED-GUARD-SELFTEST-RED：变异腿不成立 ⇒ 本件自身失效（腿③④⑤⑥⑦⑧⑨⑩任一）")
+    return 1
+
+
+def main(argv):
+    machine, do_selftest, baseline, hook_baseline = _read_args(argv)
+
+    if do_selftest:
+        return _run_selftest()
 
     files, err = roster()
     if err:

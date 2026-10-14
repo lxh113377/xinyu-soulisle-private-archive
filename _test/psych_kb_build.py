@@ -311,6 +311,178 @@ def payload_of(text, assign=None):
     return json.loads(text.split(anchor, 1)[1].rsplit(";\n", 1)[0])
 
 
+# --- selftest 的各条桩（升模块级，按主题分三族：解析与截断／该红的 fail-fast／来源面与真面变异腿）---
+# 拆出来的原因只是 loc_guard 的「单函数 ≤150 行」门；每族的判定体、字面量针脚、返回形状均与拆前逐字同文。
+# 腿数不抄在这里（分母会随增补漂移，由 _st_print_verdict 现读自印）。
+
+# 族一：解析与截断正例（单卡解析 / E 级排除 / 句界截断 / 免责保全 / 全 E 空库）
+def _st_ok_parse_one():
+    d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-001", "焦虑与放松", "A",
+                                          "一句话谈焦虑", "内容讲放松。")})
+    entries, counts, n_files = parse_entries(d)
+    if len(entries) != 1 or entries[0]["level"] != "A" or n_files != 1:
+        return False, "正例解析得 %d 条/%d 篇" % (len(entries), n_files)
+    if "fear" not in entries[0]["rel"]:
+        return False, "情绪关联未挂上 fear（rel=%s）" % entries[0]["rel"]
+    return True, ""
+
+
+def _st_ok_e_excluded():
+    d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-002", "已查证条", "A", "甲", "甲内容。")
+                     + CARD % ("PSY-ZZ-003", "未查证条", "E", "乙", "乙内容。")})
+    entries, counts, n_files = parse_entries(d)
+    payload = payload_of(build_text(entries, counts, n_files))
+    if payload["excludedE"] != 1 or len(payload["entries"]) != 1:
+        return False, "E 排除 excludedE=%s entries=%d" % (payload["excludedE"], len(payload["entries"]))
+    return True, ""
+
+
+def _st_ok_truncate():
+    long_text = "这是一段足够长的中文内容用来验证句界截断。" * 20
+    d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-004", "长内容", "B", "摘要", long_text)})
+    entries, counts, n_files = parse_entries(d)
+    c = entries[0]["content"]
+    if len(c) > CONTENT_MAX or c[-1] not in "。！？；":
+        return False, "截断后 len=%d 末字符=%r" % (len(c), c[-1:])
+    return True, ""
+
+
+def _st_ok_boundary_kept():
+    """免责短语在内容末尾时，必须被摘出并前置到句首（r167-KB11b 立）。"""
+    filler = "这是一段足够长的中文内容用来把免责短语挤到截断线之外。" * 20
+    raw = filler + "边界句：本条为证据综述，不构成治疗建议。"
+    d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-014", "带免责", "B", "摘要", raw)})
+    entries, counts, n_files = parse_entries(d)
+    c = entries[0]["content"]
+    # 对照：未截断原文里免责短语确实在很靠后的位置
+    if raw.index("不构成治疗建议") < len(raw) - 40:
+        return False, "夹具前提不成立：免责短语本就在末尾"
+    if "不构成治疗建议" not in c:
+        return False, "免责短语在产物里丢了：len=%d 头40=%r" % (len(c), c[:40])
+    if not c.startswith("边界句：本条为证据综述，不构成治疗建议。"):
+        return False, "免责短语未前置到句首：头40=%r" % c[:40]
+    return True, ""
+
+
+def _st_red_boundary_lost_without_gate():
+    """变异腿：摘掉 keep_boundary（即回到本轮修复前的行为），免责短语必须复现丢失。
+
+    腿非恒真的证据 —— 若这步也「不丢」，说明夹具根本不触发截断，正例腿是装饰。
+    """
+    filler = "这是一段足够长的中文内容用来把免责短语挤到截断线之外。" * 20
+    raw = filler + "边界句：本条为证据综述，不构成治疗建议。"
+    legacy = trim_sentence(raw, CONTENT_MAX)          # 修复前行为：只截断，不保全
+    if "不构成治疗建议" in legacy:
+        return False, "变异腿失效：旧行为下免责短语竟然没丢，正例腿可能是装饰"
+    if "不构成治疗建议" not in keep_boundary(raw, "PSY-ZZ-015"):
+        return False, "keep_boundary 也没保住（变异腿通过但正例腿是假的）"
+    return True, ""
+
+
+def _st_ok_ship_zero_guard():
+    d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-005", "全是未查证", "E", "甲", "甲内容。")})
+    entries, counts, n_files = parse_entries(d)
+    payload = payload_of(build_text(entries, counts, n_files))
+    if payload["entries"] or payload["excludedE"] != 1:
+        return False, "全 E 面 entries=%d" % len(payload["entries"])
+    return True, ""
+
+
+# 族二：该红的 fail-fast 桩（缺字段 / 撞号 / 只有规范 / 行式漂移 / 非法级）
+def _st_red_missing_level():
+    d = fixture_dir({"90-夹具.md": "### 条目 PSY-ZZ-010｜缺级\n- 一句话：甲\n- 内容：乙。\n"})
+    return raises_buildfail(lambda: parse_entries(d))
+
+
+def _st_red_dup_id():
+    one = CARD % ("PSY-ZZ-011", "同号甲", "A", "甲", "甲内容。")
+    d = fixture_dir({"90-夹具.md": one + one})
+    return raises_buildfail(lambda: parse_entries(d))
+
+
+def _st_red_only_spec():
+    d = fixture_dir({"README.md": "规范", "索引.md": "索引"})
+    return raises_buildfail(lambda: parse_entries(d))
+
+
+def _st_red_shape_drift():
+    # 半角冒号 + 缺「｜」：行式与 README §3 漂移，解析必须报 0 条而不是静默产出空库
+    d = fixture_dir({"90-夹具.md": "### 条目 PSY-ZZ-012:漂移标题\n- 可信度: A\n- 一句话: 甲\n"})
+    return raises_buildfail(lambda: parse_entries(d))
+
+
+def _st_red_bad_level_letter():
+    d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-013", "非法级", "F", "甲", "甲内容。")})
+    return raises_buildfail(lambda: parse_entries(d))
+
+
+# 族三：真面一致与两条真面变异腿（正文件 + 来源件）
+def _st_red_real_face_consistent():
+    entries, counts, n_files = check_pair()
+    if not entries:
+        return False, "真面解析 0 条"
+    return True, ""
+
+
+def _st_red_tampered_product():
+    prod = OUT.read_text("utf-8")
+    mid = len(prod) // 2
+    tampered = prod[:mid] + "X" + prod[mid + 1:]
+    d = fixture_dir({})
+    bad = d / "psych-kb.tampered.js"
+    bad.write_text(tampered, encoding="utf-8", newline="\n")
+    return raises_buildfail(lambda: check_pair(KB_DIR, bad))
+
+
+def _st_ok_sources_parsed():
+    # 来源子行抽出来 + URL 拆成独立字段 u + 定级理由抽出来
+    d = fixture_dir({'90-夹具.md': "### 条目 PSY-ZZ-021｜带来源的卡\n- 可信度：B\n- 定级理由：单研究样本有限\n- 一句话：摘要\n- 内容：内容。\n- 来源：\n  - [命题甲] Smith (2020) Journal of Testing；https://doi.org/10.1234/abc\n  - [命题乙] 无 URL 的纯题录\n- 关联：\n- 待验证点：无\n- 入库：2026-10-14 · 第12轮\n"})
+    entries, _c, _n = parse_entries(d)
+    e = entries[0]
+    if e["reason"] != "单研究样本有限":
+        return False, "定级理由未抽到：%r" % e["reason"]
+    if len(e["src"]) != 2:
+        return False, "来源子行抽到 %d 条（应 2）" % len(e["src"])
+    item = payload_of(build_sources_text(entries), SRC_GLOBAL + " = ")["src"]["PSY-ZZ-021"]["s"]
+    if len(item) != 2:
+        return False, "来源件条目数 %d（应 2）" % len(item)
+    if item[0]["u"] != "https://doi.org/10.1234/abc":
+        return False, "URL 未拆出：%r" % item[0]["u"]
+    if "doi.org" in item[0]["l"]:
+        return False, "label 里仍残留 URL（会重复显示）：%r" % item[0]["l"]
+    if item[1]["u"] != "":
+        return False, "无 URL 的题录被编造了 URL：%r" % item[1]["u"]
+    return True, ""
+
+
+def _st_red_sources_gate_off():
+    # 变异腿：卡面没有来源行时必须一条都抽不到（抽门不是恒真）
+    d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-022", "无来源的卡", "C", "摘要", "内容。")})
+    entries, _c, _n = parse_entries(d)
+    if entries[0]["src"]:
+        return False, "没有来源行的卡却抽到 %d 条" % len(entries[0]["src"])
+    return True, ""
+
+
+def _st_red_tampered_src_product():
+    # 变异腿：来源件篡改一位即判红（正文件用真面原件，故红因必来自来源件）
+    src = SRC_OUT.read_text("utf-8")
+    mid = len(src) // 2
+    tmp = Path(tempfile.mkdtemp(prefix="psychkb_srcselftest_"))
+    good_out = tmp / "psych-kb.good.js"
+    bad_src = tmp / "psych-kb-src.bad.js"
+    good_out.write_text(OUT.read_text("utf-8"), encoding="utf-8", newline="\n")
+    bad_src.write_text(src[:mid] + "X" + src[mid + 1:], encoding="utf-8", newline="\n")
+    try:
+        _check_pair_with_src(good_out, bad_src)
+    except BuildFail as e:
+        # 红因必须点名来源件，否则这条腿可能是在正文件那道上红的（等于没验来源件）
+        if "来源件不一致" not in str(e):
+            return False, "判红了但红因不是来源件：%s" % e
+        return True, ""
+    return False, "来源件被篡改却未判红"
+
+
 def selftest():
     """判据非恒真的取证：正例 6 条 + 该红的 7 条（含 2 条真面变异腿）= 13 腿。夹具只落系统临时目录。
 
@@ -326,171 +498,31 @@ def selftest():
             ok, why = False, "腿自身异常 %s: %s" % (type(e).__name__, e)
         results.append((name, bool(ok), why))
 
-    def ok_parse_one():
-        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-001", "焦虑与放松", "A",
-                                              "一句话谈焦虑", "内容讲放松。")})
-        entries, counts, n_files = parse_entries(d)
-        if len(entries) != 1 or entries[0]["level"] != "A" or n_files != 1:
-            return False, "正例解析得 %d 条/%d 篇" % (len(entries), n_files)
-        if "fear" not in entries[0]["rel"]:
-            return False, "情绪关联未挂上 fear（rel=%s）" % entries[0]["rel"]
-        return True, ""
+    leg("正例·单卡解析+情绪关联", _st_ok_parse_one)
+    leg("来源子行抽出+URL拆字段+定级理由抽出", _st_ok_sources_parsed)
+    leg("无来源行的卡必须抽不到（抽门非恒真）", _st_red_sources_gate_off)
+    leg("来源件篡改一位必判不一致（变异腿）", _st_red_tampered_src_product)
+    leg("E 级构建期排除并计数", _st_ok_e_excluded)
+    leg("内容句界截断", _st_ok_truncate)
+    leg("免责短语截断后仍前置到句首", _st_ok_boundary_kept)
+    leg("摘掉保全逻辑免责句必丢（变异腿）", _st_red_boundary_lost_without_gate)
+    leg("全 E 面产物为空库（供 main 的红腿判定）", _st_ok_ship_zero_guard)
+    leg("缺可信度字段即停", _st_red_missing_level)
+    leg("条目撞号即停", _st_red_dup_id)
+    leg("只有规范与索引即停", _st_red_only_spec)
+    leg("卡行式漂移即停（禁静默产出空库）", _st_red_shape_drift)
+    leg("可信度非法字母即停", _st_red_bad_level_letter)
+    leg("真面源⇄产物一致（正例）", _st_red_real_face_consistent)
+    leg("真产物篡改一位必判不一致（变异腿）", _st_red_tampered_product)
 
-    def ok_e_excluded():
-        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-002", "已查证条", "A", "甲", "甲内容。")
-                         + CARD % ("PSY-ZZ-003", "未查证条", "E", "乙", "乙内容。")})
-        entries, counts, n_files = parse_entries(d)
-        payload = payload_of(build_text(entries, counts, n_files))
-        if payload["excludedE"] != 1 or len(payload["entries"]) != 1:
-            return False, "E 排除 excludedE=%s entries=%d" % (payload["excludedE"], len(payload["entries"]))
-        return True, ""
+    _st_print_verdict(results)
 
-    def ok_truncate():
-        long_text = "这是一段足够长的中文内容用来验证句界截断。" * 20
-        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-004", "长内容", "B", "摘要", long_text)})
-        entries, counts, n_files = parse_entries(d)
-        c = entries[0]["content"]
-        if len(c) > CONTENT_MAX or c[-1] not in "。！？；":
-            return False, "截断后 len=%d 末字符=%r" % (len(c), c[-1:])
-        return True, ""
 
-    def ok_boundary_kept():
-        """免责短语在内容末尾时，必须被摘出并前置到句首（r167-KB11b 立）。"""
-        filler = "这是一段足够长的中文内容用来把免责短语挤到截断线之外。" * 20
-        raw = filler + "边界句：本条为证据综述，不构成治疗建议。"
-        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-014", "带免责", "B", "摘要", raw)})
-        entries, counts, n_files = parse_entries(d)
-        c = entries[0]["content"]
-        # 对照：未截断原文里免责短语确实在很靠后的位置
-        if raw.index("不构成治疗建议") < len(raw) - 40:
-            return False, "夹具前提不成立：免责短语本就在末尾"
-        if "不构成治疗建议" not in c:
-            return False, "免责短语在产物里丢了：len=%d 头40=%r" % (len(c), c[:40])
-        if not c.startswith("边界句：本条为证据综述，不构成治疗建议。"):
-            return False, "免责短语未前置到句首：头40=%r" % c[:40]
-        return True, ""
+def _st_print_verdict(results):
+    """汇总印行（拆自 selftest 的收尾段）：逐腿打点 + 结论行；有红腿即 sys.exit(1)。
 
-    def red_boundary_lost_without_gate():
-        """变异腿：摘掉 keep_boundary（即回到本轮修复前的行为），免责短语必须复现丢失。
-
-        腿非恒真的证据 —— 若这步也「不丢」，说明夹具根本不触发截断，正例腿是装饰。
-        """
-        filler = "这是一段足够长的中文内容用来把免责短语挤到截断线之外。" * 20
-        raw = filler + "边界句：本条为证据综述，不构成治疗建议。"
-        legacy = trim_sentence(raw, CONTENT_MAX)          # 修复前行为：只截断，不保全
-        if "不构成治疗建议" in legacy:
-            return False, "变异腿失效：旧行为下免责短语竟然没丢，正例腿可能是装饰"
-        if "不构成治疗建议" not in keep_boundary(raw, "PSY-ZZ-015"):
-            return False, "keep_boundary 也没保住（变异腿通过但正例腿是假的）"
-        return True, ""
-
-    def ok_ship_zero_guard():
-        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-005", "全是未查证", "E", "甲", "甲内容。")})
-        entries, counts, n_files = parse_entries(d)
-        payload = payload_of(build_text(entries, counts, n_files))
-        if payload["entries"] or payload["excludedE"] != 1:
-            return False, "全 E 面 entries=%d" % len(payload["entries"])
-        return True, ""
-
-    def red_missing_level():
-        d = fixture_dir({"90-夹具.md": "### 条目 PSY-ZZ-010｜缺级\n- 一句话：甲\n- 内容：乙。\n"})
-        return raises_buildfail(lambda: parse_entries(d))
-
-    def red_dup_id():
-        one = CARD % ("PSY-ZZ-011", "同号甲", "A", "甲", "甲内容。")
-        d = fixture_dir({"90-夹具.md": one + one})
-        return raises_buildfail(lambda: parse_entries(d))
-
-    def red_only_spec():
-        d = fixture_dir({"README.md": "规范", "索引.md": "索引"})
-        return raises_buildfail(lambda: parse_entries(d))
-
-    def red_shape_drift():
-        # 半角冒号 + 缺「｜」：行式与 README §3 漂移，解析必须报 0 条而不是静默产出空库
-        d = fixture_dir({"90-夹具.md": "### 条目 PSY-ZZ-012:漂移标题\n- 可信度: A\n- 一句话: 甲\n"})
-        return raises_buildfail(lambda: parse_entries(d))
-
-    def red_bad_level_letter():
-        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-013", "非法级", "F", "甲", "甲内容。")})
-        return raises_buildfail(lambda: parse_entries(d))
-
-    def red_real_face_consistent():
-        entries, counts, n_files = check_pair()
-        if not entries:
-            return False, "真面解析 0 条"
-        return True, ""
-
-    def red_tampered_product():
-        prod = OUT.read_text("utf-8")
-        mid = len(prod) // 2
-        tampered = prod[:mid] + "X" + prod[mid + 1:]
-        d = fixture_dir({})
-        bad = d / "psych-kb.tampered.js"
-        bad.write_text(tampered, encoding="utf-8", newline="\n")
-        return raises_buildfail(lambda: check_pair(KB_DIR, bad))
-
-    def ok_sources_parsed():
-        # 来源子行抽出来 + URL 拆成独立字段 u + 定级理由抽出来
-        d = fixture_dir({'90-夹具.md': "### 条目 PSY-ZZ-021｜带来源的卡\n- 可信度：B\n- 定级理由：单研究样本有限\n- 一句话：摘要\n- 内容：内容。\n- 来源：\n  - [命题甲] Smith (2020) Journal of Testing；https://doi.org/10.1234/abc\n  - [命题乙] 无 URL 的纯题录\n- 关联：\n- 待验证点：无\n- 入库：2026-10-14 · 第12轮\n"})
-        entries, _c, _n = parse_entries(d)
-        e = entries[0]
-        if e["reason"] != "单研究样本有限":
-            return False, "定级理由未抽到：%r" % e["reason"]
-        if len(e["src"]) != 2:
-            return False, "来源子行抽到 %d 条（应 2）" % len(e["src"])
-        item = payload_of(build_sources_text(entries), SRC_GLOBAL + " = ")["src"]["PSY-ZZ-021"]["s"]
-        if len(item) != 2:
-            return False, "来源件条目数 %d（应 2）" % len(item)
-        if item[0]["u"] != "https://doi.org/10.1234/abc":
-            return False, "URL 未拆出：%r" % item[0]["u"]
-        if "doi.org" in item[0]["l"]:
-            return False, "label 里仍残留 URL（会重复显示）：%r" % item[0]["l"]
-        if item[1]["u"] != "":
-            return False, "无 URL 的题录被编造了 URL：%r" % item[1]["u"]
-        return True, ""
-
-    def red_sources_gate_off():
-        # 变异腿：卡面没有来源行时必须一条都抽不到（抽门不是恒真）
-        d = fixture_dir({"90-夹具.md": CARD % ("PSY-ZZ-022", "无来源的卡", "C", "摘要", "内容。")})
-        entries, _c, _n = parse_entries(d)
-        if entries[0]["src"]:
-            return False, "没有来源行的卡却抽到 %d 条" % len(entries[0]["src"])
-        return True, ""
-
-    def red_tampered_src_product():
-        # 变异腿：来源件篡改一位即判红（正文件用真面原件，故红因必来自来源件）
-        src = SRC_OUT.read_text("utf-8")
-        mid = len(src) // 2
-        tmp = Path(tempfile.mkdtemp(prefix="psychkb_srcselftest_"))
-        good_out = tmp / "psych-kb.good.js"
-        bad_src = tmp / "psych-kb-src.bad.js"
-        good_out.write_text(OUT.read_text("utf-8"), encoding="utf-8", newline="\n")
-        bad_src.write_text(src[:mid] + "X" + src[mid + 1:], encoding="utf-8", newline="\n")
-        try:
-            _check_pair_with_src(good_out, bad_src)
-        except BuildFail as e:
-            # 红因必须点名来源件，否则这条腿可能是在正文件那道上红的（等于没验来源件）
-            if "来源件不一致" not in str(e):
-                return False, "判红了但红因不是来源件：%s" % e
-            return True, ""
-        return False, "来源件被篡改却未判红"
-    leg("正例·单卡解析+情绪关联", ok_parse_one)
-    leg("来源子行抽出+URL拆字段+定级理由抽出", ok_sources_parsed)
-    leg("无来源行的卡必须抽不到（抽门非恒真）", red_sources_gate_off)
-    leg("来源件篡改一位必判不一致（变异腿）", red_tampered_src_product)
-    leg("E 级构建期排除并计数", ok_e_excluded)
-    leg("内容句界截断", ok_truncate)
-    leg("免责短语截断后仍前置到句首", ok_boundary_kept)
-    leg("摘掉保全逻辑免责句必丢（变异腿）", red_boundary_lost_without_gate)
-    leg("全 E 面产物为空库（供 main 的红腿判定）", ok_ship_zero_guard)
-    leg("缺可信度字段即停", red_missing_level)
-    leg("条目撞号即停", red_dup_id)
-    leg("只有规范与索引即停", red_only_spec)
-    leg("卡行式漂移即停（禁静默产出空库）", red_shape_drift)
-    leg("可信度非法字母即停", red_bad_level_letter)
-    leg("真面源⇄产物一致（正例）", red_real_face_consistent)
-    leg("真产物篡改一位必判不一致（变异腿）", red_tampered_product)
-
+    结论行的分母一律现读（len(results)/len(passed)），不抄腿数。
+    """
     passed = [n for n, ok, _ in results if ok]
     failed = [(n, why) for n, ok, why in results if not ok]
     for name, ok, why in results:
@@ -505,6 +537,7 @@ def selftest():
     print("PSYCH-KB-SELFTEST-PASS: %d/%d 腿（真面 %d 条 A%d B%d C%d D%d E排除%d｜变异腿咬合 %d 处）"
           % (len(passed), len(results), len(entries), counts["A"], counts["B"], counts["C"],
              counts["D"], counts["E"], muts))
+
 
 
 def main():
