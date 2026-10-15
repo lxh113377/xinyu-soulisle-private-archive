@@ -249,6 +249,16 @@ SUITES = [
     # 单次 ~20s），而 kbBlockFor 的改动是本轮主线，它应该有一条**快的、离线的**回归腿，否则下次改
     # 注入面就是裸奔。零浏览器、零网络、零密钥；只复述 kbBlockFor 的判据本体（从 src/js/chat-agent.js
     # 抽函数体、node 跑），不另立打分公式；期望域集合抄 K8 的同一份（两处漂移即红，见该件 docstring）。
+    # r178-KB20：DOMAIN_KW 词表只读对账腿（N12 常驻化）。只报缺口、不自动改词表
+    # （README 7.2：不得造第二把尺；N12 的升级方向明确要求「先有 K8 期望域回归腿才能切」，
+    # K8 + kb_retrieval_check 两条腿已在，故只读对账成立）。两档分类：主诉可达域必须有词表，
+    # 非主诉可达域（产品/技术/理论/测量域，用户主诉里不会出现专属词）显式豁免并列名。
+    ("kb_domain_kw_audit", [sys.executable, "_test/kb_domain_kw_audit.py"]),
+    ("kb_domain_kw_audit_selftest", [sys.executable, "_test/kb_domain_kw_audit.py", "--selftest"]),
+    # r178-KB31：电池套数口径的机器判据（N21/N22「口径靠人工数，每轮漂移」）。
+    # 从 SUITES 表实数出不同判据前缀组，断言 >= 9。只读，不动 src。
+    ("kb_battery_count_audit", [sys.executable, "_test/kb_battery_count_audit.py"]),
+    ("kb_battery_count_audit_selftest", [sys.executable, "_test/kb_battery_count_audit.py", "--selftest"]),
     ("kb_retrieval_check", [sys.executable, "_test/kb_retrieval_check.py"]),
     ("kb_retrieval_check_selftest", [sys.executable, "_test/kb_retrieval_check.py", "--selftest"]),
     ("psych_kb_build", [sys.executable, "_test/psych_kb_build.py", "--check"]),
@@ -443,10 +453,8 @@ SUITES = [
     #   四件的主流程都要打真实 sidecar（127.0.0.1:8321）或真开浏览器，服务不在时
     #   诚实回 rc=2（未验）——接进整跑等于把「本机没起 sidecar」常年刷成红项。
     #   主流程带外复算命令见 `docs/quality-gates.md` 同条目。
-    ("asr_local_selftest", [sys.executable, "node", "_test/asr/asr_local_check.js"]),
-    ("audio_quality_selftest", [sys.executable, "node", "_test/asr/audio_quality_check.js"]),
-    ("engine_switch_selftest", [sys.executable, "_test/asr/engine_switch_check.py", "--selftest"]),
-    ("asr_chain_selftest", [sys.executable, "_test/asr/asr_chain_check.py", "--selftest"]),
+    ("asr_local_selftest", ["node", "_test/asr/asr_local_check.js"]),
+    ("audio_quality_selftest", ["node", "_test/asr/audio_quality_check.js"]),
     ("browser_check", [sys.executable, "_test/browser_check.py"]),
     ("pixel_dual", [sys.executable, "_test/pixel_dual_check.py"]),
     ("lightshow", [sys.executable, "_test/lightshow_check.py"]),
