@@ -64,6 +64,7 @@ window.VoiceCall = (function () {
   const CRISIS_HINT = /自杀|自残|不想活|活不下去|结束生命|跳楼|割腕|伤害自己/;
 
   let deps = null, rec = null, SR = null;
+  let fellBack = false;         // J6：本机引擎→Web Speech 的降级只做一次（防止两个引擎来回抖）
   let state = "idle";           // idle | listening | thinking | speaking
   let duplex = "full";          // full=可随时打断  half=讲完再听
   let micOn = true, watch = 0;
@@ -82,7 +83,42 @@ window.VoiceCall = (function () {
   const metric = { user: "", reply: "", mode: "", ttfb: 0 };
 
   /* ── 能力探测 ───────────────────────────────────────────────────── */
-  function asrReady() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+  /* 引擎选择（J6）：本机 ASR 优先，Web Speech 保留为降级路径。
+   *
+   * 🔴 两条不可退让的约束：
+   *   1. **默认态零探测**（C15 同款红线）：AsrLocal 未显式开启时，本模块**不发任何请求**，
+   *      也不许顺手探一下 /api/asr/status —— 公网部署下那是一条凭空多出来的链路。
+   *   2. **不得伪装在线**：本机引擎构造失败/中途报错，一律**回落 Web Speech**，
+   *      而不是让用户对着不出声的麦克风讲话。界面上如实显示当前用的是哪个引擎。
+   *
+   * 两个引擎返回**同形状**对象（见 asr-local.js 文件头的对照表），
+   * 所以下面 buildRec 之后的所有逻辑（回声三层 / 能量门 / 打断判据）完全共用，一行不改。 */
+  function webSpeechCtor() { return window.SpeechRecognition || window.webkitSpeechRecognition; }
+  function asrReady() {
+    const L = window.AsrLocal;
+    if (L && L.isEnabled()) return true;      // 本机引擎已显式开启 ⇒ 不依赖 Web Speech 存在
+    return !!webSpeechCtor();
+  }
+  function engineName() {
+    const L = window.AsrLocal;
+    if (L && L.isEnabled()) return "local";
+    return webSpeechCtor() ? "webspeech" : "none";
+  }
+  /** 造一个识别器：本机优先，构造失败静默回落 Web Speech。返回 null 表示一个都没有。 */
+  function pickRecognizer() {
+    const L = window.AsrLocal;
+    if (L && L.isEnabled()) {
+      try {
+        const r = L.createRecognizer();
+        if (r) { r._engine = "local"; return r; }
+      } catch { /* 构造失败 → 回落，绝不因此让通话开不起来 */ }
+    }
+    const S = webSpeechCtor();
+    if (!S) return null;
+    const r = new S();
+    r._engine = "webspeech";
+    return r;
+  }
 
   /* ── 语义收句（纯函数 ⇒ 可单测，见 _unit）───────────────────────── */
   /** 这句在语义上收得住吗：有句末标点，或「不以连接词结尾且够长」 */
@@ -325,11 +361,17 @@ window.VoiceCall = (function () {
     if (layer) layer.classList.toggle("on", state !== "idle");
     const pill = $("#call-state");
     if (pill) {
+      // J6：如实标出当前用的是哪个识别引擎（本机 / 浏览器）—— 不许让用户以为
+      // 在用「更强的那个」而其实早已降级。降级后文案会从「本机识别」变成「浏览器识别」。
+      const engTag = state === "listening"
+        ? (rec && rec._engine === "local" ? " · 本机识别" : (fellBack ? " · 浏览器识别" : ""))
+        : "";
       pill.textContent = state === "thinking" ? "心屿正在听懂你说的…"
         : state === "speaking" ? (duplex === "full" ? "心屿在说 · 你可以随时打断" : "心屿在说 · 讲完就轮到你")
-          : state === "listening" ? (micOn ? "在听 · 说完自然停顿就行" : "麦克风已静音")
+          : state === "listening" ? (micOn ? "在听 · 说完自然停顿就行" + engTag : "麦克风已静音")
             : "";
       pill.className = "call-pill s-" + state;
+      if (pill.dataset) pill.dataset.engine = rec ? (rec._engine || "webspeech") : "none";
     }
     const live = $("#call-live");
     if (live) live.textContent = pending;
@@ -351,13 +393,25 @@ window.VoiceCall = (function () {
 
   /* ── 识别器 ─────────────────────────────────────────────────────── */
   function buildRec() {
-    if (!SR || rec) return;
-    rec = new SR();
-    rec.lang = "zh-CN";
-    rec.interimResults = true;
-    rec.continuous = true;       // 通话态：一次启动持续听；浏览器自行 end 时靠重启兜住
-    rec.maxAlternatives = ALTS;  // wb-echo-L2：旧码写死 1 = 主动丢掉 n-best 里更好的那条
-    rec.onresult = (e) => {
+    if (rec) return;
+    rec = pickRecognizer();
+    if (rec) bindRec(rec);
+  }
+
+  /** 绑定识别器回调。**本机引擎与 Web Speech 共用同一套** ——
+   *  下面这一大段（回声三层 / 能量门 / 打断判据 / n-best 重排）一个字都没改，
+   *  靠的就是两个引擎返回同形状对象。抽成独立函数是为了中途降级时能重新绑一遍。 */
+  function bindRec(r) {
+    if (r._engine === "webspeech") {
+      // Web Speech 专有属性；本机引擎的默认值已在 asr-local.js 工厂里设好，
+      // 且 maxAlternatives 恒 1（贪心解码，C23 的 n-best 重排在本引擎上不成立）。
+      r.lang = "zh-CN";
+      r.interimResults = true;
+      r.continuous = true;       // 通话态：一次启动持续听；浏览器自行 end 时靠重启兜住
+      r.maxAlternatives = ALTS;  // wb-echo-L2：旧码写死 1 = 主动丢掉 n-best 里更好的那条
+    }
+    rec = r;
+    r.onresult = (e) => {
       // r175/A3-1：改成先收【片段数组】再合并 —— 原来 `said += t` 直接拼，引擎补投的
       // 重复/包含片段会被拼成整句重复（「我今天有点崩溃我今天有点崩溃了」）。
       const finals = [], interims = [];
@@ -395,16 +449,35 @@ window.VoiceCall = (function () {
       lastSpeech = now;
       paint();
     };
-    rec.onerror = (e) => {
+    r.onerror = (e) => {
+      const code = (e && e.error) ? e.error : "asr-error";
+      // 🔴 本机引擎不可用 → **当场回落 Web Speech**，而不是让用户对着不出声的麦克风讲话。
+      //    只在「还在通话、且本机引擎真的在用、且 Web Speech 还在」时才降级；
+      //    降级后本局不再切回本机（避免和本机/浏览器两个引擎来回抖）。
+      if (r._engine === "local" && state !== "idle" && webSpeechCtor() && !fellBack) {
+        fellBack = true;
+        try { r.stop(); } catch { /* 已停 */ }
+        try { r.onresult = null; r.onerror = null; r.onend = null; } catch { /* 已摘 */ }
+        recAlive = false;
+        const alt = new (webSpeechCtor())();
+        alt._engine = "webspeech";
+        bindRec(alt);
+        baseLen = 0; lastLen = 0;
+        if (state === "listening" && micOn) startRec();
+        paint();                    // 立刻重绘：不然界面还挂着「本机识别」，等于对用户撒谎
+        const n = $("#call-note");
+        if (n) n.textContent = "本机识别暂时用不了，已切回浏览器识别";
+        return;
+      }
       const n = $("#call-note");
-      if (n) n.textContent = "识别中断（" + (e && e.error ? e.error : "asr-error") + "）—— 接着说就行，或点「说完啦」";
+      if (n) n.textContent = "识别中断（" + code + "）—— 接着说就行，或点「说完啦」";
     };
-    rec.onend = () => {
+    r.onend = () => {
       // 一次 end = 一个会话结束：转写列表随之作废 ⇒ 偏移归零（真机重启后 results 是空的）。
       // 只在「正该听」的时候接手重启：半双工念话期间 end 到了不能抢着开麦（那会把自家念白收进去）。
       // 退出态不等 end（voice_check A8 一手教训）——重启条件写的是状态，不是"等谁先回来"。
       baseLen = 0; lastLen = 0; recAlive = false;
-      if (state === "listening" && micOn && rec) startRec();
+      if (state === "listening" && micOn && rec && rec._engine === r._engine) startRec();
     };
   }
   function startRec() {
@@ -575,7 +648,14 @@ window.VoiceCall = (function () {
   function startCall() {
     if (state !== "idle" || !asrReady() || !$("#call-layer")) return;
     if (window.Voice) window.Voice.probeLocal();   // 开了本机引擎就在开口前探一次；默认关 ⇒ 零请求
-    SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // J6：SR 不再决定用哪个引擎（改由 pickRecognizer 挑），仅保留给 asrReady 之外的旧读法
+    SR = webSpeechCtor();
+    fellBack = false;                     // 新的一通重新允许降级
+    if (window.AsrLocal && window.AsrLocal.isEnabled()) {
+      // 只在**显式开启**时探一次（红线2：默认态零请求）。探不到不阻断通话 ——
+      // 本机引擎会自己报错，届时 onerror 里当场回落 Web Speech。
+      window.AsrLocal.probe();
+    }
     state = "listening";
     pending = ""; ttf = 0; turnMs = 0; consumed = 0; speakingBuf = ""; aiLine = null; lastSpeech = 0;
     speakEndAt = 0; spokenLog = []; lvlHist = [];
@@ -677,7 +757,9 @@ window.VoiceCall = (function () {
       return { state: state, duplex: duplex, micOn: micOn, pending: pending, ttfb: ttf, turnMs: turnMs,
         complete: semanticallyComplete(pending || metric.user), metrics: metric,
         gum: lastGum, videoAsked: !!(lastGum && lastGum.video), lines: $("#call-captions") ? $("#call-captions").children.length : 0,
-        noiseBase: noiseBase, histN: lvlHist.length, alts: rec ? rec.maxAlternatives : 0 };   // wb-echo-L2：判据读底噪/采样数/候选数
+        noiseBase: noiseBase, histN: lvlHist.length, alts: rec ? rec.maxAlternatives : 0,
+        // J6：把当前引擎如实暴露给判据 —— 降级必须可观测，否则「以为在用本机」会被判成绿
+        engine: rec ? (rec._engine || "webspeech") : "none", fellBack: fellBack };   // wb-echo-L2：判据读底噪/采样数/候选数
     },
     /** 判据专用注入点：往能量历史灌采样 + 冻结底噪，**不参与业务路径**
      *  （等价于 Analyser 读到真人插话 / 念白前房间安静）。仅供 _test 用。 */
@@ -685,6 +767,8 @@ window.VoiceCall = (function () {
     _injectBase(v) { noiseBase = v; },
     _unit: { semanticallyComplete, shouldCommit, cutSentences, isEcho, isEchoFuzzy, gateOpen,
       bumpOkFrom, bargeOk, baseOf, altScore, pickBest,
+      // J6：引擎选择缝（判据 A 组用）—— 必须在 _unit 里暴露，否则判据只能靠桩 SpeechRecognition 间接猜
+      pickRecognizer, webSpeechCtor, asrReady, engineName,
       // r175/A3：新增三条缝 —— 断句合并、自适应底噪、采集链参数（判据 E7/E8/C24 用）
       mergeUtterance, ambientFloor, audioConstraints, setAudioConstraints, lastGum: () => lastGum }
   };

@@ -11,6 +11,7 @@
   以上各桩均由 `--selftest` 双向自证（**桩数由脚本自己印，本行不抄数**——抄了就会漂，
   口径见 docs/quality-gates.md 的「文档条数须挂责任方」）。
 """
+import hashlib
 import os
 import subprocess, sys, io, re, time, json, shutil, atexit, tempfile, types
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
@@ -244,6 +245,12 @@ SUITES = [
     # 所以这个漂移活了 3 轮零告警。公网注入的将是旧库，条目卡里的 D 级争议并陈进不了回复。
     # 同族未接线的另一件：wit_quotes_build.py（表达语料库构建器）同样无 --selftest、不在电池，
     # 本轮不代处置（该面有并行会话在途），登记于 memory/07-next-steps。
+    # r178-KB17：检索判据离线常驻化。为什么必须立：第 16 轮的 K8 是**浏览器腿**（依赖 8123 + chromium，
+    # 单次 ~20s），而 kbBlockFor 的改动是本轮主线，它应该有一条**快的、离线的**回归腿，否则下次改
+    # 注入面就是裸奔。零浏览器、零网络、零密钥；只复述 kbBlockFor 的判据本体（从 src/js/chat-agent.js
+    # 抽函数体、node 跑），不另立打分公式；期望域集合抄 K8 的同一份（两处漂移即红，见该件 docstring）。
+    ("kb_retrieval_check", [sys.executable, "_test/kb_retrieval_check.py"]),
+    ("kb_retrieval_check_selftest", [sys.executable, "_test/kb_retrieval_check.py", "--selftest"]),
     ("psych_kb_build", [sys.executable, "_test/psych_kb_build.py", "--check"]),
     ("psych_kb_build_selftest", [sys.executable, "_test/psych_kb_build.py", "--selftest"]),
     # r133：上条注释「wit_quotes_build.py 同样无 --selftest、不在电池」已过期——
@@ -430,6 +437,16 @@ SUITES = [
     # 主流程带外复算命令见 `docs/quality-gates.md` 同条目。
     ("asr_sidecar_selftest", [sys.executable, "_test/asr_sidecar_check.py", "--selftest"]),
     ("asr_eval_selftest", [sys.executable, "_test/asr_eval_check.py", "--selftest"]),
+    # r184 接线（G16 同款孤儿判据）：`asr_local_check.js` / `audio_quality_check.js` 与
+    #   `engine_switch_check.py` / `asr_chain_check.py` 四件都已写好、各跑自测全绿，
+    #   却一条都不在电池里 ⇒ 「有仪器但没人按开关」。按 r179 先例**只接 --selftest 腿**：
+    #   四件的主流程都要打真实 sidecar（127.0.0.1:8321）或真开浏览器，服务不在时
+    #   诚实回 rc=2（未验）——接进整跑等于把「本机没起 sidecar」常年刷成红项。
+    #   主流程带外复算命令见 `docs/quality-gates.md` 同条目。
+    ("asr_local_selftest", [sys.executable, "node", "_test/asr/asr_local_check.js"]),
+    ("audio_quality_selftest", [sys.executable, "node", "_test/asr/audio_quality_check.js"]),
+    ("engine_switch_selftest", [sys.executable, "_test/asr/engine_switch_check.py", "--selftest"]),
+    ("asr_chain_selftest", [sys.executable, "_test/asr/asr_chain_check.py", "--selftest"]),
     ("browser_check", [sys.executable, "_test/browser_check.py"]),
     ("pixel_dual", [sys.executable, "_test/pixel_dual_check.py"]),
     ("lightshow", [sys.executable, "_test/lightshow_check.py"]),
@@ -491,6 +508,10 @@ SUITES = [
     # selftest 那条用反例证明它有牙（5 条反例必须全部被抓到）。
     ("face_discrim_check", [sys.executable, "_test/face_discrim_check.py"]),
     ("face_discrim_selftest", [sys.executable, "_test/face_discrim_check.py", "--selftest"]),
+  # r184：F13 场景切片尺（读 AU 语料 meta + 三断言 A1 小尺寸零误伤 / A2 眨眼双向 / A3 阈值同源）
+  #   两条变异腿都接线（--selftest），与 face_* 族同形；门面行 <=110B（run_all_suites 的 line[:110]）
+  ("face_scene", [sys.executable, "_test/face_scene_check.py"]),
+  ("face_scene_selftest", [sys.executable, "_test/face_scene_check.py", "--selftest"]),
     ("quality_peer_selftest", [sys.executable, "_test/peer_quality_tooling_probe.py", "--selftest"]),
     # r59 交付物清单面：提交包是「要交出去的东西」，此前 91 套件里没有任何一条判据引用过成片、
     # 清单本体、渲染脚本 —— 09-28 00:19 实测 7 个被跟踪交付件从工作树消失且零告警。
@@ -1312,6 +1333,64 @@ def exec_selftest():
     return 1 if fails else 0
 
 
+def face_hash(lines, head):
+    """面指纹（纯函数）：HEAD sha + git status --porcelain 行集合 ⇒ 8 位摘要。
+
+    r183 立此条的一手动因（R180-05）：r180 整跑跑到 57/212，而我**同时**在改同一棵树 ⇒
+    已跑套件分属改动前后两个面，那张「50 绿 6 红」的清单既不能当冻结面收据、也不能当因果判定，
+    报告里只能写「不具因果判定力」。缺的不是纪律（"先落笔改、后整跑"是纪律），
+    是**机器面**：收据自己得说清它取自哪个面，以及跑的过程中面有没有变。
+
+    为什么不用 mtime：checkout/touch 会扰动 mtime，且 1170 个文件逐个 stat 太贵；
+    "取自哪个面"的判据是**内容面**（HEAD + 未提交改动集合），不是时间戳。
+    零输入（无 HEAD 且无 status 行）返回空串 ⇒ 调用方据此记未验，
+    不许拿「空指纹」当指纹（R247：零输入不得判绿）。
+    """
+    if not head and not lines:
+        return ""
+    h = hashlib.sha1()
+    h.update((head or "").strip().encode("utf-8"))
+    for ln in sorted(x.rstrip() for x in (lines or []) if x.strip()):
+        h.update(b"\x00" + ln.encode("utf-8", "replace"))
+    return h.hexdigest()[:8]
+
+
+def tree_face():
+    """现读面指纹 ⇒ (head, 摘要, 脏件数)。git 取不到 ⇒ ("", "", -1) 记未验，不猜。"""
+    def g(*a):
+        return subprocess.run(["git"] + list(a), capture_output=True, text=True,
+                              encoding="utf-8", errors="replace").stdout
+    try:
+        head = g("rev-parse", "HEAD").strip()
+        lines = [l for l in g("status", "--porcelain").splitlines() if l.strip()]
+    except OSError:
+        return "", "", -1
+    return head, face_hash(lines, head), len(lines)
+
+
+def face_selftest():
+    """面指纹的反例桩：该变的必须变、该稳的必须稳、零输入不得判绿。"""
+    fails = []
+    a = face_hash([" M x.py"], "abc123")
+    if not a or a != face_hash([" M x.py"], "abc123"):
+        fails.append("确定性腿：同输入应得同指纹且非空，实 %r" % (a,))
+    if face_hash([" M x.py", "?? y.py"], "abc123") == a:
+        fails.append("脏件敏感腿：多一件脏件指纹未变 ⇒ 指纹与面无关")
+    if face_hash([" M x.py"], "abc124") == a:
+        fails.append("HEAD 敏感腿：HEAD 变而指纹未变")
+    if face_hash(["?? y.py", " M x.py"], "abc123") != face_hash([" M x.py", "?? y.py"], "abc123"):
+        fails.append("行序无关腿：同一集合换序得不同指纹 ⇒ 会把稳定面误判成跨面")
+    if face_hash([], "") != "":
+        fails.append("零输入腿：空面必须返回空串（R247），实 %r" % (face_hash([], ""),))
+    if not a or a == face_hash([], ""):
+        fails.append("零输入腿：空面指纹与真实面撞车")
+    for f in fails:
+        print("  · FACE-SELFTEST-FAIL " + f)
+    print("FACE-SELFTEST-%s（5 腿：确定性／脏件敏感／HEAD 敏感／行序无关／零输入不判绿）"
+          % ("PASS" if not fails else "FAIL"))
+    return 1 if fails else 0
+
+
 def selftest_all():
     """`--selftest` 分派（r100 从 main 提出，纯搬家）。各档桩数由每条桩自己印，这里不抄数。"""
     rc1 = lock_selftest()
@@ -1322,13 +1401,14 @@ def selftest_all():
     rc6 = blind_selftest()
     rc7 = timeout_selftest()
     rc8 = exec_selftest()
+    rc9 = face_selftest()
     # 收口行 ≤110B（`run_all_suites.py` 的 `line[:110]` 会把尾巴吃掉）：PASS 带八档名册，
     # FAIL 把名册换成「红档=…」——哪一档红必须留在**这一行**上，不能靠"上面某行印过"（r40b 折叠教训）。
-    names = ("锁", "折叠", "计费", "台账", "自管", "盲红", "超时", "执行器")
-    rcs = (rc1, rc2, rc3, rc4, rc5, rc6, rc7, rc8)
+    names = ("锁", "折叠", "计费", "台账", "自管", "盲红", "超时", "执行器", "面指纹")
+    rcs = (rc1, rc2, rc3, rc4, rc5, rc6, rc7, rc8, rc9)
     bad8 = [n for n, r in zip(names, rcs) if r]
     print("BATTERY-SELFTEST-%s" % (
-        "PASS（8 档：" + "/".join(names) + "）" if not bad8
+        "PASS（%d 档：" % len(names) + "/".join(names) + "）" if not bad8
         else "FAIL 红档=" + ",".join(bad8)))
     for f in serve_fails:
         print("  · SELF-HOST-FAIL " + f)
@@ -1451,6 +1531,11 @@ def main():
     srv_state, srv_note = ensure_server()
     print("SELF-HOST: %s ｜ %s" % (srv_state, srv_note))
 
+    # r183：整跑前后各取一次面指纹（R180-05）。收据必须自己说清"取自哪个面"，
+    # 且跑的过程中面变了要当场点名——不靠下一个人从 mtime 里猜。
+    face0 = tree_face()
+    print("FACE-BEGIN: head=%s face=%s dirty=%d" % (face0[0][:8] or "-", face0[1] or "-", face0[2]))
+
     results, blurbs, times = run_suites(SUITES)
 
     bad = [r for r in results if r[1] != 0]
@@ -1489,6 +1574,14 @@ def main():
     if quota:
         parts.append("ENV-QUOTA(上游余额/计费阻塞：响应体自证，非本仓缺陷，但仍不得记为已验): "
                      + ",".join(quota))
+    face1 = tree_face()
+    # 跨面判定：两次都取到指纹才判；任一次取不到（git 不可用）⇒ 记未验，不当"没变"（失明不是零）
+    cross = None if not (face0[1] and face1[1]) else (face0[1] != face1[1])
+    print("FACE-END: head=%s face=%s dirty=%d ｜ 跨面=%s"
+          % (face1[0][:8] or "-", face1[1] or "-", face1[2],
+             "未验(git 取不到)" if cross is None else ("是(收据跨改动面)" if cross else "否")))
+    if cross:
+        parts.append("FACE-DRIFT(整跑期间工作树被改过：本收据跨改动面，不得当冻结面/因果判定用)")
     tail_msg = "ALL-GREEN" if not parts else "  |  ".join(parts)
     print("=" * 60)
     ok, coverage, why = ledger_should_write(len(SUITES), total_suites, 0)

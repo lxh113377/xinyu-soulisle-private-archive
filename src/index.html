@@ -314,7 +314,11 @@
 <script src="js/three-scene.js"></script>
 <script src="js/scroll-story.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/audio-quality.js"></script>
 <script src="js/asr-normalize.js"></script>
+<!-- J6 本机 ASR 适配器。必须在 asr-normalize.js 之后、voice-call.js 之前加载：
+     它要与 asr-normalize 协作（n-best 重排打分），并在通话层建识别器时被引用。 -->
+<script src="js/asr-local.js"></script>
 <script src="js/voice-call.js"></script>
 <script src="js/chart.js"></script>
 <script src="js/chat-window.js"></script>

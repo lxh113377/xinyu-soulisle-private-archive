@@ -23,6 +23,10 @@ const PRECACHE = [
   "/js/data-rights.js", "/js/sw-register.js", "/js/voice-call.js", "/css/voice-call.css",
   // r174/A2 转写归一化（口头语清洗）：asr-normalize.js 必须在 voice-call.js 之前就位
   "/js/asr-normalize.js",
+  // r184 语音面两件（页面引用了就必须进壳）：前置质量闸 + 本机 ASR 适配器。
+  //   本机适配器默认关（cfg.localAsr 不为 true 时一次请求都不发），但断网时它必须还在，
+  //   否则通话层读到 undefined 会走降级分支 —— 那属行为差异，不是可接受的离线形态。
+  "/js/audio-quality.js", "/js/asr-local.js",
   "/data/emotion-lexicon.js", "/data/emotion-strategy.js",
   // r113 心理学知识库数据件（psych_kb_build.py 生成，源在 交付物/心理学知识库）
   "/data/psych-kb.js",
