@@ -70,13 +70,22 @@ def main() -> int:
         {"mandarin", "yue", "chuan", "wu", "dongbei", "minnan"} <= set(status.get("dialects", [])),
         str(status.get("dialects")))
 
+    if st != 200:
+        # J1 都没量到（服务不可达/路由缺失）⇒ 整条链路无从判定。
+        # 🔴 不得在 FAIL 已入台账的情况下打 PASS —— 这是 r186 一手抓到的判据自身缺陷：
+        #   旧代码 8123 拒连时 3 条腿记 FAIL 却仍打 ASR-CHAIN-PASS rc=0（掩盖）。
+        print(f"\nASR-CHAIN: {len(PASS)} passed, {len(FAIL)} failed")
+        print(f"ASR-CHAIN-UNVERIFIED (Java 服务不可达或未暴露 /api/asr/status：st={st})")
+        return 2
+
     if not status.get("enabled"):
         # 默认态：必须**拒**而不是编一句
         code, b = post_wav(f"{a.base}/api/asr", a.wav)
         chk("J2 默认态 enabled=false → 503 asr-disabled（不得伪装在线）",
             code == 503 and json.loads(b).get("error") == "asr-disabled", f"{code} {b[:90]}")
-        print("\nASR-CHAIN-PASS (默认态；开启态腿需 XINYU_ASR_ENABLED=true 复跑)")
-        return 0
+        print(f"\nASR-CHAIN: {len(PASS)} passed, {len(FAIL)} failed")
+        print("ASR-CHAIN-PASS (默认态；开启态腿需 XINYU_ASR_ENABLED=true 复跑)" if not FAIL else "ASR-CHAIN-FAIL")
+        return 0 if not FAIL else 1
 
     ready = status.get("ready")
     chk("J3 Python 服务探到（ready 由 /health 得出，非猜）", ready is True, f"ready={ready}")
