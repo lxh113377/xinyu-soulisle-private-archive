@@ -1,5 +1,65 @@
 ## [Unreleased]
 
+### r187 — 提交并推送：先让 257 个本地提交真的推得出去（2026-10-16）
+
+> 一手事实：本地 `main` 领先 `origin/main` **257 个提交**、落后 0（纯快进），最后一次成功推送
+> 停在 10-10 的 `e8462ca`。原因不是网络也不是权限（`git ls-remote` 当场通），而是
+> **pre-push 契约闸判红** —— 本仓纪律「红不推远端」。所以这一轮的主活是修闸，不是 `git push`。
+
+**四项红逐条定根因并修到绿（14/14 GREEN，`greencheck run` rc=0）**：
+
+1. **loc-guard（3 个函数超 150 行）**：`_test/asr/train_lora.py` main 232 行、`run_eval.py` run 180 行、
+   `kb_wiring_check.py` main 183 行 ⇒ 按 r94 先例（本仓 `repo_config_check` 自己就是这么拆的）
+   **逐语句等价下移成模块级函数**，最长降到 74 行。没有把契约改成 report-only —— 那属于
+   「删规则本体求绿」（R236 白名单排除法明令禁止）。拆分顺带抓到两处真缺陷：
+   ① `train_lora.py` 收尾行写 `if cer is not None`，而 `cer` 本件从未赋值 ⇒ 训练真跑完时必抛
+      `NameError`（本机无 GPU/torch，该路径从未被触发过 ⇒ 没跑过的路径不算验过）；
+   ② `kb_wiring_check.py` 拆出 `K8_CASES` 后两处仍引用旧名 `k8_cases` ⇒ 由 `--selftest` 9 腿复算当场抓回。
+2. **size-budget（2 项超预算）**：先做**行尾归一**（25 个被跟踪件 + 30 个未入库件的 CRLF→LF），
+   体积读数才与 blob 口径一致（`chat-agent.js` 35,408→34,835）。再按在册「实测 +5%」惯例重登记并
+   **逐条写理由**（沿用 r172 / r177-KB14 / r178-KB15 先例，不静默抬分）：`chat-agent.js` 32,200→36,600
+   （增量是 DOMAIN_KW 冷域词表 + domainOf + STOP_BIGRAM，逐 hunk 实读确认非注释灌水，抬幅 8.1% 已注明）；
+   `psych-kb-sources.js` 384,225→407,900（懒加载面，不计入首屏 TOTAL）。另给 `.gitattributes`
+   补 `*.wav binary` —— `sample3s.wav` 未登记 ⇒ 被 `* text=auto eol=lf` 做行尾翻译，工作树 != blob。
+3. **repo-config G4**：README 声称 212 套件 ⇄ `run_all_suites.py` 实测 228 ⇒ 按 G20/G4 口径补更正注
+   并改到实测值（本轮接线后 231）。
+4. **repo-config G16（四面双向对账）**：抓出两组真缺陷 ——
+   ① **7 条判据早已在电池里跑，却从未进 `docs/quality-gates.md`、也从未 `git add`**
+      （F16 场景切片 / F17 遮挡 / F18 EMA 平滑 + KB 四审计）⇒ 远端 CI 根本读不到它们；
+      本轮逐件实测 rc=0 后补登记并入库（登记条数一律写「由脚本自己印，本行不抄数」）。
+   ② **r184 注释声称「四件全接」，实测只接了两件 .js** ⇒ `asr_chain_check.py` /
+      `engine_switch_check.py` 仍是「已入库却无人执行」的孤儿（空头主张被 G16 当场打回）。
+      按 r179 先例各补一条**离线 `--selftest` 腿**并入电池（主流程一条要 Java 8123、一条要真浏览器，
+      服务不在时诚实回 rc=2）。同轮修掉 `engine_switch_check.py` 一处真缺陷：playwright 写在
+      **模块级** import ⇒ 本机没装时 rc=1（判红），事实只是环境缺件 ⇒ 改惰性导入回 rc=2。
+      新补的三条腿各自都被自己的反向腿抓到过东西（`__feed` 与 `__feedQueue` 前缀撞名、
+      分支注释里的历史原文被误判成代码、n=0 时 `e2e[int(0.50*(n-1))]` 对空表取 `[-1]` 崩）——
+      三处均已修，反向腿现全绿。
+
+**我自己造成的两处失误（如实登记）**：
+- `run_code` 子进程 `process.env` 缺 `USERPROFILE`/`APPDATA` ⇒ 第一次 `pip install` 把 user-site
+  算成**相对路径**，在仓根建出字面量 `~` 目录；随后我的 `git add -A` 把 92 个第三方文件吞进暂存面。
+  处置：`git rm --cached` 撤销跟踪（0 残留）+ 走 `handoff.py recycle`（台账
+  `20261016-152530-0a6ffa`，系统回收站可还原，纪律 #21 禁磁盘直删）+ `.gitignore` 登记 `/~/`
+  复发防护（同 `%SystemDrive%` 先例）。
+- 我自己的两份参考文件与 `gh` 运行态（`.local/state/gh/device-id`）也被 `add -A` 带进暂存面，
+  已撤销跟踪并登记 `/.local/`。
+
+**未跟踪面收口**：一次性探针（`_test/_f10*.py` 等，docstring 原文即「跑完即删」）、PowerShell
+重定向产物（`*.tmp`/`*.diff`，含 UTF-16 BOM）、ASR 逐样本明细、并行工具的 HEAD 工作树
+`_wt_head/`（内含 .git 指针，入库等于把仓库套进自己）⇒ 一律走 R269 例外通道登记 gitignore 豁免，
+不迁 `_trash`（活跃工具运行态禁迁）。
+
+**环境层变化（非本仓缺陷，但影响复算）**：会话中途 `C:\Program Files\Python312\python.exe` 与
+`D:\fj-actions-runner\...\3.12.10\x64\python.exe` 双双消失（前者只剩 Lib/Scripts，mtime 落在本轮
+中途）⇒ PATH 里 `python` 不可见，契约 14 条一度全 rc=9009。我没有去动别人的运行时，改用机器上
+仍完整的基座在**仓外**建判据专用 venv（`D:\xinyu-judge-venv`，3.13.14 + requirements.txt 四件），
+只在进程内注入 PATH。⚠️ 待办：CI pin 的是 3.11/3.12 口径，本机 venv 是 3.13 ⇒ 版本兼容差
+由 `compileall-test` 与 CI 兜（本轮该条 GREEN）。
+
+**受理面**：`origin/main` 仍是 merge-base `e8462ca` ⇒ 纯快进、无需 pull、零冲突风险。
+
+
 ### r183 — 八维对标 + 四项工程改造：先证「与机器无关」，再让收据自己说清取自哪个面（2026-10-15）
 
 > 对标报告：`交付物/对标分析报告-2026-10-15-r183-face-and-eol.md`。HEAD 起点 `e1d1eab`。
