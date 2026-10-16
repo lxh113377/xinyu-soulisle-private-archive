@@ -27,9 +27,23 @@
    "wrong": 0
   }
  },
- "top1": 1.0,
+ "top1": 1,
  "confident_n": 10,
- "acc_on_confident": 1.0,
+ "acc_on_confident": 1,
  "wrong": [],
- "stored_mismatch": []
+ "stored_mismatch": [],
+ "verdicts": {
+  "anger-01-fpapi.jpg": "hit",
+  "anger-02-fpapi.jpg": "hit",
+  "neutral-01-ethel.jpg": "hit",
+  "neutral-02-john-clark.jpg": "hit",
+  "neutral-03-robert-hall.jpg": "hit",
+  "neutral-04-jane-forbes.jpg": "hit",
+  "smile-01-girl-teeth.jpg": "hit",
+  "smile-02-girl-sunshine.jpg": "hit",
+  "smile-03-boy-laos.jpg": "hit",
+  "smile-04-woman-beer.jpg": "hit",
+  "surprise-01-fpapi.jpg": "hit_lean",
+  "surprise-02-fpapi.jpg": "hit_lean"
+ }
 }

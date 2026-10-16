@@ -271,9 +271,20 @@ def leg_f10(browser, base, notes, bad):
     （否则用户没法再打开）。自带 context —— 借用别的腿的 page 会 TargetClosedError（首跑实测）。"""
     ctx = browser.new_context(permissions=["camera"], viewport={"width": 1280, "height": 900})
     pg = ctx.new_page()
+    print("    F10: goto…", flush=True)
     pg.goto(base + "/index.html", wait_until="load")
+    print("    F10: loaded, 等 UI ready…", flush=True)
     pg.wait_for_function("window.__XINYU_FACE_UI__ && window.__XINYU_FACE_UI__.state !== 'boot'", timeout=60000)
-    pg.click("#btn-face")                                # 打开面板并启动
+    print("    F10: UI ready, click btn-face…", flush=True)
+    # r173：点击一律走 dispatch_event，**不用 pg.click**。
+    # 原因（本轮实测取证）：CPU delegate 下 MediaPipe 多线程推理把约 25 个核打满
+    # （实测 8 秒窗口 CPU 增量 202s），页面主线程被饿死 ⇒ pg.click 的 actionability
+    # 检查（元素稳定/可接收事件）永远等不到，整条电池无限挂起。dispatch_event 直接
+    # 派发 click 给监听器，不等布局稳定 —— 本腿验的是开关语义，不是命中率，够用且不会挂。
+    def _tap(sel):
+        pg.eval_on_selector(sel, "el => el.dispatchEvent(new MouseEvent('click', {bubbles: true}))")
+    _tap("#btn-face")                                     # 打开面板并启动
+    print("    F10: clicked, 等 isRunning…", flush=True)
     try:
         pg.wait_for_function("window.FaceEngine.isRunning()", timeout=60000)
     except Exception:  # noqa: BLE001
@@ -285,13 +296,15 @@ def leg_f10(browser, base, notes, bad):
         word: document.getElementById('face-switch-word').textContent,
         pill: document.getElementById('face-hud-state').textContent,
         videoShown: !document.getElementById('face-hud-video').hidden})""")
+    print("    F10: on1 取到", flush=True)
     notes.append("F10 开：checked=%s word=%r pill=%r 视频=%s 面板=%s"
                  % (on1["checked"], on1["word"], on1["pill"], on1["videoShown"], on1["hud"]))
     if on1["checked"] != "true" or on1["word"] != "已开启" or on1["pill"] != "已开启":
         bad.append("F10 开关打开后状态没同步：%s" % json.dumps(on1, ensure_ascii=False))
     if not on1["videoShown"]:
         bad.append("F10 开启后预览区仍在占位态（idle 没让位给视频）")
-    pg.click("#face-switch")                             # 关
+    _tap("#face-switch")                               # 关
+    print("    F10: 已点关", flush=True)
     pg.wait_for_timeout(600)
     off1 = pg.evaluate("""({running: window.FaceEngine.isRunning(),
         live: Array.from(document.querySelectorAll('video')).filter(v => !!v.srcObject).length,
@@ -308,14 +321,17 @@ def leg_f10(browser, base, notes, bad):
         bad.append("F10 关闭后状态没翻面：%s" % json.dumps(off1, ensure_ascii=False))
     if not off1["hud"] or not off1["idle"]:
         bad.append("F10 关闭后应保留面板并显示占位（否则用户没法再打开）：%s" % json.dumps(off1, ensure_ascii=False))
-    pg.click("#face-switch")                             # 再开一次：开关必须双向可反复
+    _tap("#face-switch")                               # 再开一次：开关必须双向可反复
+    print("    F10: 已点再开", flush=True)
     try:
         pg.wait_for_function("window.FaceEngine.isRunning()", timeout=60000)
     except Exception:  # noqa: BLE001
         bad.append("F10 关掉后再打开失败（开关不是双向的）")
-    pg.click("#face-switch")
+    _tap("#face-switch")
     pg.wait_for_timeout(400)
+    print("    F10: 收尾 ctx.close…", flush=True)
     ctx.close()
+    print("    F10: ctx 已关", flush=True)
 
 
 def _set_cam_setting(page, allow):
@@ -642,6 +658,53 @@ def _leg_f6(browser, base, bad):
     ctx2.close()
 
 
+BROWSER_LEGS_TIMEOUT = 900     # 秒。整段浏览器腿的硬上限（r173 新增，理由见 browser_legs_guarded）
+
+
+def browser_legs_guarded():
+    """带硬上限地跑浏览器腿（r173）。
+
+    为什么要子进程看门狗（而不是给每个 wait 加 timeout）：
+      本轮实测：无 GPU 的 headless 环境里 MediaPipe 走 CPU delegate，多线程 XNNPACK 把
+      **约 25 个核打满**（8 秒窗口 CPU 增量 202s）。页面主线程被饿死 ⇒
+      `wait_for_function` 的轮询脚本根本插不进去，**它自带的 timeout 也一起失效**
+      （F10「再开」那一等实测超过 4 分钟仍不返回）。这不是判据写错，是仪器被饿死。
+      A/B 对照（HEAD 版 vs 工作树版同一序列）表现完全一致 ⇒ **既有问题，非本轮引入**；
+      且仅在本机无 GPU 时复现，有 GPU 的机器未必如此（未实测，不外推成产品缺陷）。
+    做法：把整段浏览器腿丢进子进程跑，超时就杀 ⇒ 本轮读数记 **UNVERIFIED** 而不是
+      让整锅电池无限挂起、连个结论行都没有（那比红更糟：红至少能被看见）。
+    """
+    import json as _json
+    import subprocess
+    import tempfile
+    from pathlib import Path as _Path
+    with tempfile.TemporaryDirectory() as td:
+        out = _Path(td) / "legs.json"
+        cmd = [sys.executable, "-u", __file__, "--browser-legs-only", str(out)]
+        try:
+            p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", timeout=BROWSER_LEGS_TIMEOUT, cwd=str(ROOT))
+        except subprocess.TimeoutExpired:
+            print("  [4/5] 浏览器腿超过 %ds 硬上限 ⇒ 本轮记 **UNVERIFIED**（判据未出结论，禁读成绿）"
+                  % BROWSER_LEGS_TIMEOUT, flush=True)
+            raise
+        if (p.stdout or "").strip():
+            for line in (p.stdout or "").strip().splitlines():
+                print("    " + line, flush=True)
+        if p.returncode != 0 or not out.is_file():
+            raise RuntimeError("浏览器腿子进程 rc=%s：%s" % (p.returncode, (p.stderr or "")[:200]))
+        data = _json.loads(out.read_text(encoding="utf-8"))
+        return data["rows"], data["bad"], data["notes"], data["rows12"]
+
+
+def _browser_legs_entry(out_path):
+    """--browser-legs-only 的入口：只跑浏览器腿并把结果写 JSON 给父进程。"""
+    rows, bad, notes, rows12 = browser_legs()
+    Path(out_path).write_text(json.dumps({"rows": rows, "bad": bad, "notes": notes,
+                                          "rows12": rows12}, ensure_ascii=False), encoding="utf-8")
+    return 0
+
+
 def browser_legs():
     """返回 (rows_F5, bad, notes)。bad 为空即绿。"""
     from playwright.sync_api import sync_playwright
@@ -663,21 +726,28 @@ def browser_legs():
             notes.append("engine=%s" % face.split(" 原因=")[0])
             try:
                 labels, hs = _leg_f4_f5(browser, base, notes, bad, cam, rows)
+                print("  [4/5] · F4/F5 完", flush=True)
 
                 _leg_f12(browser, base, bad, rows12, labels, hs)
+                print("  [4/5] · F12 完", flush=True)
 
                 _leg_f7(browser, base, notes, bad)
+                print("  [4/5] · F7 完", flush=True)
 
                 # ── F10：侧边控制面板的开关（实现见 leg_f10，可被 --leg F10 单独调起）──
                 # r113：删掉残留的 ctx10.close() —— leg_f10 自建自关 context，此处 ctx10 从未定义，
                 # 执行到必 NameError 崩掉整条浏览器腿（本轮静态确证后作为跑通验证链的前提移除）。
                 leg_f10(browser, base, notes, bad)
+                print("  [4/5] · F10 完", flush=True)
 
                 _leg_f8(browser, base, notes, bad)
+                print("  [4/5] · F8 完", flush=True)
 
                 _leg_f9(browser, base, notes, bad)
+                print("  [4/5] · F9 完", flush=True)
 
                 _leg_f6(browser, base, bad)
+                print("  [4/5] · F6 完", flush=True)
             finally:
                 browser.close()
     finally:
@@ -867,7 +937,11 @@ def main():
                     help="对公网 URL 做真脸验收（需假摄像头；不带则只跑本地六条腿）")
     ap.add_argument("--leg", metavar="NAME", default="",
                     help="开发期只跑单腿（如 F10 开关腿）；**子集永不返回绿**，恒返回 2（UNVERIFIED）")
+    ap.add_argument("--browser-legs-only", metavar="OUT", default="",
+                    help="内部用：只跑浏览器腿并把结果写到 OUT（由 browser_legs_guarded 调用）")
     a = ap.parse_args()
+    if a.browser_legs_only:
+        return _browser_legs_entry(a.browser_legs_only)
     if a.leg:
         return run_one_leg(a.leg)
     if a.public:
@@ -877,7 +951,11 @@ def main():
         return selftest()
 
     bad = []
+    # r173 进度打印：本脚本此前**全程零输出**直到最后，一轮跑几十分钟看不出卡在哪条腿
+    #   （r166 台账的仪器债）。加打印只为定位，不改变任何判定；每行都 flush 便于重定向观察。
+    print("  [1/5] F1 vendor 完整性…", flush=True)
     bad += f1_bad()
+    print("  [2/5] F2 接线面…", flush=True)
     dep_files = {f: (ROOT / "deploy" / "xinyu" / f).is_file() for f in NEW_FILES}
     html_src = (ROOT / "src" / "index.html").read_text("utf-8")
     html_dep = (ROOT / "deploy" / "xinyu" / "index.html").read_text("utf-8")
@@ -885,12 +963,14 @@ def main():
     hd = (ROOT / "deploy" / "xinyu" / "_headers").read_text("utf-8")
     bad += f2_bad(html_src, html_dep, sw_text, hd, dep_files)
 
+    print("  [3/5] F3 判据单测(node)…", flush=True)
     rc3, bad3 = run_f3()
     bad += bad3
 
+    print("  [4/5] F4/F5/F6 浏览器腿（含假摄像头与 MediaPipe 模型加载，最慢的一段）…", flush=True)
     rows, badb, notes, rows12 = [], [], [], []
     try:
-        rows, badb, notes, rows12 = browser_legs()
+        rows, badb, notes, rows12 = browser_legs_guarded()
     except Exception as e:  # noqa: BLE001
         print("FACE-CHECK-UNVERIFIED: 浏览器腿没跑起来（%s: %s）" % (type(e).__name__, str(e).splitlines()[0][:120]))
         return 2

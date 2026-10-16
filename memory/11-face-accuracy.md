@@ -43,10 +43,12 @@
 | 三层优化建议（短/中/长期） | `11-face-accuracy.part2.md` |
 | 执行方案（改进项×步骤/预期/资源/验收/时间） | `11-face-accuracy.part3.md` |
 | 验证方案 + 质量标准 + 风险预案 | `11-face-accuracy.part4.md` |
+| r184 六场景根因 / 修复 / 范畴核验 | `11-face-accuracy.part5.md` |
 
 ## 四、当轮复算入口（每轮跑，棘轮只降不升）
 
 ```bash
-python _test/core_capability_baseline_check.py     # N2 表情单测 + F1 vendor + N1 语意
-node D:/app-cache/temp/opencode/face_symptom_probe.cjs   # 症状 13 向量读数（转正后进 _test/）
+python _test/core_capability_baseline_check.py    # N2 单测 + F1 vendor + N1 语意
+python _test/face_scene_check.py{,--selftest}     # F13 场景切片（r184 新）
+python _test/face_discrim_check.py --selftest     # F11 反例8 已修活（16 条）
 ```

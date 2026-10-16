@@ -121,13 +121,21 @@ class HypCache:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-def run(manifest: str, model: str, scenarios: List[str], out_json: str,
-        dialects: Optional[List[str]] = None, split: Optional[str] = "test",
-        device: str = "auto", batch_size: int = 4, max_cases: int = 0,
-        lora: Optional[str] = None, real_only: bool = False,
-        use_lang_hint: bool = True, cache_path: Optional[str] = None,
-        denoise: bool = False, denoise_hf_db: float = 3.0,
-        denoise_over: float = 1.4) -> int:
+def _check_scenarios(scenarios):
+    """场景名白名单校验（原在推理循环内逐场景判，提到入口 ⇒ 失败更早、循环体更干净）。"""
+    for sc_name in scenarios:
+        if sc_name not in SCENARIOS:
+            print(f"[FATAL] 未知场景 '{sc_name}'。可用: {', '.join(SCENARIOS)}")
+            return False
+    return True
+
+def _prepare_cases(manifest, dialects, split, real_only, max_cases):
+    """读清单 + 筛选 + 缺音频硬检查。返回 cases；任一前置不成立 ⇒ None（调用方判 rc=2）。
+
+    r187 拆分动因：loc_guard 函数长门（≤150，原 run 180 行）。五段各自下移成模块级
+    函数，**逐语句调用序与打印顺序不变**；本机无 torch/语料 ⇒ 只做静态等价搬移，
+    不谎称跑过评测（同族教训：没跑过的路径不算验过）。
+    """
     cases = read_manifest(manifest)
     cases = filter_cases(cases, dialects=dialects, split=split, real_only=real_only)
     if max_cases:
@@ -147,6 +155,10 @@ def run(manifest: str, model: str, scenarios: List[str], out_json: str,
             print(f"          {c.audio}")
         print("        先下载语料再评测（不要跳过 —— 跳过会让基线虚高）。")
         return 2
+    return cases
+
+def _setup_cache_path(cache_path, out_json, denoise, denoise_hf_db, denoise_over):
+    """缓存落点默认值 + 降噪配置。返回 (dn_cfg, cache_path, dn_stats)。"""
 
     cache_path = cache_path or os.path.join(
         os.path.dirname(out_json), "hyp_cache.jsonl")
@@ -164,9 +176,10 @@ def run(manifest: str, model: str, scenarios: List[str], out_json: str,
         print(f"[INFO] 降噪开启 hf={denoise_hf_db}dB over={denoise_over} 缓存={cache_path}")
     else:
         print(f"[INFO] 降噪关闭（对照）")
-    cache = HypCache(cache_path)
-    print(f"[INFO] 缓存: {cache_path}（已有 {len(cache.store)} 条）")
+    return dn_cfg, cache_path, dn_stats
 
+def _load_engine(device, model, lora):
+    """设备解析 + 引擎构造。返回 (eng, device, LANG_HINTS)。"""
     from engine_qwen import LANG_HINTS, QwenASR
     if device == "auto":
         import torch
@@ -174,14 +187,19 @@ def run(manifest: str, model: str, scenarios: List[str], out_json: str,
     eng = QwenASR(model_id=model, device=device, enable_lora=bool(lora),
                   lora_path=lora)
 
+    return eng, device, LANG_HINTS
+
+def _infer_all(cases, scenarios, cache, dn_cfg, eng, LANG_HINTS, use_lang_hint,
+           batch_size, model, dn_stats):
+    """「场景 × 方言」主循环：命中缓存直接打分，未命中批量推理并回填。
+
+    返回 (results, perf, t_all)。场景名合法性已由 run() 入口的 _check_scenarios 拦下。
+    """
     results: List[dict] = []
     perf: List[dict] = []
     t_all = time.perf_counter()
 
     for sc_name in scenarios:
-        if sc_name not in SCENARIOS:
-            print(f"[FATAL] 未知场景 '{sc_name}'。可用: {', '.join(SCENARIOS)}")
-            return 2
         sc = SCENARIOS[sc_name]
 
         # 按方言分组，便于用方言专属语言提示批量推理
@@ -230,6 +248,11 @@ def run(manifest: str, model: str, scenarios: List[str], out_json: str,
             print(f"[进度] 场景={sc_name:<12} 方言={dialect:<9} 完成 {done}/{len(dcases)}")
 
     cache.close()
+    return results, perf, t_all
+
+def _build_report(manifest, model, lora, device, cases, scenarios, t_all, results,
+                perf, dn_stats, denoise_hf_db, denoise_over, out_json):
+    """聚合分桶 → 组 report → 落 JSON → 印 Markdown。返回 rc=0。"""
 
     # ── 汇总 ──────────────────────────────────────────────────────────────────
     buckets: Dict[tuple, List[CaseResult]] = defaultdict(list)
@@ -301,6 +324,30 @@ def run(manifest: str, model: str, scenarios: List[str], out_json: str,
     print("\n" + render_markdown(report))
     print(f"\n[OK ] 报告已写入 {out_json}")
     return 0
+
+def run(manifest: str, model: str, scenarios: List[str], out_json: str,
+        dialects: Optional[List[str]] = None, split: Optional[str] = "test",
+        device: str = "auto", batch_size: int = 4, max_cases: int = 0,
+        lora: Optional[str] = None, real_only: bool = False,
+        use_lang_hint: bool = True, cache_path: Optional[str] = None,
+        denoise: bool = False, denoise_hf_db: float = 3.0,
+        denoise_over: float = 1.4) -> int:
+    """调度：校验 → 取数 → 缓存/降噪 → 引擎 → 推理 → 汇总（各段见同名私有函数）。"""
+    if not _check_scenarios(scenarios):
+        return 2
+    cases = _prepare_cases(manifest, dialects, split, real_only, max_cases)
+    if cases is None:
+        return 2
+    dn_cfg, cache_path, dn_stats = _setup_cache_path(
+        cache_path, out_json, denoise, denoise_hf_db, denoise_over)
+    cache = HypCache(cache_path)
+    print(f"[INFO] 缓存: {cache_path}（已有 {len(cache.store)} 条）")
+    eng, device, LANG_HINTS = _load_engine(device, model, lora)
+    results, perf, t_all = _infer_all(
+        cases, scenarios, cache, dn_cfg, eng, LANG_HINTS, use_lang_hint,
+        batch_size, model, dn_stats)
+    return _build_report(manifest, model, lora, device, cases, scenarios, t_all,
+                         results, perf, dn_stats, denoise_hf_db, denoise_over, out_json)
 
 
 def hyp_rtf_guard(h: str) -> float:

@@ -112,6 +112,11 @@ def build_corpora():
                 for k in ("faceSize", "imgW", "imgH"):
                     if raw.get(k) is not None:
                         meta[k] = raw[k]
+                # r183b：人口学两轴直接搬运（名册标注 → fixture meta → 切片）。值本身是
+                #   人工标注（ethel 旧照=adult、wayuu=elderly 等），不是推断，故不做再分档。
+                for k in ("age_group", "gender", "prov", "license"):
+                    if raw.get(k) is not None:
+                        meta[k] = raw[k]
                 meta["source"] = obj.get("source", "")
             real.append({"name": fp.stem, "want": want, "vec": bs, "meta": meta})
     corpora["REAL"] = real

@@ -908,6 +908,54 @@ def machine_state():
             "taken_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
 
 
+def _main_block2(a, throttled):
+    """main 的连续区间 943-963（mid_split 原样搬运；判定/阈值/注释未改一字）。"""
+    if throttled and not a.no_settle:
+        cap = declared_burst()
+        # 结构性不可达：串行样本数 > 令牌桶上限时，等回满也没用（回满就停在 cap，第 cap+1 发必 429）。
+        # 这时再睡 22s 重跑一遍同样的形状是**白等**（r171 那条 settle 是为"上一判据的余温"设计的，
+        # 覆盖不了"本轮样本数本身就超配额"这一类），所以直接点名算术并退出，不装作重试过。
+        why = latency_reach(a.reps, cap)
+        if why:
+            partial_receipt(a.json, {"kind": "PERF-UNREACHABLE", "base": a.base, "reps": a.reps,
+                                     "declared_burst": cap, "why": why, "measured": throttled,
+                                     "machine": machine_state()})
+            print("PERF-ENV: 延迟面在带闸实例上结构性不可达 —— %s；实测面 %s"
+                  "。两条出路：空闲副本加 `--xinyu.guard.burst=%d`（整轮对 /api/emotion 共需 %d 发）起服务复跑，"
+                  "或把 --reps 收到 ≤%s（收样本档时结论行必须印档）%s"
+                  % (why, throttled[0][:80], required_burst(a.reps), required_burst(a.reps) - 16, cap,
+                     "；缺席理由已写 %s.partial" % a.json if a.json else ""))
+            return 2
+        print("   限流重试：检出 %d 条 429 ⇒ 等 %ds 让令牌桶回满后重打一次（复算：--no-settle 可关）"
+              % (len(throttled), GUARD_SETTLE_S))
+        time.sleep(GUARD_SETTLE_S)
+        retried = 1
+        m, fatal = measure(a.base, a.reps)
+    return fatal, m, retried
+
+def _main_block1(a, bad, m, no_read, ramp, ramp_bad, tiers, worst_band):
+    """main 的连续区间 1006-1024（mid_split 原样搬运；判定/阈值/注释未改一字）。"""
+    if a.json:
+        Path(a.json + (".partial" if no_read else "")).write_bytes(
+            json.dumps({"base": a.base, "reps": a.reps, "samples": m,
+                                             "machine": machine_state(),
+                                             "budgets": {k: v["p95_ms"] for k, v in BUDGETS.items()},
+                                             "concurrency": {"single_point_threads": CONC["threads"],
+                                                             "single_point_requests": CONC["threads"] * CONC["per_thread"],
+                                                             "throttled_faces": sorted(no_read),
+                                                             "guard_settle_s": GUARD_SETTLE_S},
+                                             "ramp": ({"tiers": list(tiers), "work_per_thread": a.ramp_work,
+                                                       "reps_per_tier": a.ramp_reps,
+                                                       "warmup_per_tier": a.ramp_warmup,
+                                                       "machine_tag": machine_state()["tag"],
+                                                       "budget_s": a.ramp_budget,
+                                                       "worst_band_pct": worst_band,
+                                                       "result": {str(k): v for k, v in (ramp or {}).items()}}
+                                                      if ramp else None),
+                                             "breach": bad + ramp_bad},
+                                            ensure_ascii=False, indent=1).encode("utf-8"))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("base", nargs="?", default="http://127.0.0.1:8123")
@@ -940,27 +988,7 @@ def main():
     # 只重试一次（不是循环放宽）：真被限流打断时第二次仍会 429，那时如实报未验。
     throttled = [f for f in fatal if "429" in f]
     retried = 0
-    if throttled and not a.no_settle:
-        cap = declared_burst()
-        # 结构性不可达：串行样本数 > 令牌桶上限时，等回满也没用（回满就停在 cap，第 cap+1 发必 429）。
-        # 这时再睡 22s 重跑一遍同样的形状是**白等**（r171 那条 settle 是为"上一判据的余温"设计的，
-        # 覆盖不了"本轮样本数本身就超配额"这一类），所以直接点名算术并退出，不装作重试过。
-        why = latency_reach(a.reps, cap)
-        if why:
-            partial_receipt(a.json, {"kind": "PERF-UNREACHABLE", "base": a.base, "reps": a.reps,
-                                     "declared_burst": cap, "why": why, "measured": throttled,
-                                     "machine": machine_state()})
-            print("PERF-ENV: 延迟面在带闸实例上结构性不可达 —— %s；实测面 %s"
-                  "。两条出路：空闲副本加 `--xinyu.guard.burst=%d`（整轮对 /api/emotion 共需 %d 发）起服务复跑，"
-                  "或把 --reps 收到 ≤%s（收样本档时结论行必须印档）%s"
-                  % (why, throttled[0][:80], required_burst(a.reps), required_burst(a.reps) - 16, cap,
-                     "；缺席理由已写 %s.partial" % a.json if a.json else ""))
-            return 2
-        print("   限流重试：检出 %d 条 429 ⇒ 等 %ds 让令牌桶回满后重打一次（复算：--no-settle 可关）"
-              % (len(throttled), GUARD_SETTLE_S))
-        time.sleep(GUARD_SETTLE_S)
-        retried = 1
-        m, fatal = measure(a.base, a.reps)
+    fatal, m, retried = _main_block2(a, throttled)
     if fatal:
         partial_receipt(a.json, {"kind": "PERF-FETCH-FAILED", "base": a.base, "reps": a.reps,
                                  "fatal": fatal, "retried": retried, "machine": machine_state()})
@@ -1003,25 +1031,7 @@ def main():
     # 这一轮的台账只能是 `.partial`——把"没量到"写回基线，下一轮就再也分不清是环境坏了还是服务退了。
     no_read = {k: d for k, d in m.items()
                if k.startswith("throughput_") and isinstance(d, dict) and d.get("measurable") is False}
-    if a.json:
-        Path(a.json + (".partial" if no_read else "")).write_bytes(
-            json.dumps({"base": a.base, "reps": a.reps, "samples": m,
-                                             "machine": machine_state(),
-                                             "budgets": {k: v["p95_ms"] for k, v in BUDGETS.items()},
-                                             "concurrency": {"single_point_threads": CONC["threads"],
-                                                             "single_point_requests": CONC["threads"] * CONC["per_thread"],
-                                                             "throttled_faces": sorted(no_read),
-                                                             "guard_settle_s": GUARD_SETTLE_S},
-                                             "ramp": ({"tiers": list(tiers), "work_per_thread": a.ramp_work,
-                                                       "reps_per_tier": a.ramp_reps,
-                                                       "warmup_per_tier": a.ramp_warmup,
-                                                       "machine_tag": machine_state()["tag"],
-                                                       "budget_s": a.ramp_budget,
-                                                       "worst_band_pct": worst_band,
-                                                       "result": {str(k): v for k, v in (ramp or {}).items()}}
-                                                      if ramp else None),
-                                             "breach": bad + ramp_bad},
-                                            ensure_ascii=False, indent=1).encode("utf-8"))
+    _main_block1(a, bad, m, no_read, ramp, ramp_bad, tiers, worst_band)
     allbad = bad + ramp_bad
     if allbad:
         for x in allbad:

@@ -61,10 +61,11 @@ def serve():
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, srv.server_address[1]
 
-# labels.json 的 5 个标注值 → 引擎 8 类输出的期望主情绪。
+# labels.json 的标注值 → 引擎 8 类输出的期望主情绪。（r183：新增 sadness/disgust 两类真照片）
 # ⚠️ 这是**人工映射**（照片名册用的是 smiling/neutral 这类词，引擎输出 joy/calm），
 #   映射表落在这里是为了让「改映射」等于一次可审计的代码改动，而不是藏在数据里。
-WANT = {"smiling": "joy", "neutral": "calm", "anger": "anger", "surprise": "surprise"}
+WANT = {"smiling": "joy", "neutral": "calm", "anger": "anger", "surprise": "surprise",
+        "sadness": "sadness", "disgust": "disgust", "fear": "fear"}
 
 
 def roster():
@@ -93,6 +94,13 @@ def roster():
         if not (FIX / f).is_file():
             bad.append("labels.json 列了 %s 但磁盘没有该照" % f)
         labeled.add(f)
+    # r183t+：provenance 结构守卫——名册条目必须带 prov/sha1/license 三键（A/B/derived 级之外
+    #   不得有裸条目）。这是 R196「新增评测数据先登记 provenance」的机器化延伸：只查 file/label
+    #   会放过「有标注没出处」的半登记态，而半登记态正是 r183 之前 14 张照的成因。
+    for e in labs:
+        f = e.get("file", "?")
+        if not e.get("prov") or not e.get("sha1") or not e.get("license"):
+            bad.append("%s 名册条目缺 prov/sha1/license（半登记态，R196 红线）" % f)
     disk = {p.name for p in FIX.glob("*.jpg")}
     for extra in sorted(disk - labeled):
         bad.append("磁盘有 %s 但 labels.json 没登记（会虚增复算腿分母）" % extra)
@@ -155,12 +163,18 @@ def export():
                     missing_dims = [k for k in WANT_LABELS_DIMENSIONS if k not in bs]
                     # meta 由 harness 现算（luma / yaw / faceSize），r173 起写进 fixture。
                     # ⚠️ meta 缺失时必须存 None 而不是空字典：空字典会被下游读成「有 meta 但全空」，
-                    #    而 F13 的分层切片正是靠 meta 有无来决定出数字还是出「不可测」——
+                    #    而 F16 的分层切片正是靠 meta 有无来决定出数字还是出「不可测」——
                     #    这两件事必须分得开，否则「没测」又会被当成「测了」。
                     rec = {"file": f, "label": e["label"], "want": WANT[e["label"]],
                            "faces": int(d["faces"]), "dim": len(bs),
                            "missing_dims": missing_dims, "bs": bs,
-                           "meta": d.get("meta") or None,
+                           # r183b：age_group/gender 两轴由名册（labels.json，唯一人工标注源）随 meta 带出，
+                           #   F16 的切片据此出数字；名册没标就是 None ⇒ 切片如实报「未标注」，不造数。
+                           "meta": (lambda m: (m.update({"age_group": e.get("age_group"),
+                                                         "gender": e.get("gender"),
+                                                         "prov": e.get("prov"),
+                                                         "license": e.get("license")}) or m)
+                                     if isinstance(m, dict) else m)(d.get("meta") or None),
                            "view": {"emotion": d["view"]["emotion"],
                                     "intensity": d["view"]["intensity"],
                                     "confidence": d["view"]["confidence"],

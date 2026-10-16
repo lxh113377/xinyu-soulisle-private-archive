@@ -40,7 +40,7 @@ window.__HARNESS__ = { ready: false, err: null };
         if (cats) for (const c of cats) bs[c.categoryName] = c.score;
         /* ── 环境元数据（r173）：以前只存 bs，把 luma/yaw/faceSize 全丢了 ──────────
          * 为什么非要补：需求要「不同光照 / 不同人脸角度下的准确率」，而没有这两项
-         * 的 fixture 一根切片轴都算不出来（F13 会如实报「不可测」）。
+         * 的 fixture 一根切片轴都算不出来（F16 会如实报「不可测」）。
          * 过程是：luma 走 face-engine.js `assessQuality` 的**同一把尺**（24×24 缩样求
          * 灰度均值与方差），阈值直接读 R.quality ⇒ **样本分组与线上质量门同源**，
          * 不是在这里另发明一套分档。yaw 同理，调 FaceEngine.yawRatio（同源函数）。

@@ -10,6 +10,17 @@
   if (!R) throw new Error("face-smile-rules.js 未加载：面部判据缺失（禁静默回落）");
 
   const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+  /* 眼动/眨眼维（10 个）：非表情，micro 剔除之（r184） */
+  const gazeRe = /^eye(?:Blink|Look)/;
+  /* 区域维（r184 遮挡：眼镜/帽子）：整区长期趋零即视为被遮。阈值见 rules.quality.flatMin。 */
+  const EYE_KEYS = ["eyeBlinkLeft", "eyeBlinkRight", "eyeSquintLeft", "eyeSquintRight", "eyeWideLeft",
+    "eyeWideRight", "eyeLookUpLeft", "eyeLookUpRight", "eyeLookDownLeft", "eyeLookDownRight",
+    "eyeLookInLeft", "eyeLookInRight", "eyeLookOutLeft", "eyeLookOutRight", "cheekSquintLeft", "cheekSquintRight"];
+  const BROW_KEYS = ["browDownLeft", "browDownRight", "browInnerUp", "browOuterUpLeft", "browOuterUpRight"];
+  function regionFlat(bs, keys, min) {
+    for (let i = 0; i < keys.length; i++) if ((bs[keys[i]] || 0) >= min) return false;
+    return true;
+  }
   const sleep = (ms, tag) => new Promise((res) => setTimeout(() => res(tag), ms));
 
   /* ── 纯函数层（判据与运行时共用，_test/face_check.py 复算的就是这两条）────────── */
@@ -99,16 +110,27 @@
       masking: kind === "social" && tension >= T.tensionOn };
   }
 
-  /* ── 质量门（r113）：画面靠不住时读数降档。四信号全在本机帧上算，零新增依赖。 */
+  /* ── 质量门（r113/r184）：画面靠不住 ⇒ 降置信。信号全在本机帧上算。 */
   const qCanvas = (typeof document !== "undefined") ? document.createElement("canvas") : null;
   if (qCanvas) { qCanvas.width = 24; qCanvas.height = 24; }
   const qCtx = qCanvas ? qCanvas.getContext("2d", { willReadFrequently: true }) : null;
 
-  /** 亮度/模糊：video 缩样到 24×24 的平均灰度与方差（方差是糊图信号）。取不到帧返回 null，不猜。 */
-  function lumaStats() {
+  /** 人脸外接框 → 取样区（r184，避开背景）；无关键点 ⇒ null ⇒ 回落整帧 */
+  function lumaRect(lm, vw, vh) {
+    if (!lm || lm.length < 455 || !(vw > 0) || !(vh > 0)) return null;
+    let x0 = 1, x1 = 0, y0 = 1, y1 = 0;
+    for (const q of lm) { if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x; if (q.y < y0) y0 = q.y; if (q.y > y1) y1 = q.y; }
+    x0 = Math.max(0, x0 - 0.06); x1 = Math.min(1, x1 + 0.06); y0 = Math.max(0, y0 - 0.06); y1 = Math.min(1, y1 + 0.06);
+    if (x1 <= x0 || y1 <= y0) return null;
+    return { sx: Math.round(x0 * vw), sy: Math.round(y0 * vh), sw: Math.max(1, Math.round((x1 - x0) * vw)), sh: Math.max(1, Math.round((y1 - y0) * vh)) };
+  }
+
+  /** 亮度/模糊：24×24 缩样均值与方差（方差=糊图信号）。取不到帧 ⇒ null。 */
+  function lumaStats(rect) {
     if (!qCtx || !videoEl || videoEl.readyState < 2) return null;
     try {
-      qCtx.drawImage(videoEl, 0, 0, 24, 24);
+      if (rect) qCtx.drawImage(videoEl, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, 24, 24);
+      else qCtx.drawImage(videoEl, 0, 0, 24, 24);
       const d = qCtx.getImageData(0, 0, 24, 24).data;
       let sum = 0;
       const px = d.length / 4;
@@ -123,7 +145,7 @@
     } catch (e) { return null; }   // 取像素失败等：没有证据就不下结论
   }
 
-  /** 侧脸：鼻尖(1) 偏离左右面部边界(234/454)中点的比例，正脸≈0，越大越侧。 */
+  /** 侧脸：鼻尖(1) 偏离边界(234/454)中点比例，正脸≈0，越大越侧。 */
   function yawRatio(landmarks) {
     if (!landmarks || landmarks.length < 455) return 0;
     const nose = landmarks[1], l = landmarks[234], r = landmarks[454];
@@ -131,7 +153,15 @@
     return w > 0.01 ? (nose.x - (l.x + r.x) / 2) / w : 0;
   }
 
-  /** 纯函数：四信号 → {ok, reasons[]}。阈值全在 rules.quality；unit 测的就是这条。
+  /** 人脸宽度占比（x 跨度）；无关键点 ⇒ 1 */
+  function faceWidthRatio(lm) {
+    if (!lm || lm.length < 455) return 1;
+    let x0 = 1, x1 = 0;
+    for (const p of lm) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; }
+    return x1 - x0;
+  }
+
+  /** 纯函数：五信号 → {ok, reasons[]}。阈值全在 rules.quality；unit 测的就是这条。
    *  luma 取不到（null）= 没证据 ⇒ 不判 lighting/blur，宁缺勿滥。 */
   function assessQuality(sig) {
     sig = sig || {};
@@ -142,6 +172,9 @@
     if (sig.luma && sig.luma.variance < Q.blurVarMin) reasons.push("blur");
     if (Math.abs(sig.yaw || 0) > Q.yawMax) reasons.push("profile");
     if ((sig.mouthFlatSamples || 0) >= Q.mouthFlatSamples) reasons.push("mouth-flat");
+    if (Q.faceMin != null && sig.faceWidth != null && sig.faceWidth < Q.faceMin) reasons.push("small");
+    if (Q.flatSamples != null && (sig.eyeFlatSamples || 0) >= Q.flatSamples) reasons.push("occluded-eye");
+    if (Q.flatSamples != null && (sig.browFlatSamples || 0) >= Q.flatSamples) reasons.push("occluded-brow");
     return { ok: reasons.length === 0, reasons: reasons };
   }
 
@@ -205,9 +238,11 @@
          因为整体提到 25fps 会让每条推理链的开销涨到原来的 3 倍。
          跃变量取全向量欧氏距离（不挑单个 AU），防研发阶段挑出一个好看的维度。 */
       const M = S.micro || { maxAmp: 0.30, minRise: 0.12 };
+      /* r184：眨眼 rise≈1.3 > 真微表情 0.28 ⇒ 剔除眼动维（part5） */
       let sq = 0;
       for (const k in bs) {
         if (typeof bs[k] !== "number") continue;
+        if (M.gazeSkip !== false && gazeRe.test(k)) continue;
         const d = (bs[k] || 0) - (prev[k] || 0);
         sq += d * d;
       }
@@ -273,6 +308,7 @@
 
   let stream = null, timer = null, landmarker = null, videoEl = null, running = false;
   let mouthFlatRun = 0;   // 嘴部 blendshape 连续平坦样本数（质量门信号之一）
+  let eyeFlatRun = 0, browFlatRun = 0;   // 眼/眉区连续平坦（r184）
   let lastTs = 0, samples = 0;
   /* 会话令牌：getUserMedia / 模型创建都是**异步**的（公网首帧实测要等十几秒），
      期间用户点了「关闭」⇒ 不能因为 await 返回晚就把摄像头又开回来。
@@ -362,11 +398,16 @@
     return Promise.resolve().then(step);
   }
 
+  /** EMA 单步内核（纯函数）：α 越大越跟手、越小越稳。拆出来供 F18 量噪声过滤。 */
+  function emaStep(prev, bs, a) {
+    const o = {};
+    for (const k in bs) o[k] = prev ? a * bs[k] + (1 - a) * (prev[k] || 0) : bs[k];
+    return o;
+  }
+
   /** EMA 平滑：对原始 blendshape 做指数移动平均，读数才不会逐帧抖 */
   function smooth(bs) {
-    const a = R.smooth.alpha;
-    if (!state.ema) { state.ema = {}; for (const k in bs) state.ema[k] = bs[k]; }
-    else for (const k in bs) state.ema[k] = a * bs[k] + (1 - a) * (state.ema[k] || 0);
+    state.ema = emaStep(state.ema, bs, R.smooth.alpha);
     return state.ema;
   }
 
@@ -393,10 +434,17 @@
       if ((bs[k] || 0) >= Q.mouthFlat) { flat = false; break; }
     }
     mouthFlatRun = flat ? mouthFlatRun + 1 : 0;
+    /* r184：眼区/眉区各自的「连续平坦」计数（与 mouthFlat 同构） */
+    const FM = Q.flatMin != null ? Q.flatMin : Q.mouthFlat;
+    eyeFlatRun = regionFlat(bs, EYE_KEYS, FM) ? eyeFlatRun + 1 : 0;
+    browFlatRun = regionFlat(bs, BROW_KEYS, FM) ? browFlatRun + 1 : 0;
+    const lm0 = res.faceLandmarks && res.faceLandmarks[0];
     applyQuality(state.view, assessQuality({
-      luma: lumaStats(),
-      yaw: yawRatio(res.faceLandmarks && res.faceLandmarks[0]),
-      mouthFlatSamples: mouthFlatRun
+      luma: lumaStats(lumaRect(lm0, videoEl.videoWidth, videoEl.videoHeight)),
+      yaw: yawRatio(lm0),
+      faceWidth: faceWidthRatio(lm0),
+      mouthFlatSamples: mouthFlatRun,
+      eyeFlatSamples: eyeFlatRun, browFlatSamples: browFlatRun
     }));
     /* compute 判≤100ms；infer=推理 */
     const tView = performance.now();
@@ -459,7 +507,7 @@
     try { landmarker = await window.__XINYU_FACE_VISION__.createLandmarker(); }
     catch (e) { stop(); state.err = "landmarker-failed"; o.onError && o.onError("landmarker-failed"); return false; }
     if (my !== session) { stop(); return false; }        // 同理：模型建完才发现已被叫停
-    running = true; state.ema = null; samples = 0; mouthFlatRun = 0; state.err = null; state.phase = "running";
+    running = true; state.ema = null; samples = 0; mouthFlatRun = 0; eyeFlatRun = 0; browFlatRun = 0; state.err = null; state.phase = "running";
     const period = Math.round(1000 / ((o && o.fps) || R.sample.fps));
     const tick = () => {
       if (!running) return;
@@ -562,7 +610,7 @@
        `_test/face-harness.html` 要用它对照片算出同一把「侧脸到什么程度」的尺 ——
        让导出的 meta 与**线上质量门同源**（同一套 R.quality 阈值），而不是另外拍一组数。
        ⚠️ 它不参与任何判定：导出脚本只把它当作样本的环境元数据存下来。 */
-    yawRatio: yawRatio,
+    yawRatio: yawRatio, faceWidthRatio: faceWidthRatio, lumaRect: lumaRect, emaStep: emaStep,
     assessQuality: assessQuality, applyQuality: applyQuality,
     labelOf: labelOfFace,
     capability: capability, whenReady: whenReady, diagnose: diagnose,

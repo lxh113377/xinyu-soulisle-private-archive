@@ -247,3 +247,25 @@ r42 首跑不传 `runOnly` 得到 `violations=0`，加该标签即命中 `seriou
 
 环境三态：服务不可达 / axe 件缺失或长度不符 / PIL 不可用 ⇒ `rc=2 ENV-UNVERIFIED`，不给绿也不给红；
 vendored 件**禁在线回落**（判据不接受"顺手下一个"，那会让一次坏下载伪装成一次通过）。
+
+# ↓ r187 补登记：以下 7 条**早已在电池里跑**（run_all_suites.py 的 SUITES 现读），却从未进本文明细，
+#   且 7 件全部**从未 git add** ⇒ 远端 CI 与发布面根本读不到它们。同族盲区由 G16 的
+#   第一腿（电池⇄本文）与第三腿（电池⇄git index）同时抓出（一手：G16 报「7 条未入库 + 7 条未登记」，
+#   两组同名 ⇒ 这不是判据误报，是这批判据交付时只写了脚本、没走完登记与入库两步）。
+python _test/face_scene_check.py             # r184 立 · F16 表情**场景切片**尺（目标#5「标准/低光照/侧脸/小尺寸」分场景验证）。与 F11/F12/S4 不重复（逐字对照过）：F11 量分类判别力（合成向量）、F12 量低强度三态水位、S4 量真照片 top-1 不分场景 ⇒ 本尺是**第一条按场景切片的尺**。读 `_test/face-au/*.json` 里 harness 存的 meta（lumaBucket/yawBucket/faceSize，分档阈值与线上质量门**同源**），六条常驻断言含 A1 小尺寸门在现有语料命中数必须=0、A2 眨眼不得冒充微表情（双向，防把 micro 修死）、A3 meta 记录的 quality 阈值必须等于当前 R.quality（禁拿旧档切新阈值）、A6 侧脸必须被 yaw 门拦下、A5 复杂背景取样区必须锁在人脸框内（悄悄回落整帧 ⇒ R1 复发）
+python _test/face_scene_check.py --selftest  # r184 判据桩（F16-SELFTEST）：定向破坏必须各自翻红、原样必须绿｜条数由脚本自己印，本行不抄数
+python _test/face_occlusion_check.py         # r184 立 · F17 表情**遮挡**尺（目标#1 点名的「口罩/帽子/眼镜」场景，此前**零测试覆盖**）。一手实测缺口：墨镜（眼区归零）后引擎笃定数 9→**14** —— 看不见眼睛反而更笃定（眼区证据归零被当成"平静"）⇒ r184 补 occluded-eye / occluded-brow 两个区域平坦信号（与 mouth-flat 同构）把三行都压到 0。四条常驻断言含「口罩机制回归腿：口部归零 ⇒ mouth-flat 必须命中、confident 全 false、微笑三态 none」
+python _test/face_occlusion_check.py --selftest # r184 判据桩（F17-SELFTEST）｜条数由脚本自己印，本行不抄数
+python _test/face_smooth_check.py            # r184 立 · F18 表情**噪声过滤（EMA 平滑）**尺（目标#2 点名「噪声过滤」，而 EMA 是系统里**唯一的**噪声过滤环节、长期零覆盖 —— 它藏在有状态的 smooth() 里，判据够不着；r184 把单步内核拆成纯函数 emaStep(prev, bs, a) 挂出来本尺才有得量）。给曲线不给单一数：交替噪声 ±0.3 看抖动压到输入的多少、阶跃 0→1 看多少帧到 90%（α=0.3 现行值实测 17.8% / 7 帧）
+python _test/face_smooth_check.py --selftest # r184 判据桩（F18-SELFTEST）｜条数由脚本自己印，本行不抄数
+python _test/kb_retrieval_check.py           # r178-KB17 立 · 检索判据的**离线常驻腿**。动因：第 16 轮的 K8 是浏览器腿（依赖 8123 + chromium，单次 ~20s），而 kbBlockFor 的改动是主线 ⇒ 改注入面不能裸奔。两条纪律（README §7.2）：① **不得造第二把尺** —— 本件只复述 kbBlockFor 的判据本体（从 `src/js/chat-agent.js` 抽函数体 eval 后直接调），不另立打分公式与阈值；② 期望域集合**抄 K8 的同一份**（EXPECTED），两处漂移即红 ⇒ 必须人工裁决，不能让两把尺各自自洽。零浏览器、零网络、零密钥
+python _test/kb_retrieval_check.py --selftest # r178-KB17 判据桩｜条数由脚本自己印，本行不抄数
+python _test/kb_domain_kw_audit.py           # r178-KB20 立 · DOMAIN_KW 词表**只读**对账腿。动因：N12 登记「DOMAIN_KW 是人工词表，会漂移」，第 18/19 轮用实证方式补了 10 个词（先测候选词在卡面的命中数、0 命中才补）但那是手工动作 ⇒ 固化成常驻判据。rc=0 当且仅当「每个有卡的域都在 DOMAIN_KW 里有至少一个触发词」；**只报缺口、不自动改词表**
+python _test/kb_domain_kw_audit.py --selftest # r178-KB20 判据桩｜条数由脚本自己印，本行不抄数
+python _test/kb_battery_count_audit.py       # r178-KB31 立 · 电池套数口径的机器判据（N21/N22 登记「口径在文案里漂移」：8 套→9 套，文案还散落七套/五套；根因是口径靠人工数 —— 每轮 grep 一次、数一次、写一次，下一轮又漂）。尺 A 下限：从 SUITES 表实数全部判据前缀组断言 ≥9（防套件被删而没人发现）；尺 B（r178-KB38）两源比对：README 当前版本段「X 套电池各自 ALL-GREEN」的 X ⇄ SUITES 里 KB 判据组实数，不等即红。作用域只限当前段（历史段按纪律保留当日值，扫全文件会恒红）
+python _test/kb_battery_count_audit.py --selftest # r178-KB31 判据桩｜条数由脚本自己印，本行不抄数
+python _test/kb_source_year_audit.py         # r178-KB46 立 · 来源「未来年份」审计（N50 一手：PSY-PR-003 来源⑨ 年份写 2026，当时是人工逐条核 Crossref 才证真；同类教训已三次 ⇒ 靠人工抽查就会漂）。语义：> 当前年的年份逐条列出且**必须带 DOI 或 URL**；未来年份本身不判红（今年之后的卷期确是预告/在线优先），判红的是「未来年份且无任何可核载体」= 无法溯源的臆造高风险形态。另一条腿：荒谬年份（>2100）一律红 —— 那不是文献年份，是正则咬到卷号/被引数（实测源件里有 3875/5643/5827/7021/7841 五个）
+python _test/kb_source_year_audit.py --selftest # r178-KB46 判据桩｜条数由脚本自己印，本行不抄数
+python _test/asr/asr_chain_check.py --selftest    # r187 接线（G16 第五腿复抓）· 上两条主流程腿都要 Java 服务在 8123 ⇒ 电池只接这条离线腿。它守的是 r186 一手抓到的**判据自身缺陷**：旧代码在 8123 拒连时把 3 条腿记进 FAIL 台账、却仍打 ASR-CHAIN-PASS rc=0（判红被自己的收口行洗成绿）。修法（不可达分支打 UNVERIFIED + return 2）本身若被后人"顺手简化"掉，主流程在有服务的机器上照样绿 ⇒ 必须有一把不依赖服务的尺盯着源码形状。6 腿 = 2 正例 + 4 反向（含「return 2 改 0 必须被抓」「分支里 print PASS 必须被抓」）
+python _test/face_micro_proto_check.py --selftest # r187 接线（G16 第五腿，本件随本轮入库才被报为新孤儿：未跟踪时该腿结构性看不见它）· 微表情快通道（≥25fps）**原型可行性尺**的离线判定腿。主流程只证一件事：独立 FaceLandmarker（VIDEO + GPU delegate）+ 现有规则层，单帧整链能否稳定 ≤40ms —— 它是数字依据、不进产品。本腿零浏览器零网络，钉的是**判定式本身**（p95 ≤ 40ms 且检出率 ≥ 80%）：若比较号被反向或检出率门被删，主流程在有 GPU 的机器上照样打 PASS ⇒ 必须有把不依赖环境的尺。7 腿 = 2 正例 + 5 反向（含「零帧必须被拒」「空表分位数必须 None 而非 0」「尾部延迟必须被 p95 抓到」）。⚠️ 现行分位数定义 `vals[int(q*(n-1))]` 在 n=20 时**抓不到单个**离群点（index 19 > 18），这是定义的固有性质不是缺陷，默认 `--frames 60` 时容忍 2 个；边界已钉在代码注释里，是否抬 frames 留待下一轮按实测决定
+python _test/asr/engine_switch_check.py --selftest # r187 接线（同上）· J9–J14 六档是「选路 + 降级 + 界面如实」的**全部**断言面，少一档等于该红线没人守；桩钩子名（__feed / __asrCalls / __gumCalls…）任一被改名 ⇒ 腿会静默跑空（页面里没人调它，engine 恒 webspeech ⇒ 结论完全反过来，头注已记该次实测踩坑）。同轮修掉本件一处真缺陷：playwright 原写在**模块级** import ⇒ 本机没装时 rc=1（判红），事实只是「这台机器没装浏览器驱动」⇒ 改惰性导入回 rc=2（未验），与 face_latency_check 的「环境不可用回 2，禁把 2 读成绿」同口径

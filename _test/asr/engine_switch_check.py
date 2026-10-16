@@ -22,7 +22,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))   # _test/（browser_engine 在那）
 from browser_engine import launch  # noqa: E402  唯一 launch 实现（走 sync API）
-from playwright.sync_api import sync_playwright  # noqa: E402  要 sync API，不是裸 playwright
 
 BASE = "http://127.0.0.1:8123"
 
@@ -94,6 +93,15 @@ window.__feedQueue = [];
 
 
 def main() -> int:
+    # r187：playwright 改**惰性导入**。原写在模块级 ⇒ 本机没装 playwright 时本件在 import 阶段
+    #   就抛 ModuleNotFoundError（实测 rc=1、stdout 只有 traceback）。接进电池后那就是**判红**，
+    #   而事实只是「这台机器没装浏览器驱动」⇒ 应为环境未验（rc=2）。
+    #   同族先例：face_latency_check 的「环境不可用回 2，禁把 2 读成绿」。
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:                      # noqa: BLE001
+        print(f"J-SWITCH-UNVERIFIED playwright 不可导入（{type(e).__name__}: {e}）—— 环境缺件不是判红")
+        return 2
     with sync_playwright() as _pw:
         try:
             browser, face = launch(_pw, label="asr-switch")
@@ -226,5 +234,63 @@ def run_legs(browser):
     return 0 if ok else 1
 
 
+
+
+# ── r187 离线自检腿（主流程要真起浏览器 + 8123 服务，CI/本机常不可达 ⇒ 电池只接这条）────
+# 为什么这条腿有信息量：J9-J14 六档是「选路 + 降级 + 界面如实」的**全部**断言面，
+#   少一档等于该红线没人守。桩钩子名（__feed / __asrCalls / __gumCalls …）任一被改名
+#   ⇒ 腿会静默跑空（页面里没人调它，engine 恒 webspeech ⇒ 结论完全反过来；头注已记该踩坑）。
+REQUIRED_LEGS = ("J9", "J10", "J11", "J12", "J13", "J14")
+REQUIRED_STUB_HOOKS = ("window.__asrCalls", "window.__feed =", "window.__gumCalls",
+                       "window.speechSynthesis", "onaudioprocess", "FakeAudioContext")
+# ⚠ 钩子名必须带赋值号（"window.__feed ="）：桩里另有 window.__feedQueue，
+#   写裸前缀 "window.__feed" 会在 __feed 定义被删时仍被 __feedQueue 匹配而漏抓
+#   （本件 --selftest 的反向腿 1 当场抓到，非推断）。
+
+
+def stub_problems(stub):
+    """纯函数：桩文本 → 缺失钩子清单（空表 = 桩的驱动面完整）。"""
+    return [h for h in REQUIRED_STUB_HOOKS if h not in stub]
+
+
+def leg_problems(src):
+    """纯函数：本件源码 → 缺失的 J 档清单（按 leg("Jxx") 调用点现读，不抄常量）。"""
+    import re
+    have = set(re.findall(r'leg\("(J\d+)"', src))
+    return [k for k in REQUIRED_LEGS if k not in have]
+
+
+def selftest():
+    """离线腿：正例必须零问题，四类定向破坏必须各自报问题（证明尺作用在被审对象上）。"""
+    import re
+    src = Path(__file__).read_text(encoding="utf-8")
+    bad = []
+    if stub_problems(STUB):
+        bad.append("正例 桩钩子应完整，实际缺: " + str(stub_problems(STUB)))
+    if leg_problems(src):
+        bad.append("正例 J9-J14 应齐全，实际缺: " + str(leg_problems(src)))
+    # 反向腿 1：删掉 __feed 定义 ⇒ 必须点名
+    if not stub_problems(re.sub(r"window\.__feed = [^\n]*\n", "", STUB)):
+        bad.append("反例1 删 __feed 未被抓到")
+    # 反向腿 2：fetch 记录钩子改名 ⇒ 必须点名
+    if not stub_problems(STUB.replace("window.__asrCalls", "window.__zzz")):
+        bad.append("反例2 __asrCalls 改名未被抓到")
+    # 反向腿 3：抽掉一档 J 腿 ⇒ 必须点名
+    if not leg_problems(src.replace('leg("J12"', 'leg("JX2"')):
+        bad.append("反例3 抽掉 J12 未被抓到")
+    # 反向腿 4：抽掉全部 J 腿 ⇒ 六档全点名（防「零输入读成通过」）
+    if len(leg_problems(re.sub(r'leg\("J', 'zz("J', src))) != len(REQUIRED_LEGS):
+        bad.append("反例4 抽掉全部 J 腿未逐一抓到")
+    if bad:
+        print(f"J-SWITCH-SELFTEST:FAIL {len(bad)} 项")
+        for s in bad:
+            print("  FAIL " + s)
+        return 1
+    print("J-SWITCH-SELFTEST-PASS: 6 腿（2 正例 + 4 反向）")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        sys.exit(selftest())
     sys.exit(main())

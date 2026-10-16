@@ -14,6 +14,14 @@
 
 用法：python _test/kb_source_panel_check.py [--base http://127.0.0.1:8123] [--selftest]
 退出码：0=全过 1=判红 2=环境未验证
+
+> 更正注 r178-KB22（2026-10-15）：wait_for_function 超时 15000→30000（3 处）。抖动实证 ×2
+> （r178-KB15b 首跑、r178-KB21 首跑：P3 等 window.KbSourcePanel 15s 超时，同参数立即复跑皆 PASS；
+> 226 条后 sources 件 374KB 首载更慢）。不是判据变松：超时只影响等页面就绪的耐心，
+> 全部内容断言与 N1/N2 变异腿不变；30s 内仍未就绪照旧判红。
+> 二补：30s 仍偶发超时（四连跑 1 次）⇒ 诊断四连跑 KbSourcePanel 全部 0.2s 就绪、零控制台错误
+> ⇒ 环境病实锤。加**就绪等待重试腿**：仅 TimeoutError 复开一页再等（内容断言与 N1/N2 失败不重试、
+> 不洗白）；四连跑全 PASS 验证。同 r173「环境病不算产品红」哲学。
 """
 import argparse
 import json
@@ -168,8 +176,24 @@ def browser_legs(base, bad, notes):
             env_ok = True
             notes.append("P3 环境预检通过（引擎=%s）" % face)
             pg = b.new_page()
-            pg.goto(base + "/index.html", wait_until="domcontentloaded")
-            pg.wait_for_function("() => !!window.KbSourcePanel", timeout=15000)
+            # 就绪等待重试腿（r178-KB22）：抖动实证——0.2s 就绪与 30s 超时在同一台机器交替出现，
+            # 诊断四连跑零控制台错误零失败请求 ⇒ 机器负载窗口的环境病（同 r173「环境病不算产品红」）。
+            # 只重试「就绪等待」：内容断言与 N1/N2 变异腿失败**不重试**，二次仍失败照旧真红。
+            def _wait_ready(page):
+                page.goto(base + "/index.html", wait_until="domcontentloaded")
+                page.wait_for_function("() => !!window.KbSourcePanel", timeout=30000)
+            try:
+                _wait_ready(pg)
+            except Exception as _re:
+                if "TimeoutError" not in type(_re).__name__ and "Timeout" not in str(_re)[:60]:
+                    raise
+                notes.append("P3 首次就绪等待超时（环境抖动），按重试腿复开一页")
+                try:
+                    pg.close()
+                except Exception:
+                    pass
+                pg = b.new_page()
+                _wait_ready(pg)
             env_ok = True
             # 直接喂一条含真实依据标记的气泡（不依赖上游），验面板本身
             pg.evaluate(
@@ -215,11 +239,11 @@ def browser_legs(base, bad, notes):
             # 复用已加载过的页会让 ensureSrc 走第一行短路，abort 永远打不到 —— 那验的不是访客路径。
             pg2 = b.new_page()
             pg2.goto(base + "/index.html", wait_until="domcontentloaded")
-            pg2.wait_for_function("() => !!window.KbSourcePanel", timeout=15000)
+            pg2.wait_for_function("() => !!window.KbSourcePanel", timeout=30000)
             pg2.route("**/psych-kb-sources.js", lambda route: route.abort())
             pg2.evaluate("() => window.KbSourcePanel.open('PSY-FE-001')")
             pg2.wait_for_function(
-                "() => /加载失败|超时/.test(document.body.textContent)", timeout=15000)
+                "() => /加载失败|超时/.test(document.body.textContent)", timeout=30000)
             bad_txt = pg2.inner_text("#kb-source-panel")
             pg2.close()
             if "此条目在库内未登记可核对来源" in bad_txt and "加载失败" not in bad_txt:

@@ -413,3 +413,137 @@ test("cueRegions 结构契约：区域只在有权重且均值达门槛时入选
   assert.deepEqual(JSON.parse(JSON.stringify(FE.cueRegions(R.weights.joy, onlyDead))), [],
     "无权重 AU 却点亮了区域 ⇒ 区域佐证被零贡献的信号撑起来，need 规则会被骗过");
 });
+
+/* ── r184 面部质量门第五信号 + 微表情剔除眼动：两项修复的常驻回归腿 ──────────────
+ * 为什么必须钉在单测里而不只靠 F16：F16 用真照片 meta，而 meta 是分场景的；
+ * 这两条是**纯函数级契约**，任何人把 gazeRe 或 faceMin 改回去都会当场红（N2 棘轮）。 */
+
+test("质量门第五信号 small：人脸宽度过小必须报 small，无证据（null）不得报", () => {
+  const Q = RULES.quality;
+  assert.ok(typeof Q.faceMin === "number", "rules.quality.faceMin 缺失 ⇒ 小尺寸门形同虚设");
+  const clean = q(FE.assessQuality({ luma: { mean: 0.5, variance: 0.03 }, yaw: 0, mouthFlatSamples: 0, faceWidth: Q.faceMin + 0.02 }));
+  assert.deepEqual(clean, { ok: true, reasons: [] }, "达标宽度必须全过（对照组）");
+  const tiny = q(FE.assessQuality({ luma: { mean: 0.5, variance: 0.03 }, yaw: 0, mouthFlatSamples: 0, faceWidth: Q.faceMin - 0.02 }));
+  assert.ok(tiny.reasons.includes("small"), "低于 faceMin 必须报 small");
+  const edge = q(FE.assessQuality({ luma: { mean: 0.5, variance: 0.03 }, yaw: 0, mouthFlatSamples: 0, faceWidth: Q.faceMin }));
+  assert.deepEqual(edge, { ok: true, reasons: [] }, "恰好等于线不命中（边界腿：阈值用严格小于）");
+  const noEv = q(FE.assessQuality({ luma: { mean: 0.5, variance: 0.03 }, yaw: 0, mouthFlatSamples: 0, faceWidth: null }));
+  assert.ok(!noEv.reasons.includes("small"), "拿不到关键点 = 没证据 ⇒ 宁缺勿滥，不得判小");
+});
+
+test("质量门 small 可证伪：faceMin 抬到 1 后正常画面也必须被拦（阈值真在参与计算）", () => {
+  const c2 = makeCtx();
+  c2.window.__XINYU_FACE_RULES__.quality.faceMin = 1.0;
+  runInContext(SRC("src/js/face-engine.js"), c2);
+  const r = q(c2.window.FaceEngine.assessQuality(
+    { luma: { mean: 0.5, variance: 0.03 }, yaw: 0, mouthFlatSamples: 0, faceWidth: 0.40 }));
+  assert.ok(r.reasons.includes("small"), "faceMin=1 还放行 0.40 ⇒ 阈值没参与计算");
+});
+
+test("质量门落点：small 命中同样强制降置信，且不停用微笑（只有 mouth-flat 才停用）", () => {
+  const base = read(vec({ mouthSmileLeft: 0.8, mouthSmileRight: 0.8, cheekSquintLeft: 0.6, cheekSquintRight: 0.6 }));
+  assert.equal(base.confident, true, "对照组：干净真笑本应自信");
+  const small = FE.assessQuality({ luma: { mean: 0.5, variance: 0.03 }, yaw: 0, mouthFlatSamples: 0, faceWidth: 0.05 });
+  const v = q(FE.applyQuality(base, small));
+  assert.equal(v.confident, false, "small 命中必须降置信");
+  assert.notEqual(v.smile.occluded, true, "小尺寸≠嘴部被遮挡 ⇒ 不得误停微笑三态");
+});
+
+test("faceWidthRatio 与 lumaRect 的证据契约：无关键点不得造出证据", () => {
+  const lm = (n) => Array.from({ length: 478 }, (_, i) => ({ x: 0.02 + (i / 477) * n, y: 0.5 }));
+  assert.equal(FE.faceWidthRatio(null), 1, "无关键点必须返回 1（不判小），不能返回 0（=全判小）");
+  assert.equal(FE.faceWidthRatio([{ x: 0.1, y: 0.5 }]), 1, "关键点不足 455 个 = 不可信输入 ⇒ 同无关键点");
+  assert.ok(Math.abs(FE.faceWidthRatio(lm(0.35)) - 0.35) < 0.011, "宽度占比要能还原注入值");
+  assert.equal(FE.lumaRect(null, 640, 480), null, "无关键点 ⇒ null ⇒ lumaStats 回落整帧（旧行为）");
+  assert.equal(FE.lumaRect(lm(0.5), 0, 0), null, "视频尺寸取不到 ⇒ null，不许除零造出假取样区");
+  const r = FE.lumaRect(lm(0.5), 640, 480);
+  assert.ok(r && r.sw > 0 && r.sh > 0 && r.sx >= 0 && r.sy >= 0 && r.sx + r.sw <= 641, "取样区必须落在帧内（含 6% 外扩的钳制）");
+});
+
+test("微表情不得被眨眼/眼动冒充：两帧只差 eyeBlink/eyeLook 时 micro 必须 false，真表情跃升仍 true", () => {
+  /* ⚠️ 本条首版写错过一次，留作教训：prev 当时写成 vec({eyeBlinkLeft:.92,...})
+     —— 只有眨眼维、表情维全缺，于是「空脸 → calm 的 0.10 微笑」本身构成真实跃升
+     （rise≈0.15 > minRise 0.12）⇒ 引擎报 micro **语义没错**，是我的对照向量错了。
+     正解：prev 必须是「与当前帧表情维相同、只多眨眼/眼动」，测的才是剔除本身。
+     （真实运行时 MediaPipe 每帧都给全 52 维，不存在缺维；这里靠 sameFrame 复现。） */
+  /* ⚠️ 第二个坑（同一类错的第二次发作，值得记住）：跃升量的循环是 `for (const k in bs)`
+     ⇒ **只遍历当前帧存在的维**。若把眨眼维只写进 prev、不写进 bs，两帧差异根本进不了
+     计算 ⇒ 剔除与否读数一样 ⇒ 本条会「假绿地通过」。真实运行时 MediaPipe **每帧都给全
+     52 维**，所以眼动维在 bs 里恒存在；夹具必须复现这一点（下面每帧都带眼动维）。 */
+  const calm = vec({ browInnerUp: 0.05, mouthSmileLeft: 0.10, mouthSmileRight: 0.10, eyeBlinkLeft: 0.02, eyeBlinkRight: 0.02, eyeLookDownLeft: 0.02, eyeLookDownRight: 0.02 });
+  const withBlink = Object.assign({}, calm, { eyeBlinkLeft: 0.92, eyeBlinkRight: 0.88 });
+  const withGaze = Object.assign({}, calm, { eyeLookDownLeft: 0.85, eyeLookDownRight: 0.85 });
+  // ① 两帧只差眨眼 ⇒ 剔除后 rise≈0 ⇒ 不得报微表情
+  assert.equal(FE.read(calm, withBlink).subs.micro, false,
+    "眨眼被读成微表情 ⇒ r184 剔除失效（8fps 下眨眼约 4s 一次，micro 会几乎恒真）");
+  // ② 两帧只差眼动 ⇒ 同样不得报
+  assert.equal(FE.read(calm, withGaze).subs.micro, false, "眼动被读成微表情 ⇒ gazeRe 没接上");
+  // ③ 对照组：同表情无差异 ⇒ 不报（证明不是「一律不报」）
+  assert.equal(FE.read(calm, calm).subs.micro, false, "同帧自比必须不报");
+  // ④ 真实表情肌跃升（嘴角 0.02→0.30）⇒ 必须仍能报，否则是「把 micro 修死」
+  assert.equal(FE.read(vec({ mouthSmileLeft: 0.30, mouthSmileRight: 0.30 }),
+    vec({ mouthSmileLeft: 0.02, mouthSmileRight: 0.02 })).subs.micro, true,
+    "剔除眼动顺手把真微表情也压灭 ⇒ 矫枉过正");
+  // ⑤ 可证伪：拆掉剔除 ⇒ 眨眼必须重新被误报（证明本条作用在开关上，不是恒真）
+  const c2 = makeCtx();
+  runInContext(SRC("src/js/face-engine.js").replace("const gazeRe = /^eye(?:Blink|Look)/;", "const gazeRe = /^(?!);/;"), c2);
+  assert.equal(c2.window.FaceEngine.read(calm, withBlink).subs.micro, true,
+    "拆掉 gazeRe 后仍不报 micro ⇒ 本条断言无牙（尺子失效）");
+});
+
+test("r184 遮挡信号：整区平坦 ⇒ occluded-eye / occluded-brow 必须命中并降置信", () => {
+  /* 设计口径与 F17 一致：一整个区（眼/眉）长期趋零 = 该区被遮住（墨镜/帽子/刘海）。
+     阈值 0.03 取在语料观测最小值之下（眼区 0.1978、眉区 0.0599）—— 首版取 0.06 时
+     眉区当场假阳性 1 帧（neutral-01 的 bmax=0.0599，差 0.0001），本条把这条边界钉死。 */
+  const base = { browDownLeft: 0.30, eyeSquintLeft: 0.40, eyeBlinkLeft: 0.10, mouthSmileLeft: 0.40, mouthSmileRight: 0.40 };
+  /* ⚠️ 断言一律用 .length/join 而不用 assert.deepEqual：reasons 是**引擎 VM 那个 realm** 里
+     造出的 Array，deepEqual 会因跨 realm 判定不等而误红（本条首版就栽在这上面）。 */
+  // ① 原帧：无任何区域平坦 ⇒ 不得命中（假阳性闸门）
+  let v = FE.read(base);
+  FE.applyQuality(v, FE.assessQuality({ mouthFlatSamples: 0, eyeFlatSamples: 0, browFlatSamples: 0 }));
+  assert.equal(v.quality.reasons.length, 0, "正常帧不得被判遮挡（实得 " + v.quality.reasons.join(",") + "）");
+  // ② 眼区归零满 10 样本 ⇒ occluded-eye 且降置信
+  v = FE.read(base);
+  FE.applyQuality(v, FE.assessQuality({ eyeFlatSamples: 10, browFlatSamples: 0, mouthFlatSamples: 0 }));
+  assert.ok(v.quality.reasons.indexOf("occluded-eye") >= 0, "眼区连续平坦必须报 occluded-eye");
+  assert.equal(v.confident, false, "遮挡命中必须降置信（遮挡只降置信，不产生确定性结论）");
+  // ③ 眉区同理
+  v = FE.read(base);
+  FE.applyQuality(v, FE.assessQuality({ eyeFlatSamples: 0, browFlatSamples: 10, mouthFlatSamples: 0 }));
+  assert.ok(v.quality.reasons.indexOf("occluded-brow") >= 0, "眉区连续平坦必须报 occluded-brow");
+  assert.equal(v.confident, false, "眉区遮挡同样降置信");
+  // ④ 差一个样本不得命中（阈值语义：>= flatSamples）
+  v = FE.read(base);
+  FE.applyQuality(v, FE.assessQuality({ eyeFlatSamples: 9, browFlatSamples: 9, mouthFlatSamples: 0 }));
+  assert.equal(v.quality.reasons.length, 0, "9 < flatSamples(10) 不得命中（实得 " + v.quality.reasons.join(",") + "）");
+  // ⑤ 可证伪：拆掉两条判定行 ⇒ 必须不再命中（证明本条作用在开关上，不是恒真）
+  const c2 = makeCtx();
+  runInContext(SRC("src/js/face-engine.js")
+    .replace('reasons.push("occluded-eye")', "0")
+    .replace('reasons.push("occluded-brow")', "0"), c2);
+  const v2 = c2.window.FaceEngine.read(base);
+  c2.window.FaceEngine.applyQuality(v2, c2.window.FaceEngine.assessQuality({ eyeFlatSamples: 10, browFlatSamples: 10, mouthFlatSamples: 0 }));
+  assert.equal(v2.quality.reasons.length, 0, "拆掉判定行后仍报遮挡 ⇒ 本条断言无牙（实得 " + v2.quality.reasons.join(",") + "）");
+});
+
+test("r184 EMA 单步内核：首帧取原值、其后按 α 收敛，且语义与旧的有状态实现等价", () => {
+  /* 为什么钉在单测里：r184 把有状态的 smooth() 拆成纯函数 emaStep() 并挂出来给 F18 量。
+     拆分本身改动了 `smooth` 的实现路径（原来是原地改 state.ema，现在是新建对象），
+     运行时行为必须逐字不变 —— 这条就是那次重构的安全网。 */
+  const A = 0.3;
+  // ① 首帧（prev 为空）必须直接取原值，不得按 (1-α) 衰减
+  assert.equal(FE.emaStep(null, { mouthSmileLeft: 1 }, A).mouthSmileLeft, 1, "首帧必须取原值");
+  // ② 其后按 EMA 收敛：1 → 0 的第一跳应为 1-α
+  assert.ok(Math.abs(FE.emaStep({ mouthSmileLeft: 1 }, { mouthSmileLeft: 0 }, A).mouthSmileLeft - (1 - A)) < 1e-12,
+    "第二帧必须按 (1-α) 收敛（旧实现为 a*bs+(1-a)*ema）");
+  // ③ 缺维按 0 处理（与旧实现的 (state.ema[k] || 0) 同义）
+  assert.ok(Math.abs(FE.emaStep({}, { mouthSmileLeft: 1 }, A).mouthSmileLeft - A) < 1e-12,
+    "prev 存在但缺该维 ⇒ 按 0 计（旧实现 ||0 的语义）");
+  // ④ α=1 等价于不过滤、α→0 等价于冻结（F18 的两条变异腿量的就是这两个极端）
+  assert.equal(FE.emaStep({ mouthSmileLeft: 0 }, { mouthSmileLeft: 1 }, 1).mouthSmileLeft, 1, "α=1 ⇒ 直通");
+  assert.equal(FE.emaStep({ mouthSmileLeft: 0 }, { mouthSmileLeft: 1 }, 0).mouthSmileLeft, 0, "α=0 ⇒ 冻结");
+  // ⑤ 不得原地改 prev（纯函数契约：F18 靠它做无副作用复算）
+  const prev = { mouthSmileLeft: 1 };
+  FE.emaStep(prev, { mouthSmileLeft: 0 }, A);
+  assert.equal(prev.mouthSmileLeft, 1, "emaStep 不得原地改写 prev（否则 F18 的序列复算会被自己污染）");
+});

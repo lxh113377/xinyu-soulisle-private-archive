@@ -1,0 +1,11 @@
+{
+ "n": 60,
+ "detect_ratio": 1.0,
+ "e2e_p50_ms": 5.9,
+ "e2e_p95_ms": 7.1,
+ "infer_p50_ms": 5.9,
+ "infer_p95_ms": 7,
+ "fps_at_p95": 140.8,
+ "engine": "chromium@executable_path(153.0.8010.12)",
+ "pass": true
+}

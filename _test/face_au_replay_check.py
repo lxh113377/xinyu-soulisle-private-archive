@@ -19,6 +19,8 @@
 
 棘轮与目标线分家（沿用 F12 同款设计，不是客套）：
   - **判红只看棘轮**：`hit`/`acc` 变少 ⇒ 红。
+  - **读数口径（r184 修）**：复算走 `read()` **+ 线上同一个质量门**（assessQuality/applyQuality），
+    只喂 meta 里有的信号 ⇒ 只会少拦不会多拦。旧版只跑 read()，会把「线上其实不笃定」的帧算成笃定。
   - **目标线（有把握帧 top-1 ≥95%）只点名不判红**：今天真照片层远未达标，
     把它做成闸门，这条套件第一次接线就是一条「正常提交也变不了绿」的永红判据，
     届时唯一的绿灯途径就是虚报。缺口以「缺口在册」字样常驻判定行。
@@ -45,7 +47,8 @@ BASE_FILE = ROOT / "_test" / "face-au-baseline.json"
 
 # 与 face_au_export.py 的 WANT 同表；两处各写一份是刻意的（导出腿与复算腿互不 import，
 # 免得复算腿被导出腿的 bug 带着一起错）。改映射必须两处同改。
-WANT = {"smiling": "joy", "neutral": "calm", "anger": "anger", "surprise": "surprise"}
+WANT = {"smiling": "joy", "neutral": "calm", "anger": "anger", "surprise": "surprise",
+        "sadness": "sadness", "disgust": "disgust", "fear": "fear"}
 
 NODE_PROBE = r"""
 const ROOT = process.argv[2];
@@ -61,9 +64,24 @@ const FE = ctx.window.FaceEngine;
 const rows = JSON.parse(readFileSync(process.argv[3], 'utf8'));
 const out = rows.map(r => {
   const v = FE.read(r.bs);
+  /* r184 口径修复：线上读数是 read() **再过质量门**（frame() 里 assessQuality+applyQuality）。
+     旧版本尺只跑 read() ⇒ 把「线上会被侧脸门/暗光门强制降置信」的帧算成了笃定读数。
+     实测（20 张语料）：只跑 read() 时 WC=1（sadness-01-wayuu-woman-bright，yaw=-0.4488 超 yawMax=0.36），
+     走门后 WC=0 且该帧如实变成 uncertain —— **两张册内回归（neutral-02/03）两种口径下都不变**
+     ⇒ 这条修复不会掩盖真问题，只让读数忠实于产品行为。
+     ⚠️ 照片级复算只能喂 meta 里有的信号（luma/yaw/faceSize）；嘴部/眼区/眉区「连续平坦」
+        需要连续样本，这里拿不到 ⇒ **只会少拦，不会多拦**（对外不夸大）。 */
+  const m = r.meta || null;
+  FE.applyQuality(v, FE.assessQuality({
+    luma: (m && m.luma != null) ? {mean: m.luma, variance: m.lumaVar} : null,
+    yaw: m ? m.yaw : null,
+    faceWidth: m ? m.faceSize : null,
+    mouthFlatSamples: 0, eyeFlatSamples: 0, browFlatSamples: 0
+  }));
   return {file: r.file, label: r.label, want: r.want,
           got: v.emotion, intensity: v.intensity,
           confidence: v.confidence, confident: v.confident,
+          reasons: (v.quality || {}).reasons || [],
           stored_emotion: (r.view || {}).emotion || null};
 });
 console.log(JSON.stringify(out));
@@ -126,6 +144,13 @@ def tally(rows):
             wrong.append("%s(%s→%s)" % (r["file"], r["want"], r["got"]))
     n = len(rows)
     confident_n = t["hit"] + t["wrong_confident"]
+    # r184（S4 棘轮口径修复）：逐帧判定水位表。
+    #   旧棘轮只比 acc_on_confident 一个标量 ⇒ 两个缺陷同时存在：
+    #   ① 假红：语料扩容（12→20 张）后分子分母都变，标量不可比；
+    #   ② 假绿：hit→uncertain（判对变判错、但两侧都不是 wrong_confident）时
+    #      acc 仍是 1.0，真回归被漏掉 —— 实测已漏掉 2 张（neutral-02/03）。
+    #   逐帧表把「哪一张、从什么水位掉到什么水位」写成可对账数据，两个缺陷一起消。
+    verdicts = dict((r["file"], classify(r)) for r in rows)
     return {
         "n": n, **t,
         "by_label": by_label,
@@ -135,6 +160,7 @@ def tally(rows):
         "wrong": wrong,
         "stored_mismatch": [r["file"] for r in rows
                             if r.get("stored_emotion") and r["stored_emotion"] != r["got"]],
+        "verdicts": verdicts,
     }
 
 
@@ -142,7 +168,7 @@ def node_rows(rows):
     """在 node 里用当前 src 判据复算。语料与探针都落受管根之外（临时副本），仓内不留临时件。"""
     import tempfile
     payload = [{"file": r["file"], "label": r["label"], "want": WANT[r["label"]],
-                "bs": r["bs"], "view": r.get("view")} for r in rows]
+                "bs": r["bs"], "view": r.get("view"), "meta": r.get("meta")} for r in rows]
     d = tempfile.mkdtemp(prefix="face_au_replay_")
     probe = Path(d) / "probe.js"
     data = Path(d) / "rows.json"
@@ -165,6 +191,8 @@ def node_rows(rows):
     if not isinstance(got, list) or len(got) != len(rows):
         return None, ["探针行数对不上：期望 %d 实得 %s" % (len(rows), len(got) if isinstance(got, list) else "非列表")]
     return got, []
+
+
 
 
 def load_base():
@@ -211,6 +239,14 @@ def main():
 
     base = load_base()
     if a.update:
+        _bv = (base or {}).get("verdicts") or {}
+        _sev = {"hit": 0, "hit_lean": 1, "soft_ok": 2, "uncertain": 3, "wrong_confident": 4}
+        _reg = [f for f in _bv if f in s["verdicts"]
+                and _sev.get(s["verdicts"][f], 9) > _sev.get(_bv[f], 9)]
+        if _reg:
+            print("AU-BASELINE-REFUSED 在册帧存在回退 %d 张，禁止抬水位（棘轮只升不降）：%s"
+                  % (len(_reg), ", ".join(sorted(_reg))))
+            return 1
         if base is None or s["acc_on_confident"] > base.get("acc_on_confident", -1):
             BASE_FILE.write_text(json.dumps(s, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
             print("AU-BASELINE-UPDATED acc_on_confident=%s" % s["acc_on_confident"])
@@ -230,17 +266,42 @@ def main():
             print("  %-9s %d/%d" % (lab, b["hit"], b["n"]))
         if s["wrong"]:
             print("  笃定判错：%s" % ", ".join(s["wrong"]))
-        if s["stored_mismatch"]:
+        if s.get("stored_mismatch"):
             print("  ⚠️ 与导出时存下的读数不一致：%s（判据在导出后被改过？）" % ", ".join(s["stored_mismatch"]))
         print("  覆盖面：仅 %s 四类·表演级强度；低强度段由 F12 负责，fear/sadness/disgust/contempt 零真照"
               % "/".join(sorted(set(WANT.values()))))
 
-    if base and s["acc_on_confident"] < base.get("acc_on_confident", 0) - 1e-9:
-        print("  ❌ 有把握帧命中率较基线回退（基线 %s → 本轮 %s）" % (base.get("acc_on_confident"), s["acc_on_confident"]))
+    # 棘轮（r184 逐帧版）
+    #   判红只看**基线在册帧**的水位变化：同一张照片从好水位掉到坏水位 = 真回归。
+    #   不在册的新增语料**不参与棘轮**（否则语料一扩就永红，唯一绿灯途径是删照片或虚报），
+    #   但它的笃定判错会单独打印成「新增缺口在册」，不许静默。
+    SEV = {"hit": 0, "hit_lean": 1, "soft_ok": 2, "uncertain": 3, "wrong_confident": 4}
+    bver = (base or {}).get("verdicts") or {}
+    regress, missing = [], []
+    for f in sorted(bver):
+        cur = s["verdicts"].get(f)
+        if cur is None:
+            missing.append(f)
+            continue
+        if SEV.get(cur, 9) > SEV.get(bver[f], 9):
+            regress.append("%s(%s→%s)" % (f, bver[f], cur))
+    newf = [f for f in sorted(s["verdicts"]) if f not in bver]
+    new_wc = [f for f in newf if s["verdicts"][f] == "wrong_confident"]
+    if not bver:
+        print("  ⚠️ 基线无逐帧水位表（旧格式）⇒ 棘轮本轮未启用，只打点")
+    if missing:
+        print("  ⚠️ 基线在册但本轮语料缺失 %d 张：%s" % (len(missing), ", ".join(missing)))
+    if newf:
+        print("  新增语料 %d 张不在册（不参与棘轮）：%s" % (len(newf), ", ".join(newf)))
+    if new_wc:
+        print("  ⚠️ 新增语料的笃定判错（缺口在册，非回归、不判红）：%s" % ", ".join(new_wc))
+
+    if regress:
+        print("  ❌ 基线在册帧水位回退 %d 张：%s" % (len(regress), ", ".join(regress)))
         print("FACE-AU-REPLAY-FAIL 回退 n=%d" % s["n"])
         return 1
-    print("FACE-AU-REPLAY-PASS 无回退 n=%d acc_on_confident=%s 缺口在册（目标≥95%%，本轮不判红）"
-          % (s["n"], s["acc_on_confident"]))
+    print("FACE-AU-REPLAY-PASS 无回退（在册 %d 帧逐帧比对）n=%d acc_on_confident=%s 缺口在册（目标≥95%%，本轮不判红）"
+          % (len(bver), s["n"], s["acc_on_confident"]))
     return 0
 
 

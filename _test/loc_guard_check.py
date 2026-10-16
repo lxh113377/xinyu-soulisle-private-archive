@@ -34,6 +34,8 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "_test"))
+import commit_face as CF            # r177：提交面取数单一实现（本件不得自带第二份 git 取面逻辑）
 
 # 与 benchmark_metrics.EXCLUDE_PARTS 同族：取 git 面（HEAD），排除产物与第三方代码。
 EXCLUDE_PARTS = {"vendor", "target", "node_modules", "__pycache__", ".git", ".wrangler",
@@ -249,6 +251,50 @@ def scan_face(paths, limit_rows=DEFAULT_ROWS, limit_func=DEFAULT_FUNC, reader=No
     return res, over
 
 
+def head_face(paths, limit_rows=DEFAULT_ROWS, limit_func=DEFAULT_FUNC, runner=None):
+    """对**提交面**逐件复算行数/函数长（r177，承 r174/r175 的同型缺陷推广）。
+
+    一手形状：`git_files()` 的名单一直取自 HEAD，而 `scan_face` 的 reader 读的是工作树字节
+    ——「名单是历史提交、量的是此刻磁盘」。并行会话正往 `src/js/*` 里打字时，
+    本轮提交的 rc 就由别人的在途字节决定（r174 那条 111>108 的白跑红换了个尺复现）。
+    返回 ({rel: scan}, 超限清单, 仅工作树存在的新件, 失败原因|None)；
+    失败原因非空 ⇒ 调用方必须判 rc=2 UNVERIFIED，**禁回落工作树数冒充提交面数**。
+    """
+    texts, missing, err = CF.show_batch(paths, runner=runner)
+    if err:
+        return {}, [], missing, err
+    res, over = {}, []
+    for rel in paths:
+        if rel in missing:
+            continue
+        try:
+            r = scan_text(rel, texts[rel], limit_rows, limit_func)
+        except Exception as e:                                  # noqa: BLE001
+            return {}, [], missing, "%s(scan:%s)" % (rel, type(e).__name__)
+        res[rel] = r
+        if r["over"]:
+            over.append(rel)
+    over.sort(key=lambda p: (-res[p]["lines"], p))
+    return res, over, missing, None
+
+
+def untracked_code(runner=None):
+    """未入库的代码新件（`git ls-files --others`）：它们不在 HEAD 面上 ⇒ 不产生本轮义务，
+    但必须**印出来**，否则「工作树比提交面胖」这件事只在红因里看不见（r175 同族：可见性是缺陷的一半）。"""
+    def _run():
+        r = subprocess.run(["git", "-c", "core.quotepath=false", "ls-files", "--others",
+                            "--exclude-standard"],
+                           capture_output=True, cwd=str(ROOT), timeout=60)
+        if r.returncode != 0:
+            raise RuntimeError("ls-files rc=%d" % r.returncode)
+        return (r.stdout or b"").decode("utf-8", "replace").splitlines()
+    try:
+        lines = runner() if runner else _run()
+    except Exception:                                           # noqa: BLE001
+        return None
+    return [p.strip() for p in lines if p.strip().endswith(CODE_EXT)]
+
+
 def context_lines():
     """并列打印既有更严约束，避免「门更松所以通过」的误读。"""
     have_budget = (ROOT / "_test" / "size_budget_check.py").exists()
@@ -404,9 +450,11 @@ def main():
         return 2
 
     res, over = scan_face(paths, args.limit_rows, args.limit_func)
-    n_lines = sum(r["lines"] for r in res.values())
-    print("LOC 扫描面：%d 个代码文件（git HEAD 面，%s）｜合计 %d 行"
-          % (len(res), "/".join(sorted(CODE_EXT))[:40] + "…", n_lines))
+    hres, hover, hnew, herr = head_face(paths, args.limit_rows, args.limit_func)
+    n_lines = sum(r["lines"] for r in hres.values()) if not herr else 0
+    print("LOC 扫描面：%d 个代码文件（git HEAD 面，%s）｜合计 %d 行%s"
+          % (len(paths), "/".join(sorted(CODE_EXT))[:40] + "…", n_lines,
+             "" if not herr else "（提交面取不到 ⇒ 面值未验）"))
     print("  阈值：文件行数 ≤%d、函数长 ≤%d（对标 opensoul check:loc）｜模式：%s"
           % (args.limit_rows, args.limit_func, "report-only（只报不拦）" if args.report_only else "enforce（超限即红）"))
     n_cls = sum(r.get("class_blocks", 0) for r in res.values())

@@ -1,5 +1,87 @@
 ## [Unreleased]
 
+### r183 — 八维对标 + 四项工程改造：先证「与机器无关」，再让收据自己说清取自哪个面（2026-10-15）
+
+> 对标报告：`交付物/对标分析报告-2026-10-15-r183-face-and-eol.md`。HEAD 起点 `e1d1eab`。
+> 同一指令第 24 次重发 ⇒ 按原文整跑一轮。**产品源码零新增功能**，四项改造全部落在
+> 判据层与字节面（外加一次已被客观前提解锁的基座重建）。
+
+**本轮主线**：r179 审「回归基座跑的产物是不是当前代码」，r180 审「报告读的台账是不是它以为的那份」，
+本轮再往下一层问 —— **我们声称「与机器无关」的那些字节、以及「取自哪个面」的那些读数，是不是真立得住**。
+两条都先证伪了「这已经修过」。
+
+#### S1 · 基座换新产物（前提已被解锁）
+
+r179/r180 连续两轮把 `server_preflight` 的红记成「前提未满足＝持有 8123 的会话自己停服」。
+本轮开工实测 `Get-NetTCPConnection -LocalPort 8123` 取不到监听者 ⇒ **前提已解锁**，
+按规走 `build_jar.py`（不 `--takeover`、不杀他人进程）：`mvn rc=0`、验货 PASS、
+起服务 pid 登记进租约。回执 `PREFLIGHT-PASS`：jar 29,256,991 B｜`e440fbd9abf7`｜夹具 15/15｜
+pom=jar=1.8.3｜资源 2 件 SHA256 等值。`api_contract_check` 由「20 项 3 失败」→「20 项 1 失败」。
+
+#### S2 · 行尾确定性：`EOL-PARITY-FAIL 244 项` 的三层真因
+
+**r179 的归因是错的**（记成「存量治理，待老大点头动 `.gitattributes`」）。本轮当场证伪：
+`.gitattributes` 早已钉死 `* text=auto eol=lf`（r36 立），**一个字节都没问题**。244 项来自三层叠加：
+
+1. **检出面**：本机 `core.autocrlf=true` ⇒ 110 个被跟踪文件「工作树 CRLF / 索引 blob LF」，
+   而这些文件**没有任何待提交改动**（`git diff` 为空）——不是谁写错了，是检出没按 `eol=lf` 走。
+2. **一个字面 NUL 把整个文件从文本面踢出去**：`server/src/main/java/.../MemoryPortService.java` 里
+   4 个字面 NUL 字节（去重键 `role + NUL + content`）⇒ `git ls-files --eol` 判它 `i/-text w/-text`
+   ⇒ 文本规则对它**静默失效**，工作树与 blob **双双留 CRLF**；而判据按 `check-attr` 仍当它是文本 ⇒
+   判红且红因写成「行尾没锁死」，**真因在别处**。这一条最贵：它让「外人 clone 拿到不同字节」永久成立。
+3. **未入库面**：`_test/` 下 15 个未跟踪件同样带 CRLF——入库那一刻就变成第 1 类红。
+
+处置（先证改法安全，再动数据，最后修判据）：
+- **先证「无孤立 CR」**：114 个目标件逐件扫 CR 是否只以 CRLF 成对出现（实测 0 个孤立 CR）⇒
+  `CRLF→LF` 是字节安全的无损归一；`_test/face-fixtures/*.jpg` 等 13 件含孤立 CR **自动跳过**（不碰二进制）。
+- 归一 109 个被跟踪件 + 15 个未入库件；Java 源 4 处字面 NUL 改写为 Java 转义（语义等价，
+  文件重新成为文本；改后按规 `git add` 单文件，使 `eol_parity` 的「索引优先」口径读到归一后的 blob）。
+  **语义等价由构建期用例背书**：`mvn -B -f server/pom.xml test` ⇒ `Tests run: 203, Failures: 0, Errors: 0` + BUILD SUCCESS。
+- 判据补 **E5**：文本件含字面 NUL ⇒ 点名判红，红因直说「源文件应写转义」；配两条桩
+  （字面 NUL 必红／写转义必放行）——**证明修的是判据不是期望值**。
+- 回执：`EOL-PARITY-PASS（已跟踪 text=1097 binary=73 total=1170｜未入库 text=45 binary=14 取不到=1）`，
+  244 → **0**；`--selftest` 10 类已跟踪 + 4 类未入库；`loc_guard --enforce` 仍 LOC-PASS。
+
+#### S3 · 电池收据自带**面指纹**（R180-05 从纪律变成机器面）
+
+r180 整跑跑到 57/212，而当时我在改同一棵树 ⇒ 那张「50 绿 6 红」跨了改动前后两个面，
+既不能当冻结面收据、也不能当因果判定，报告里只能写「不具因果判定力」。当时的结论是
+「下一轮先落笔改、后整跑」——**那是纪律，不是机制**。
+
+新增纯函数 `face_hash(lines, head)` + `tree_face()` + `face_selftest()`：整跑**前后各取一次**
+`HEAD + git status --porcelain` 的 8 位摘要，跑的过程中面变了就当场在收口行点名 `FACE-DRIFT`。
+- 为什么不用 mtime：checkout/touch 会扰动 mtime，且 1170 个文件逐个 stat 太贵；
+  「取自哪个面」的判据是**内容面**（HEAD + 未提交改动集合），不是时间戳。
+- 零输入（无 HEAD 且无 status 行）返回空串 ⇒ 记未验，不许拿「空指纹」当指纹（R247）。
+- 5 条反例桩（确定性／脏件敏感／HEAD 敏感／行序无关／零输入不判绿）并入 `--selftest` 第 9 档。
+- 回执：`BATTERY-SELFTEST-PASS（9 档：锁/折叠/计费/台账/自管/盲红/超时/执行器/面指纹）`；
+  `FACE-SELFTEST-PASS（5 腿）`；单套件实跑 `FACE-BEGIN: head=e1d1eab9 face=dd38a871 dirty=167` →
+  `FACE-END: ... 跨面=否`。
+
+#### S4 · 棘轮越限的精确归因（只归因，不改数值）
+
+`timing_coupling` 现读 `C1=24 基线20 余量=-4｜已越限`（r179 时是 -2）。24 处定长等待逐条点名到文件与行：
+`dock_auto_check`×8、`face_check`×5、`rescan_shots_check`×3、`browser_check`×2、`lightshow_check`×2、
+`j4_memory_check`×1、`memory_recall_check`×1、`offline_shell_check`×1、`ux_guards_check`×1。
+r179 判「他方提交的代码，评审账不代写」——**边界正确**，但四轮过去基线一路涨而无人认领，
+棘轮从「提示」退化成「常红噪声」。本轮**不抬基线、不代写评审账**，只把它记成「需要一次专门认领会」。
+
+#### 未闭环项（如实登记，不写成通过）
+
+1. **整跑电池未跑**：仪器刚改成「收据自带面指纹」，要先落笔改、后整跑才有意义；最近全量仍是 r180 的半程。
+2. **`/api/chat` 现读挂起，根因未定**：服务端访问日志留下 `"leg":"/api/chat","status":200,"ms":900301`（900 秒），
+   随后四次 70s 探测全 `TimeoutError`；而 `/api/emotion` 同期自行恢复。候选两条（上游长连接无超时 /
+   共享 8123 被并行会话性能探针打满），**本轮没取证**，不把猜测写成结论。
+3. **`/api/asr`、`/api/status` 未文档化**（`api_contract_check` C1/C3 红）：`AsrController` 是**他方在途未入库**件，不代提。
+4. **8 族 peers 探针未重采**（停在 10-08）；**未推送**故无远端 CI 回执（本地领先 `origin/main` 246）。
+5. 未入库面是**移动靶**：本轮归一后并行 face 轮又写入 2 件带 CRLF 的新产物，不追他方在途产物。
+
+#### 执行边界（本轮明确不做）
+
+不推 `origin`（246 个提交含他人内容）、不建 tag、不部署、不碰他方在途文件
+（`_test/face_check.py`、`_test/asr/`、`server/.../AsrController.java`、`src/js/asr-local.js` 等）、
+不抬任何基线、`.gitattributes` 一个字节未改。
+
 ### r182 — 星雾滚轮失效的真正漏网点：非全屏态（老大报障，2026-10-14）
 
 **症状（老大原话口径）**：对话框切全屏后，滚轮上下滚动，原本由滚轮驱动的星雾 3D 效果

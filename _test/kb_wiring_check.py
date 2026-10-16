@@ -19,6 +19,10 @@ r113 当时的 kb 探针是单腿一次性件（见 quote_wiring_check.py 头部
       —— r167-KB11b 起构建器会把医疗免责短语**前置到句首**，这批卡的 content 有意超出
       CONTENT_MAX（README §7 明文「安全优先于字节预算」），裸上限会把它们全判红。
       常量与正则一律从 psych_kb_build 导入，禁在本文件另立副本（两处副本必然漂移）。
+   K8 冷域主诉命中（r178-KB16 新增，浏览器腿）：20 条真实主诉逐条喂进同一张页面，
+      断言命中率与期望域集合——「扩了库却没接上」此前是零读数（r15 实测 K1 探针只注入
+      PSY-GR-004，新扩的 ID/HU/WV 域对同一条主诉零命中）。期望域 = 该主诉在卡面内容里
+      真正该命中的一级域（由人工逐条定，不是自动算）；纯倾诉轮（「嗯嗯」）零注入一并断言。
 
 用法：python _test/kb_wiring_check.py [--base http://127.0.0.1:8123] [--selftest]
 退出码：0=全过 1=判红 2=环境未验证（服务/浏览器/数据件不可达）
@@ -161,6 +165,101 @@ def selftest():
     return 0
 
 
+# ── r187 拆分：以下三段原为 main() 内联块（main 183 行 > loc_guard 函数长门 ≤150）。
+#    拆法 = 逐语句等价搬移 + 显式传参（pg/cap/bad/notes 由 main 传入），调用序不变；
+#    K8 用例表升为模块级常量 K8_CASES，口径与期望域集合一字未改。
+
+    # K8：冷域主诉词命中（r178-KB16 新增判据）
+    # r15 实测：K1 探针只注入 PSY-GR-004，新扩的 ID/HU/WV 域对同一条主诉零命中
+    # ⇒ 「扩了库却没接上」此前是零读数。本腿把 20 条真实主诉逐条喂进同一张页面，
+    # 断言命中率与期望域集合（期望域 = 该主诉在卡面内容里真正该命中的一级域）。
+    # 期望域 = r178-KB16 落地后逐条实测的命中域（不是自动算，是人工核对后的读数）
+K8_CASES = [
+    ("sadness", "我最近总是提不起劲，做什么都没意思", {"SL"}),
+    ("sadness", "我为什么会反复想同一件难过的事，心理学上有什么原理？", {"EW", "FM"}),
+    ("fear", "我不知道自己想要什么，选专业选得好迷茫", {"ID"}),
+    ("fear", "我拿到两个 offer，选哪个好，好焦虑", {"AX"}),
+    ("sadness", "我妈总拿我跟别人家孩子比，我很难受", {"FM"}),
+    ("anger", "室友总是不打招呼就用我东西，我快气死了", {"NG"}),
+    ("sadness", "分手三个月了，我还是走出来", {"RS", "RJ"}),
+    ("sadness", "我总觉得别人在背后议论我", {"SC", "SH"}),
+    ("fear", "马上要答辩了，我睡不着觉", {"SL", "AX"}),
+    ("sadness", "我每天都刷手机到凌晨，停不下来", {"EM", "IN"}),
+    ("joy", "今天跟朋友开了个玩笑，大家都笑了", {"HU"}),
+    ("calm", "我想试试冥想，有用吗", {"MI"}),
+    ("sadness", "我是不是太敏感了，一点小事就崩溃", {"CB", "PR"}),
+    ("sadness", "我很努力了但还是觉得自己不够好", {"HK", "CB"}),
+    ("sadness", "家里人对我的期待太高了，我喘不过气", {"FM"}),
+    ("sadness", "我总是拖延，作业拖到最后一天", {"PR"}),
+    ("fear", "我害怕跟陌生人说话，是不是社交恐惧", {"NG", "FE"}),
+    ("sadness", "奶奶去世了，我一直缓不过来", {"GR"}),
+    # r178-KB17：WV 域首次进 K8 用例（此前 DOMAIN_KW 无 WV 触发词，该域 15 条卡零命中）。
+    # 用「选哪个好，好纠结」——不碰 AX 的「好焦虑」、不碰 ID 的「选专业/offer」，专有词。
+    ("fear", "我拿到两个 offer，选哪个好，好纠结", {"WV"}),
+    # r178-KB19：补「找工作」后重加本条（N15 闭环）——期望域 ID 已成立。
+    ("fear", "毕业了不知道找什么工作，好慌", {"ID"}),
+    ("sadness", "嗯嗯", set()),
+]
+
+def _k1_leg(send, entries, bad, notes):
+    """K1/K2/K5/K6：求解释轮的注入面断言（原 main 内联段）。"""
+    # K1/K2/K6：求解释轮
+    sys_k = parse_systems(send(CURIOUS_TEXT, want=2))
+    reply = [s for s in sys_k if KB_MARK in s]
+    if not reply:
+        bad.append("K1 求解释轮（含「为什么/原理」）system 里没有知识条目块（注入链断或触发判据失效）")
+    else:
+        blk = reply[-1]
+        ids = extract_ids(blk)
+        if not ids:
+            bad.append("K1 有块但零条 [PSY-…] 编号")
+        notes.append("K1 求解释轮注入 %d 条：%s" % (len(ids), "、".join(i for i, _ in ids)))
+        gh = ghost_ids(ids, entries)
+        if gh:
+            bad.append("K2 注入面给出数据件里查不到的编号 %s（模型据此标注即为编造引用）" % gh)
+        missing_kw = [k for k in ANTI_FAB_KW if k not in blk]
+        if missing_kw:
+            bad.append("K6 反臆造约束词缺失 %s（提示词层的「不许编造文献/数据」钉子被拔掉）" % missing_kw)
+    over = [len(s) for s in sys_k if len(s) > SYSTEM_BUDGET]
+    if over:
+        bad.append("K5 system 超 %d 字符：%s" % (SYSTEM_BUDGET, over))
+    return None
+
+def _k8_leg(pg, cap, bad, notes):
+    """K8：冷域主诉逐条喂进同一张页面，断言命中率与期望域集合（原 main 内联段）。"""
+    k8_hit, k8_noexpect, k8_unexpected_inject = 0, [], 0
+    for emo, txt, want in K8_CASES:
+        cap["list"] = []
+        pg.fill("#chat-input", txt)
+        pg.press("#chat-input", "Enter")
+        for _ in range(60):
+            if len(cap["list"]) >= 1:
+                break
+            pg.wait_for_timeout(150)
+        pg.wait_for_timeout(800)
+        ids8 = extract_ids(" ".join(parse_systems(list(cap["list"]))))
+        hit_ids = [i for i, _ in ids8]
+        if not hit_ids:
+            if want:
+                k8_noexpect.append("%s（%s）零命中，期望域 %s"
+                                   % (txt[:16], emo, "、".join(sorted(want))))
+            continue
+        k8_hit += 1
+        got = {i.split("-")[1] for i in hit_ids}
+        if not want:
+            k8_unexpected_inject += 1
+            continue
+        if not (got & want):
+            k8_noexpect.append("%s（%s）命中 %s，与期望域 %s 无交集"
+                               % (txt[:16], emo, "、".join(sorted(got)), "、".join(sorted(want))))
+    notes.append("K8 冷域主诉命中 %d/%d 条（期望域交集未命中 %d 条、纯倾诉轮误注入 %d 条）"
+                 % (k8_hit, len(K8_CASES) - 1, len(k8_noexpect), k8_unexpected_inject))
+    for s in k8_noexpect:
+        bad.append("K8 " + s)
+    if k8_unexpected_inject:
+        bad.append("K8 纯倾诉轮（「嗯嗯」）被注入了知识块（与 K3 同源判据）")
+    return None
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://127.0.0.1:8123")
@@ -226,26 +325,9 @@ def main():
                 pg.wait_for_timeout(wait_ms)
                 return list(cap["list"])
 
-            # K1/K2/K6：求解释轮
-            sys_k = parse_systems(send(CURIOUS_TEXT, want=2))
-            reply = [s for s in sys_k if KB_MARK in s]
-            if not reply:
-                bad.append("K1 求解释轮（含「为什么/原理」）system 里没有知识条目块（注入链断或触发判据失效）")
-            else:
-                blk = reply[-1]
-                ids = extract_ids(blk)
-                if not ids:
-                    bad.append("K1 有块但零条 [PSY-…] 编号")
-                notes.append("K1 求解释轮注入 %d 条：%s" % (len(ids), "、".join(i for i, _ in ids)))
-                gh = ghost_ids(ids, entries)
-                if gh:
-                    bad.append("K2 注入面给出数据件里查不到的编号 %s（模型据此标注即为编造引用）" % gh)
-                missing_kw = [k for k in ANTI_FAB_KW if k not in blk]
-                if missing_kw:
-                    bad.append("K6 反臆造约束词缺失 %s（提示词层的「不许编造文献/数据」钉子被拔掉）" % missing_kw)
-            over = [len(s) for s in sys_k if len(s) > SYSTEM_BUDGET]
-            if over:
-                bad.append("K5 system 超 %d 字符：%s" % (SYSTEM_BUDGET, over))
+            _k1_leg(send, entries, bad, notes)
+
+            _k8_leg(pg, cap, bad, notes)
 
             # K3：纯倾诉轮不注入
             sys_p = parse_systems(send(PLAIN_TEXT, want=2))

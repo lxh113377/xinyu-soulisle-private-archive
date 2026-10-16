@@ -1,0 +1,203 @@
+{
+ "cases": [
+  {
+   "name": "neutral",
+   "on": [
+    "neutral"
+   ],
+   "off": [
+    "duchenne",
+    "social",
+    "worry",
+    "tense",
+    "asymmetric"
+   ],
+   "subs": {
+    "neutral": true,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": true
+   },
+   "emotion": "calm"
+  },
+  {
+   "name": "duchenne",
+   "on": [
+    "duchenne"
+   ],
+   "off": [
+    "social",
+    "neutral",
+    "worry",
+    "tense"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": true,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "joy"
+  },
+  {
+   "name": "social",
+   "on": [
+    "social"
+   ],
+   "off": [
+    "duchenne",
+    "neutral"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": false,
+    "social": true,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "joy"
+  },
+  {
+   "name": "worry",
+   "on": [
+    "worry"
+   ],
+   "off": [
+    "duchenne",
+    "social",
+    "neutral"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": true,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "sadness"
+  },
+  {
+   "name": "sad",
+   "on": [],
+   "off": [
+    "worry",
+    "neutral"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "sadness"
+  },
+  {
+   "name": "tense",
+   "on": [
+    "tense"
+   ],
+   "off": [
+    "neutral",
+    "duchenne",
+    "social",
+    "worry"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": true,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "anger"
+  },
+  {
+   "name": "asym",
+   "on": [
+    "asymmetric"
+   ],
+   "off": [
+    "duchenne",
+    "neutral"
+   ],
+   "subs": {
+    "neutral": false,
+    "duchenne": false,
+    "social": true,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": true,
+    "microAvailable": false
+   },
+   "emotion": "contempt"
+  },
+  {
+   "name": "micro_noprev",
+   "on": [],
+   "off": [
+    "micro"
+   ],
+   "subs": {
+    "neutral": true,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": false,
+    "asymmetric": false,
+    "microAvailable": false
+   },
+   "emotion": "calm"
+  },
+  {
+   "name": "micro_withprev",
+   "on": [
+    "microAvailable"
+   ],
+   "off": [],
+   "subs": {
+    "neutral": true,
+    "duchenne": false,
+    "social": false,
+    "masked": false,
+    "worry": false,
+    "tense": false,
+    "micro": true,
+    "asymmetric": false,
+    "microAvailable": true
+   },
+   "emotion": "calm"
+  }
+ ],
+ "bad": []
+}

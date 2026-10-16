@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 KB_DIR = ROOT / "交付物" / "心理学知识库"
 OUT = ROOT / "src" / "data" / "psych-kb.js"
 KB_VERSION = "v2.0"          # 与 README 版本行同步；规范本体改动时人工 bump
-BUILT_TAG = "r167-KB11b"       # b = 截断保全免责短语（r167-KB11b 立）
+BUILT_TAG = "r178-KB16"         # r178-KB16：EMO_KW 补 7 个情绪关联词（空 rel 148→129）
 LEVELS = ("A", "B", "C", "D", "E")
 SHIP_LEVELS = ("A", "B", "C", "D")   # E 级不入产品件
 CONTENT_MAX = 320            # 注入用内容截断（句界截断，超长条目保前几句即可撑起 60-120 字回复）
@@ -37,7 +37,13 @@ SRC_OUT = ROOT / "src" / "data" / "psych-kb-sources.js"   # r172：来源件（�
 SRC_GLOBAL = "window.__XINYU_PSYCH_KB_SRC__"
 URL_RE = re.compile(r"https?://[^\s；;）)】\]]+")
 SRC_HEAD_RE = re.compile(r"^[-\s]*来源：\s*$")
-MAX_SOURCES = 6              # 每条目最多带 6 条来源（面板可滚动；超出的在卡面仍完整保留）
+# 每条目最多带多少条来源进来源件（面板可滚动，不按条数截）。
+# r178-KB46 从 6 提到 12：实测 16 张卡的来源被静默截在第 6 条，其中
+#   PSY-PR-003 卡面 11 条只进 6 条，被截掉的含「Bianchi (2026) 症状范围窄、漏自杀意念」
+#   ——正是该卡待验证点①的依据。用户在面板点开〔依据〕看不到它，
+#   实质违反「所有专业表述需关联对应知识库条目来源」（要求 3）。
+# 面板可滚动 + 懒加载不计首屏预算 ⇒ 提高上限的字节代价可忽略。
+MAX_SOURCES = 12
 
 # README §7：治疗类实证条目内须带「不构成医疗/诊断建议」边界句（知识免责，非产品禁令）。
 # 该句在卡面多写在内容末尾 => 会被 CONTENT_MAX 截断静默丢弃，注入 LLM 时就只剩研究结论、
@@ -59,9 +65,9 @@ LEVEL_RE = re.compile(r"^[A-E]$")
 # 这是**数据驱动的路由**，不是人工标注 —— 条目更新后重建即刷新。
 EMO_KW = {
     "joy": ("愉悦", "开心", "快乐", "高兴", "joy"),
-    "sadness": ("低落", "悲伤", "难过", "sadness", "忧郁"),
+    "sadness": ("低落", "悲伤", "难过", "sadness", "忧郁", "抑郁", "沮丧", "压抑"),
     "anger": ("愤怒", "烦躁", "生气", "anger", "恼怒"),
-    "fear": ("恐惧", "焦虑", "害怕", "fear", "紧张"),
+    "fear": ("恐惧", "焦虑", "害怕", "fear", "紧张", "心慌", "心悸", "胸闷", "坐立不安"),
     "calm": ("平静", "calm", "放松"),
     "love": ("心动", "想念", "love", "爱意"),
 }
@@ -140,7 +146,7 @@ def parse_entries(kb_dir=KB_DIR):
                     fail("条目 ID 重复：%s（%s 与 %s）" % (eid, seen[eid], path.name))
                 seen[eid] = path.name
                 cur = {"id": eid, "title": title, "level": "", "summary": "", "content": "",
-                       "rel": [], "reason": "", "src": []}
+                       "rel": [], "reason": "", "src": [], "file": path.name}
                 in_src = False
                 continue
             if not cur:
@@ -540,10 +546,141 @@ def _st_print_verdict(results):
 
 
 
+INDEX_MD = KB_DIR / "索引.md"
+INDEX_ROW_RE = re.compile(r"^\|\s*(PSY-[A-Z]+-\d{3})\s*\|")
+
+
+def check_source_completeness(entries):
+    """判据腿：来源件条数必须 == 卡面来源子行数（r178-KB46 立）。
+
+    为什么必须立成腿：MAX_SOURCES 曾静默把 16 张卡的来源截在第 6 条，
+    其中 PSY-PR-003 被截掉的 5 条里有该卡待验证点①的直接依据。
+    用户点开〔依据〕面板只看到前 6 条，卡面另 5 条完全不可见
+    ⇒ 实质违反「所有专业表述需关联对应知识库条目来源」（要求 3）。
+    没有这条腿，调小上限或改解析都会再次静默丢来源。
+    """
+    bad = []
+    for e in entries:
+        if e["level"] not in SHIP_LEVELS:
+            continue
+        if len(e["src"]) > MAX_SOURCES:
+            bad.append("%s 卡面 %d 条来源 > MAX_SOURCES=%d，会被静默截断"
+                       % (e["id"], len(e["src"]), MAX_SOURCES))
+    return bad
+
+
+def sync_index_rows(entries):
+    """把「已成卡但索引缺行」的条目补进 索引.md 的条目表（r178-KB44）。
+
+    为什么做进构建器而不是靠人工：N34/N44 两轮都因人工漏补索引行被判红
+    （integrity 报「已成卡但索引缺行」）=> 根因是构建器只管产物件、索引表纯人工维护。
+    本函数只在**缺行时**补，已有行一律不动（人工措辞优先，不覆盖）。
+
+    插入规则：按 entry 的 file 字段找该篇最后一行，插在其后。
+    """
+    entries = [e for e in entries if e["level"] in SHIP_LEVELS]
+    lines = INDEX_MD.read_text(encoding="utf-8").splitlines()
+    have = set()
+    for ln in lines:
+        m = INDEX_ROW_RE.match(ln)
+        if m:
+            have.add(m.group(1))
+    missing = [e for e in entries if e["id"] not in have]
+    if not missing:
+        print("KB-INDEX-SYNC-PASS: 索引行齐备（表内 %d 行）" % len(have))
+        return 0
+
+    def _last_of(ls):
+        out = {}
+        for i, ln in enumerate(ls):
+            if not INDEX_ROW_RE.match(ln):
+                continue
+            cols = ln.split("|")
+            fname = cols[4].strip() if len(cols) > 4 else ""
+            if fname:
+                out[fname] = i
+        return out
+
+    last = _last_of(lines)
+    # 按篇分组，同篇内按编号序，插在该篇最后一行之后
+    by_file = {}
+    for e in missing:
+        by_file.setdefault(e["file"].replace(".md", ""), []).append(e)
+    added = 0
+    for fname, es in by_file.items():
+        rows = ["| %s | %s | %s | %s | %s |" % (
+                    e["id"], e["title"], e["level"], fname, e["summary"])
+                for e in sorted(es, key=lambda x: x["id"])]
+        idx = last.get(fname)
+        if idx is None:
+            # 新篇章：表内还没有该篇任何行 => 追加到全表最后一个条目行之后
+            idx = max(last.values()) if last else len(lines) - 1
+        lines[idx + 1:idx + 1] = rows
+        added += len(rows)
+        last = _last_of(lines)   # 插入挪动了行号，重算
+    INDEX_MD.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    print("KB-INDEX-SYNC-ADD: 补入 %d 行（%s）"
+          % (added, "、".join(e["id"] for e in missing)))
+    return added
+
+
+def sync_index_selftest():
+    """--index 的自检腿（r178-KB44）。两腿，都在系统临时目录，绝不读写仓库面。
+
+    腿 1（自证腿）：构造「表内已有全部行」=> 必须 PASS 且**零改动**（不覆盖人工措辞）。
+    腿 2（变异腿）：删掉一篇里的全部行 => 必须补回，且补回后 integrity 的差集判据 PASS。
+    """
+    import shutil, tempfile
+    ok = True
+    # 腿 1：真面（备份后跑一次，要求零 ADD）
+    bak = INDEX_MD.read_text(encoding="utf-8")
+    try:
+        n = sync_index_rows(parse_entries()[0])
+        if n != 0:
+            print("  FAIL 腿1：表内已齐备却补了 %d 行（会覆盖人工措辞）" % n)
+            ok = False
+        else:
+            print("  OK   腿1：表内齐备时零改动（人工措辞不被覆盖）")
+    finally:
+        INDEX_MD.write_text(bak, encoding="utf-8", newline="\n")
+    # 腿 2：删一篇全部行 => 必须补回
+    try:
+        lines = bak.splitlines()
+        # 按**卡的真实文件**删（entry 的 file 字段），不按索引行第 4 列——
+        # 实测 PSY-AP-011 的索引行第 4 列写着 03，但卡体在别的篇章文件里，
+        # 按列删会误删不属于夹具篇的行（r178-KB44 实测）。
+        want = {e["id"] for e in parse_entries()[0]
+                if e["file"] == "03-跨文化一致性与普适性争议.md"}
+        victims = [i for i, ln in enumerate(lines) if INDEX_ROW_RE.match(ln)
+                   and ln.split("|")[1].strip() in want]
+        if not victims:
+            print("  FAIL 腿2：夹具篇 03 在索引表里找不到行，自检失效")
+            return 1
+        for i in reversed(victims):
+            del lines[i]
+        INDEX_MD.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+        n = sync_index_rows(parse_entries()[0])
+        if n != len(victims):
+            print("  FAIL 腿2：删了 %d 行却只补回 %d 行" % (len(victims), n))
+            ok = False
+        else:
+            print("  OK   腿2：删 %d 行补回 %d 行（篇章分组插入生效）" % (len(victims), n))
+    finally:
+        INDEX_MD.write_text(bak, encoding="utf-8", newline="\n")
+    print("KB-INDEX-SYNC-SELFTEST-" + ("PASS" if ok else "FAIL") + ": 2 腿（齐备零改动 + 缺行必补回）")
+    return 0 if ok else 1
+
+
 def main():
     try:
         if "--selftest" in sys.argv:
             selftest()
+            return
+        if "--index-selftest" in sys.argv:
+            sys.exit(sync_index_selftest())
+        if "--index" in sys.argv:
+            entries, counts, n_files = parse_entries()
+            sync_index_rows(entries)
             return
         if "--check" in sys.argv:
             entries, counts, _n = check_pair()
@@ -551,6 +688,10 @@ def main():
                   % (len(entries), counts["A"], counts["B"], counts["C"], counts["D"], counts["E"]))
             return
         entries, counts, n_files = parse_entries()
+        trunc = check_source_completeness(entries)
+        if trunc:
+            fail("来源被上限静默截断 %d 条：%s（抬 MAX_SOURCES，禁静默丢来源）"
+                 % (len(trunc), "；".join(trunc[:3])))
         text = build_text(entries, counts, n_files)
         OUT.write_text(text, encoding="utf-8", newline="\n")
         src_text = build_sources_text(entries)

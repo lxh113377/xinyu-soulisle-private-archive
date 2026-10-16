@@ -198,7 +198,7 @@ CloudBase 注意事项（实测得来）：
 
 > **现状（与机器逐条对账，别手抄）**：GitHub Actions 四条门禁（`.github/workflows/ci.yml` 的 job 数；
 > 另有独立的性能基线工作流 `.github/workflows/perf-baseline.yml`，周常复跑）｜
-> ★ 全量电池（212 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
+> ★ 全量电池（231 套件）＝ `run_all_suites.py` 的 SUITES 条数｜对标源数据台账（16 仓指标）＝台账 `peers_expected`。
 > （更正注 r111：旧值写 146；本轮按用户立规新增双核心能力基线棘轮 `core_capability_baseline` 与其 `--selftest` 两套件 ⇒ 146→148。旧值按本仓惯例保留于此，不删。）
 > （更正注 r116：语音通话层落地，新增 `voice_call` 与其 `--selftest` 两套件 ⇒ 148→150。判据 `_test/voice_call_check.py`，见 `docs/quality-gates.md` 同条目。）
 > （更正注 r117：BLIND-RED 常驻棘轮入电池，新增 `blindred_guard` 与其 `--selftest` 两套件 ⇒ 150→152（`run_all_suites.py` 实测 152）。判据 `_test/blindred_guard_check.py`，见 `docs/quality-gates.md` 同条目。）
@@ -208,6 +208,7 @@ CloudBase 注意事项（实测得来）：
 > （更正注 r122：peers 文档面探针的离线桩入电池，新增 `peer_docs_selftest` 一套件 ⇒ 155→156。判据 `_test/peer_docs_probe.py`，见 `docs/quality-gates.md` 同条目；同轮 `_test/js/face-engine.unit.test.mjs` 补 5 条运行时离线腿走 js_unit 文件枚举面 ⇒ 套件数不变。）
 > （更正注 r123：表情引擎离线腿的**可证伪性**判据固化入电池，新增 `js_engine_mut` 一套件 ⇒ 156→157。判据 `_test/js_engine_mut.mjs`（5 类定向破坏各自翻红 + 不破坏时全绿），见 `docs/quality-gates.md` 同条目。）
 > （更正注 r129：心理学知识库「条目卡⇄数据件」一致性判据入电池，新增 `psych_kb_build` 与其 `--selftest` 两套件 ⇒ 本轮实测 162→164（157→162 段由同期他轮新增，本轮未逐轮归属）。判据 `_test/psych_kb_build.py`，见 `docs/quality-gates.md` 同条目。立此条的一手代价：第 4 轮 24 张源卡未跟踪活了 3 轮，HEAD 面数据件停在 74 条而该判据在提交面实跑 rc=1，本地电池与 CI 双双看不见。）
+> （更正注 r187：G16 复抓出两条**已入库却无人执行**的孤儿判据 `_test/asr/asr_chain_check.py` / `_test/asr/engine_switch_check.py`（r184 注释声称"四件全接"，实测只接了两件 .js ⇒ 空头主张），各补一条离线 `--selftest` 腿并入电池 ⇒ 228→**230**；同轮 `face_micro_proto_check.py` 随 `git add -A` 入库后被第五腿报为新孤儿、补离线腿 ⇒ 230→**231**（`run_all_suites.py --list` 实测）。同轮另补登 7 条**早已在电池跑、却从未进 `docs/quality-gates.md` 也从未 `git add`** 的判据（F16/F17/F18 + KB 四审计）⇒ 那 7 条不新增套件数，只补登记与入库两步。旧值 212 按本仓惯例保留于此不删。）
 > 这三处数字由 `repo_config_check.py` 的 **G2 / G4 / G14** 当场等值对账，写错即红。
 >
 > **判据清单与逐条口径全文见 [docs/quality-gates.md](docs/quality-gates.md)**（r39 起从 README 迁出）。这里只留四个『现在到底是多少』的复算入口：

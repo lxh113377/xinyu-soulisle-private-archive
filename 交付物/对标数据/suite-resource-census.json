@@ -1,14 +1,14 @@
 {
  "generated_by": "_test/suite_resource_census.py",
  "ceiling": "只出资源与耗时分桶；最大桶是**算出的时间下界**，不是实测加速比",
- "suites": 208,
+ "suites": 222,
  "blind": [
   "js_engine_mut"
  ],
  "timings_from": "battery-timing.json",
  "buckets": {
   "jar8123": {
-   "n": 63,
+   "n": 66,
    "seconds": 29.9,
    "members": [
     "preflight",
@@ -16,6 +16,8 @@
     "perf_baseline_selftest",
     "perf_api_selftest",
     "battery_lock_selftest",
+    "kb_retrieval_check",
+    "kb_retrieval_check_selftest",
     "quote_eval_selftest",
     "kb_wiring",
     "kb_wiring_selftest",
@@ -56,6 +58,7 @@
     "voice_call_selftest",
     "asr_replay",
     "asr_replay_selftest",
+    "asr_sidecar_selftest",
     "browser_check",
     "pixel_dual",
     "lightshow",
@@ -77,7 +80,7 @@
    ]
   },
   "free": {
-   "n": 142,
+   "n": 153,
    "seconds": 160.8,
    "members": [
     "docs_tutorial",
@@ -92,6 +95,10 @@
     "eol_parity_selftest",
     "size_budget",
     "size_budget_selftest",
+    "kb_domain_kw_audit",
+    "kb_domain_kw_audit_selftest",
+    "kb_battery_count_audit",
+    "kb_battery_count_audit_selftest",
     "psych_kb_build",
     "psych_kb_build_selftest",
     "wit_quotes_build",
@@ -142,6 +149,9 @@
     "j4_remote_down",
     "voice",
     "voice_selftest",
+    "asr_eval_selftest",
+    "asr_local_selftest",
+    "audio_quality_selftest",
     "public_check",
     "live_sync",
     "live_sync_alt",
@@ -154,12 +164,16 @@
     "face_au_replay",
     "face_au_replay_selftest",
     "face_au_export_check",
+    "face_subs",
+    "face_latency",
     "js_unit",
     "js_unit_selftest",
     "face_check",
     "face_check_selftest",
     "face_discrim_check",
     "face_discrim_selftest",
+    "face_scene",
+    "face_scene_selftest",
     "quality_peer_selftest",
     "deliverable_inventory",
     "deliverable_inventory_selftest",
@@ -386,6 +400,56 @@
    "mode": "stub",
    "facets": [],
    "exclusive": []
+  },
+  {
+   "suite": "kb_domain_kw_audit",
+   "target": "_test/kb_domain_kw_audit.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "kb_domain_kw_audit_selftest",
+   "target": "_test/kb_domain_kw_audit.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "kb_battery_count_audit",
+   "target": "_test/kb_battery_count_audit.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "kb_battery_count_audit_selftest",
+   "target": "_test/kb_battery_count_audit.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "kb_retrieval_check",
+   "target": "_test/kb_retrieval_check.py",
+   "mode": "real",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "kb_retrieval_check_selftest",
+   "target": "_test/kb_retrieval_check.py",
+   "mode": "stub",
+   "facets": [
+    "jar8123"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
   },
   {
    "suite": "psych_kb_build",
@@ -1296,6 +1360,42 @@
    ]
   },
   {
+   "suite": "asr_sidecar_selftest",
+   "target": "_test/asr_sidecar_check.py",
+   "mode": "stub",
+   "facets": [
+    "jar8123",
+    "own_server",
+    "public_net"
+   ],
+   "exclusive": [
+    "jar8123"
+   ]
+  },
+  {
+   "suite": "asr_eval_selftest",
+   "target": "_test/asr_eval_check.py",
+   "mode": "stub",
+   "facets": [
+    "own_server"
+   ],
+   "exclusive": []
+  },
+  {
+   "suite": "asr_local_selftest",
+   "target": "_test/asr/asr_local_check.js",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "audio_quality_selftest",
+   "target": "_test/asr/audio_quality_check.js",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
    "suite": "browser_check",
    "target": "_test/browser_check.py",
    "mode": "real",
@@ -1466,6 +1566,23 @@
    "exclusive": []
   },
   {
+   "suite": "face_subs",
+   "target": "_test/face_subs_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "face_latency",
+   "target": "_test/face_latency_check.py",
+   "mode": "real",
+   "facets": [
+    "browser",
+    "own_server"
+   ],
+   "exclusive": []
+  },
+  {
    "suite": "js_unit",
    "target": "_test/js_unit_check.py",
    "mode": "real",
@@ -1509,6 +1626,20 @@
   {
    "suite": "face_discrim_selftest",
    "target": "_test/face_discrim_check.py",
+   "mode": "stub",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "face_scene",
+   "target": "_test/face_scene_check.py",
+   "mode": "real",
+   "facets": [],
+   "exclusive": []
+  },
+  {
+   "suite": "face_scene_selftest",
+   "target": "_test/face_scene_check.py",
    "mode": "stub",
    "facets": [],
    "exclusive": []

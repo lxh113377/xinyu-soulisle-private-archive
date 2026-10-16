@@ -114,3 +114,37 @@ nul
 # _b3_full_auto.json 是带全部 300 条逐样本明细的基线快照，汇总已固化为 asr_eval_baseline.json
 _test/_eval_last.json
 _test/_b3_full_auto.json
+
+# ===== r187 收口：会话运行态与工具运行态（R269 例外通道，同 _shots/.wrangler/_temp 先例）=====
+# 判据：本体可再生、当日台账引用其路径属历史取证 ⇒ 走 gitignore 豁免，不迁 _trash 也不提交。
+# 1) 根目录散落的一次性读数/差异件（*.tmp 是 PowerShell 重定向产物、含 UTF-16 BOM；
+#    *.diff 是手工 diff 导出；_test_r15e.txt 是一次报错原文）。与 .aiexclude 的 *.tmp/*.bak
+#    口径对齐 —— 此前 .gitignore 没有 *.tmp，等于「AI 看不见但 git 会提交」，两面不一致
+#    正是 noise_lint 一路在防的形状。
+*.tmp
+*.diff
+/_test_r15e.txt
+# 2) 一次性探针（docstring 原文即「一次性探针（r173）… 跑完即删」）
+/_test/_f10*.py
+/_test/_scan.py
+# 3) 并行会话运行态（.pid 心跳 / 探针读数 / 空台账）
+/_test/_r15*.txt
+/_test/_r15*.pid
+# 4) ASR 评测逐样本明细与构建日志（同 r176/B3 已豁免的 _b3_full_auto.json 一族：
+#    汇总已固化为 asr_eval_baseline.json / asr_eval_manifest.meta.json，明细可复跑重建）
+/_test/_b3_full_yue.json
+/_test/_b3_base_auto.json
+/_test/_b3_build.log
+# 5) 并行工具的 HEAD 工作树（git worktree add 产物，内含 .git 指针与整份检出；
+#    入库等于把仓库套进自己，且它是活跃工具运行态 ⇒ 禁迁 _trash）
+/_wt_head/
+
+# ===== r187 复发防护：字面量 ~ 目录（同 %SystemDrive% 先例）=====
+# 一手：run_code 子进程 env 缺 USERPROFILE/APPDATA 时，pip 把 user-site 算成**相对路径**，
+#   在仓根建出字面量 "~" 目录（内含第三方包，pip 可重建）。已走 recycle 处置
+#   （台账 20261016-152530-0a6ffa）。登记为忽略而非删除：这是工具运行态，
+#   下次同类调用还会再生（R269 例外通道），且禁磁盘直删（纪律 #21）。
+/~/
+
+# r187：gh CLI 的运行态目录（本机 gh 探测产物，同 .mimosa/.zcode 先例走豁免）
+/.local/

@@ -3,7 +3,7 @@
   "dim_a_testing_repro": {
     "self": {
       "face": "git HEAD",
-      "regression_suites": 208,
+      "regression_suites": 231,
       "java_test_files": 26,
       "java_test_cases": 203,
       "jacoco_minimum": {
@@ -11,10 +11,10 @@
         "BRANCH": 0.9
       },
       "check_scripts_in_test": 0,
-      "src_code_files": 29,
+      "src_code_files": 31,
       "first_screen_budget": {
-        "files": 30,
-        "total_bytes": 1208064
+        "files": 32,
+        "total_bytes": 1265147
       },
       "build_config_files": [
         "deploy/cloudbase/functions/chat/package.json"
@@ -29,12 +29,12 @@
     },
     "peers_quality_tooling": {
       "available": true,
-      "file": "peer-quality-tooling-2026-10-08.json",
-      "ts": "2026-10-08",
+      "file": "peer-quality-tooling-2026-10-14-r179.json",
+      "ts": "2026-10-14-r179",
       "generated_by": "peer_quality_tooling_probe.py",
       "denominator": 16,
       "have_test_struct": 7,
-      "ci_unit_step": 5,
+      "ci_unit_step": 6,
       "note": "只出结构化在册证据；不得据此比较代码质量/缺陷率（覆盖率不在取数面内）",
       "stale": null
     },
@@ -50,7 +50,7 @@
   "dim_b_zero_build_cost": {
     "self_cost": {
       "face": "git HEAD",
-      "regression_suites": 208,
+      "regression_suites": 231,
       "java_test_files": 26,
       "java_test_cases": 203,
       "jacoco_minimum": {
@@ -58,10 +58,10 @@
         "BRANCH": 0.9
       },
       "check_scripts_in_test": 0,
-      "src_code_files": 29,
+      "src_code_files": 31,
       "first_screen_budget": {
-        "files": 30,
-        "total_bytes": 1208064
+        "files": 32,
+        "total_bytes": 1265147
       },
       "build_config_files": [
         "deploy/cloudbase/functions/chat/package.json"

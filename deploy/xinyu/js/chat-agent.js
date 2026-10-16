@@ -180,6 +180,45 @@ window.ChatAgent = (function () {
     else setTimeout(function () { ensureKb(0); }, 1200);
   })();
 
+/* r178-KB16：冷域触发词表（一级域 -> 用户主诉里会用到的词）。
+   * 起因：bigram 只在 title+summary 里数，220 条里 148 条 rel 为空、冷域卡对
+   * 「选专业/offer/拖延/开玩笑/奶奶去世了」类主诉零命中（r15 实测 K1 探针只注入
+   * PSY-GR-004）。放宽到内容面后噪声又失控（「室友不打招呼」会命中哀伤卡），
+   * 故改用显式领域词：命中即该域，可解释、不随卡面措辞漂移。
+   * 与已有的 curious 信号同构：都是「用户在问/在谈某类事」的判据，不是相关性打分。 */
+  const DOMAIN_KW = {
+    // r178-KB19：补「找工作/求职」——N15 词表缺口。先实测：该词在 223 条卡面里 0 命中，
+    // 故补进 DOMAIN_KW **零误召回风险**（DOMAIN_KW 是命中即该域的显式判据，不走卡面 bigram）。
+    ID: ["选专业", "不知道自己想要什么", "迷茫", "生涯", "未来想", "offer", "职业", "找工作", "求职"],
+    PR: ["拖延", "拖到", "作业拖", "什么都做不完", "我是不是废了", "找不到工作"],
+    FM: ["我妈", "我爸", "父母", "家里人", "家人", "期望", "孝顺", "说我"],
+    SC: ["别人家孩子", "跟别人比", "比较", "刷朋友圈", "朋友圈", "议论", "背后"],
+    NG: ["室友", "不打招呼", "吵架", "气死", "愤怒", "发泄"],
+    SH: ["议论", "背后", "内疚", "愧疚", "自责"],
+    GR: ["去世", "走了", "奶奶", "爷爷", "失去", "丧失", "再也回不来"],
+    HU: ["玩笑", "开玩笑", "幽默", "搞笑"],
+    MI: ["冥想", "正念"],
+    AX: ["焦虑", "心慌", "心悸", "睡不着", "失眠", "紧张"],
+    SL: ["睡不着", "失眠", "不想动", "提不起劲"],
+    EM: ["刷手机", "停不下来", "打游戏"],
+    IN: ["停不下来", "上瘾", "戒不掉"],
+    CB: ["敏感", "一点小事", "崩溃", "不够好"],
+    HK: ["不够好", "自我批评", "觉得自己"],
+    RS: ["走不出来", "走不出", "放不下"],
+    RJ: ["分手", "失恋", "前女友", "前男友"],
+    // r178-KB17：WV 域此前整域缺席触发词表（库内 15 条卡、DOMAIN_KW 只有 15 个域），
+    // 「选错了 / 选哪个好 / 纠结 / 备胎」类主诉零命中。词选与现有 15 域零重叠
+    // （不碰 ID 的「选专业/offer」、不碰 PR 的「拖延」、不碰 RS 的「走不出来」），
+    // 专有词：选错/选哪个/好纠结/选择困难/决定好难/备胎/总想留着。
+    WV: ["选错", "选哪个", "好纠结", "纠结", "选择困难", "决定好难", "备胎", "总想留着"],
+  };
+  function domainOf(hay) {
+    const hit = [];
+    for (const [dom, kws] of Object.entries(DOMAIN_KW)) {
+      if (kws.some((k) => hay.indexOf(k) >= 0)) hit.push(dom);
+    }
+    return hit;
+  }
   function kbBlockFor(emo, userText, budget) {
     const KB = window.__XINYU_PSYCH_KB__;
     if (!KB || !KB.entries || !KB.entries.length || budget < 220) return EMPTY_KB;
@@ -191,13 +230,30 @@ window.ChatAgent = (function () {
     }
     if (!grams.size) return EMPTY_KB;
     const curious = /[?？]|为什么|怎么|如何|原理|科学|是不是|心理学/.test(hay);
+    // r178-KB18：停用 bigram 过滤——「没有/任何/时候/一样/如果」这类纯功能词不带主题信号，
+    // 却会把「我对未来没有任何规划」错配到微表情卡（FE-014 摘要里有「没有任何现成」）、
+    // 「别人笑的时候我不觉得好笑」错配到书写卡（EW-002 摘要里有「写的时候」）。
+    // 实测两条假命中的元凶只有五个功能词 bigram ⇒ 停用表必须最小：第一版把「不知道/什么/自己」
+    // 也剪了 ⇒ 「毕业了不知道找什么工作」等承重命中被误杀（KB18 实测 retrieval MISS 1），已收缩。
+    const STOP_BIGRAM = /^(没有|有任|任何|时候|的时)$/;;
+    grams.forEach((g) => { if (STOP_BIGRAM.test(g)) grams.delete(g); });
     const scored = [];
+    const domains = domainOf(hay);
     for (const e of KB.entries) {
       const txt = e.title + "，" + e.summary;
-      let hits = 0;
-      grams.forEach((g) => { if (txt.indexOf(g) >= 0) hits++; });
+      const eHay = e.title + "，" + e.summary + e.content;
+      let hits = 0, hayHits = 0;
+      grams.forEach((g) => {
+        if (txt.indexOf(g) >= 0) hits++;
+        if (eHay.indexOf(g) >= 0) hayHits++;
+      });
       const relHit = e.rel && e.rel.indexOf(emo) >= 0 ? 1 : 0;
-      if (hits >= 2 || (curious && relHit)) scored.push({ e: e, s: relHit * 2 + hits });
+      const eDom = e.id.split("-")[1];
+      const domHit = domains.indexOf(eDom) >= 0 ? 2 : 0;
+      // r178-KB16：原判据只在 title+summary 里数 bigram，冷域卡零命中；内容面放宽又会
+      // 误召回（「室友不打招呼」命中哀伤卡），故冷域改用显式领域词，与 bigram/rel 三路并行。
+      if (hits >= 2 || hayHits >= 4 || domHit || (curious && relHit))
+        scored.push({ e: e, s: relHit * 4 + domHit * 3 + hits + (hayHits >= 4 ? 2 : 0) });
     }
     scored.sort((a, b) => b.s - a.s);
     const head = "可依据的心理学知识条目（回答可自然融入，不说教；句末可标〔依据:编号·级〕；条目未覆盖的专业内容不要编造文献或数据，用弱化表述；D级内容须呈现争议双方）：";

@@ -97,6 +97,16 @@ xinyu:
   #   —— 即 src/data/emotion-lexicon.js（fat jar）或 /app/web/data/...（Docker）。
   #   加载失败会 fail-fast 终止启动，绝不静默回退到旧词表。
   lexicon: ${XINYU_LEXICON:}
+  # J6 本机 ASR（Qwen3-ASR-0.6B）。默认 enabled=false：
+  #   Python 推理服务不在这台机器上时，前端自动留在 Web Speech，
+  #   **不会**出现「点开没反应」或「假装识别成功」（红线：不得伪装在线）。
+  # 开启方式：先把 server/asr-service/app.py 跑起来，再 XINYU_ASR_ENABLED=true 起 Java。
+  # 前端侧对应 _test/asr/README.md 与 src/js/asr-local.js。
+  asr:
+    enabled: ${XINYU_ASR_ENABLED:false}
+    url: ${XINYU_ASR_URL:http://127.0.0.1:8765}
+    # 单次请求上限。实测稳态 RTF≈0.11（13.7s 音频 1.5s），15s 留足冗余又不至于挂住通话线程。
+    timeout-ms: ${XINYU_ASR_TIMEOUT_MS:15000}
   llm:
     # 密钥只从环境变量来：零落盘、零入库。J5 会进一步做外置与最小权限。
     # provider 适配层（对标 LobeChat 多模型）：LLM_* 为通用名，DEEPSEEK_* 保留为兼容别名，

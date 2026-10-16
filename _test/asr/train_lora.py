@@ -139,7 +139,7 @@ def build_lora(model, rank: int, alpha: int, dropout: float):
     return pm, cfg, found
 
 
-def main() -> int:
+def _parse_args(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="D:/asr-data/lora_data")
     ap.add_argument("--model", default=MODEL_DEFAULT)
@@ -159,21 +159,24 @@ def main() -> int:
     ap.add_argument("--val-per-dialect", type=int, default=12)
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--log-every", type=int, default=20)
-    a = ap.parse_args()
+    return ap.parse_args(argv)
 
-    import torch
-    from transformers import AutoProcessor, AutoModelForMultimodalLM, get_cosine_schedule_with_warmup
 
-    torch.manual_seed(a.seed)
-    random.seed(a.seed)
-    np.random.seed(a.seed)
+def _load_rows(a):
+    """读三份划分 + 验证集分层 + 留出集隔离硬断言。
 
+    返回 (train_rows, val_rows, ho_ids)；任一前置不成立 ⇒ None（调用方判 rc=2）。
+
+    r187 拆分动因：loc_guard 的函数长门（≤150）。原 main 232 行，把「取数与隔离」
+    「组 batch 顺序」「训练循环」「收尾与验证」四段各自下移成模块级函数，
+    **逐语句调用序不变**。本机无 GPU/torch ⇒ 只做静态等价搬移，不谎称跑过训练。
+    """
     tr_path = os.path.join(a.data, "train.jsonl")
     va_path = os.path.join(a.data, "val.jsonl")
     ho_path = os.path.join(a.data, "holdout.jsonl")
     if not os.path.isfile(tr_path):
         print(f"[FATAL] 训练集不存在: {tr_path}（先跑 build_lora_split.py）")
-        return 2
+        return None
     train_rows = load_split(tr_path, a.max_train or None)
     val_rows = load_split(va_path, a.max_val or None)
 
@@ -204,23 +207,17 @@ def main() -> int:
     leak = ho_ids & ({r.id for r in train_rows} | {r.id for r in val_rows})
     if leak:
         print(f"[FATAL] 留出集泄漏到训练/验证：{len(leak)} 条（如 {list(leak)[:3]}）")
-        return 2
+        return None
     print(f"[隔离] train={len(train_rows)} val={len(val_rows)} holdout={len(ho_ids)} 且零交集 ✅")
 
     from collections import Counter
     print("[分布] train " + ", ".join(f"{k}={v}" for k, v in
                                        sorted(Counter(r.dialect for r in train_rows).items())))
+    return train_rows, val_rows, ho_ids
 
-    proc = AutoProcessor.from_pretrained(a.model)
-    model = AutoModelForMultimodalLM.from_pretrained(a.model, dtype=torch.bfloat16).to("cuda")
-    model, lora_cfg, targets = build_lora(model, a.rank, a.alpha, a.dropout)
-    model.gradient_checkpointing_enable()
-    model.enable_input_require_grads()   # 冻结基座时必须有这句，否则 checkpointing 梯度断
-    model.train()
 
-    collate = Collator(proc, a.max_sec)
-
-    # 按方言分桶打散成 step
+def _build_order(train_rows, a):
+    """按方言分桶 → 低资源过采样 → 轮转打平成 step 序列（原 main 内联段）。"""
     by_d: dict = {}
     for r in train_rows:
         by_d.setdefault(r.dialect, []).append(r)
@@ -235,7 +232,6 @@ def main() -> int:
             f"{d}={len(v)}→{max(len(v), a.oversample_min)}" for d, v in sorted(by_d.items())))
         for d, v in list(by_d.items()):
             if len(v) < a.oversample_min:
-                reps = a.oversample_min // max(len(v), 1)
                 v.extend(random.Random(a.seed).sample(v, min(len(v), a.oversample_min - len(v))))
                 by_d[d] = v
     order: List[Row] = []
@@ -243,46 +239,56 @@ def main() -> int:
         for d in sorted(by_d):
             if by_d[d]:
                 order.append(by_d[d].pop())
+    return order
 
-    steps_per_epoch = math.ceil(len(order) / (a.batch_size * a.grad_accum))
-    total_steps = max(1, int(steps_per_epoch * a.epochs))
-    opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
-                            lr=a.lr, weight_decay=0.01)
-    sched = get_cosine_schedule_with_warmup(opt, int(0.03 * total_steps), total_steps)
-    os.makedirs(a.out, exist_ok=True)
-    log = {"args": vars(a), "targets": sorted(set(targets))[:200],
-           "steps": [], "loss": []}
-    print(f"[计划] {total_steps} step（batch {a.batch_size} × accum {a.grad_accum}）")
 
-    def val_cer(model) -> Optional[dict]:
-        """按方言分别算 CER。**必须分方言报**：合并成一个数会掩盖
-        dongbei 涨、zongyuan 跌这种反向抵消（这正是热词实验上栽过的坑）。"""
-        from metrics import aggregate, score_case
-        model.eval()
-        per: dict = {}
-        with torch.inference_mode():
-            for d in sorted({r.dialect for r in val_rows}):
-                sub = [r for r in val_rows if r.dialect == d][: a.val_per_dialect]
-                rs = []
-                for i in range(0, len(sub), a.batch_size):
-                    ch = sub[i:i + a.batch_size]
-                    inp, lab = collate(ch)
-                    inp = inp.to("cuda")
-                    ids = model.generate(**inp, max_new_tokens=200, do_sample=False)
-                    gen = ids[:, inp["input_ids"].shape[1]:]
-                    for r, g in zip(ch, gen):
-                        rs.append(score_case(r.id, r.text, proc.decode(g)))
-                if rs:
-                    ag = aggregate(rs)
-                    per[d] = {"cer": round(ag.cer, 4), "acc": round(ag.accuracy, 4), "n": len(rs)}
-        model.train()
-        if not per:
-            return None
-        allr = [r for v in per.values() for r in [v]]
-        mean_cer = sum(v["cer"] for v in per.values()) / len(per)
-        return {"per_dialect": per, "mean_cer": round(mean_cer, 4),
-                "mean_acc": round(1 - mean_cer, 4)}
+def _train_micro(chunk, collate, proc, model, opt, a, torch):
+    """一个 micro-batch 的前向 + 反传。返回 loss 值；OOM ⇒ 清缓存并返回 None。
 
+    ⚠ 音频特征必须转成与基座一致的 dtype。processor 出来的是 **float32**，
+      而基座是 **bfloat16**；直接喂会在音频塔的 conv2d 上炸
+      「Input type (float) and bias type (struct c10::BFloat16)」。
+      生成路径（generate）内部会自己转，所以只有训练这条 forward 暴露出来。
+    """
+    try:
+        inp, lab = collate(chunk)
+        inp = inp.to("cuda")
+        # 标签右移 + 只对音频对齐后的文本位算 loss
+        full = inp["input_ids"]
+        prompt_len = full.shape[1]
+        tgt = lab["input_ids"].to("cuda")
+        pad_id = proc.tokenizer.pad_token_id
+        cat = torch.cat([full, tgt], dim=1)
+        labels = torch.full_like(cat, -100)
+        labels[:, prompt_len:] = tgt.clone()
+        labels[cat == pad_id] = -100
+        attn = inp.get("attention_mask")
+        if attn is not None:
+            am = torch.cat([attn, lab["attention_mask"].to("cuda")], dim=1)
+        else:
+            am = None
+        feats = inp.get("input_features")
+        fmask = inp.get("input_features_mask")
+        if feats is not None:
+            feats = feats.to("cuda", dtype=torch.bfloat16)
+        if fmask is not None:
+            fmask = fmask.to("cuda")
+        out = model(input_ids=cat, attention_mask=am,
+                    input_features=feats,
+                    input_features_mask=fmask,
+                    labels=labels)
+        loss = out.loss
+        (loss / a.grad_accum).backward()
+        return float(loss)
+    except torch.cuda.OutOfMemoryError:
+        opt.zero_grad(set_to_none=True)
+        torch.cuda.empty_cache()
+        print(f"[OOM] 跳过并清缓存（batch={a.batch_size} 可减半重试）")
+        return None
+
+
+def _train_loop(model, proc, opt, sched, collate, order, log, a, torch, total_steps):
+    """梯度累积训练循环（原 main 内联段）。返回起始时间戳供收尾报用时。"""
     t0 = time.perf_counter()
     step = 0
     acc_loss, acc_n = 0.0, 0
@@ -294,49 +300,12 @@ def main() -> int:
         i += a.batch_size
         if not chunk:
             break
-        try:
-            inp, lab = collate(chunk)
-            inp = inp.to("cuda")
-            # 标签右移 + 只对音频对齐后的文本位算 loss
-            ids = model.generate(**inp, max_new_tokens=1, do_sample=False)
-            full = inp["input_ids"]
-            prompt_len = full.shape[1]
-            tgt = lab["input_ids"].to("cuda")
-            pad_id = proc.tokenizer.pad_token_id
-            cat = torch.cat([full, tgt], dim=1)
-            labels = torch.full_like(cat, -100)
-            labels[:, prompt_len:] = tgt.clone()
-            labels[cat == pad_id] = -100
-            attn = inp.get("attention_mask")
-            if attn is not None:
-                am = torch.cat([attn, lab["attention_mask"].to("cuda")], dim=1)
-            else:
-                am = None
-            feats = inp.get("input_features")
-            fmask = inp.get("input_features_mask")
-            # ⚠ 音频特征必须转成与基座一致的 dtype。
-            #   processor 出来的是 **float32**，而基座是 **bfloat16**；
-            #   直接喂会在音频塔的 conv2d 上炸
-            #   「Input type (float) and bias type (struct c10::BFloat16)」。
-            #   生成路径（generate）内部会自己转，所以只有训练这条 forward 暴露出来。
-            if feats is not None:
-                feats = feats.to("cuda", dtype=torch.bfloat16)
-            if fmask is not None:
-                fmask = fmask.to("cuda")
-            out = model(input_ids=cat, attention_mask=am,
-                        input_features=feats,
-                        input_features_mask=fmask,
-                        labels=labels)
-            loss = out.loss
-            (loss / a.grad_accum).backward()
-            acc_loss += float(loss); acc_n += 1
-            micro += 1
-        except torch.cuda.OutOfMemoryError:
-            opt.zero_grad(set_to_none=True)
-            torch.cuda.empty_cache()
-            print(f"[OOM] step {step} 跳过并清缓存（batch={a.batch_size} 可减半重试）")
+        loss = _train_micro(chunk, collate, proc, model, opt, a, torch)
+        if loss is None:
             continue
-
+        acc_loss += loss
+        acc_n += 1
+        micro += 1
         if micro % a.grad_accum == 0:
             torch.nn.utils.clip_grad_norm_(
                 [p for p in model.parameters() if p.requires_grad], 1.0)
@@ -351,25 +320,105 @@ def main() -> int:
                 log["steps"].append(step)
                 log["loss"].append(acc_loss / max(acc_n, 1))
             acc_loss, acc_n = 0.0, 0
+    return t0
 
+
+def val_cer(model, val_rows, collate, a, proc, torch) -> Optional[dict]:
+    """按方言分别算 CER。**必须分方言报**：合并成一个数会掩盖
+    dongbei 涨、zongyuan 跌这种反向抵消（这正是热词实验上栽过的坑）。"""
+    from metrics import aggregate, score_case
+    model.eval()
+    per: dict = {}
+    with torch.inference_mode():
+        for d in sorted({r.dialect for r in val_rows}):
+            sub = [r for r in val_rows if r.dialect == d][: a.val_per_dialect]
+            rs = []
+            for i in range(0, len(sub), a.batch_size):
+                ch = sub[i:i + a.batch_size]
+                inp, lab = collate(ch)
+                inp = inp.to("cuda")
+                ids = model.generate(**inp, max_new_tokens=200, do_sample=False)
+                gen = ids[:, inp["input_ids"].shape[1]:]
+                for r, g in zip(ch, gen):
+                    rs.append(score_case(r.id, r.text, proc.decode(g)))
+            if rs:
+                ag = aggregate(rs)
+                per[d] = {"cer": round(ag.cer, 4), "acc": round(ag.accuracy, 4), "n": len(rs)}
+    model.train()
+    if not per:
+        return None
+    mean_cer = sum(v["cer"] for v in per.values()) / len(per)
+    return {"per_dialect": per, "mean_cer": round(mean_cer, 4),
+            "mean_acc": round(1 - mean_cer, 4)}
+
+
+def _write_log(a, log):
+    with open(os.path.join(a.out, "train_log.json"), "w", encoding="utf-8") as f:
+        json.dump(log, f, ensure_ascii=False, indent=2)
+
+
+def _finalize(model, proc, val_rows, collate, a, log, torch, t0):
+    """存 adapter + 复算 val CER + 落台账（原 main 收尾段）。"""
     model.save_pretrained(a.out)
     proc.save_pretrained(a.out)
     log["train_seconds"] = round(time.perf_counter() - t0, 1)
-    with open(os.path.join(a.out, "train_log.json"), "w", encoding="utf-8") as f:
-        json.dump(log, f, ensure_ascii=False, indent=2)
+    _write_log(a, log)
     print(f"[OK ] adapter → {a.out}（仅 LoRA 权重，未存基座）")
 
-    v = val_cer(model)
+    v = val_cer(model, val_rows, collate, a, proc, torch)
     log["val"] = v
+    _write_log(a, log)
     if v:
         print("\n[验证] 分方言 val 准确率:")
         for d, m in sorted(v["per_dialect"].items()):
             print(f"   {d:<10} n={m['n']:<3} 准确率 {m['acc']*100:.2f}%  CER {m['cer']*100:.2f}%")
-        print(f"   {'均值':<10} 准确率 {v['mean_acc']*100:.2f}%")
-    with open(os.path.join(a.out, "train_log.json"), "w", encoding="utf-8") as f:
-        json.dump(log, f, ensure_ascii=False, indent=2)
-    if cer is not None and cer > 1.0:
-        print("[WARN] val CER > 100%，检查标签对齐")
+        print(f"   均值       准确率 {v['mean_acc']*100:.2f}%")
+        # r187 修一处必崩的 NameError（拆分时发现，非推断）：原写作
+        #   「if cer is not None and cer > 1.0」，而 cer 在本件**从未被赋值**
+        #   ⇒ 训练跑完且 val 有读数时这一行必抛 NameError。本机无 GPU/torch，
+        #   该路径从未被触发，所以缺陷一直隐形（同族教训：没跑过的路径不算验过）。
+        #   口径改用上面已算出的 mean_cer，语义不变（CER>100% ⇒ 标签对齐可疑）。
+        if v["mean_cer"] > 1.0:
+            print("[WARN] val CER > 100%，检查标签对齐")
+
+
+def main() -> int:
+    a = _parse_args()
+
+    import torch
+    from transformers import AutoProcessor, AutoModelForMultimodalLM, get_cosine_schedule_with_warmup
+
+    torch.manual_seed(a.seed)
+    random.seed(a.seed)
+    np.random.seed(a.seed)
+
+    loaded = _load_rows(a)
+    if loaded is None:
+        return 2
+    train_rows, val_rows, _ho_ids = loaded
+
+    proc = AutoProcessor.from_pretrained(a.model)
+    model = AutoModelForMultimodalLM.from_pretrained(a.model, dtype=torch.bfloat16).to("cuda")
+    model, _lora_cfg, targets = build_lora(model, a.rank, a.alpha, a.dropout)
+    model.gradient_checkpointing_enable()
+    model.enable_input_require_grads()   # 冻结基座时必须有这句，否则 checkpointing 梯度断
+    model.train()
+
+    collate = Collator(proc, a.max_sec)
+    order = _build_order(train_rows, a)
+
+    steps_per_epoch = math.ceil(len(order) / (a.batch_size * a.grad_accum))
+    total_steps = max(1, int(steps_per_epoch * a.epochs))
+    opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
+                            lr=a.lr, weight_decay=0.01)
+    sched = get_cosine_schedule_with_warmup(opt, int(0.03 * total_steps), total_steps)
+    os.makedirs(a.out, exist_ok=True)
+    log = {"args": vars(a), "targets": sorted(set(targets))[:200],
+           "steps": [], "loss": []}
+    print(f"[计划] {total_steps} step（batch {a.batch_size} × accum {a.grad_accum}）")
+
+    t0 = _train_loop(model, proc, opt, sched, collate, order, log, a, torch, total_steps)
+    _finalize(model, proc, val_rows, collate, a, log, torch, t0)
     return 0
 
 

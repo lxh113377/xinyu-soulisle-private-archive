@@ -259,6 +259,9 @@ SUITES = [
     # 从 SUITES 表实数出不同判据前缀组，断言 >= 9。只读，不动 src。
     ("kb_battery_count_audit", [sys.executable, "_test/kb_battery_count_audit.py"]),
     ("kb_battery_count_audit_selftest", [sys.executable, "_test/kb_battery_count_audit.py", "--selftest"]),
+    # r178-KB46：来源「当年份」可核载体审计（N50 人工抽查的机器化）
+    ("kb_source_year_audit", [sys.executable, "_test/kb_source_year_audit.py"]),
+    ("kb_source_year_audit_selftest", [sys.executable, "_test/kb_source_year_audit.py", "--selftest"]),
     ("kb_retrieval_check", [sys.executable, "_test/kb_retrieval_check.py"]),
     ("kb_retrieval_check_selftest", [sys.executable, "_test/kb_retrieval_check.py", "--selftest"]),
     ("psych_kb_build", [sys.executable, "_test/psych_kb_build.py", "--check"]),
@@ -453,6 +456,20 @@ SUITES = [
     #   四件的主流程都要打真实 sidecar（127.0.0.1:8321）或真开浏览器，服务不在时
     #   诚实回 rc=2（未验）——接进整跑等于把「本机没起 sidecar」常年刷成红项。
     #   主流程带外复算命令见 `docs/quality-gates.md` 同条目。
+    # r187 接线（G16 第五腿复抓）：r184 注释声称"四件全接"，实测只接了两件 .js ⇒
+    #   `engine_switch_check.py` / `asr_chain_check.py` 两条仍是**已入库却无人执行**的孤儿判据
+    #   （空头主张由 G16 当场打回，见本轮报告）。同轮修掉两件自身的两处缺陷：
+    #   ① engine_switch 的 playwright 在模块级 import ⇒ 本机没装时 rc=1（判红），事实只是
+    #      环境缺件 ⇒ 改惰性导入回 rc=2（未验）；② 两条都无离线腿 ⇒ 各补 --selftest（正例 +
+    #      四类定向破坏）。按 r179 先例**只接 --selftest 腿**：主流程一条要 Java 8123、
+    #   一条要真浏览器 + 假麦克风，服务不在时诚实回 rc=2，接进整跑等于常年刷未验。
+    # r187：`face_micro_proto_check.py` 随本轮 `git add -A` 入库后，G16 第五腿当场报它为
+    #   新孤儿（此前未跟踪 ⇒ 该腿结构性看不见它）。主流程要真起浏览器 + MediaPipe ⇒ 按
+    #   r179 先例只接离线腿。同轮修掉两处：① 统计段抽成纯函数（否则离线腿无从判定）；
+    #   ② n=0 时 e2e[int(0.50*(n-1))] 对空表取 [-1] ⇒ IndexError，现明确回 rc=2 未验。
+    ("face_micro_proto_selftest", [sys.executable, "_test/face_micro_proto_check.py", "--selftest"]),
+    ("asr_chain_selftest", [sys.executable, "_test/asr/asr_chain_check.py", "--selftest"]),
+    ("engine_switch_selftest", [sys.executable, "_test/asr/engine_switch_check.py", "--selftest"]),
     ("asr_local_selftest", ["node", "_test/asr/asr_local_check.js"]),
     ("audio_quality_selftest", ["node", "_test/asr/audio_quality_check.js"]),
     ("browser_check", [sys.executable, "_test/browser_check.py"]),
@@ -516,10 +533,18 @@ SUITES = [
     # selftest 那条用反例证明它有牙（5 条反例必须全部被抓到）。
     ("face_discrim_check", [sys.executable, "_test/face_discrim_check.py"]),
     ("face_discrim_selftest", [sys.executable, "_test/face_discrim_check.py", "--selftest"]),
-  # r184：F13 场景切片尺（读 AU 语料 meta + 三断言 A1 小尺寸零误伤 / A2 眨眼双向 / A3 阈值同源）
+  # r184：F16 场景切片尺（读 AU 语料 meta + 三断言 A1 小尺寸零误伤 / A2 眨眼双向 / A3 阈值同源）
   #   两条变异腿都接线（--selftest），与 face_* 族同形；门面行 <=110B（run_all_suites 的 line[:110]）
   ("face_scene", [sys.executable, "_test/face_scene_check.py"]),
   ("face_scene_selftest", [sys.executable, "_test/face_scene_check.py", "--selftest"]),
+  # r184：F17 遮挡尺（口罩/墨镜/帽子三变体 + 四断言 A1 口罩机制 / A2 无眼证据不称真笑 /
+  #   A3 阈值零假阳性 / A4 遮挡必须降笃定）；两条变异腿接线。
+  ("face_occlusion", [sys.executable, "_test/face_occlusion_check.py"]),
+  ("face_occlusion_selftest", [sys.executable, "_test/face_occlusion_check.py", "--selftest"]),
+  # r184：F18 噪声过滤（EMA）尺 —— 目标#2「噪声过滤」此前零覆盖。四断言（抖动压制 / 响应延迟 /
+  #   α 合法同源 / 权衡曲线单调）+ 三条变异腿（关过滤 / 过度平滑 / 内核直通）。
+  ("face_smooth", [sys.executable, "_test/face_smooth_check.py"]),
+  ("face_smooth_selftest", [sys.executable, "_test/face_smooth_check.py", "--selftest"]),
     ("quality_peer_selftest", [sys.executable, "_test/peer_quality_tooling_probe.py", "--selftest"]),
     # r59 交付物清单面：提交包是「要交出去的东西」，此前 91 套件里没有任何一条判据引用过成片、
     # 清单本体、渲染脚本 —— 09-28 00:19 实测 7 个被跟踪交付件从工作树消失且零告警。

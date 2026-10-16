@@ -292,7 +292,18 @@ window.__XINYU_FACE_RULES__ = {
    * ⚠️ 标定债：阈值是首版保守值，未按标注照复标（与 ratioOn 的 4 张样本同族债务）；
    *   命中质量门只降置信+改文案，不参与任何确定性结论。 */
   quality: { brightMin: 0.16, brightMax: 0.94, blurVarMin: 0.0045,
-             yawMax: 0.36, mouthFlat: 0.02, mouthFlatSamples: 10 },
+             yawMax: 0.36, mouthFlat: 0.02, mouthFlatSamples: 10,
+             /* faceMin（r184 第五信号 small）：关键点 x 跨度/图宽 < 此值 ⇒ 人脸太小或
+                太远，blendshape 幅度不可信 ⇒ 降置信。现状语料 12 张实测 0.198~0.638 ⇒
+                0.18 在观测最小值之下（一张都不该命中；保守值非标定值，与 brightMin/yawMax
+                同族标定债）。F13 face_scene_check.py 盯「命中数必须为 0」。 */
+             faceMin: 0.18,
+             /* flatMin/flatSamples（r184 第六、七信号 occluded-eye / occluded-brow）：
+                眼区/眉区整区连续趋零 ⇒ 被遮（墨镜/帽子/刘海）。与 mouth-flat 同构。
+                阈值 0.03 在观测最小值之下（眼区 0.1978、眉区 0.0599）⇒ 20 张真照零命中（F17 A3 钉）。
+                ⚠️ 首版取 0.06 时眉区**当场假阳性 1 帧**（neutral-01 的 bmax=0.0599，差 0.0001）。
+                标定债同 faceMin。误命中只降置信+出文案 ⇒ 假阳性代价是「少说」不是「说错」。 */
+             flatMin: 0.03, flatSamples: 10 },
 
   /* ── 强颜欢笑判据（Duchenne）───────────────────────────────────────
    * 老师提的验证难题：「表情大笑，怎么知道是真开心还是强颜欢笑」。

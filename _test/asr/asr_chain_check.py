@@ -14,10 +14,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 PASS, FAIL = [], []
 
@@ -146,5 +148,80 @@ def main() -> int:
     return 0 if not FAIL else 1
 
 
+
+
+# ── r187 离线自检腿（主流程要 Java 服务在 8123，CI/本机常不可达 ⇒ 电池只接这条）────────
+# 立此腿的一手事实（r186 已修，本腿守它不回退）：旧代码在 8123 拒连时把 3 条腿记进 FAIL
+#   台账、却仍打 ASR-CHAIN-PASS rc=0 —— 判红被自己的收口行洗成绿。修法是在 `st != 200`
+#   分支里改打 UNVERIFIED 并 return 2。这条修法本身若被后人「顺手简化」掉，主流程在
+#   有服务的机器上照样绿 ⇒ 必须有一把不依赖服务的尺盯着源码形状。
+REQUIRED_LEGS = ("J1", "J2", "J3", "J4", "J5", "J6", "J7", "J8")
+
+
+def unverified_branch_problems(src):
+    """纯函数：源码 → 反掩盖形状的问题清单（空表 = 该不变量在位）。
+
+    口径：取 `if st != 200:` 到下一个顶层语句之间的分支体，要求它
+      ① 打 UNVERIFIED  ② `return 2`  ③ **不得**出现 ASR-CHAIN-PASS（PASS 只在真量到后才许打）。
+    """
+    bad = []
+    m = re.search(r"if st != 200:\n(.*?)(?=\n    if |\n    ready|\n\n    if not os)", src, re.S)
+    if not m:
+        return ["取不到 `if st != 200:` 分支体 ⇒ 反掩盖形状无从判定（零输入不得读成通过）"]
+    body = m.group(1)
+    if "UNVERIFIED" not in body:
+        bad.append("服务不可达分支没打 UNVERIFIED")
+    if "return 2" not in body:
+        bad.append("服务不可达分支没有 return 2（会被读成已验通过）")
+    # ⚠ 只认**可执行行**上的 PASS：该分支的注释原文就写着「旧代码…仍打 ASR-CHAIN-PASS
+    #   rc=0（掩盖）」—— 按裸子串判会把记录教训的注释读成缺陷（本件 --selftest 首跑当场抓到）。
+    for ln in body.split(chr(10)):
+        s = ln.strip()
+        if s.startswith("#") or "ASR-CHAIN-PASS" not in s or "print" not in s:
+            continue
+        bad.append("服务不可达分支里 print 了 ASR-CHAIN-PASS（r186 抓到的正是这条掩盖）")
+        break
+    return bad
+
+
+def leg_problems(src):
+    """纯函数：源码 → 缺失的 J 档清单（按 chk("Jxx" 调用点现读，不抄常量）。"""
+    have = set(re.findall(r'chk\("(J\d+)', src))
+    return [k for k in REQUIRED_LEGS if k not in have]
+
+
+def selftest():
+    """离线腿：正例零问题 + 四类定向破坏各自报问题（证明尺作用在被审对象上）。"""
+    src = Path(__file__).read_text(encoding="utf-8")
+    bad = []
+    if unverified_branch_problems(src):
+        bad += ["正例 反掩盖形状应成立: " + str(unverified_branch_problems(src))]
+    if leg_problems(src):
+        bad += ["正例 J1-J8 应齐全: " + str(leg_problems(src))]
+    # 反向腿 1：把 return 2 改成 return 0 ⇒ 必须点名
+    brk = re.sub(r"(?s)(if st != 200:.*?)(return 2)", r"\1return 0", src, count=1)
+    if not unverified_branch_problems(brk):
+        bad.append("反例1 return 2 改 0 未被抓到")
+    # 反向腿 2：在不可达分支里塞回 PASS ⇒ 必须点名
+    if not unverified_branch_problems(src.replace('        return 2', '        print("ASR-CHAIN-PASS")\n        return 2')):
+        bad.append("反例2 分支里打 PASS 未被抓到")
+    # 反向腿 3：抽掉一档 J 腿 ⇒ 必须点名
+    if not leg_problems(src.replace('chk("J6', 'zz("J6')):
+        bad.append("反例3 抽掉 J6 未被抓到")
+    # 反向腿 4：抽掉全部 J 腿 ⇒ 八档全点名（防「零输入读成通过」）
+    if len(leg_problems(re.sub(r'chk\("J', 'zz("J', src))) != len(REQUIRED_LEGS):
+        bad.append("反例4 抽掉全部 J 腿未逐一抓到")
+    if bad:
+        print(f"ASR-CHAIN-SELFTEST:FAIL {len(bad)} 项")
+        for s in bad:
+            print("  FAIL " + s)
+        return 1
+    print("ASR-CHAIN-SELFTEST-PASS: 6 腿（2 正例 + 4 反向）")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        sys.exit(selftest())
     sys.exit(main())
+

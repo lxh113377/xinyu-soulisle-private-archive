@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>face micro proto（≥25fps 快通道原型，仅供 _test 驱动）</title></head>
+<body>
+<!-- 微表情快通道原型页（r183b）：目的 = 证「独立实例 + GPU delegate + VIDEO 模式」
+     单帧整链耗时可稳定 ≤40ms（≥25fps）。红线不变：零像素落盘、零网络请求。
+     判据与运行时同源（直接引 src/ 下规则与引擎）。 -->
+<video id="v" muted playsinline style="display:none"></video>
+<canvas id="c" width="320" height="240" style="display:none"></canvas>
+<script src="../src/data/emotion-lexicon.js"></script>
+<script src="../src/js/emotion-engine.js"></script>
+<script src="../src/data/face-smile-rules.js"></script>
+<script src="../src/js/face-engine.js"></script>
+<script type="module">
+import { FaceLandmarker, FilesetResolver } from "../src/vendor/mediapipe/vision_bundle.js";
+const BASE = new URL("../src/vendor/mediapipe/", import.meta.url).href;
+const MODEL = new URL("../src/vendor/mediapipe/face_landmarker.task", import.meta.url).href;
+window.__MICRO__ = { ready: false, err: null };
+(async () => {
+  try {
+    const fileset = await FilesetResolver.forVisionTasks(BASE);
+    let lm;
+    try {
+      lm = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL, delegate: "GPU" }, runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true });
+    } catch (e) {
+      lm = await FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL, delegate: "CPU" }, runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: true });
+    }
+    const v = document.getElementById("v");
+    const c = document.getElementById("c");
+    const g = c.getContext("2d", { willReadFrequently: true });
+    // 帧源：合成人脸不现实，原型用摄像头不可得（无头）⇒ 用 detectForVideo 的时间戳循环
+    //   推一张静态图（canvas 当帧源）。VIDEO 模式要求时间戳单调递增 ⇒ 每次 +3333µs。
+    const img = new Image();
+    img.src = "../_test/face-fixtures/smile-01-girl-teeth.jpg";
+    await img.decode();
+    g.drawImage(img, 0, 0, c.width, c.height);
+    let ts = 0;
+    window.__MICRO__ = {
+      ready: true, err: null, delegate: lm.baseOptions ? "?" : "?",
+      frame: () => {
+        ts += 3333;
+        const t0 = performance.now();
+        const r = lm.detectForVideo(c, ts);
+        const t1 = performance.now();
+        const cats = (r.faceBlendshapes && r.faceBlendshapes[0]) ? r.faceBlendshapes[0].categories : null;
+        const bs = {};
+        if (cats) for (const x of cats) bs[x.categoryName] = x.score;
+        const view = bs && Object.keys(bs).length ? window.FaceEngine.read(bs) : null;
+        const t2 = performance.now();
+        return { inferMs: +(t1 - t0).toFixed(3), computeMs: +(t2 - t1).toFixed(3),
+                 e2eMs: +(t2 - t0).toFixed(3), face: cats ? 1 : 0,
+                 emotion: view ? view.emotion : null };
+      }
+    };
+  } catch (e) { window.__MICRO__ = { ready: false, err: String((e && e.message) || e) }; }
+})();
+</script>
+</body></html>

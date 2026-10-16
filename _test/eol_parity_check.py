@@ -19,6 +19,8 @@
      且两侧都不含 CRLF（同时覆盖"本机工作树"与"外人 clone"两种形态）
   E3 二进制不漏 declare：工作树含 `0D0A` 的被跟踪文件必须被 git 判为 binary
   E4 分母自证：`text + binary == total`；取不到 git 或跟踪清单为空 ⇒ rc=2（ENV-UNVERIFIED），不得判绿
+  E5 文本件含**字面 NUL** ⇒ git 判二进制 ⇒ 行尾策略静默失效（r183 一手：Java 源里 4 个字面 NUL，
+     工作树与 blob 双双留 CRLF 且红因指向「行尾没锁死」，真因在别处；正解是写转义）
 
 用法：python _test/eol_parity_check.py [--selftest]
 """
@@ -170,6 +172,14 @@ def audit(paths, reader=None, bin_check=None, blob_reader=None, dirty=None):
             continue
         n_text += 1
         blob = blobs(rel)
+        # E5（r183）：文本件里出现**字面 NUL 字节** ⇒ git 把它判成二进制，而 `.gitattributes`
+        # 的 `* text=auto eol=lf` 只作用于文本 ⇒ 行尾策略对这类文件静默失效。
+        # 一手形态（r183）：一个 Java 源里 4 个字面 NUL ⇒ `git ls-files --eol` 报 i/-text w/-text、
+        # 工作树与 blob 双双留 CRLF，而本判据按 check-attr 仍把它当文本 ⇒ 判红且红因写成
+        # "行尾没锁死"，真因在别处（同一形态还让 blob 永远含 CRLF，外人 clone 拿到不同字节）。
+        # Java 侧正解是 `"\\0"` 转义，不是把 NUL 字节写进源文件。
+        if b"\x00" in wt or b"\x00" in blob:
+            bad.append("文本件含字面 NUL（git 判二进制 ⇒ 行尾策略静默失效；源文件应写转义）：%s" % rel)
         if b"\r\n" in wt:
             bad.append("工作树含 CRLF：%s" % rel)
         if b"\r\n" in blob:
@@ -240,6 +250,11 @@ def selftest() -> int:
          {"d.md": (b"new\n", b"old\n")}, []),
         ("在途改动但工作树带 CRLF ⇒ 仍必须点名（脏不是免检理由）",
          {"e.md": (b"new\r\n", b"old\n")}, ["e.md"]),
+        # E5（r183）：字面 NUL 让 git 判二进制 ⇒ 行尾策略静默失效（本仓实测形态）
+        ("文本件含字面 NUL ⇒ 必须点名（E5）",
+         {"n.java": (b'a="\x00";\n', b'a="\x00";\n')}, ["n.java"]),
+        ("同一处写转义 \\0 ⇒ 必须放行（正解不是删断言）",
+         {"n.java": (b'a="\\0";\n', b'a="\\0";\n')}, []),
     ]
     for name, payloads, expect in cases:
         dirty = {k for k, (wt, bl) in payloads.items() if wt != bl}
@@ -299,7 +314,7 @@ def selftest() -> int:
     if bad:
         print("EOL-PARITY-SELFTEST-FAIL: " + " ; ".join(bad))
         return 1
-    print("EOL-PARITY-SELFTEST-PASS: %d 类已跟踪样本 + %d 类未入库样本各归各位"
+    print("EOL-PARITY-SELFTEST-PASS: %d 类已跟踪样本 + %d 类未入库样本各归各位（含 E5 字面 NUL 判红/转义放行）"
           "（合规文本放行 / 工作树 CRLF 判红 / binary 的 0D0A 放行与不要求 / 未声明 binary 判红 /"
           " 仓库侧 CRLF 判红 / 未入库+CRLF 判红 / 未入库+LF 放行）+ 两面零输入分母为 0"
           " + 3 条批处理解析腿（三元组流 / 敌意内容不错位 / 截断宁缺勿错）"

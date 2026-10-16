@@ -489,8 +489,13 @@ def selftest():
 
     # 反例 8：把 sadness 加回 need:2（r102 旧状态）。多区要求会让只有 brow 证据的真悲伤
     #   被打折一半 ⇒ 同样漏判。这条盯的是「多区要求被加回来」。
+    # ⚠️ r184 修锚点：原写 ("need: { fear: 2 }," → …sadness:2)，但 7e61fa9（r173，10-14）
+    #   把 rules 的 need 改成 {} 后**旧锚匹配不上**（实测 cnt=0）⇒ 这条反例从此只打印
+    #   "构造失败"、再没真跑过（判据自证面自己失效了而无人知）。现锚按当前文件形态取
+    #   "need: {},"。定向性实测（_temp/r184_c8）：sadness:2 ⇒ F11 变红（有牙）；
+    #   joy:2 ⇒ F11 仍绿 ⇒ 这条只咬「sadness 被加回多区要求」那一类回退，不是一律变红。
     ran += _rule_case(real_rules, bad, "反例8 把 sadness 加回 need:2（回退到漏判态）",
-              ("need: { fear: 2 },", "need: { fear: 2, sadness: 2 },"))
+              ("need: {},", "need: { sadness: 2 },"))
 
     # 反例 9：browInnerUp 压回 r102 的 0.7 ⇒ 真悲伤 sad 分跌破 0.55（②c 必须红）。
     #   【覆盖②c：真悲伤分数低端保护】

@@ -26,6 +26,10 @@
 *.woff binary
 *.woff2 binary
 *.ttf  binary
+# r187 补：*.wav 必须钉 binary。实测 sample3s.wav 未登记 ⇒ `* text=auto eol=lf`
+#   对它生效，git 在检出处做 CRLF↔LF 翻译 ⇒ 工作树字节 != blob 字节（eol_parity 判红），
+#   且该件含 NUL 会被判二进制而使策略静默。音频容器格式无行尾语义，禁任何改写。
+*.wav binary
 *.mp3  binary
 *.mp4  binary
 *.webm binary

@@ -1,78 +1,246 @@
 [
-  {
-    "file": "smile-01-girl-teeth.jpg",
-    "label": "smiling",
-    "title": "Smiling_young_girl_with_deciduous_teeth.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Smiling_young_girl_with_deciduous_teeth.jpg"
-  },
-  {
-    "file": "smile-02-girl-sunshine.jpg",
-    "label": "smiling",
-    "title": "Young_girl_smiling_with_teeth_in_sunshine.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Young_girl_smiling_with_teeth_in_sunshine.jpg"
-  },
-  {
-    "file": "smile-03-boy-laos.jpg",
-    "label": "smiling",
-    "title": "Smiling_little_boy_of_Laos.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Smiling_little_boy_of_Laos.jpg"
-  },
-  {
-    "file": "smile-04-woman-beer.jpg",
-    "label": "smiling",
-    "title": "Smiling_woman_holding_a_cup_of_beer.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Smiling_woman_holding_a_cup_of_beer.jpg"
-  },
-  {
-    "file": "neutral-01-ethel.jpg",
-    "label": "neutral",
-    "title": "Name-_Ethel_Penman_(17131341001).jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Name-_Ethel_Penman_%2817131341001%29.jpg"
-  },
-  {
-    "file": "neutral-02-john-clark.jpg",
-    "label": "neutral",
-    "title": "Name-_John_Clark_(20156387152).jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Name-_John_Clark_%2820156387152%29.jpg"
-  },
-  {
-    "file": "neutral-03-robert-hall.jpg",
-    "label": "neutral",
-    "title": "Name-_Robert_Hall_(16252447916).jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Name-_Robert_Hall_%2816252447916%29.jpg"
-  },
-  {
-    "file": "neutral-04-jane-forbes.jpg",
-    "label": "neutral",
-    "title": "Name-_Jane_Forbes_(16268376188).jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Name-_Jane_Forbes_%2816268376188%29.jpg"
-  },
-  {
-    "file": "anger-01-fpapi.jpg",
-    "label": "anger",
-    "title": "angry.jpg",
-    "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/angry.jpg",
-    "note": "r102 补：Commons 检索面被画作/纪念照污染（实测 12 张候选仅 3 张能检出人脸、0 张判对），改用 face-api.js 的**带标注测试图**。该仓 MIT 授权。"
-  },
-  {
-    "file": "anger-02-fpapi.jpg",
-    "label": "anger",
-    "title": "angry_cropped.jpg",
-    "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/angry_cropped.jpg",
-    "note": "r102 补：与 anger-01 同源同姿态的裁剪版（单变量对照：只换裁剪，读数应一致）"
-  },
-  {
-    "file": "surprise-01-fpapi.jpg",
-    "label": "surprise",
-    "title": "surprised.jpg",
-    "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/surprised.jpg",
-    "note": "r102 补：face-api.js 带标注测试图（该仓 MIT 授权）"
-  },
-  {
-    "file": "surprise-02-fpapi.jpg",
-    "label": "surprise",
-    "title": "surprised_cropped.jpg",
-    "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/surprised_cropped.jpg",
-    "note": "r102 补：与 surprise-01 同源同姿态的裁剪版（单变量对照）"
-  }
+ {
+  "file": "smile-01-girl-teeth.jpg",
+  "label": "smiling",
+  "title": "Smiling_young_girl_with_deciduous_teeth.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Smiling_young_girl_with_deciduous_teeth.jpg",
+  "prov": "B-thumb",
+  "sha1": "9a05c25deecb7edb7d5e61590197a80ee51eb7e3",
+  "age_group": "child",
+  "gender": "female",
+  "license": "CC BY-SA 4.0"
+ },
+ {
+  "file": "smile-02-girl-sunshine.jpg",
+  "label": "smiling",
+  "title": "Young_girl_smiling_with_teeth_in_sunshine.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Young_girl_smiling_with_teeth_in_sunshine.jpg",
+  "prov": "B-thumb",
+  "sha1": "54ecc204a543272de857b8daa931f7fd0c2813a7",
+  "age_group": "child",
+  "gender": "female",
+  "license": "CC BY-SA 4.0"
+ },
+ {
+  "file": "smile-03-boy-laos.jpg",
+  "label": "smiling",
+  "title": "Smiling_little_boy_of_Laos.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Smiling_little_boy_of_Laos.jpg",
+  "prov": "B-thumb",
+  "sha1": "a4decccc7fbdc018bc606cff6fc71eac30b07e71",
+  "age_group": "child",
+  "gender": "male",
+  "license": "CC BY-SA 4.0"
+ },
+ {
+  "file": "smile-04-woman-beer.jpg",
+  "label": "smiling",
+  "title": "Smiling_woman_holding_a_cup_of_beer.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Smiling_woman_holding_a_cup_of_beer.jpg",
+  "prov": "B-thumb",
+  "sha1": "95855a175faf091a920381a25b3993b40c3802a0",
+  "age_group": "adult",
+  "gender": "female",
+  "license": "CC BY-SA 4.0"
+ },
+ {
+  "file": "neutral-01-ethel.jpg",
+  "label": "neutral",
+  "title": "Name-_Ethel_Penman_(17131341001).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Name-_Ethel_Penman_%2817131341001%29.jpg",
+  "prov": "A-byte",
+  "sha1": "4001630f68222731628373e150dec0a171f7ebe9",
+  "age_group": "adult",
+  "gender": "female",
+  "license": "No restrictions"
+ },
+ {
+  "file": "neutral-02-john-clark.jpg",
+  "label": "neutral",
+  "title": "Name-_John_Clark_(20156387152).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Name-_John_Clark_%2820156387152%29.jpg",
+  "prov": "A-byte",
+  "sha1": "965b6c3eb78d4e90eb993fe62931db046bac8d20",
+  "age_group": "adult",
+  "gender": "male",
+  "license": "No restrictions"
+ },
+ {
+  "file": "neutral-03-robert-hall.jpg",
+  "label": "neutral",
+  "title": "Name-_Robert_Hall_(16252447916).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Name-_Robert_Hall_%2816252447916%29.jpg",
+  "prov": "A-byte",
+  "sha1": "d078c59345a7f73be195d4691aa9af8ccfa53a1b",
+  "age_group": "adult",
+  "gender": "male",
+  "license": "No restrictions"
+ },
+ {
+  "file": "neutral-04-jane-forbes.jpg",
+  "label": "neutral",
+  "title": "Name-_Jane_Forbes_(16268376188).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Name-_Jane_Forbes_%2816268376188%29.jpg",
+  "prov": "A-byte",
+  "sha1": "e68207444b6c07454aa9cd26cb0fb4bf2b608ca5",
+  "age_group": "adult",
+  "gender": "female",
+  "license": "No restrictions"
+ },
+ {
+  "file": "anger-01-fpapi.jpg",
+  "label": "anger",
+  "title": "angry.jpg",
+  "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/angry.jpg",
+  "note": "r102 补：Commons 检索面被画作/纪念照污染（实测 12 张候选仅 3 张能检出人脸、0 张判对），改用 face-api.js 的**带标注测试图**。该仓 MIT 授权。",
+  "prov": "A-byte",
+  "sha1": "cd90fc5d9e7b5cd07929a48aa811c5c3dad99917",
+  "age_group": "adult",
+  "gender": "male",
+  "license": "MIT (face-api.js test image)"
+ },
+ {
+  "file": "anger-02-fpapi.jpg",
+  "label": "anger",
+  "title": "angry_cropped.jpg",
+  "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/angry_cropped.jpg",
+  "note": "r102 补：与 anger-01 同源同姿态的裁剪版（单变量对照：只换裁剪，读数应一致）",
+  "prov": "A-byte",
+  "sha1": "a2b4be8772ea2e20b1a393bc3e02a48ac91c8760",
+  "age_group": "adult",
+  "gender": "male",
+  "license": "MIT (face-api.js test image)"
+ },
+ {
+  "file": "surprise-01-fpapi.jpg",
+  "label": "surprise",
+  "title": "surprised.jpg",
+  "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/surprised.jpg",
+  "note": "r102 补：face-api.js 带标注测试图（该仓 MIT 授权）",
+  "prov": "A-byte",
+  "sha1": "12aea46d20fafba134ade27d3ad6348c2cdcc077",
+  "age_group": "adult",
+  "gender": "female",
+  "license": "MIT (face-api.js test image)"
+ },
+ {
+  "file": "surprise-02-fpapi.jpg",
+  "label": "surprise",
+  "title": "surprised_cropped.jpg",
+  "source": "https://github.com/justadudewhohacks/face-api.js/blob/master/test/images/surprised_cropped.jpg",
+  "note": "r102 补：与 surprise-01 同源同姿态的裁剪版（单变量对照）",
+  "prov": "A-byte",
+  "sha1": "4246264b3b2ffc2231072bd90a3f450f305fbd78",
+  "age_group": "adult",
+  "gender": "female",
+  "license": "MIT (face-api.js test image)"
+ },
+ {
+  "file": "disgust-04-look-woman.jpg",
+  "label": "disgust",
+  "title": "A woman with a look of disgust.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:A_woman_with_a_look_of_disgust.jpg",
+  "license": "CC BY 3.0",
+  "prov": "A-byte",
+  "sha1": "9acdeb13783c5d300a4d3245dbc13d9fb7cf2e4a",
+  "age_group": "adult",
+  "gender": "female",
+  "note": "r183 注册：本地 sha1 与 Commons imageinfo.sha1 字节直对（David Shankbone, 1567x2376）。双人构图，主脸在左。"
+ },
+ {
+  "file": "disgust-04-look-woman-bright.jpg",
+  "label": "disgust",
+  "title": "A woman with a look of disgust.jpg (derived bright)",
+  "source": "https://commons.wikimedia.org/wiki/File:A_woman_with_a_look_of_disgust.jpg",
+  "license": "CC BY 3.0",
+  "prov": "derived",
+  "sha1": "4813e36a68073fe5ade0fe60e38db3faf0af4f7d",
+  "age_group": "adult",
+  "gender": "female",
+  "note": "r183 注册：上条的提亮派生（本地 PIL 增益），光照切片「亮」档用；不新增来源。"
+ },
+ {
+  "file": "disgust-04-look-woman-dark.jpg",
+  "label": "disgust",
+  "title": "A woman with a look of disgust.jpg (derived dark)",
+  "source": "https://commons.wikimedia.org/wiki/File:A_woman_with_a_look_of_disgust.jpg",
+  "license": "CC BY 3.0",
+  "prov": "derived",
+  "sha1": "9dc0ff250087bd83d4f2c3a540241e22247e4fca",
+  "age_group": "adult",
+  "gender": "female",
+  "note": "r183 注册：上条的压暗派生（本地 PIL 增益），光照切片「暗」档用；不新增来源。"
+ },
+ {
+  "file": "disgust-05-cropped-man.jpg",
+  "label": "disgust",
+  "title": "Disgust (cropped).jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Disgust_(cropped).jpg",
+  "license": "CC BY-SA 3.0",
+  "prov": "A-byte",
+  "sha1": "b3be285cf65429553ad4ffc356dfcfa008e32793",
+  "age_group": "adult",
+  "gender": "male",
+  "note": "r183 注册：sha1 与 Commons imageinfo 字节直对（Kremlin.ru 传，CC BY-SA 3.0）。"
+ },
+ {
+  "file": "sadness-01-wayuu-woman.jpg",
+  "label": "sadness",
+  "title": "Wayuu woman with sad face in the market buying.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Wayuu_woman_with_sad_face_in_the_market_buying.jpg",
+  "license": "CC0",
+  "prov": "B-thumb",
+  "sha1": "bfe8ca024919f98742f6bc8f031ef6efe45da325",
+  "age_group": "elderly",
+  "gender": "female",
+  "note": "r183 注册：本地 1920x1339 与 Commons 官方 thumb/1920 缩放链字节比对一致（Wilfredor 摄）。"
+ },
+ {
+  "file": "sadness-01-wayuu-woman-bright.jpg",
+  "label": "sadness",
+  "title": "Wayuu woman with sad face in the market buying.jpg (derived bright)",
+  "source": "https://commons.wikimedia.org/wiki/File:Wayuu_woman_with_sad_face_in_the_market_buying.jpg",
+  "license": "CC0",
+  "prov": "derived",
+  "sha1": "7102caf6867f3a0a3ffa92ac0bfd646c8f302695",
+  "age_group": "elderly",
+  "gender": "female",
+  "note": "r183 注册：提亮派生，光照「亮」档。"
+ },
+ {
+  "file": "sadness-01-wayuu-woman-dark.jpg",
+  "label": "sadness",
+  "title": "Wayuu woman with sad face in the market buying.jpg (derived dark)",
+  "source": "https://commons.wikimedia.org/wiki/File:Wayuu_woman_with_sad_face_in_the_market_buying.jpg",
+  "license": "CC0",
+  "prov": "derived",
+  "sha1": "c7c501da6f5288779bcf5cf7d21f81afaf5a9ac2",
+  "age_group": "elderly",
+  "gender": "female",
+  "note": "r183 注册：压暗派生，光照「暗」档。"
+ },
+ {
+  "file": "sadness-03-fatigue-man.jpg",
+  "label": "sadness",
+  "title": "Tired (EXIF: Wilfredo R. Rodriguez H., CC0)",
+  "source": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Tired.jpg",
+  "license": "CC0 (EXIF 内嵌)",
+  "prov": "A-exif",
+  "sha1": "a37ffd5ca00a73a8d1784b8b7617cfaeca6124fb",
+  "age_group": "elderly",
+  "gender": "male",
+  "note": "r183 注册：EXIF Artist=Wilfredo R. Rodriguez H. + License=CC0，与 wayuu 同作者；Commons 标题反查未命中 ⇒ 定 A-exif 级（授权字段内嵌原图）。"
+ },
+ {
+  "file": "fear-01-scared-girl.jpg",
+  "label": "fear",
+  "title": "Scared Girl.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Scared_Girl.jpg",
+  "license": "CC BY 2.0",
+  "prov": "A-byte",
+  "sha1": "8bfe596ddecb60f03d5523f9c6a006b911635d33",
+  "age_group": "child",
+  "gender": "female",
+  "note": "r183f 注册：本地 sha1 与 Commons imageinfo 字节直对（Victor Bez..., 500x500 原图即此尺寸）。捂嘴惊恐眼型，fear 类首张真照。"
+ }
 ]
