@@ -67,7 +67,13 @@ def guard(blobs, exists, size):
 
 def run() -> int:
     try:
-        r = subprocess.run(["git", "ls-tree", "-r", "-l", "HEAD"],
+        # r187 修（一手：CI 全新 clone 上 476 个中文路径全部误判 VANISHED）：
+        #   git 默认 core.quotepath=true 会把非 ASCII 路径输出成带引号的八进制转义
+        #   （"\344\272\244..."），本判据拿这个假路径去工作树 os.path.exists ⇒ 永远 False
+        #   ⇒ 中文路径文件全部误判「蒸发」。本地源仓库恰好配了 core.quotepath=false 所以
+        #   一直是绿的——典型「本地配置掩盖判据缺陷」。修法 = 判据自己显式传 -c，
+        #   不再依赖任何机器的本地配置（同族教训：r35 密钥扫描只有 CI 红、本地全绿）。
+        r = subprocess.run(["git", "-c", "core.quotepath=false", "ls-tree", "-r", "-l", "HEAD"],
                            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90)
     except Exception as exc:
         print("TRACKED-ZERO-UNVERIFIED: 取不到 HEAD 面（%s）⇒ 不得声称已验" % type(exc).__name__)

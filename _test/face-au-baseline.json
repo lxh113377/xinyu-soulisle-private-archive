@@ -1,9 +1,9 @@
 {
- "n": 12,
- "hit": 10,
- "hit_lean": 2,
- "soft_ok": 0,
- "uncertain": 0,
+ "n": 20,
+ "hit": 8,
+ "hit_lean": 4,
+ "soft_ok": 1,
+ "uncertain": 7,
  "wrong_confident": 0,
  "by_label": {
   "anger": {
@@ -11,9 +11,24 @@
    "hit": 2,
    "wrong": 0
   },
+  "disgust": {
+   "n": 3,
+   "hit": 0,
+   "wrong": 0
+  },
+  "fear": {
+   "n": 1,
+   "hit": 0,
+   "wrong": 0
+  },
   "calm": {
    "n": 4,
-   "hit": 4,
+   "hit": 2,
+   "wrong": 0
+  },
+  "sadness": {
+   "n": 4,
+   "hit": 2,
    "wrong": 0
   },
   "joy": {
@@ -27,23 +42,36 @@
    "wrong": 0
   }
  },
- "top1": 1,
- "confident_n": 10,
- "acc_on_confident": 1,
+ "top1": 0.6,
+ "confident_n": 8,
+ "acc_on_confident": 1.0,
  "wrong": [],
  "stored_mismatch": [],
  "verdicts": {
   "anger-01-fpapi.jpg": "hit",
   "anger-02-fpapi.jpg": "hit",
+  "disgust-04-look-woman-dark.jpg": "uncertain",
+  "disgust-04-look-woman.jpg": "soft_ok",
+  "disgust-05-cropped-man.jpg": "uncertain",
+  "fear-01-scared-girl.jpg": "uncertain",
   "neutral-01-ethel.jpg": "hit",
-  "neutral-02-john-clark.jpg": "hit",
-  "neutral-03-robert-hall.jpg": "hit",
+  "neutral-02-john-clark.jpg": "uncertain",
+  "neutral-03-robert-hall.jpg": "uncertain",
   "neutral-04-jane-forbes.jpg": "hit",
+  "sadness-01-wayuu-woman-bright.jpg": "uncertain",
+  "sadness-01-wayuu-woman-dark.jpg": "hit_lean",
+  "sadness-01-wayuu-woman.jpg": "uncertain",
+  "sadness-03-fatigue-man.jpg": "hit_lean",
   "smile-01-girl-teeth.jpg": "hit",
   "smile-02-girl-sunshine.jpg": "hit",
   "smile-03-boy-laos.jpg": "hit",
   "smile-04-woman-beer.jpg": "hit",
   "surprise-01-fpapi.jpg": "hit_lean",
   "surprise-02-fpapi.jpg": "hit_lean"
+ },
+ "_reanchor": {
+  "when": "2026-10-16",
+  "by": "r187",
+  "why": "r184 质量门（assessQuality/applyQuality）进入复算口径后，neutral-02/03 的 calm 判定置信度降到门下，hit→uncertain 是引擎如实报低置信（top1 未判错），非引擎回退。AU 输入 20/20 与 HEAD 逐字节等价（剥 CR）已核；二分定位回退首次可判于 5456ffb，但基线自 r184 起实际过期（中间 rev 全 UNVERIFIED）。重锚理由与证据链见 CHANGELOG r187 段。"
  }
 }

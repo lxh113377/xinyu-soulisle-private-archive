@@ -59,13 +59,18 @@ def load_kb_block():
     m = re.search(r"window.__XINYU_PSYCH_KB__\s*=\s*(\{[\s\S]*\})", kbtext)
     KB_json = m[1]
     js = 'global.window={__XINYU_PSYCH_KB__:' + KB_json + '};\nconst EMPTY_KB={block:"",used:[]};\n' + slice_ + '\nconst fs=require("fs");\nconst CASES=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));\nconst out=[];for(const [emo,txt,expect] of CASES){const r=kbBlockFor(emo,txt,1600);out.push({emo,txt,used:r.used.map(e=>e.id),empty:!r.used.length});}\nprocess.stdout.write(JSON.stringify(out));\n'
-    p = ROOT / "_temp" / "_kb_block.js"
+    # r187 修（一手：CI 全新 clone 上 FileNotFoundError _temp/_kb_block.js）：
+    #   _temp/ 是 gitignore 的运行态目录，全新 clone 上不存在 ⇒ write_text 直接崩。
+    #   本件 2026-10-16 才首次入库上 CI（G16 第五腿抓出的 7 件之一），此前从未在
+    #   全新 clone 上跑过 ⇒ 缺陷一直隐形。修法 = 落盘前 mkdir（parents 防上层也缺）。
+    #   同轮去掉紧随其后的三行重复代码（p 定义 + write_text 写了两遍，纯搬运事故）。
+    tmp = ROOT / "_temp"
+    tmp.mkdir(parents=True, exist_ok=True)
+    p = tmp / "_kb_block.js"
     p.write_text(js, encoding="utf-8")
     # 注：exec 是 Python 词法，跑不了 JS ⇒ 走 node。js 只负责把函数体写到 _temp/_kb_block.js。
-    cases_path = ROOT / "_temp" / "_kb_cases.json"
+    cases_path = tmp / "_kb_cases.json"
     cases_path.write_text(json.dumps(CASES, ensure_ascii=False), encoding="utf-8")
-    p = ROOT / "_temp" / "_kb_block.js"
-    p.write_text(js, encoding="utf-8")
     import subprocess
     sub_out = subprocess.run(["node", str(p), str(cases_path)], capture_output=True, text=True)
     if sub_out.returncode != 0:
