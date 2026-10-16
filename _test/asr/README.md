@@ -23,6 +23,8 @@
 | `asr_local_check.js` | 本机适配器判据（A1–A12） | `node _test/asr/asr_local_check.js` |
 | `asr_chain_check.py` | HTTP 链路判据（J1–J8） | `py -3.12 _test/asr/asr_chain_check.py` |
 | `engine_switch_check.py` | 浏览器选路+降级判据（J9–J14） | `py -3.12 _test/asr/engine_switch_check.py` |
+| `dl_stream_model.py` | B2 流式选型模型下载（hf-mirror urllib 直连；huggingface_hub 在本机 httpx2 下炸 InvalidURL，r186 踩坑） | 重跑即 SKIP |
+| `stream_zipformer_eval.py` | B2 流式评测驱动（与 run_eval 同尺：import scenarios/metrics/run_eval 本体，零漂移） | 需先 `dl_stream_model.py`；不进电池 |
 
 服务与前端：
 `server/asr-service/app.py`（Python 推理服务）·
